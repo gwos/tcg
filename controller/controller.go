@@ -1,6 +1,10 @@
 package controller
 
-import "time"
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"time"
+)
 
 // Agent possible status
 type StatusEnum int
@@ -12,17 +16,17 @@ const (
 )
 
 type AgentStats struct {
-	agentId string
-	appType string
-	bytesSent int
-	metricsSent int
-	messagesSent int
-	lastInventoryRun time.Time
-	lastMetricsRun time.Time
-	executionTimeInventory time.Duration
-	executionTimeMetrics time.Duration
-	upSince time.Duration
-	lastError string
+	AgentId string
+	AppType string
+	BytesSent int
+	MetricsSent int
+	MessagesSent int
+	LastInventoryRun time.Time
+	LastMetricsRun time.Time
+	ExecutionTimeInventory time.Duration
+	ExecutionTimeMetrics time.Duration
+	UpSince time.Duration
+	LastError string
 }
 
 // TNG Control Plane interfaces
@@ -35,40 +39,71 @@ type ControllerServices interface {
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
 
+//---------------------------------------------
+
+func Start(c *gin.Context) {
+	var controllerServices = CreateController()
+	_, _ = controllerServices.Start()
+
+	c.JSON(http.StatusOK, controllerServices)
+}
+
+func Stop(c *gin.Context) {
+	var controllerServices = CreateController()
+	_, _ = controllerServices.Stop()
+
+	c.JSON(http.StatusOK, controllerServices)
+}
+
+func Status(c *gin.Context) {
+	var controllerServices = CreateController()
+
+	c.JSON(http.StatusOK, controllerServices)
+}
+
+func Stats(c *gin.Context) {
+	var controllerServices = CreateController()
+	stats, _ := controllerServices.Stats()
+
+	c.JSON(http.StatusOK, stats)
+}
+
+//---------------------------------------------
+
 type Controller struct {
-	state StatusEnum
+	State StatusEnum
 }
 
 func CreateController() *Controller {
-	return &Controller{state: Pending}
+	return &Controller{State: Pending}
 }
 
 func (controller *Controller) Start() (StatusEnum, error) {
-	controller.state = Running
-	return controller.state, nil
+	controller.State = Running
+	return controller.State, nil
 }
 
 func (controller *Controller) Stop() (StatusEnum, error) {
-	controller.state = Stopped
-	return controller.state, nil
+	controller.State = Stopped
+	return controller.State, nil
 }
 
 func (controller *Controller) Status() (StatusEnum, error) {
-	return controller.state, nil
+	return controller.State, nil
 }
 
 func (controller *Controller) Stats() (*AgentStats, error) {
 	return &AgentStats{
-		agentId:                "agent 007",
-		appType:				"nagios",
-		bytesSent:              8192,
-		metricsSent:            1024,
-		messagesSent:           512,
-		lastInventoryRun:       time.Time{},
-		lastMetricsRun:         time.Time{},
-		executionTimeInventory: 3949,
-		executionTimeMetrics:   21934,
-		upSince:                9393993,
-		lastError:              "",
+		AgentId:                "agent 007",
+		AppType:				"nagios",
+		BytesSent:              8192,
+		MetricsSent:            1024,
+		MessagesSent:           512,
+		LastInventoryRun:       time.Time{},
+		LastMetricsRun:         time.Time{},
+		ExecutionTimeInventory: 3949,
+		ExecutionTimeMetrics:   21934,
+		UpSince:                9393993,
+		LastError:              "",
 	}, nil
 }

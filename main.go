@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/transit"
 	"math/rand"
@@ -108,6 +109,17 @@ func main() {
 	controllerServices.Status()
 	stats, _ := controllerServices.Stats()
 	fmt.Println(*stats);
+
+	router := gin.Default()
+
+	v1 := router.Group("/api/v1")
+	{
+		v1.GET("/stats", controller.Stats)
+		v1.GET("/status", controller.Status)
+		v1.POST("/start", controller.Start)
+		v1.DELETE("/stop", controller.Stop)
+	}
+	_ = router.Run()
 }
 
 func makePoints()  []*transit.Point {
