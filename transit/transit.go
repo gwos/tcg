@@ -420,10 +420,11 @@ type TransitServices interface {
 
 // Groundwork Connection Configuration
 type GroundworkConfig struct {
-	HostName string
-	Account  string
-	Token    string
-	SSL      bool
+	HostName string `yaml:"host",envconfig:"HOST"`
+	Port int `yaml:"port",envconfig:"PORT"`
+	Account  string	`yaml:"account",envconfig:"ACCOUNT"`
+	Token    string	`yaml:"token",envconfig:"TOKEN"`
+	SSL      bool	`yaml:"ssl",envconfig:"SSL"`
 }
 
 // Implementation of TransitServices
