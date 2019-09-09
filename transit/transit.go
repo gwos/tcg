@@ -405,16 +405,27 @@ type TracerContext struct {
 	timeStamp  time.Time
 }
 
+type TransitSendInventoryRequest struct {
+	context   *TracerContext
+	inventory *[]MonitoredResource
+	groups    *[]Group
+}
+
 type TransitSynchronizeResponse struct {
 	ResourcesAdded   int
 	ResourcesDeleted int
+}
+
+type Group struct {
+	groupName string
+	resources []MonitoredResource
 }
 
 // Transit interfaces / operations
 type TransitServices interface {
 	SendMetrics(metrics *[]TimeSeries) (string, error)
 	ListMetrics() (*[]MetricDescriptor, error)
-	// SynchronizeInventory(request TransitSendInventoryRequest) (TransitSynchronizeResponse, error)
+	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
 	// listInventory() (/*TODO*/ error)
 }
 
