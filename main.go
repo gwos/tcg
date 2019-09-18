@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/transit"
+	"github.com/stealthly/go-avro"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -20,6 +23,10 @@ func valueOf(x int8) *int8 {
 func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
+	AvroPlayground()
+	if (1 == 1) {
+		os.Exit(3)
+	}
 	localhost := transit.MonitoredResource{
 		Name: "localhost",
 		Type:   transit.HostResource,
@@ -124,4 +131,54 @@ func makePoints()  []*transit.Point {
 	return points;
 }
 
+func AvroPlayground() {
+	localhost := DummyMonitoredResource{
+		Name: "localhost",
+		Type:   transit.HostResource,
+		Status: "UNSCHEDULED_DOWN",
+		Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
+	}
+	l2 := new(DummyMonitoredResource)
+	l2.Name = "Dumb"
+	l2.Type = "MyType"
+	// l2.Status = transit.HOST_SCHEDULED_DOWN
+	l2.Labels = make(map[string]string)
+	l2.Labels["one"] = "b"
+	l2.Labels["two"] = "c"
+	schema, err := avro.ParseSchema(transit.MONITORED_RESOURCE)
+	if err != nil {
+		// Should not happen if the schema is valid
+		panic(err)
+	}
+	writer := avro.NewSpecificDatumWriter()
+	// SetSchema must be called before calling Write
+	writer.SetSchema(schema)
+	// Create a new Buffer and Encoder to write to this Buffer
+	buffer := new(bytes.Buffer)
+	encoder := avro.NewBinaryEncoder(buffer)
+	// Write the record
+	writer.Write(&localhost, encoder)
+
+	reader := avro.NewSpecificDatumReader()
+	// SetSchema must be called before calling Read
+	reader.SetSchema(schema)
+	// Create a new Decoder with a given buffer
+	decoder := avro.NewBinaryDecoder(buffer.Bytes())
+	// Create a new TestRecord to decode data into
+	decodedRecord := new(DummyMonitoredResource)
+	// Read data into a given record with a given Decoder. Unlike GenericDatumReader the first parameter should be the value to map data into.
+	err = reader.Read(decodedRecord, decoder)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println("Read a value: ", decodedRecord)
+}
+
+type DummyMonitoredResource struct {
+	Name string
+	Type string
+	Status string
+	Labels map[string]string
+}
 

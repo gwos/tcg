@@ -191,6 +191,7 @@ type TimeSeries struct {
 
 	// Resource: The associated monitored resource. Custom metrics can use
 	// only certain monitored resource types in their time series data.
+	// TODO: remove this for new API SendResourcesWithMetrics
 	Resource *MonitoredResource `json:"resource,omitempty"`
 
 	// ValueType: The value type of the time series. When listing time
@@ -356,7 +357,7 @@ type MonitoredResource struct {
 	// Groundwork Status
 	Status MonitorStatusEnum `json:"status"`
 
-	// Owner relationship for associations like host->service
+	//  Owner relationship for associations like host->service
 	Owner *MonitoredResource `json:"owner,omitempty"`
 
 	// Labels: Values for all of the labels listed in the
@@ -421,9 +422,15 @@ type Group struct {
 	resources []MonitoredResource
 }
 
+type ResourceWithMetrics struct {
+	resource MonitoredResource
+	metrics []TimeSeries
+}
+
 // Transit interfaces / operations
 type TransitServices interface {
 	SendMetrics(metrics *[]TimeSeries) (string, error)
+	SendResourcesWithMetrics(resources []ResourceWithMetrics) (error)
 	ListMetrics() (*[]MetricDescriptor, error)
 	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
 	// listInventory() (/*TODO*/ error)
@@ -464,6 +471,23 @@ func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 		fmt.Println()
 	}
 	return "success", nil
+}
+
+func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) (error) {
+	for _, mr := range resources {
+		fmt.Println("resource: %s - status: %s",
+			mr.resource.Type,
+			mr.resource.Status,
+		)
+		for _, ts := range mr.metrics {
+			fmt.Printf("metric: %s\n", ts.Metric.Type)
+			for _, point := range ts.Points {
+				fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
+			}
+			fmt.Println()
+		}
+	}
+	return nil
 }
 
 // TODO: implement
