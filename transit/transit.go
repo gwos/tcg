@@ -1,5 +1,6 @@
 package transit
 
+import "C"
 import (
 	"fmt"
 	"time"
@@ -36,7 +37,7 @@ func (metricKind MetricKindEnum) String() string {
 type ValueTypeEnum int
 
 const (
-	BOOL ValueTypeEnum = iota
+	BOOL ValueTypeEnum = iota + 1
 	INT8
 	INT32
 	INT64
@@ -59,7 +60,7 @@ const (
 // CloudHub Compute Types
 type ComputeTypeEnum int
 const (
-	Query ComputeTypeEnum = iota
+	Query ComputeTypeEnum = iota + 1
 	Regex
 	Synthetic
 	Info
@@ -75,7 +76,7 @@ func (computeType ComputeTypeEnum) String() string {
 type MonitorStatusEnum int
 
 const (
-	SERVICE_OK MonitorStatusEnum = iota
+	SERVICE_OK MonitorStatusEnum = iota + 1
 	SERVICE_UNSCHEDULED_CRITICAL
 	SERVICE_WARNING
 	SERVICE_PENDING
@@ -228,10 +229,6 @@ type Metric struct {
 
 // MetricDescriptor: Defines a metric type and its schema
 type MetricDescriptor struct {
-
-	// Groundwork Compute Type such as Synthetic
-	ComputeType ComputeTypeEnum `json:"name,omitempty"`
-
 	// Custom Name: Override the resource type with a custom name of the metric descriptor.
 	CustomName string `json:"name,omitempty"`
 
@@ -253,24 +250,6 @@ type MetricDescriptor struct {
 	// look at latencies for successful responses or just for responses that
 	// failed.
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
-
-	// Metadata: Optional. Metadata which can be used to guide usage of the
-	// metric.
-	// Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
-
-	// MetricKind: Whether the metric records instantaneous values, changes
-	// to a value, etc. Some combinations of metric_kind and value_type
-	// might not be supported.
-	//
-	// Possible values:
-	//   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
-	//   "GAUGE" - An instantaneous measurement of a value.
-	//   "DELTA" - The change in a value during a time interval.
-	//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-	// measurements in a time series should have the same start time and
-	// increasing end times, until an event resets the cumulative value to
-	// zero and sets a new start time for the following points.
-	MetricKind MetricKindEnum `json:"metricKind,omitempty"`
 
 	Thresholds []*ThresholdDescriptor `json:"thresholds,omitempty"`
 
@@ -297,6 +276,27 @@ type MetricDescriptor struct {
 	// number, etc. Some combinations of metric_kind and value_type might
 	// not be supported.
 	ValueType ValueTypeEnum `json:"valueType,omitempty"`
+
+	// Groundwork Compute Type such as Synthetic
+	ComputeType ComputeTypeEnum `json:"computeType,omitempty"`
+
+	// Metadata: Optional. Metadata which can be used to guide usage of the
+	// metric.
+	// Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
+
+	// MetricKind: Whether the metric records instantaneous values, changes
+	// to a value, etc. Some combinations of metric_kind and value_type
+	// might not be supported.
+	//
+	// Possible values:
+	//   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
+	//   "GAUGE" - An instantaneous measurement of a value.
+	//   "DELTA" - The change in a value during a time interval.
+	//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
+	// measurements in a time series should have the same start time and
+	// increasing end times, until an event resets the cumulative value to
+	// zero and sets a new start time for the following points.
+	MetricKind MetricKindEnum `json:"metricKind"`
 }
 
 func (md MetricDescriptor) String() string {
@@ -347,7 +347,7 @@ type ThresholdDescriptor struct {
 //
 type MonitoredResource struct {
 	// The unique name of the instance
-	Name string `json:name,required`
+	Name string `json:"name,required"`
 
 	// Type: Required. The monitored resource type. This field must match
 	// the type field of a MonitoredResourceDescriptor object. For example,
@@ -430,10 +430,10 @@ type ResourceWithMetrics struct {
 // Transit interfaces / operations
 type TransitServices interface {
 	SendMetrics(metrics *[]TimeSeries) (string, error)
-	SendResourcesWithMetrics(resources []ResourceWithMetrics) (error)
+	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
 	ListMetrics() (*[]MetricDescriptor, error)
 	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
-	// listInventory() (/*TODO*/ error)
+	//TODO: ListInventory() error
 }
 
 // Groundwork Connection Configuration
@@ -473,7 +473,8 @@ func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 	return "success", nil
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) (error) {
+
+func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
 	for _, mr := range resources {
 		fmt.Println("resource: %s - status: %s",
 			mr.resource.Type,
@@ -497,7 +498,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Description: "Number of Cores",
 		Key:         "cores",
 		ValueType:   STRING,
-	};
+	}
 	sampleTime := LabelDescriptor{
 		Description: "Sample Time",
 		Key:         "sampleTime",
@@ -547,7 +548,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 			&ThresholdDescriptor{ Key: "warning", Value: 115 },
 		},
 	}
-	arr := []MetricDescriptor{load1, load5, load15};
+	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
 }
 
