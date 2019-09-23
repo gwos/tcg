@@ -21,6 +21,19 @@ go run .
 
 ## C-API
 
+Requirements
+------------
+* The jansson library should be installed.
+* The jansson-dev library package should be installed for development.
+
+Building and running tests
+--------------------------
+```
+gcc transit-c/*.c -o ./transit-c.test -ljansson && ./transit-c.test
+```
+
+Development
+-----------
 The `clang-format` tool is used for formatting with the "Google" style option.
 * https://clang.llvm.org/docs/ClangFormat.html
 * https://clang.llvm.org/docs/ClangFormatStyleOptions.html
