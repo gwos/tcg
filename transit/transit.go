@@ -230,7 +230,7 @@ type Metric struct {
 type MetricDescriptor struct {
 
 	// Groundwork Compute Type such as Synthetic
-	ComputeType ComputeTypeEnum `json:"name,omitempty"`
+	ComputeType ComputeTypeEnum `json:"computeType,omitempty"`
 
 	// Custom Name: Override the resource type with a custom name of the metric descriptor.
 	CustomName string `json:"name,omitempty"`
@@ -347,7 +347,7 @@ type ThresholdDescriptor struct {
 //
 type MonitoredResource struct {
 	// The unique name of the instance
-	Name string `json:name,required`
+	Name string `json:"name,required"`
 
 	// Type: Required. The monitored resource type. This field must match
 	// the type field of a MonitoredResourceDescriptor object. For example,

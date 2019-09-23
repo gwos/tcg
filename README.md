@@ -19,3 +19,13 @@ go run .
 ```
 
 
+## C-API
+
+The `clang-format` tool is used for formatting with the "Google" style option.
+* https://clang.llvm.org/docs/ClangFormat.html
+* https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+```
+cd transit-c
+clang-format -style=Google -i *.c *.h
+```
