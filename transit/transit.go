@@ -23,7 +23,7 @@ import (
 type MetricKindEnum int
 
 const (
-	GAUGE MetricKindEnum = iota
+	GAUGE MetricKindEnum = iota + 1
 	DELTA
 	CUMULATIVE
 	METRIC_KIND_UNSPECIFIED
@@ -37,17 +37,15 @@ func (metricKind MetricKindEnum) String() string {
 type ValueTypeEnum int
 
 const (
-	BOOL ValueTypeEnum = iota + 1
-	INT8
-	INT32
-	INT64
-	DOUBLE
-	STRING
-	VALUE_TYPE_UNSPECIFIED
+	IntegerType ValueTypeEnum = iota + 1
+	DoubleType
+	StringType
+	BooleanType
+	UnspecifiedType
 )
 
 func (valueType ValueTypeEnum) String() string {
-	return [...]string{"BOOL", "INT8", "INT32", "INT64", "DOUBLE", "STRING", "VALUE_TYPE_UNSPECIFIED"}[valueType]
+	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "UnspecifiedType"}[valueType]
 }
 
 // Supported units are a subset of The Unified Code for Units of Measure
@@ -139,13 +137,9 @@ type TypedValue struct {
 	// has 16 significant digits of precision.
 	DoubleValue *float64 `json:"doubleValue,omitempty"`
 
-	// Int8Value: A small integer
-	Int8Value *int8 `json:"int8Value,omitempty,string"`
-	Int32Value *int32 `json:"int32Value,omitempty,string"`
-
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	Int64Value *int64 `json:"int64Value,omitempty,string"`
+	IntegerValue *int64 `json:"integerValue,omitempty,string"`
 
 	// StringValue: A variable-length string value.
 	StringValue *string `json:"stringValue,omitempty"`
@@ -497,12 +491,12 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	cores := LabelDescriptor{
 		Description: "Number of Cores",
 		Key:         "cores",
-		ValueType:   STRING,
+		ValueType:   StringType,
 	}
 	sampleTime := LabelDescriptor{
 		Description: "Sample Time",
 		Key:         "sampleTime",
-		ValueType:   INT64,
+		ValueType:   IntegerType,
 	}
 	load1 := MetricDescriptor{
 		Type:        "local_load_1",
@@ -513,7 +507,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		ComputeType: Query,
 		CustomName:  "load-one-minute",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
+		ValueType:   DoubleType,
 		Thresholds:  []*ThresholdDescriptor{
 			&ThresholdDescriptor{ Key: "critical", Value: 200 },
 			&ThresholdDescriptor{ Key: "warning", Value: 100 },
@@ -525,9 +519,10 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		DisplayName: "LocalLoad5",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricKind:  GAUGE,
+		ComputeType: Query,
 		CustomName:  "load-five-minutes",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
+		ValueType:   DoubleType,
 		Thresholds:  []*ThresholdDescriptor{
 			&ThresholdDescriptor{ Key: "critical", Value: 205 },
 			&ThresholdDescriptor{ Key: "warning", Value: 105 },
@@ -540,9 +535,10 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		DisplayName: "LocalLoad15",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricKind:  GAUGE,
+		ComputeType: Query,
 		CustomName:  "load-fifteen-minutes",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
+		ValueType:   DoubleType,
 		Thresholds:  []*ThresholdDescriptor{
 			&ThresholdDescriptor{ Key: "critical", Value: 215 },
 			&ThresholdDescriptor{ Key: "warning", Value: 115 },

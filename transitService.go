@@ -2,8 +2,8 @@ package main
 
 import "C"
 import (
-	"./transit"
 	"encoding/json"
+	"github.com/gwos/tng/transit"
 )
 
 var transitPackage transit.Transit

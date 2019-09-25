@@ -15,12 +15,12 @@ import (
 // Flags
 var argPort =  flag.Int("port", 8080, "port to listen")
 
-func valueOf(x int8) *int8 {
+func valueOf(x int64) *int64 {
 	return &x
 }
 
 // examples
-func main() {
+func main2() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 	AvroPlayground()
@@ -48,45 +48,45 @@ func main() {
 			"lastPluginOutput": "foo | bar",
 		},
 	}
-	cores := int8(4)
+	cores := int64(4)
 	localLoadMetric1 := transit.Metric{
 		Type:   "local_load_1",
 		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(1)}},
+			"cores": transit.TypedValue{IntegerValue: &cores},
+			"sampleTime": transit.TypedValue{IntegerValue: valueOf(1)}},
 	}
 	localLoadMetric5 := transit.Metric{
 		Type:   "local_load_5",
 		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(5)}},
+			"cores": transit.TypedValue{IntegerValue: &cores},
+			"sampleTime": transit.TypedValue{IntegerValue: valueOf(5)}},
 	}
 	localLoadMetric15 := transit.Metric{
 		Type:   "local_load_15",
 		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(15)}},
+			"cores": transit.TypedValue{IntegerValue: &cores},
+			"sampleTime": transit.TypedValue{IntegerValue: valueOf(15)}},
 	}
 	sample1 := transit.TimeSeries{
 		Metric:     &localLoadMetric1,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
 		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
+		ValueType:  transit.DoubleType,
 	}
 	sample5 := transit.TimeSeries{
 		Metric:     &localLoadMetric5,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
 		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
+		ValueType:  transit.DoubleType,
 	}
 	sample15 := transit.TimeSeries{
 		Metric:     &localLoadMetric15,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
 		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
+		ValueType:  transit.DoubleType,
 	}
 	// create a Groundwork Configuration
 	config := transit.GroundworkConfig{

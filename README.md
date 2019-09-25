@@ -9,6 +9,8 @@ Building
 ```
 cd go/src/github/com/gwos/tng
 go build .
+# build tng shared module
+go build -o tng.so -buildmode=c-shared .
 ```
 
 Running 
