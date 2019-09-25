@@ -27,27 +27,27 @@ func main2() {
 	if (1 == 1) {
 		os.Exit(3)
 	}
-	localhost := transit.MonitoredResource{
-		Name: "localhost",
-		Type:   transit.HostResource,
-		Status: transit.HOST_UP,
-		Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
-	}
-	serviceLocalLoad := transit.MonitoredResource /* instance state */ {
-		Name: "local_load",
-		Type: transit.ServiceResource,
-		Status: transit.SERVICE_OK,
-		Owner: &localhost,
-		Labels: map[string]string{
-			"appType":          "nagios",		// this is redundant, appTypes are all the same
-			"device":           "127.0.0.1",
-			"checkType":        "passive",
-			"stateType":        "hard",
-			"lastStateChange":  "10 mins ago",
-			"lastCheckTime":    "10 mins ago",
-			"lastPluginOutput": "foo | bar",
-		},
-	}
+	//localhost := transit.MonitoredResource{
+	//	Name: "localhost",
+	//	Type:   transit.HostResource,
+	//	Status: transit.HOST_UP,
+	//	Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
+	//}
+	//serviceLocalLoad := transit.MonitoredResource /* instance state */ {
+	//	Name: "local_load",
+	//	Type: transit.ServiceResource,
+	//	Status: transit.SERVICE_OK,
+	//	Owner: &localhost,
+	//	Labels: map[string]string{
+	//		"appType":          "nagios",		// this is redundant, appTypes are all the same
+	//		"device":           "127.0.0.1",
+	//		"checkType":        "passive",
+	//		"stateType":        "hard",
+	//		"lastStateChange":  "10 mins ago",
+	//		"lastCheckTime":    "10 mins ago",
+	//		"lastPluginOutput": "foo | bar",
+	//	},
+	//}
 	cores := int64(4)
 	localLoadMetric1 := transit.Metric{
 		Type:   "local_load_1",
@@ -71,21 +71,21 @@ func main2() {
 		Metric:     &localLoadMetric1,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
+		//Resource:   &serviceLocalLoad,
 		ValueType:  transit.DoubleType,
 	}
 	sample5 := transit.TimeSeries{
 		Metric:     &localLoadMetric5,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
+		//Resource:   &serviceLocalLoad,
 		ValueType:  transit.DoubleType,
 	}
 	sample15 := transit.TimeSeries{
 		Metric:     &localLoadMetric15,
 		MetricKind: transit.GAUGE,
 		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
+		//Resource:   &serviceLocalLoad,
 		ValueType:  transit.DoubleType,
 	}
 	// create a Groundwork Configuration

@@ -184,11 +184,6 @@ type TimeSeries struct {
 	// type, which must be BOOL, INT64, DOUBLE, or DISTRIBUTION.
 	Points []*Point `json:"points,omitempty"`
 
-	// Resource: The associated monitored resource. Custom metrics can use
-	// only certain monitored resource types in their time series data.
-	// TODO: remove this for new API SendResourcesWithMetrics
-	Resource *MonitoredResource `json:"resource,omitempty"`
-
 	// ValueType: The value type of the time series. When listing time
 	// series, this value type might be different from the value type of the
 	// associated metric if this time series is an alignment or reduction of
@@ -455,10 +450,10 @@ func Disconnect(transit *Transit) {}
 func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 	for _, ts := range *metrics {
 		fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
-			ts.Metric.Type,
-			ts.Resource.Type,
-			ts.Resource.Labels["host"],
-			ts.Resource.Labels["name"])
+			ts.Metric.Type)
+			//ts.Resource.Type,
+			//ts.Resource.Labels["host"],
+			//ts.Resource.Labels["name"])
 		for _, point := range ts.Points {
 			fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
 		}
