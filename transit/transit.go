@@ -2,7 +2,10 @@ package transit
 
 import "C"
 import (
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"net/http"
 	"time"
 )
 
@@ -51,12 +54,14 @@ func (valueType ValueTypeEnum) String() string {
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
 type UnitEnum string
+
 const (
 	UnitCounter = "1"
 )
 
 // CloudHub Compute Types
 type ComputeTypeEnum int
+
 const (
 	Query ComputeTypeEnum = iota + 1
 	Regex
@@ -312,8 +317,8 @@ type LabelDescriptor struct {
 // A definition of a Threshold
 type ThresholdDescriptor struct {
 	// Key: The threshold key.
-	Key string `json:"key"`
-	Value int32 `json:"value"`
+	Key   string `json:"key"`
+	Value int32  `json:"value"`
 }
 
 // MonitoredResource: An object representing a live resource instance that
@@ -344,7 +349,7 @@ type MonitoredResource struct {
 	Type string `json:"type"`
 
 	// Groundwork Status
-	Status MonitorStatusEnum `json:"status"`
+	Description string `json:"description"`
 
 	//  Owner relationship for associations like host->service
 	Owner *MonitoredResource `json:"owner,omitempty"`
@@ -353,7 +358,6 @@ type MonitoredResource struct {
 	// associated monitored resource descriptor. For example, Compute Engine
 	// VM instances use the labels "project_id", "instance_id", and "zone".
 	Labels map[string]string `json:"labels,omitempty"`
-
 }
 
 // MonitoredResourceDescriptor: An object that describes the schema of a
@@ -389,10 +393,10 @@ type MonitoredResourceDescriptor struct {
 
 // Trace Context of a Transit call
 type TracerContext struct {
-	appType    string
-	agentId    string
-	traceToken string
-	timeStamp  time.Time
+	AppType    string    `json:"appType"`
+	AgentId    string    `json:"agentId"`
+	TraceToken string    `json:"traceToken"`
+	TimeStamp  time.Time `json:"timeStamp"`
 }
 
 type TransitSendInventoryRequest struct {
@@ -402,8 +406,8 @@ type TransitSendInventoryRequest struct {
 }
 
 type TransitSynchronizeResponse struct {
-	ResourcesAdded   int
-	ResourcesDeleted int
+	ResourcesAdded   int `xml:"resourcesAdded"`
+	ResourcesDeleted int `xml:"resourcesDeleted"`
 }
 
 type Group struct {
@@ -413,7 +417,7 @@ type Group struct {
 
 type ResourceWithMetrics struct {
 	resource MonitoredResource
-	metrics []TimeSeries
+	metrics  []TimeSeries
 }
 
 // Transit interfaces / operations
@@ -441,7 +445,7 @@ type Transit struct {
 // create and connect to a Transit instance from a Groundwork connection configuration
 func Connect(config GroundworkConfig) Transit {
 	transit := Transit{config: config}
-	return transit;
+	return transit
 }
 
 func Disconnect(transit *Transit) {}
@@ -451,9 +455,9 @@ func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 	for _, ts := range *metrics {
 		fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
 			ts.Metric.Type)
-			//ts.Resource.Type,
-			//ts.Resource.Labels["host"],
-			//ts.Resource.Labels["name"])
+		//ts.Resource.Type,
+		//ts.Resource.Labels["host"],
+		//ts.Resource.Labels["name"])
 		for _, point := range ts.Points {
 			fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
 		}
@@ -462,12 +466,11 @@ func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 	return "success", nil
 }
 
-
 func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
 	for _, mr := range resources {
-		fmt.Println("resource: %s - status: %s",
+		fmt.Printf("resource: %s - status: %s",
 			mr.resource.Type,
-			mr.resource.Status,
+			//mr.resource.Status,
 		)
 		for _, ts := range mr.metrics {
 			fmt.Printf("metric: %s\n", ts.Metric.Type)
@@ -503,9 +506,9 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		CustomName:  "load-one-minute",
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 200 },
-			&ThresholdDescriptor{ Key: "warning", Value: 100 },
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 200},
+			&ThresholdDescriptor{Key: "warning", Value: 100},
 		},
 	}
 	load5 := MetricDescriptor{
@@ -518,11 +521,10 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		CustomName:  "load-five-minutes",
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 205 },
-			&ThresholdDescriptor{ Key: "warning", Value: 105 },
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 205},
+			&ThresholdDescriptor{Key: "warning", Value: 105},
 		},
-
 	}
 	load15 := MetricDescriptor{
 		Type:        "local_load_15",
@@ -534,13 +536,53 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		CustomName:  "load-fifteen-minutes",
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 215 },
-			&ThresholdDescriptor{ Key: "warning", Value: 115 },
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 215},
+			&ThresholdDescriptor{Key: "warning", Value: 115},
 		},
 	}
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
+}
+
+func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (*TransitSynchronizeResponse, error) {
+	context := TracerContext{
+		AppType:    "GoClient",
+		AgentId:    "test-agent",
+		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
+		TimeStamp:  time.Time{},
+	}
+
+	transitInventoryRequest := transitSendInventoryRequest{
+		Trace:     context,
+		Inventory: inventory,
+		Groups:    groups,
+	}
+
+	headers := map[string]string{
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": "3768b1d7-00d8-4e0f-b96a-0aafde97eb39",
+		"GWOS-APP-NAME":  "gw8",
+	}
+
+	byteBody, err := json.Marshal(transitInventoryRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, byteBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var transitSynchronize TransitSynchronizeResponse
+
+	err = xml.Unmarshal(byteResponse, &transitSynchronize)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transitSynchronize, nil
 }
 
 // internal transit data
@@ -550,6 +592,7 @@ type transitSendMetricsRequest struct {
 }
 
 type transitSendInventoryRequest struct {
-	trace     TracerContext
-	inventory []*MonitoredResourceDescriptor
+	Trace     TracerContext        `json:"context"`
+	Inventory *[]MonitoredResource `json:"inventory"`
+	Groups    *[]Group             `json:"groups"`
 }

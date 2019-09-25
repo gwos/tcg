@@ -2,14 +2,15 @@ package main
 
 import "C"
 import (
-	"encoding/json"
 	"github.com/gwos/tng/transit"
+	"encoding/json"
+	"log"
 )
 
 var transitPackage transit.Transit
 
-func main()  {
-	
+func main() {
+
 }
 
 //export SendMetrics
@@ -20,8 +21,19 @@ func SendMetrics(timeSeriesJson *C.char) *C.char {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsJson *C.char) *C.char {
+	var resourceWithMetrics []transit.ResourceWithMetrics
 
-	return C.CString("")
+	err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
+	if err != nil {
+		panic(err)
+	}
+
+	err = transitPackage.SendResourcesWithMetrics(resourceWithMetrics)
+	if err != nil {
+		panic(err)
+	}
+
+	return C.CString("Sent")
 }
 
 //export ListMetrics
@@ -41,11 +53,28 @@ func ListMetrics() *C.char {
 
 //export SynchronizeInventory
 func SynchronizeInventory(monitoredResourcesJson, groupsJson *C.char) *C.char {
+	var monitoredResources []transit.MonitoredResource
+	var groups []transit.Group
 
-	return C.CString("")
+	err := json.Unmarshal([]byte(C.GoString(monitoredResourcesJson)), &monitoredResources)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.Unmarshal([]byte(C.GoString(groupsJson)), &groups)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	transitSynchronize, err := transitPackage.SynchronizeInventory(&monitoredResources, &groups)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	transitSynchronizeJson, err := json.Marshal(transitSynchronize)
+
+	return C.CString(string(transitSynchronizeJson))
 }
 
 //TODO:
 func ListInventory() {
-
 }
