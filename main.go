@@ -67,27 +67,53 @@ func main2() {
 			"cores": transit.TypedValue{IntegerValue: &cores},
 			"sampleTime": transit.TypedValue{IntegerValue: valueOf(15)}},
 	}
-	sample1 := transit.TimeSeries{
-		Metric:     &localLoadMetric1,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		//Resource:   &serviceLocalLoad,
-		ValueType:  transit.DoubleType,
+	println(localLoadMetric1.Type)
+	println(localLoadMetric5.Type)
+	println(localLoadMetric15.Type)
+
+	point := makePoint()
+	sampleValue := transit.TimeSeries{
+		MetricName:   "local_load_5",
+		SampleType:	transit.Value,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		ValueType: transit.DoubleType,
+		Interval: point.Interval,
+		Value: point.Value,
+		Unit: "load",
 	}
-	sample5 := transit.TimeSeries{
-		Metric:     &localLoadMetric5,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		//Resource:   &serviceLocalLoad,
-		ValueType:  transit.DoubleType,
+	point = makePoint()
+	sampleCritical := transit.TimeSeries{
+		MetricName:   "local_load_5_cr",
+		SampleType:	transit.Critical,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		ValueType: transit.DoubleType,
+		Interval: point.Interval,
+		Value: point.Value,
+		Unit: "load",
 	}
-	sample15 := transit.TimeSeries{
-		Metric:     &localLoadMetric15,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		//Resource:   &serviceLocalLoad,
-		ValueType:  transit.DoubleType,
+	point = makePoint()
+	sampleWarning := transit.TimeSeries{
+		MetricName:   "local_load_5_wn",
+		SampleType:	transit.Warning,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		ValueType: transit.DoubleType,
+		Interval: point.Interval,
+		Value: point.Value,
+		Unit: "load",
 	}
+
 	// create a Groundwork Configuration
 	config := transit.GroundworkConfig{
 		HostName: "localhost",
@@ -98,7 +124,7 @@ func main2() {
 	// Connect with Transit...
 	var transitServices = transit.Connect(config)
 	// Send Metrics with Transit ...
-	transitServices.SendMetrics(&[]transit.TimeSeries{sample1, sample5, sample15})
+	transitServices.SendMetrics(&[]transit.TimeSeries{sampleValue, sampleWarning, sampleCritical})
 	// Retrieve Metrics List with Transit
 	metrics, _ := transitServices.ListMetrics()
 	for _, metric := range *metrics {
@@ -115,6 +141,15 @@ func main2() {
 	controllerServices.Status()
 	stats, _ := controllerServices.Stats()
 	fmt.Println(*stats);
+}
+
+func makePoint()  *transit.Point {
+	random := rand.Float64()
+	now := time.Now()
+	return &transit.Point{
+		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
+		Value:    &transit.TypedValue{DoubleValue: &random},
+	}
 }
 
 func makePoints()  []*transit.Point {
