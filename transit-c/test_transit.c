@@ -76,9 +76,80 @@ void test_encodeMonitoredResource() {
   free(result);
 }
 
+void test_decodeMonitoredResource() {
+  char *resource_str01 =
+      "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
+      "\"HOST_UP\", \"type\": \"gce_instance\"}";
+
+  char *resource_str02 =
+      "{\"labels\": {\"key_003\": \"val_003\", \"key_02\": \"val_02\", "
+      "\"key_1\": \"val_1\"}, \"name\": "
+      "\"the-unique-name-of-the-instance-02\", \"owner\": {\"name\": "
+      "\"the-unique-name-of-the-instance-01\", \"status\": \"HOST_UP\", "
+      "\"type\": \"gce_instance\"}, \"status\": \"SERVICE_OK\", \"type\": "
+      "\"gce_instance\"}";
+
+  MonitoredResource *resource = decodeMonitoredResource(resource_str01);
+
+  if (!resource) {
+    fail("!resource");
+  };
+  if (strcmp(resource->name, "the-unique-name-of-the-instance-01")) {
+    fail(resource->name);
+  }
+  if (strcmp(resource->type, "gce_instance")) {
+    fail(resource->type);
+  }
+  if (resource->status != HOST_UP) {
+    fail("resource->status != HOST_UP");
+  }
+
+  free(resource);
+  resource = decodeMonitoredResource(resource_str02);
+
+  if (!resource) {
+    fail("!resource");
+  };
+  if (resource->labels.count != 3) {
+    fail("resource->labels.count");
+  }
+  if (strcmp(resource->labels.items[0].key, "key_003")) {
+    fail(resource->labels.items[0].key);
+  }
+  if (strcmp(resource->labels.items[1].key, "key_02")) {
+    fail(resource->labels.items[1].key);
+  }
+  if (strcmp(resource->labels.items[2].key, "key_1")) {
+    fail(resource->labels.items[2].key);
+  }
+  if (strcmp(resource->labels.items[0].value, "val_003")) {
+    fail(resource->labels.items[0].value);
+  }
+  if (strcmp(resource->labels.items[1].value, "val_02")) {
+    fail(resource->labels.items[1].value);
+  }
+  if (strcmp(resource->labels.items[2].value, "val_1")) {
+    fail(resource->labels.items[2].value);
+  }
+  if (strcmp(resource->name, "the-unique-name-of-the-instance-02")) {
+    fail(resource->name);
+  }
+  if (strcmp(resource->owner->name, "the-unique-name-of-the-instance-01")) {
+    fail(resource->owner->name);
+  }
+  if (resource->status != SERVICE_OK) {
+    fail("resource->status != SERVICE_OK");
+  }
+  if (resource->owner->status != HOST_UP) {
+    fail("resource->owner->status != HOST_UP");
+  }
+  free(resource);
+}
+
 int main(void) {
   test_defineMonitoredResource();
   test_encodeMonitoredResource();
+  test_decodeMonitoredResource();
 
   fprintf(stdout, "\nall tests passed");
   return 0;
