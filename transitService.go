@@ -78,3 +78,38 @@ func SynchronizeInventory(monitoredResourcesJson, groupsJson *C.char) *C.char {
 //TODO:
 func ListInventory() {
 }
+
+//export Connect
+func Connect(credentialsJson *C.char) *C.char{
+	var credentials transit.Credentials
+
+	err := json.Unmarshal([]byte(C.GoString(credentialsJson)), &credentials)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	transitConfig, err := transit.Connect(credentials)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	transitJson, err := json.Marshal(transitConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return C.CString(string(transitJson))
+}
+
+//export Disconnect
+func Disconnect(transitJson *C.char) bool{
+	var transitConfig transit.Transit
+
+	err := json.Unmarshal([]byte(C.GoString(transitJson)), &transitConfig)
+	if err != nil {
+		log.Fatal(err)
+		return false
+	}
+
+	return transit.Disconnect(&transitConfig)
+}

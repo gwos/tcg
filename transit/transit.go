@@ -437,18 +437,68 @@ type GroundworkConfig struct {
 	SSL      bool
 }
 
+type Credentials struct {
+	User     string
+	Password string
+}
+
 // Implementation of TransitServices
 type Transit struct {
-	config GroundworkConfig
+	Config GroundworkConfig
 }
 
 // create and connect to a Transit instance from a Groundwork connection configuration
-func Connect(config GroundworkConfig) Transit {
-	transit := Transit{config: config}
-	return transit
+func Connect(credentials Credentials) (*Transit, error) {
+	formValues := map[string]string{
+		"gwos-app-name": "gw8",
+		"user":          credentials.User,
+		"password":      credentials.Password,
+	}
+
+	headers := map[string]string{
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 200 {
+		config := GroundworkConfig{
+			HostName: "Test",
+			Account:  credentials.User,
+			Token:    string(byteResponse),
+			SSL:      false,
+		}
+		transit := Transit{
+			Config: config,
+		}
+		return &transit, nil
+	}
+
+	return nil, nil
 }
 
-func Disconnect(transit *Transit) {}
+func Disconnect(transit *Transit) bool {
+	formValues := map[string]string{
+		"gwos-app-name":  "gw8",
+		"gwos-api-token": transit.Config.Token,
+	}
+
+	headers := map[string]string{
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	statusCode, _, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
+	if err != nil {
+		return false
+	}
+
+	return statusCode == 200
+}
 
 // TODO: implement
 func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
@@ -570,7 +620,7 @@ func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, grou
 		return nil, err
 	}
 
-	byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, byteBody)
+	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, nil, byteBody)
 	if err != nil {
 		return nil, err
 	}
