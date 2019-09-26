@@ -80,7 +80,6 @@ func main2() {
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		ValueType: transit.DoubleType,
 		Interval: point.Interval,
 		Value: point.Value,
 		Unit: "load",
@@ -94,7 +93,6 @@ func main2() {
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		ValueType: transit.DoubleType,
 		Interval: point.Interval,
 		Value: point.Value,
 		Unit: "load",
@@ -108,7 +106,6 @@ func main2() {
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		ValueType: transit.DoubleType,
 		Interval: point.Interval,
 		Value: point.Value,
 		Unit: "load",
@@ -148,7 +145,7 @@ func makePoint()  *transit.Point {
 	now := time.Now()
 	return &transit.Point{
 		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
-		Value:    &transit.TypedValue{DoubleValue: &random},
+		Value:    &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: &random},
 	}
 }
 

@@ -140,6 +140,8 @@ type TimeInterval struct {
 
 // TypedValue: A single strongly-typed value.
 type TypedValue struct {
+	ValueType ValueTypeEnum `json:"valueType"`
+
 	// BoolValue: A Boolean value: true or false.
 	BoolValue *bool `json:"boolValue,omitempty"`
 
@@ -179,7 +181,6 @@ type TimeSeries struct {
 	MetricName string `json:"metricName"`
 	SampleType MetricSampleType `json:"sampleType"`
 	Tags map[string]string `json:"tags,omitempty"`
-	ValueType ValueTypeEnum `json:"valueType,omitempty"`
 	Interval *TimeInterval `json:"interval,omitempty"`
 	Value *TypedValue `json:"value,omitempty"`
 	Unit string `json:"unit,omitempty"`
