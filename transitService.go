@@ -103,7 +103,7 @@ func Connect(credentialsJson *C.char) *C.char{
 }
 
 //export Disconnect
-func Disconnect(transitJson *C.char) bool{
+func Disconnect(transitJson *C.char) bool {
 	var transitConfig transit.Transit
 
 	err := json.Unmarshal([]byte(C.GoString(transitJson)), &transitConfig)
@@ -113,16 +113,4 @@ func Disconnect(transitJson *C.char) bool{
 	}
 
 	return transit.Disconnect(&transitConfig)
-}
-
-var variable string
-
-//export FirstCall
-func FirstCall() {
-	variable = "first call"
-}
-
-//export SecondCall
-func SecondCall() {
-	fmt.Println(variable)
 }
