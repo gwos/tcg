@@ -28,19 +28,19 @@ func (metricKind MetricKindEnum) String() string {
 }
 
 // ValueType defines the data type of the value of a metric
-type ValueTypeEnum int
+type ValueTypeEnum string
 
 const (
-	IntegerType ValueTypeEnum = iota + 1
-	DoubleType
-	StringType
-	BooleanType
-	UnspecifiedType
+	IntegerType     ValueTypeEnum = "IntegerType"
+	DoubleType                    = "DoubleType"
+	StringType                    = "StringType"
+	BooleanType                   = "BooleanType"
+	UnspecifiedType               = "UnspecifiedType"
 )
 
-func (valueType ValueTypeEnum) String() string {
-	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "UnspecifiedType"}[valueType]
-}
+//func (valueType ValueTypeEnum) String() string {
+//	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "UnspecifiedType"}[valueType]
+//}
 
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
@@ -98,19 +98,19 @@ const (
 )
 
 // TimeSeries Metric Sample Possible Types
-type MetricSampleType int
+type MetricSampleType string
 
 const (
-	Value 	MetricSampleType = iota + 1
-	Critical
-	Warning
-	Min
-	Max
+	Value    MetricSampleType = "Value"
+	Critical                  = "Critical"
+	Warning                   = "Warning"
+	Min                       = "Min"
+	Max                       = "Max"
 )
 
-func (metricSampleType MetricSampleType) String() string {
-	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
-}
+//func (metricSampleType MetricSampleType) String() string {
+//	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
+//}
 
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
@@ -130,12 +130,12 @@ func (metricSampleType MetricSampleType) String() string {
 // start time could overwrite data written at the previous  end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime time.Time `json:"endTime,omitempty"`
+	EndTime string `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime time.Time `json:"startTime,omitempty"`
+	StartTime string `json:"startTime,omitempty"`
 }
 
 // TypedValue: A single strongly-typed value.
@@ -143,19 +143,19 @@ type TypedValue struct {
 	ValueType ValueTypeEnum `json:"valueType"`
 
 	// BoolValue: A Boolean value: true or false.
-	BoolValue *bool `json:"boolValue,omitempty"`
+	BoolValue bool `json:"boolValue,omitempty"`
 
 	// DoubleValue: A 64-bit double-precision floating-point number. Its
 	// magnitude is approximately &plusmn;10<sup>&plusmn;300</sup> and it
 	// has 16 significant digits of precision.
-	DoubleValue *float64 `json:"doubleValue,omitempty"`
+	DoubleValue float64 `json:"doubleValue,omitempty"`
 
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	IntegerValue *int64 `json:"integerValue,omitempty,string"`
+	IntegerValue int64 `json:"integerValue,omitempty"`
 
 	// StringValue: A variable-length string value.
-	StringValue *string `json:"stringValue,omitempty"`
+	StringValue string `json:"stringValue,omitempty"`
 }
 
 // Point: A single data point in a time series.
@@ -178,12 +178,11 @@ type Point struct {
 // TimeSeries: A collection of data points that describes the
 // time-varying values of a metric.
 type TimeSeries struct {
-	MetricName string `json:"metricName"`
-	SampleType MetricSampleType `json:"sampleType"`
-	Tags map[string]string `json:"tags,omitempty"`
-	Interval *TimeInterval `json:"interval,omitempty"`
-	Value *TypedValue `json:"value,omitempty"`
-	Unit string `json:"unit,omitempty"`
+	MetricName string            `json:"metricName"`
+	SampleType MetricSampleType  `json:"sampleType"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Interval   *TimeInterval     `json:"interval,omitempty"`
+	Value      *TypedValue       `json:"value,omitempty"`
 }
 
 type TimeSeriesOld struct {
@@ -363,15 +362,10 @@ type MonitoredResource struct {
 	Type string `json:"type"`
 
 	// Groundwork Status
-	Description string `json:"description"`
+	Status string `json:"status"`
 
 	//  Owner relationship for associations like host->service
-	Owner *MonitoredResource `json:"owner,omitempty"`
-
-	// Labels: Values for all of the labels listed in the
-	// associated monitored resource descriptor. For example, Compute Engine
-	// VM instances use the labels "project_id", "instance_id", and "zone".
-	Labels map[string]string `json:"labels,omitempty"`
+	Owner string `json:"owner,omitempty"`
 }
 
 // MonitoredResourceDescriptor: An object that describes the schema of a
@@ -430,15 +424,14 @@ type Group struct {
 }
 
 type ResourceWithMetrics struct {
-	resource MonitoredResource
-	metrics  []TimeSeries
+	Resource MonitoredResource `json:"resource"`
+	Metrics  []TimeSeries      `json:"metrics"`
 }
 
 type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
-	context TracerContext
-	resources []ResourceWithMetrics
+	Context   TracerContext
+	Resources []ResourceWithMetrics
 }
-
 
 // Transit interfaces / operations
 type TransitServices interface {
@@ -522,30 +515,53 @@ func Disconnect(transit *Transit) bool {
 
 // TODO: implement
 func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
-	for _, ts := range *metrics {
-		fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
-			ts.MetricName)
-		//ts.Resource.Type,
-		//ts.Resource.Labels["host"],
-		//ts.Resource.Labels["name"])
-		fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
-		fmt.Println()
-	}
+	//for _, ts := range *metrics {
+	//	fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
+	//		ts.MetricName)
+	//	//ts.Resource.Type,
+	//	//ts.Resource.Labels["host"],
+	//	//ts.Resource.Labels["name"])
+	//	fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
+	//	fmt.Println()
+	//}
 	return "success", nil
 }
 
 func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
-	for _, mr := range resources {
-		fmt.Printf("resource: %s - status: %s",
-			mr.resource.Type,
-			//mr.resource.Status,
-		)
-		for _, ts := range mr.metrics {
-			fmt.Printf("metric: %s\n", ts.MetricName)
-			fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
-			fmt.Println()
-		}
+	context := TracerContext{
+		AppType:    "GoClient",
+		AgentId:    "test-agent",
+		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
+		TimeStamp:  time.Time{},
 	}
+
+	transitSendMetricsRequest := transitSendMetricsRequest{
+		Trace:   context,
+		Metrics: &resources,
+	}
+
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": "82b3b063-998b-4d08-9498-f4c2a18b7f0e",
+		"GWOS-APP-NAME":  "gw8",
+	}
+
+	byteBody, err := json.Marshal(transitSendMetricsRequest)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(byteBody))
+
+	statusCode, response, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(response))
+	fmt.Println(statusCode)
+
 	return nil
 }
 
@@ -653,8 +669,8 @@ func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, grou
 
 // internal transit data
 type transitSendMetricsRequest struct {
-	trace   TracerContext
-	metrics []*TimeSeries
+	Trace   TracerContext          `json:"context"`
+	Metrics *[]ResourceWithMetrics `json:"resources"`
 }
 
 type transitSendInventoryRequest struct {

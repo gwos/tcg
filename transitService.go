@@ -4,6 +4,7 @@ import "C"
 import (
 	"github.com/gwos/tng/transit"
 	"encoding/json"
+	"fmt"
 	"log"
 )
 
@@ -25,15 +26,15 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson *C.char) *C.char {
 
 	err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	err = transitPackage.SendResourcesWithMetrics(resourceWithMetrics)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	return C.CString("Sent")
+	return C.CString("Success")
 }
 
 //export ListMetrics
@@ -112,4 +113,16 @@ func Disconnect(transitJson *C.char) bool{
 	}
 
 	return transit.Disconnect(&transitConfig)
+}
+
+var variable string
+
+//export FirstCall
+func FirstCall() {
+	variable = "first call"
+}
+
+//export SecondCall
+func SecondCall() {
+	fmt.Println(variable)
 }
