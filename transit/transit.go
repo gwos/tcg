@@ -10,19 +10,10 @@ import (
 )
 
 // MetricKind: The metric kind of the time series.
-// If present, it must be the same as the metric kind
-// of the associated metric. If the associated metric's descriptor must
-// be auto-created, then this field specifies the metric kind of the new
-// descriptor and must be either GAUGE (the default) or CUMULATIVE.
-//
-// Possible values:
 //   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
 //   "GAUGE" - An instantaneous measurement of a value.
 //   "DELTA" - The change in a value during a time interval.
 //   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-// measurements in a time series should have the same start time and
-// increasing end times, until an event resets the cumulative value to
-// zero and sets a new start time for the following points.
 type MetricKindEnum int
 
 const (
@@ -106,6 +97,21 @@ const (
 	HostResource    = "host"
 )
 
+// TimeSeries Metric Sample Possible Types
+type MetricSampleType int
+
+const (
+	Value 	MetricSampleType = iota + 1
+	Critical
+	Warning
+	Min
+	Max
+)
+
+func (metricSampleType MetricSampleType) String() string {
+	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
+}
+
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
 // intervals depend on the MetricKind of the metric value. In no case
@@ -134,6 +140,8 @@ type TimeInterval struct {
 
 // TypedValue: A single strongly-typed value.
 type TypedValue struct {
+	ValueType ValueTypeEnum `json:"valueType"`
+
 	// BoolValue: A Boolean value: true or false.
 	BoolValue *bool `json:"boolValue,omitempty"`
 
@@ -168,11 +176,17 @@ type Point struct {
 }
 
 // TimeSeries: A collection of data points that describes the
-// time-varying values of a metric. A time series is identified by a
-// combination of a fully-specified monitored resource and a
-// fully-specified metric. This type is used for both listing and
-// creating time series.
+// time-varying values of a metric.
 type TimeSeries struct {
+	MetricName string `json:"metricName"`
+	SampleType MetricSampleType `json:"sampleType"`
+	Tags map[string]string `json:"tags,omitempty"`
+	Interval *TimeInterval `json:"interval,omitempty"`
+	Value *TypedValue `json:"value,omitempty"`
+	Unit string `json:"unit,omitempty"`
+}
+
+type TimeSeriesOld struct {
 	// Metric: The associated metric. A fully-specified metric used to
 	// identify the time series.
 	Metric *Metric `json:"metric,omitempty"`
@@ -420,6 +434,12 @@ type ResourceWithMetrics struct {
 	metrics  []TimeSeries
 }
 
+type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
+	context TracerContext
+	resources []ResourceWithMetrics
+}
+
+
 // Transit interfaces / operations
 type TransitServices interface {
 	SendMetrics(metrics *[]TimeSeries) (string, error)
@@ -504,13 +524,11 @@ func Disconnect(transit *Transit) bool {
 func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
 	for _, ts := range *metrics {
 		fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
-			ts.Metric.Type)
+			ts.MetricName)
 		//ts.Resource.Type,
 		//ts.Resource.Labels["host"],
 		//ts.Resource.Labels["name"])
-		for _, point := range ts.Points {
-			fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
-		}
+		fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
 		fmt.Println()
 	}
 	return "success", nil
@@ -523,10 +541,8 @@ func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics)
 			//mr.resource.Status,
 		)
 		for _, ts := range mr.metrics {
-			fmt.Printf("metric: %s\n", ts.Metric.Type)
-			for _, point := range ts.Points {
-				fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
-			}
+			fmt.Printf("metric: %s\n", ts.MetricName)
+			fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
 			fmt.Println()
 		}
 	}
