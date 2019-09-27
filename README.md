@@ -24,12 +24,19 @@ go run .
 Requirements
 ------------
 * The jansson library should be installed.
-* The jansson-dev library package should be installed for development.
+* The libjansson-dev library package should be installed for development.
 
 Building and running tests
 --------------------------
 ```
 gcc transit-c/*.c -o ./transit-c.test -ljansson && ./transit-c.test
+```
+
+Building and running tests in Docker container
+----------------------------------------------
+```
+docker build -t groundworkdevelopment/tng .
+docker run --rm --name tng-test-c groundworkdevelopment/tng sh -c "gcc transit-c/*.c -o ./transit-c.test -ljansson && ./transit-c.test"
 ```
 
 Development
