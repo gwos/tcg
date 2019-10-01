@@ -4,7 +4,6 @@ import "C"
 import (
 	"github.com/gwos/tng/transit"
 	"encoding/json"
-	"fmt"
 	"log"
 )
 

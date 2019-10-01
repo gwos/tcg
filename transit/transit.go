@@ -28,19 +28,20 @@ func (metricKind MetricKindEnum) String() string {
 }
 
 // ValueType defines the data type of the value of a metric
-type ValueTypeEnum string
+type ValueTypeEnum int
 
 const (
-	IntegerType     ValueTypeEnum = "IntegerType"
-	DoubleType                    = "DoubleType"
-	StringType                    = "StringType"
-	BooleanType                   = "BooleanType"
-	UnspecifiedType               = "UnspecifiedType"
+	IntegerType ValueTypeEnum = iota + 1
+	DoubleType
+	StringType
+	BooleanType
+	DateType
+	UnspecifiedType
 )
 
-//func (valueType ValueTypeEnum) String() string {
-//	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "UnspecifiedType"}[valueType]
-//}
+func (valueType ValueTypeEnum) String() string {
+	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "DateType", "UnspecifiedType"}[valueType]
+}
 
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
@@ -98,19 +99,19 @@ const (
 )
 
 // TimeSeries Metric Sample Possible Types
-type MetricSampleType string
+type MetricSampleType int
 
 const (
-	Value    MetricSampleType = "Value"
-	Critical                  = "Critical"
-	Warning                   = "Warning"
-	Min                       = "Min"
-	Max                       = "Max"
+	Value MetricSampleType = iota + 1
+	Critical
+	Warning
+	Min
+	Max
 )
 
-//func (metricSampleType MetricSampleType) String() string {
-//	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
-//}
+func (metricSampleType MetricSampleType) String() string {
+	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
+}
 
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
@@ -130,12 +131,12 @@ const (
 // start time could overwrite data written at the previous  end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime string `json:"endTime,omitempty"`
+	EndTime time.Time `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime string `json:"startTime,omitempty"`
+	StartTime time.Time `json:"startTime,omitempty"`
 }
 
 // TypedValue: A single strongly-typed value.
@@ -156,6 +157,9 @@ type TypedValue struct {
 
 	// StringValue: A variable-length string value.
 	StringValue string `json:"stringValue,omitempty"`
+
+	// a date stored as full timestamp
+	DateValue time.Time `json:"dateValue,omitEmpty"`
 }
 
 // Point: A single data point in a time series.
@@ -183,55 +187,7 @@ type TimeSeries struct {
 	Tags       map[string]string `json:"tags,omitempty"`
 	Interval   *TimeInterval     `json:"interval,omitempty"`
 	Value      *TypedValue       `json:"value,omitempty"`
-}
-
-type TimeSeriesOld struct {
-	// Metric: The associated metric. A fully-specified metric used to
-	// identify the time series.
-	Metric *Metric `json:"metric,omitempty"`
-
-	// Metric Kind defines how a metric is gathered, as a gauge, delta, or cumulative
-	MetricKind MetricKindEnum `json:"metricKind,omitempty"`
-
-	// Points: The data points of this time series. When listing time
-	// series, points are returned in reverse time order.When creating a
-	// time series, this field must contain exactly one point and the
-	// point's type must be the same as the value type of the associated
-	// metric. If the associated metric's descriptor must be auto-created,
-	// then the value type of the descriptor is determined by the point's
-	// type, which must be BOOL, INT64, DOUBLE, or DISTRIBUTION.
-	Points []*Point `json:"points,omitempty"`
-
-	// ValueType: The value type of the time series. When listing time
-	// series, this value type might be different from the value type of the
-	// associated metric if this time series is an alignment or reduction of
-	// other time series.When creating a time series, this field is
-	// optional. If present, it must be the same as the type of the data in
-	// the points field.
-	//
-	// Possible values:
-	//   "VALUE_TYPE_UNSPECIFIED" - Do not use this default value.
-	//   "BOOL" - The value is a boolean. This value type can be used only
-	// if the metric kind is GAUGE.
-	//   "INT64" - The value is a signed 64-bit integer.
-	//   "DOUBLE" - The value is a double precision floating point number.
-	//   "STRING" - The value is a text string. This value type can be used
-	// only if the metric kind is GAUGE.
-	//   "DISTRIBUTION" - The value is a Distribution.
-	//   "MONEY" - The value is money.
-	ValueType ValueTypeEnum `json:"valueType,omitempty"`
-}
-
-// Metric: A specific metric, identified by specifying values for all of
-// the labels of a MetricDescriptor.
-type Metric struct {
-	// Type: An existing metric type, MetricDescriptor. For
-	// example, custom.googleapis.com/invoice/paid/amount.
-	Type string `json:"type"`
-
-	// Labels: The set of label values that uniquely identify this metric.
-	// All labels listed in the MetricDescriptor must be assigned values.
-	Labels map[string]TypedValue `json:"labels,omitempty"`
+	Unit 	   string 			 `json:"unit,omitempty"`
 }
 
 // MetricDescriptor: Defines a metric type and its schema
@@ -353,50 +309,27 @@ type ThresholdDescriptor struct {
 //               "zone": "us-central1-a" }}
 //
 type MonitoredResource struct {
-	// The unique name of the instance
+	// The unique name of the resource
 	Name string `json:"name,required"`
-
-	// Type: Required. The monitored resource type. This field must match
-	// the type field of a MonitoredResourceDescriptor object. For example,
-	// the type of a Compute Engine VM instance is gce_instance.
-	Type string `json:"type"`
-
-	// Groundwork Status
-	Status string `json:"status"`
-
+	// Type: Required. The monitored resource type uniquely defining the resource type
+	// General Nagios Types are host and service, where as CloudHub
+	Type string `json:"type,required"`
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatusEnum `json:"status,required"`
 	//  Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
-}
-
-// MonitoredResourceDescriptor: An object that describes the schema of a
-// MonitoredResource object using a type name and a set of labels. For
-// example, the monitored resource descriptor for Google Compute Engine
-// VM instances has a type of "gce_instance" and specifies the use of
-// the labels "instance_id" and "zone" to identify particular VM
-// instances.Different APIs can support different monitored resource
-// types. APIs generally provide a list method that returns the
-// monitored resource descriptors used by the API.
-type MonitoredResourceDescriptor struct {
-	// Type: Required. The monitored resource type. For example, the type
-	// "cloudsql_database" represents databases in Google Cloud SQL. The
-	// maximum length of this value is 256 characters.
-	Type string `json:"type,omitempty"`
-
-	// Description: Optional. A detailed description of the monitored
-	// resource type that might be used in documentation.
+	// The last status check time on this resource
+	LastCheckTime time.Time `json:"lastCheckTime,omitempty"`
+	// The last status check time on this resource
+	NextCheckTime time.Time `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
+	// CloudHub Categorization of resources, translate to Foundation Metric Type
+	Category string `json:"category,omitempty"`
+	// CloudHub Categorization of resources, translate to Foundation Metric Type
 	Description string `json:"description,omitempty"`
-
-	// DisplayName: Optional. A concise name for the monitored resource type
-	// that might be displayed in user interfaces. It should be a Title
-	// Cased Noun Phrase, without any article or other determiners. For
-	// example, "Google Cloud SQL Database".
-	DisplayName string `json:"displayName,omitempty"`
-
-	// Labels: A set of labels used to describe instances of this
-	// monitored resource type. For example, an individual Google Cloud SQL
-	// database is identified by values for the labels "database_id" and
-	// "zone".
-	Labels []*LabelDescriptor `json:"labels,omitempty"`
+	// General Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
 // Trace Context of a Transit call
@@ -435,11 +368,9 @@ type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
 
 // Transit interfaces / operations
 type TransitServices interface {
-	SendMetrics(metrics *[]TimeSeries) (string, error)
 	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
 	ListMetrics() (*[]MetricDescriptor, error)
 	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
-	//TODO: ListInventory() error
 }
 
 // Groundwork Connection Configuration
@@ -511,20 +442,6 @@ func Disconnect(transit *Transit) bool {
 	}
 
 	return statusCode == 200
-}
-
-// TODO: implement
-func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
-	//for _, ts := range *metrics {
-	//	fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
-	//		ts.MetricName)
-	//	//ts.Resource.Type,
-	//	//ts.Resource.Labels["host"],
-	//	//ts.Resource.Labels["name"])
-	//	fmt.Printf("\t%f - %s\n", ts.Value.DoubleValue, ts.Interval.EndTime.Format(time.RFC3339Nano))
-	//	fmt.Println()
-	//}
-	return "success", nil
 }
 
 func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
