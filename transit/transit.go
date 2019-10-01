@@ -552,15 +552,10 @@ func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics)
 		return err
 	}
 
-	fmt.Println(string(byteBody))
-
-	statusCode, response, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	_, _, err = sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(string(response))
-	fmt.Println(statusCode)
 
 	return nil
 }
