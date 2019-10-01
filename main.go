@@ -1,104 +1,120 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/transit"
-	"github.com/stealthly/go-avro"
 	"math/rand"
-	"os"
 	"time"
 )
 
 // Flags
-var argPort =  flag.Int("port", 8080, "port to listen")
+var argPort = flag.Int("port", 8080, "port to listen")
 
-func valueOf(x int8) *int8 {
+func valueOf(x int64) *int64 {
 	return &x
 }
 
 // examples
-func main() {
+func main2() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
-	AvroPlayground()
-	if (1 == 1) {
-		os.Exit(3)
-	}
-	localhost := transit.MonitoredResource{
-		Name: "localhost",
+	// Example Usage with a host
+	geneva := transit.MonitoredResource{
+		Name: "geneva",
 		Type:   transit.HostResource,
 		Status: transit.HOST_UP,
-		Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
-	}
-	serviceLocalLoad := transit.MonitoredResource /* instance state */ {
-		Name: "local_load",
-		Type: transit.ServiceResource,
-		Status: transit.SERVICE_OK,
-		Owner: &localhost,
-		Labels: map[string]string{
-			"appType":          "nagios",		// this is redundant, appTypes are all the same
-			"device":           "127.0.0.1",
-			"checkType":        "passive",
-			"stateType":        "hard",
-			"lastStateChange":  "10 mins ago",
-			"lastCheckTime":    "10 mins ago",
-			"lastPluginOutput": "foo | bar",
+		LastCheckTime: time.Now(),
+		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastPlugInOutput: "44/55/888 QA00005-BC",
+		Description: "Subversion Server",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
 		},
 	}
-	cores := int8(4)
-	localLoadMetric1 := transit.Metric{
-		Type:   "local_load_1",
-		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(1)}},
+	localLoadService := transit.MonitoredResource{
+		Name: "local_load",
+		Type:   transit.ServiceResource,
+		Status: transit.SERVICE_OK,
+		LastCheckTime: time.Now(),
+		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastPlugInOutput: "foo | bar",
+		Description: "Load on subversion",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
+		},
 	}
-	localLoadMetric5 := transit.Metric{
-		Type:   "local_load_5",
-		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(5)}},
+	point := makePoint()
+	sampleValue := transit.TimeSeries{
+		MetricName: "local_load_5",
+		SampleType: transit.Value,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		Interval: point.Interval,
+		Value:    point.Value,
 	}
-	localLoadMetric15 := transit.Metric{
-		Type:   "local_load_15",
-		Labels: map[string]transit.TypedValue{
-			"cores": transit.TypedValue{Int8Value: &cores},
-			"sampleTime": transit.TypedValue{Int8Value: valueOf(15)}},
+	point = makePoint()
+	sampleCritical := transit.TimeSeries{
+		MetricName: "local_load_5_cr",
+		SampleType: transit.Critical,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		Interval: point.Interval,
+		Value:    point.Value,
 	}
-	sample1 := transit.TimeSeries{
-		Metric:     &localLoadMetric1,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
+	point = makePoint()
+	sampleWarning := transit.TimeSeries{
+		MetricName: "local_load_5_wn",
+		SampleType: transit.Warning,
+		Tags: map[string]string{
+			"deviceTag":     "127.0.0.1",
+			"httpMethodTag": "POST",
+			"httpStatusTag": "200",
+		},
+		Interval: point.Interval,
+		Value:    point.Value,
 	}
-	sample5 := transit.TimeSeries{
-		Metric:     &localLoadMetric5,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
+
+	// Build Payload
+	resources := []transit.ResourceWithMetrics{
+		{Resource: geneva, Metrics: make([]transit.TimeSeries, 0)},
+		{Resource: localLoadService, Metrics: []transit.TimeSeries{sampleValue, sampleCritical, sampleWarning}},
 	}
-	sample15 := transit.TimeSeries{
-		Metric:     &localLoadMetric15,
-		MetricKind: transit.GAUGE,
-		Points: 	makePoints(),
-		Resource:   &serviceLocalLoad,
-		ValueType:  transit.DOUBLE,
-	}
+
+
 	// create a Groundwork Configuration
-	config := transit.GroundworkConfig{
-		HostName: "localhost",
-		Account:  "RESTAPIACCESS",
-		Token:    "63c5bt",
-		SSL:      false,
-	}
+	//config := transit.GroundworkConfig{
+	//	HostName: "localhost",
+	//	Account:  "RESTAPIACCESS",
+	//	Token:    "63c5bt",
+	//	SSL:      false,
+	//}
 	// Connect with Transit...
-	var transitServices = transit.Connect(config)
+	var transitServices,_ = transit.Connect(transit.Credentials{
+		User:     "test",
+		Password: "test",
+	})
+
 	// Send Metrics with Transit ...
-	transitServices.SendMetrics(&[]transit.TimeSeries{sample1, sample5, sample15})
+	transitServices.SendResourcesWithMetrics(resources)
+
 	// Retrieve Metrics List with Transit
 	metrics, _ := transitServices.ListMetrics()
 	for _, metric := range *metrics {
@@ -106,7 +122,7 @@ func main() {
 		fmt.Println(metric)
 	}
 	// complete
-	transit.Disconnect(&transitServices)
+	transit.Disconnect(transitServices)
 
 	// Controller Example
 	var controllerServices = controller.CreateController()
@@ -114,71 +130,28 @@ func main() {
 	controllerServices.Stop()
 	controllerServices.Status()
 	stats, _ := controllerServices.Stats()
-	fmt.Println(*stats);
+	fmt.Println(*stats)
 }
 
-func makePoints()  []*transit.Point {
+func makePoint() *transit.Point {
+	random := rand.Float64()
+	now := time.Now()
+	return &transit.Point{
+		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
+		Value:    &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
+	}
+}
+
+func makePoints() []*transit.Point {
 	points := make([]*transit.Point, 3)
 	for i := range points {
 		random := rand.Float64()
-		//now := strconv.FormatInt(time.Now().Unix(), 10)
 		now := time.Now()
 		points[i] = &transit.Point{
+
 			Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
-			Value:    &transit.TypedValue{DoubleValue: &random},
+			Value:    &transit.TypedValue{DoubleValue: random},
 		}
 	}
 	return points;
 }
-
-func AvroPlayground() {
-	localhost := DummyMonitoredResource{
-		Name: "localhost",
-		Type:   transit.HostResource,
-		Status: "UNSCHEDULED_DOWN",
-		Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
-	}
-	l2 := new(DummyMonitoredResource)
-	l2.Name = "Dumb"
-	l2.Type = "MyType"
-	// l2.Status = transit.HOST_SCHEDULED_DOWN
-	l2.Labels = make(map[string]string)
-	l2.Labels["one"] = "b"
-	l2.Labels["two"] = "c"
-	schema, err := avro.ParseSchema(transit.MONITORED_RESOURCE)
-	if err != nil {
-		// Should not happen if the schema is valid
-		panic(err)
-	}
-	writer := avro.NewSpecificDatumWriter()
-	// SetSchema must be called before calling Write
-	writer.SetSchema(schema)
-	// Create a new Buffer and Encoder to write to this Buffer
-	buffer := new(bytes.Buffer)
-	encoder := avro.NewBinaryEncoder(buffer)
-	// Write the record
-	writer.Write(&localhost, encoder)
-
-	reader := avro.NewSpecificDatumReader()
-	// SetSchema must be called before calling Read
-	reader.SetSchema(schema)
-	// Create a new Decoder with a given buffer
-	decoder := avro.NewBinaryDecoder(buffer.Bytes())
-	// Create a new TestRecord to decode data into
-	decodedRecord := new(DummyMonitoredResource)
-	// Read data into a given record with a given Decoder. Unlike GenericDatumReader the first parameter should be the value to map data into.
-	err = reader.Read(decodedRecord, decoder)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Read a value: ", decodedRecord)
-}
-
-type DummyMonitoredResource struct {
-	Name string
-	Type string
-	Status string
-	Labels map[string]string
-}
-

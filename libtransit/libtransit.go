@@ -20,7 +20,7 @@ func TestMonitoredResource(str *C.char, error *C.char) *C.char {
 		return nil
 	}
 
-	resource.Labels = map[string]string{"key1": "value1", "key02": "value02"}
+	// resource.Labels = map[string]string{"key1": "value1", "key02": "value02"}
 	resource.Status = transit.SERVICE_PENDING
 	buf, _ := json.Marshal(&resource)
 
