@@ -1,7 +1,9 @@
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "libtransit.h"
 #include "transit.h"
 #include "transit_json.h"
 #include "util.h"
