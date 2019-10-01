@@ -26,17 +26,25 @@ Requirements
 * The jansson library should be installed.
 * The libjansson-dev library package should be installed for development.
 
+Building shared library
+-----------------------
+```
+go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
+```
+
 Building and running tests
 --------------------------
 ```
-gcc transit-c/*.c -o ./transit-c.test -ljansson && ./transit-c.test
+gcc transit-c/test_libtransit_dl.c -o ./libtransit-dl-c.test -ldl && ./libtransit-dl-c.test
+
+gcc transit-c/test_transit.c transit-c/transit_json.c -o ./transit-c.test -ljansson && ./transit-c.test
 ```
 
 Building and running tests in Docker container
 ----------------------------------------------
 ```
 docker build -t groundworkdevelopment/tng .
-docker run --rm --name tng-test-c groundworkdevelopment/tng sh -c "gcc transit-c/*.c -o ./transit-c.test -ljansson && ./transit-c.test"
+docker run --rm --name tng-test-c groundworkdevelopment/tng sh -c "gcc transit-c/test_transit.c transit-c/transit_json.c -o ./transit-c.test -ljansson && ./transit-c.test"
 ```
 
 Development
