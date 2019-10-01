@@ -1,10 +1,10 @@
 package main
 
 import (
-	"./controller"
-	"./transit"
 	"flag"
 	"fmt"
+	"github.com/gwos/tng/controller"
+	"github.com/gwos/tng/transit"
 	"math/rand"
 	"time"
 )
@@ -20,50 +20,41 @@ func valueOf(x int64) *int64 {
 func main2() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
-	//localhost := transit.MonitoredResource{
-	//	Name: "localhost",
-	//	Type:   transit.HostResource,
-	//	Status: transit.HOST_UP,
-	//	Labels: map[string]string{"hostGroup": "egain-21", "appType": "nagios"},
-	//}
-	//serviceLocalLoad := transit.MonitoredResource /* instance state */ {
-	//	Name: "local_load",
-	//	Type: transit.ServiceResource,
-	//	Status: transit.SERVICE_OK,
-	//	Owner: &localhost,
-	//	Labels: map[string]string{
-	//		"appType":          "nagios",		// this is redundant, appTypes are all the same
-	//		"device":           "127.0.0.1",
-	//		"checkType":        "passive",
-	//		"stateType":        "hard",
-	//		"lastStateChange":  "10 mins ago",
-	//		"lastCheckTime":    "10 mins ago",
-	//		"lastPluginOutput": "foo | bar",
-	//	},
-	//}
-	cores := int64(4)
-	localLoadMetric1 := transit.Metric{
-		Type: "local_load_1",
-		Labels: map[string]transit.TypedValue{
-			"cores":      transit.TypedValue{IntegerValue: cores},
-			"sampleTime": transit.TypedValue{IntegerValue: 1}},
+	// Example Usage with a host
+	geneva := transit.MonitoredResource{
+		Name: "geneva",
+		Type:   transit.HostResource,
+		Status: transit.HOST_UP,
+		LastCheckTime: time.Now(),
+		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastPlugInOutput: "44/55/888 QA00005-BC",
+		Description: "Subversion Server",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
+		},
 	}
-	localLoadMetric5 := transit.Metric{
-		Type: "local_load_5",
-		Labels: map[string]transit.TypedValue{
-			"cores":      transit.TypedValue{IntegerValue: cores},
-			"sampleTime": transit.TypedValue{IntegerValue: 5}},
+	localLoadService := transit.MonitoredResource{
+		Name: "local_load",
+		Type:   transit.ServiceResource,
+		Status: transit.SERVICE_OK,
+		LastCheckTime: time.Now(),
+		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastPlugInOutput: "foo | bar",
+		Description: "Load on subversion",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
+		},
 	}
-	localLoadMetric15 := transit.Metric{
-		Type: "local_load_15",
-		Labels: map[string]transit.TypedValue{
-			"cores":      transit.TypedValue{IntegerValue: cores},
-			"sampleTime": transit.TypedValue{IntegerValue: 15}},
-	}
-	println(localLoadMetric1.Type)
-	println(localLoadMetric5.Type)
-	println(localLoadMetric15.Type)
-
 	point := makePoint()
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
@@ -101,13 +92,29 @@ func main2() {
 		Value:    point.Value,
 	}
 
+	// Build Payload
+	resources := []transit.ResourceWithMetrics{
+		{Resource: geneva, Metrics: make([]transit.TimeSeries, 0)},
+		{Resource: localLoadService, Metrics: []transit.TimeSeries{sampleValue, sampleCritical, sampleWarning}},
+	}
+
+
+	// create a Groundwork Configuration
+	//config := transit.GroundworkConfig{
+	//	HostName: "localhost",
+	//	Account:  "RESTAPIACCESS",
+	//	Token:    "63c5bt",
+	//	SSL:      false,
+	//}
 	// Connect with Transit...
-	var transitServices, _ = transit.Connect(transit.Credentials{
-		User:     "RESTAPIACCESS",
-		Password: "! PASSWORD_HERE !",
+	var transitServices,_ = transit.Connect(transit.Credentials{
+		User:     "test",
+		Password: "test",
 	})
+
 	// Send Metrics with Transit ...
-	_, _ = transitServices.SendMetrics(&[]transit.TimeSeries{sampleValue, sampleWarning, sampleCritical})
+	transitServices.SendResourcesWithMetrics(resources)
+
 	// Retrieve Metrics List with Transit
 	metrics, _ := transitServices.ListMetrics()
 	for _, metric := range *metrics {
@@ -130,7 +137,7 @@ func makePoint() *transit.Point {
 	random := rand.Float64()
 	now := time.Now()
 	return &transit.Point{
-		Interval: &transit.TimeInterval{EndTime: now.String(), StartTime: now.String()},
+		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
 		Value:    &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
 	}
 }
@@ -141,16 +148,10 @@ func makePoints() []*transit.Point {
 		random := rand.Float64()
 		now := time.Now()
 		points[i] = &transit.Point{
-			Interval: &transit.TimeInterval{EndTime: now.String(), StartTime: now.String()},
+
+			Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
 			Value:    &transit.TypedValue{DoubleValue: random},
 		}
 	}
-	return points
-}
-
-type DummyMonitoredResource struct {
-	Name   string
-	Type   string
-	Status string
-	Labels map[string]string
+	return points;
 }
