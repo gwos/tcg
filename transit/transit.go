@@ -67,7 +67,7 @@ func (computeType ComputeTypeEnum) String() string {
 	return [...]string{"query", "regex", "synthetic", "info", "performance", "health"}[computeType]
 }
 
-// Groundwork service monitor status
+// MonitorStatusEnum represents Groundwork service monitor status
 type MonitorStatusEnum int
 
 const (
@@ -87,7 +87,7 @@ const (
 
 func (status MonitorStatusEnum) String() string {
 	return [...]string{
-		"OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
+		"", "OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
 		"UP", "UNSCHEDULED DOWN", "WARNING", "PENDING", "SCHEDULED DOWN", "UNREACHABLE",
 	}[status]
 }
