@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <time.h>
 
 /* https://stackoverflow.com/a/10966395 */
 #define GENERATE_ENUM(ENUM) ENUM,
@@ -96,7 +97,7 @@ typedef struct {
 } StringPairList;
 
 typedef struct {
-  char *endTime, *startTime;  // go:time.Time
+  time_t endTime, startTime;  // go:time.Time
 } TimeInterval;
 
 typedef struct {
@@ -105,7 +106,7 @@ typedef struct {
   double doubleValue;
   int64_t integerValue;
   char *stringValue;
-  char *dateValue;  // go:time.Time
+  time_t dateValue;  // go:time.Time
 } TypedValue;
 
 typedef struct {
@@ -125,10 +126,9 @@ typedef struct {
 
 typedef struct {
   MONITOR_STATUS_ENUM status;
-  char *name, *type, *owner;
-  char *lastCheckTime;  // go:time.Time
-  char *nextCheckTime;  // go:time.Time
-  char *lastPlugInOutput, *category, *description;
+  char *name, *type, *owner, *category, *description, *lastPlugInOutput;
+  time_t lastCheckTime;  // go:time.Time
+  time_t nextCheckTime;  // go:time.Time
   TypedValuePairList properties;  // go:map[string]TypedValue
 } MonitoredResource;
 
@@ -183,7 +183,7 @@ typedef struct {
 
 typedef struct {
   char *appType, *agentId, *traceToken;
-  char *timeStamp;  // go:time.Time
+  time_t timeStamp;  // go:time.Time
 } TracerContext;
 
 typedef struct {
