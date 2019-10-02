@@ -76,6 +76,16 @@ extern "C" {
 
 extern char* TestMonitoredResource(char* p0, char* p1);
 
+extern char* SendResourcesWithMetrics(char* p0, char* p1);
+
+extern char* ListMetrics(char* p0);
+
+extern char* SynchronizeInventory(char* p0, char* p1, char* p2);
+
+extern char* Connect(char* p0, char* p1);
+
+extern GoUint8 Disconnect(char* p0, char* p1);
+
 #ifdef __cplusplus
 }
 #endif
