@@ -3,9 +3,9 @@ package transit
 import "C"
 import (
 	"encoding/json"
-	"encoding/xml"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -131,12 +131,12 @@ func (metricSampleType MetricSampleType) String() string {
 // start time could overwrite data written at the previous  end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime time.Time `json:"endTime,omitempty"`
+	EndTime SpecialDate `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime time.Time `json:"startTime,omitempty"`
+	StartTime SpecialDate `json:"startTime,omitempty"`
 }
 
 // TypedValue: A single strongly-typed value.
@@ -159,7 +159,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a date stored as full timestamp
-	DateValue time.Time `json:"dateValue,omitEmpty"`
+	//DateValue SpecialDate `json:"dateValue,omitempty"`
 }
 
 // Point: A single data point in a time series.
@@ -187,7 +187,7 @@ type TimeSeries struct {
 	Tags       map[string]string `json:"tags,omitempty"`
 	Interval   *TimeInterval     `json:"interval,omitempty"`
 	Value      *TypedValue       `json:"value,omitempty"`
-	Unit 	   string 			 `json:"unit,omitempty"`
+	Unit       string            `json:"unit,omitempty"`
 }
 
 // MetricDescriptor: Defines a metric type and its schema
@@ -319,9 +319,9 @@ type MonitoredResource struct {
 	//  Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// The last status check time on this resource
-	LastCheckTime time.Time `json:"lastCheckTime,omitempty"`
+	LastCheckTime SpecialDate `json:"lastCheckTime,omitempty"`
 	// The last status check time on this resource
-	NextCheckTime time.Time `json:"nextCheckTime,omitempty"`
+	NextCheckTime SpecialDate `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
@@ -334,10 +334,10 @@ type MonitoredResource struct {
 
 // Trace Context of a Transit call
 type TracerContext struct {
-	AppType    string    `json:"appType"`
-	AgentId    string    `json:"agentId"`
-	TraceToken string    `json:"traceToken"`
-	TimeStamp  time.Time `json:"timeStamp"`
+	AppType    string      `json:"appType"`
+	AgentId    string      `json:"agentId"`
+	TraceToken string      `json:"traceToken"`
+	TimeStamp  SpecialDate `json:"timeStamp"`
 }
 
 type TransitSendInventoryRequest struct {
@@ -346,9 +346,9 @@ type TransitSendInventoryRequest struct {
 	groups    *[]Group
 }
 
-type TransitSynchronizeResponse struct {
-	ResourcesAdded   int `xml:"resourcesAdded"`
-	ResourcesDeleted int `xml:"resourcesDeleted"`
+type OperationResults struct {
+	ResourcesAdded   int `json:"successful"`
+	ResourcesDeleted int `json:"failed"`
 }
 
 type Group struct {
@@ -370,7 +370,7 @@ type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
 type TransitServices interface {
 	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
 	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
+	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (OperationResults, error)
 }
 
 // Groundwork Connection Configuration
@@ -444,37 +444,44 @@ func Disconnect(transit *Transit) bool {
 	return statusCode == 200
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
+func (transit Transit) SendResourcesWithMetrics(resources *[]ResourceWithMetrics) (*OperationResults, error) {
 	context := TracerContext{
 		AppType:    "GoClient",
 		AgentId:    "test-agent",
 		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  time.Time{},
+		TimeStamp:  SpecialDate{},
 	}
 
 	transitSendMetricsRequest := transitSendMetricsRequest{
 		Trace:   context,
-		Metrics: &resources,
+		Metrics: resources,
 	}
 
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "82b3b063-998b-4d08-9498-f4c2a18b7f0e",
+		"GWOS-API-TOKEN": "6f4173ec-2bc5-486b-8bd8-6f8d983fa6a2",
 		"GWOS-APP-NAME":  "gw8",
 	}
 
 	byteBody, err := json.Marshal(transitSendMetricsRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, _, err = sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	var operationResults OperationResults
+
+	err = json.Unmarshal(byteResponse, &operationResults)
+	if err != nil {
+		return nil, err
+	}
+
+	return &operationResults, nil
 }
 
 // TODO: implement
@@ -539,44 +546,32 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	return &arr, nil
 }
 
-func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (*TransitSynchronizeResponse, error) {
-	context := TracerContext{
-		AppType:    "GoClient",
-		AgentId:    "test-agent",
-		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  time.Time{},
-	}
-
-	transitInventoryRequest := transitSendInventoryRequest{
-		Trace:     context,
-		Inventory: inventory,
-		Groups:    groups,
-	}
-
+func (transit Transit) SynchronizeInventory(inventory *transitSendInventoryRequest) (*OperationResults, error) {
 	headers := map[string]string{
+		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "3768b1d7-00d8-4e0f-b96a-0aafde97eb39",
+		"GWOS-API-TOKEN": "6f4173ec-2bc5-486b-8bd8-6f8d983fa6a2",
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(transitInventoryRequest)
+	byteBody, err := json.Marshal(inventory)
 	if err != nil {
 		return nil, err
 	}
 
-	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, nil, byteBody)
+	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
 	if err != nil {
 		return nil, err
 	}
 
-	var transitSynchronize TransitSynchronizeResponse
+	var operationResults OperationResults
 
-	err = xml.Unmarshal(byteResponse, &transitSynchronize)
+	err = json.Unmarshal(byteResponse, &operationResults)
 	if err != nil {
 		return nil, err
 	}
 
-	return &transitSynchronize, nil
+	return &operationResults, nil
 }
 
 // internal transit data
@@ -587,6 +582,29 @@ type transitSendMetricsRequest struct {
 
 type transitSendInventoryRequest struct {
 	Trace     TracerContext        `json:"context"`
-	Inventory *[]MonitoredResource `json:"inventory"`
+	Inventory *[]MonitoredResource `json:"resources"`
 	Groups    *[]Group             `json:"groups"`
+}
+
+type SpecialDate struct {
+	time.Time
+}
+
+func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
+	strInput := string(input)
+
+	i, err := strconv.ParseInt(strInput, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	i *= int64(time.Millisecond)
+
+	*sd = SpecialDate{time.Unix(0, i)}
+
+	return nil
+}
+
+func (sd SpecialDate) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }
