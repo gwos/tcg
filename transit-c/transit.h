@@ -111,8 +111,8 @@ typedef struct {
   bool boolValue;
   double doubleValue;
   int64_t integerValue;
-  char *stringValue;
   time_t dateValue;  // go:time.Time
+  char *stringValue;
 } TypedValue;
 
 typedef struct {
@@ -133,8 +133,8 @@ typedef struct {
 typedef struct {
   MONITOR_STATUS_ENUM status;
   char *name, *type, *owner, *category, *description, *lastPlugInOutput;
-  time_t lastCheckTime;  // go:time.Time
-  time_t nextCheckTime;  // go:time.Time
+  time_t lastCheckTime;           // go:time.Time
+  time_t nextCheckTime;           // go:time.Time
   TypedValuePairList properties;  // go:map[string]TypedValue
 } MonitoredResource;
 
