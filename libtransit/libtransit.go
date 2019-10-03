@@ -4,8 +4,8 @@ package main
 // #include <string.h> /* for strncpy error message */
 import "C"
 import (
-	"encoding/json"
 	"github.com/gwos/tng/transit"
+	"encoding/json"
 	"log"
 )
 
@@ -32,7 +32,6 @@ func TestMonitoredResource(str *C.char, errorMsg *C.char) *C.char {
 	return C.CString(string(buf))
 }
 
-
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.char {
 	var resourceWithMetrics []transit.ResourceWithMetrics
@@ -53,7 +52,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.cha
 }
 
 //export ListMetrics
-func ListMetrics(errorMsg  *C.char) *C.char {
+func ListMetrics(errorMsg *C.char) *C.char {
 	monitorDescriptor, err := transitPackage.ListMetrics()
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)

@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -131,12 +132,12 @@ func (metricSampleType MetricSampleType) String() string {
 // start time could overwrite data written at the previous  end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime time.Time `json:"endTime,omitempty"`
+	EndTime SpecialDate `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime time.Time `json:"startTime,omitempty"`
+	StartTime SpecialDate `json:"startTime,omitempty"`
 }
 
 // TypedValue: A single strongly-typed value.
@@ -159,7 +160,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a date stored as full timestamp
-	DateValue time.Time `json:"dateValue,omitEmpty"`
+	DateValue SpecialDate `json:"dateValue,omitEmpty"`
 }
 
 // Point: A single data point in a time series.
@@ -187,7 +188,7 @@ type TimeSeries struct {
 	Tags       map[string]string `json:"tags,omitempty"`
 	Interval   *TimeInterval     `json:"interval,omitempty"`
 	Value      *TypedValue       `json:"value,omitempty"`
-	Unit 	   string 			 `json:"unit,omitempty"`
+	Unit       string            `json:"unit,omitempty"`
 }
 
 // MetricDescriptor: Defines a metric type and its schema
@@ -319,9 +320,9 @@ type MonitoredResource struct {
 	//  Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// The last status check time on this resource
-	LastCheckTime time.Time `json:"lastCheckTime,omitempty"`
+	LastCheckTime SpecialDate `json:"lastCheckTime,omitempty"`
 	// The last status check time on this resource
-	NextCheckTime time.Time `json:"nextCheckTime,omitempty"`
+	NextCheckTime SpecialDate `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
@@ -334,10 +335,10 @@ type MonitoredResource struct {
 
 // Trace Context of a Transit call
 type TracerContext struct {
-	AppType    string    `json:"appType"`
-	AgentId    string    `json:"agentId"`
-	TraceToken string    `json:"traceToken"`
-	TimeStamp  time.Time `json:"timeStamp"`
+	AppType    string      `json:"appType"`
+	AgentId    string      `json:"agentId"`
+	TraceToken string      `json:"traceToken"`
+	TimeStamp  SpecialDate `json:"timeStamp"`
 }
 
 type TransitSendInventoryRequest struct {
@@ -449,7 +450,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics)
 		AppType:    "GoClient",
 		AgentId:    "test-agent",
 		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  time.Time{},
+		TimeStamp:  SpecialDate{},
 	}
 
 	transitSendMetricsRequest := transitSendMetricsRequest{
@@ -544,7 +545,7 @@ func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, grou
 		AppType:    "GoClient",
 		AgentId:    "test-agent",
 		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  time.Time{},
+		TimeStamp:  SpecialDate{},
 	}
 
 	transitInventoryRequest := transitSendInventoryRequest{
@@ -589,4 +590,26 @@ type transitSendInventoryRequest struct {
 	Trace     TracerContext        `json:"context"`
 	Inventory *[]MonitoredResource `json:"inventory"`
 	Groups    *[]Group             `json:"groups"`
+}
+
+type SpecialDate struct {
+	time.Time
+}
+
+func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
+	strInput := string(input)
+	strInput += "000000"
+
+	i, err := strconv.ParseInt(strInput, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	*sd = SpecialDate{time.Unix(0, i)}
+
+	return nil
+}
+
+func (sd SpecialDate) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }
