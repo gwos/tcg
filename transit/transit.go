@@ -1,28 +1,23 @@
 package transit
 
+import "C"
 import (
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
+	"net/http"
 	"time"
 )
 
 // MetricKind: The metric kind of the time series.
-// If present, it must be the same as the metric kind
-// of the associated metric. If the associated metric's descriptor must
-// be auto-created, then this field specifies the metric kind of the new
-// descriptor and must be either GAUGE (the default) or CUMULATIVE.
-//
-// Possible values:
 //   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
 //   "GAUGE" - An instantaneous measurement of a value.
 //   "DELTA" - The change in a value during a time interval.
 //   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-// measurements in a time series should have the same start time and
-// increasing end times, until an event resets the cumulative value to
-// zero and sets a new start time for the following points.
 type MetricKindEnum int
 
 const (
-	GAUGE MetricKindEnum = iota
+	GAUGE MetricKindEnum = iota + 1
 	DELTA
 	CUMULATIVE
 	METRIC_KIND_UNSPECIFIED
@@ -36,30 +31,31 @@ func (metricKind MetricKindEnum) String() string {
 type ValueTypeEnum int
 
 const (
-	BOOL ValueTypeEnum = iota
-	INT8
-	INT32
-	INT64
-	DOUBLE
-	STRING
-	VALUE_TYPE_UNSPECIFIED
+	IntegerType ValueTypeEnum = iota + 1
+	DoubleType
+	StringType
+	BooleanType
+	DateType
+	UnspecifiedType
 )
 
 func (valueType ValueTypeEnum) String() string {
-	return [...]string{"BOOL", "INT8", "INT32", "INT64", "DOUBLE", "STRING", "VALUE_TYPE_UNSPECIFIED"}[valueType]
+	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "DateType", "UnspecifiedType"}[valueType]
 }
 
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
 type UnitEnum string
+
 const (
 	UnitCounter = "1"
 )
 
 // CloudHub Compute Types
 type ComputeTypeEnum int
+
 const (
-	Query ComputeTypeEnum = iota
+	Query ComputeTypeEnum = iota + 1
 	Regex
 	Synthetic
 	Info
@@ -71,11 +67,11 @@ func (computeType ComputeTypeEnum) String() string {
 	return [...]string{"query", "regex", "synthetic", "info", "performance", "health"}[computeType]
 }
 
-// Groundwork service monitor status
+// MonitorStatusEnum represents Groundwork service monitor status
 type MonitorStatusEnum int
 
 const (
-	SERVICE_OK MonitorStatusEnum = iota
+	SERVICE_OK MonitorStatusEnum = iota + 1
 	SERVICE_UNSCHEDULED_CRITICAL
 	SERVICE_WARNING
 	SERVICE_PENDING
@@ -91,7 +87,7 @@ const (
 
 func (status MonitorStatusEnum) String() string {
 	return [...]string{
-		"OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
+		"", "OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
 		"UP", "UNSCHEDULED DOWN", "WARNING", "PENDING", "SCHEDULED DOWN", "UNREACHABLE",
 	}[status]
 }
@@ -101,6 +97,21 @@ const (
 	ServiceResource = "service"
 	HostResource    = "host"
 )
+
+// TimeSeries Metric Sample Possible Types
+type MetricSampleType int
+
+const (
+	Value MetricSampleType = iota + 1
+	Critical
+	Warning
+	Min
+	Max
+)
+
+func (metricSampleType MetricSampleType) String() string {
+	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
+}
 
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
@@ -130,24 +141,25 @@ type TimeInterval struct {
 
 // TypedValue: A single strongly-typed value.
 type TypedValue struct {
+	ValueType ValueTypeEnum `json:"valueType"`
+
 	// BoolValue: A Boolean value: true or false.
-	BoolValue *bool `json:"boolValue,omitempty"`
+	BoolValue bool `json:"boolValue,omitempty"`
 
 	// DoubleValue: A 64-bit double-precision floating-point number. Its
 	// magnitude is approximately &plusmn;10<sup>&plusmn;300</sup> and it
 	// has 16 significant digits of precision.
-	DoubleValue *float64 `json:"doubleValue,omitempty"`
-
-	// Int8Value: A small integer
-	Int8Value *int8 `json:"int8Value,omitempty,string"`
-	Int32Value *int32 `json:"int32Value,omitempty,string"`
+	DoubleValue float64 `json:"doubleValue,omitempty"`
 
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	Int64Value *int64 `json:"int64Value,omitempty,string"`
+	IntegerValue int64 `json:"integerValue,omitempty"`
 
 	// StringValue: A variable-length string value.
-	StringValue *string `json:"stringValue,omitempty"`
+	StringValue string `json:"stringValue,omitempty"`
+
+	// a date stored as full timestamp
+	DateValue time.Time `json:"dateValue,omitEmpty"`
 }
 
 // Point: A single data point in a time series.
@@ -168,70 +180,18 @@ type Point struct {
 }
 
 // TimeSeries: A collection of data points that describes the
-// time-varying values of a metric. A time series is identified by a
-// combination of a fully-specified monitored resource and a
-// fully-specified metric. This type is used for both listing and
-// creating time series.
+// time-varying values of a metric.
 type TimeSeries struct {
-	// Metric: The associated metric. A fully-specified metric used to
-	// identify the time series.
-	Metric *Metric `json:"metric,omitempty"`
-
-	// Metric Kind defines how a metric is gathered, as a gauge, delta, or cumulative
-	MetricKind MetricKindEnum `json:"metricKind,omitempty"`
-
-	// Points: The data points of this time series. When listing time
-	// series, points are returned in reverse time order.When creating a
-	// time series, this field must contain exactly one point and the
-	// point's type must be the same as the value type of the associated
-	// metric. If the associated metric's descriptor must be auto-created,
-	// then the value type of the descriptor is determined by the point's
-	// type, which must be BOOL, INT64, DOUBLE, or DISTRIBUTION.
-	Points []*Point `json:"points,omitempty"`
-
-	// Resource: The associated monitored resource. Custom metrics can use
-	// only certain monitored resource types in their time series data.
-	// TODO: remove this for new API SendResourcesWithMetrics
-	Resource *MonitoredResource `json:"resource,omitempty"`
-
-	// ValueType: The value type of the time series. When listing time
-	// series, this value type might be different from the value type of the
-	// associated metric if this time series is an alignment or reduction of
-	// other time series.When creating a time series, this field is
-	// optional. If present, it must be the same as the type of the data in
-	// the points field.
-	//
-	// Possible values:
-	//   "VALUE_TYPE_UNSPECIFIED" - Do not use this default value.
-	//   "BOOL" - The value is a boolean. This value type can be used only
-	// if the metric kind is GAUGE.
-	//   "INT64" - The value is a signed 64-bit integer.
-	//   "DOUBLE" - The value is a double precision floating point number.
-	//   "STRING" - The value is a text string. This value type can be used
-	// only if the metric kind is GAUGE.
-	//   "DISTRIBUTION" - The value is a Distribution.
-	//   "MONEY" - The value is money.
-	ValueType ValueTypeEnum `json:"valueType,omitempty"`
-}
-
-// Metric: A specific metric, identified by specifying values for all of
-// the labels of a MetricDescriptor.
-type Metric struct {
-	// Type: An existing metric type, MetricDescriptor. For
-	// example, custom.googleapis.com/invoice/paid/amount.
-	Type string `json:"type"`
-
-	// Labels: The set of label values that uniquely identify this metric.
-	// All labels listed in the MetricDescriptor must be assigned values.
-	Labels map[string]TypedValue `json:"labels,omitempty"`
+	MetricName string            `json:"metricName"`
+	SampleType MetricSampleType  `json:"sampleType"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Interval   *TimeInterval     `json:"interval,omitempty"`
+	Value      *TypedValue       `json:"value,omitempty"`
+	Unit 	   string 			 `json:"unit,omitempty"`
 }
 
 // MetricDescriptor: Defines a metric type and its schema
 type MetricDescriptor struct {
-
-	// Groundwork Compute Type such as Synthetic
-	ComputeType ComputeTypeEnum `json:"name,omitempty"`
-
 	// Custom Name: Override the resource type with a custom name of the metric descriptor.
 	CustomName string `json:"name,omitempty"`
 
@@ -253,24 +213,6 @@ type MetricDescriptor struct {
 	// look at latencies for successful responses or just for responses that
 	// failed.
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
-
-	// Metadata: Optional. Metadata which can be used to guide usage of the
-	// metric.
-	// Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
-
-	// MetricKind: Whether the metric records instantaneous values, changes
-	// to a value, etc. Some combinations of metric_kind and value_type
-	// might not be supported.
-	//
-	// Possible values:
-	//   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
-	//   "GAUGE" - An instantaneous measurement of a value.
-	//   "DELTA" - The change in a value during a time interval.
-	//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-	// measurements in a time series should have the same start time and
-	// increasing end times, until an event resets the cumulative value to
-	// zero and sets a new start time for the following points.
-	MetricKind MetricKindEnum `json:"metricKind,omitempty"`
 
 	Thresholds []*ThresholdDescriptor `json:"thresholds,omitempty"`
 
@@ -297,6 +239,27 @@ type MetricDescriptor struct {
 	// number, etc. Some combinations of metric_kind and value_type might
 	// not be supported.
 	ValueType ValueTypeEnum `json:"valueType,omitempty"`
+
+	// Groundwork Compute Type such as Synthetic
+	ComputeType ComputeTypeEnum `json:"computeType,omitempty"`
+
+	// Metadata: Optional. Metadata which can be used to guide usage of the
+	// metric.
+	// Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
+
+	// MetricKind: Whether the metric records instantaneous values, changes
+	// to a value, etc. Some combinations of metric_kind and value_type
+	// might not be supported.
+	//
+	// Possible values:
+	//   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
+	//   "GAUGE" - An instantaneous measurement of a value.
+	//   "DELTA" - The change in a value during a time interval.
+	//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
+	// measurements in a time series should have the same start time and
+	// increasing end times, until an event resets the cumulative value to
+	// zero and sets a new start time for the following points.
+	MetricKind MetricKindEnum `json:"metricKind"`
 }
 
 func (md MetricDescriptor) String() string {
@@ -323,8 +286,8 @@ type LabelDescriptor struct {
 // A definition of a Threshold
 type ThresholdDescriptor struct {
 	// Key: The threshold key.
-	Key string `json:"key"`
-	Value int32 `json:"value"`
+	Key   string `json:"key"`
+	Value int32  `json:"value"`
 }
 
 // MonitoredResource: An object representing a live resource instance that
@@ -346,64 +309,35 @@ type ThresholdDescriptor struct {
 //               "zone": "us-central1-a" }}
 //
 type MonitoredResource struct {
-	// The unique name of the instance
-	Name string `json:name,required`
-
-	// Type: Required. The monitored resource type. This field must match
-	// the type field of a MonitoredResourceDescriptor object. For example,
-	// the type of a Compute Engine VM instance is gce_instance.
-	Type string `json:"type"`
-
-	// Groundwork Status
-	Status MonitorStatusEnum `json:"status"`
-
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The monitored resource type uniquely defining the resource type
+	// General Nagios Types are host and service, where as CloudHub
+	Type string `json:"type,required"`
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatusEnum `json:"status,required"`
 	//  Owner relationship for associations like host->service
-	Owner *MonitoredResource `json:"owner,omitempty"`
-
-	// Labels: Values for all of the labels listed in the
-	// associated monitored resource descriptor. For example, Compute Engine
-	// VM instances use the labels "project_id", "instance_id", and "zone".
-	Labels map[string]string `json:"labels,omitempty"`
-
-}
-
-// MonitoredResourceDescriptor: An object that describes the schema of a
-// MonitoredResource object using a type name and a set of labels. For
-// example, the monitored resource descriptor for Google Compute Engine
-// VM instances has a type of "gce_instance" and specifies the use of
-// the labels "instance_id" and "zone" to identify particular VM
-// instances.Different APIs can support different monitored resource
-// types. APIs generally provide a list method that returns the
-// monitored resource descriptors used by the API.
-type MonitoredResourceDescriptor struct {
-	// Type: Required. The monitored resource type. For example, the type
-	// "cloudsql_database" represents databases in Google Cloud SQL. The
-	// maximum length of this value is 256 characters.
-	Type string `json:"type,omitempty"`
-
-	// Description: Optional. A detailed description of the monitored
-	// resource type that might be used in documentation.
+	Owner string `json:"owner,omitempty"`
+	// The last status check time on this resource
+	LastCheckTime time.Time `json:"lastCheckTime,omitempty"`
+	// The last status check time on this resource
+	NextCheckTime time.Time `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
+	// CloudHub Categorization of resources, translate to Foundation Metric Type
+	Category string `json:"category,omitempty"`
+	// CloudHub Categorization of resources, translate to Foundation Metric Type
 	Description string `json:"description,omitempty"`
-
-	// DisplayName: Optional. A concise name for the monitored resource type
-	// that might be displayed in user interfaces. It should be a Title
-	// Cased Noun Phrase, without any article or other determiners. For
-	// example, "Google Cloud SQL Database".
-	DisplayName string `json:"displayName,omitempty"`
-
-	// Labels: A set of labels used to describe instances of this
-	// monitored resource type. For example, an individual Google Cloud SQL
-	// database is identified by values for the labels "database_id" and
-	// "zone".
-	Labels []*LabelDescriptor `json:"labels,omitempty"`
+	// General Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
 // Trace Context of a Transit call
 type TracerContext struct {
-	appType    string
-	agentId    string
-	traceToken string
-	timeStamp  time.Time
+	AppType    string    `json:"appType"`
+	AgentId    string    `json:"agentId"`
+	TraceToken string    `json:"traceToken"`
+	TimeStamp  time.Time `json:"timeStamp"`
 }
 
 type TransitSendInventoryRequest struct {
@@ -413,8 +347,8 @@ type TransitSendInventoryRequest struct {
 }
 
 type TransitSynchronizeResponse struct {
-	ResourcesAdded   int
-	ResourcesDeleted int
+	ResourcesAdded   int `xml:"resourcesAdded"`
+	ResourcesDeleted int `xml:"resourcesDeleted"`
 }
 
 type Group struct {
@@ -423,17 +357,20 @@ type Group struct {
 }
 
 type ResourceWithMetrics struct {
-	resource MonitoredResource
-	metrics []TimeSeries
+	Resource MonitoredResource `json:"resource"`
+	Metrics  []TimeSeries      `json:"metrics"`
+}
+
+type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
+	Context   TracerContext
+	Resources []ResourceWithMetrics
 }
 
 // Transit interfaces / operations
 type TransitServices interface {
-	SendMetrics(metrics *[]TimeSeries) (string, error)
-	SendResourcesWithMetrics(resources []ResourceWithMetrics) (error)
+	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
 	ListMetrics() (*[]MetricDescriptor, error)
 	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
-	// listInventory() (/*TODO*/ error)
 }
 
 // Groundwork Connection Configuration
@@ -444,49 +381,99 @@ type GroundworkConfig struct {
 	SSL      bool
 }
 
+type Credentials struct {
+	User     string
+	Password string
+}
+
 // Implementation of TransitServices
 type Transit struct {
-	config GroundworkConfig
+	Config GroundworkConfig
 }
 
 // create and connect to a Transit instance from a Groundwork connection configuration
-func Connect(config GroundworkConfig) Transit {
-	transit := Transit{config: config}
-	return transit;
+func Connect(credentials Credentials) (*Transit, error) {
+	formValues := map[string]string{
+		"gwos-app-name": "gw8",
+		"user":          credentials.User,
+		"password":      credentials.Password,
+	}
+
+	headers := map[string]string{
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode == 200 {
+		config := GroundworkConfig{
+			HostName: "Test",
+			Account:  credentials.User,
+			Token:    string(byteResponse),
+			SSL:      false,
+		}
+		transit := Transit{
+			Config: config,
+		}
+		return &transit, nil
+	}
+
+	return nil, nil
 }
 
-func Disconnect(transit *Transit) {}
-
-// TODO: implement
-func (transit Transit) SendMetrics(metrics *[]TimeSeries) (string, error) {
-	for _, ts := range *metrics {
-		fmt.Printf("metric: %s, resourceType: %s, host:service: %s:%s\n",
-			ts.Metric.Type,
-			ts.Resource.Type,
-			ts.Resource.Labels["host"],
-			ts.Resource.Labels["name"])
-		for _, point := range ts.Points {
-			fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
-		}
-		fmt.Println()
+func Disconnect(transit *Transit) bool {
+	formValues := map[string]string{
+		"gwos-app-name":  "gw8",
+		"gwos-api-token": transit.Config.Token,
 	}
-	return "success", nil
+
+	headers := map[string]string{
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	statusCode, _, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
+	if err != nil {
+		return false
+	}
+
+	return statusCode == 200
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) (error) {
-	for _, mr := range resources {
-		fmt.Println("resource: %s - status: %s",
-			mr.resource.Type,
-			mr.resource.Status,
-		)
-		for _, ts := range mr.metrics {
-			fmt.Printf("metric: %s\n", ts.Metric.Type)
-			for _, point := range ts.Points {
-				fmt.Printf("\t%f - %s\n", *point.Value.DoubleValue, point.Interval.EndTime.Format(time.RFC3339Nano))
-			}
-			fmt.Println()
-		}
+func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
+	context := TracerContext{
+		AppType:    "GoClient",
+		AgentId:    "test-agent",
+		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
+		TimeStamp:  time.Time{},
 	}
+
+	transitSendMetricsRequest := transitSendMetricsRequest{
+		Trace:   context,
+		Metrics: &resources,
+	}
+
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": "82b3b063-998b-4d08-9498-f4c2a18b7f0e",
+		"GWOS-APP-NAME":  "gw8",
+	}
+
+	byteBody, err := json.Marshal(transitSendMetricsRequest)
+	if err != nil {
+		return err
+	}
+
+	_, _, err = sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -496,12 +483,12 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	cores := LabelDescriptor{
 		Description: "Number of Cores",
 		Key:         "cores",
-		ValueType:   STRING,
-	};
+		ValueType:   StringType,
+	}
 	sampleTime := LabelDescriptor{
 		Description: "Sample Time",
 		Key:         "sampleTime",
-		ValueType:   INT64,
+		ValueType:   IntegerType,
 	}
 	load1 := MetricDescriptor{
 		Type:        "local_load_1",
@@ -512,10 +499,10 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		ComputeType: Query,
 		CustomName:  "load-one-minute",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 200 },
-			&ThresholdDescriptor{ Key: "warning", Value: 100 },
+		ValueType:   DoubleType,
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 200},
+			&ThresholdDescriptor{Key: "warning", Value: 100},
 		},
 	}
 	load5 := MetricDescriptor{
@@ -524,14 +511,14 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		DisplayName: "LocalLoad5",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricKind:  GAUGE,
+		ComputeType: Query,
 		CustomName:  "load-five-minutes",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 205 },
-			&ThresholdDescriptor{ Key: "warning", Value: 105 },
+		ValueType:   DoubleType,
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 205},
+			&ThresholdDescriptor{Key: "warning", Value: 105},
 		},
-
 	}
 	load15 := MetricDescriptor{
 		Type:        "local_load_15",
@@ -539,25 +526,67 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		DisplayName: "LocalLoad15",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricKind:  GAUGE,
+		ComputeType: Query,
 		CustomName:  "load-fifteen-minutes",
 		Unit:        UnitCounter,
-		ValueType:   DOUBLE,
-		Thresholds:  []*ThresholdDescriptor{
-			&ThresholdDescriptor{ Key: "critical", Value: 215 },
-			&ThresholdDescriptor{ Key: "warning", Value: 115 },
+		ValueType:   DoubleType,
+		Thresholds: []*ThresholdDescriptor{
+			&ThresholdDescriptor{Key: "critical", Value: 215},
+			&ThresholdDescriptor{Key: "warning", Value: 115},
 		},
 	}
-	arr := []MetricDescriptor{load1, load5, load15};
+	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
+}
+
+func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (*TransitSynchronizeResponse, error) {
+	context := TracerContext{
+		AppType:    "GoClient",
+		AgentId:    "test-agent",
+		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
+		TimeStamp:  time.Time{},
+	}
+
+	transitInventoryRequest := transitSendInventoryRequest{
+		Trace:     context,
+		Inventory: inventory,
+		Groups:    groups,
+	}
+
+	headers := map[string]string{
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": "3768b1d7-00d8-4e0f-b96a-0aafde97eb39",
+		"GWOS-APP-NAME":  "gw8",
+	}
+
+	byteBody, err := json.Marshal(transitInventoryRequest)
+	if err != nil {
+		return nil, err
+	}
+
+	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, nil, byteBody)
+	if err != nil {
+		return nil, err
+	}
+
+	var transitSynchronize TransitSynchronizeResponse
+
+	err = xml.Unmarshal(byteResponse, &transitSynchronize)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transitSynchronize, nil
 }
 
 // internal transit data
 type transitSendMetricsRequest struct {
-	trace   TracerContext
-	metrics []*TimeSeries
+	Trace   TracerContext          `json:"context"`
+	Metrics *[]ResourceWithMetrics `json:"resources"`
 }
 
 type transitSendInventoryRequest struct {
-	trace     TracerContext
-	inventory []*MonitoredResourceDescriptor
+	Trace     TracerContext        `json:"context"`
+	Inventory *[]MonitoredResource `json:"inventory"`
+	Groups    *[]Group             `json:"groups"`
 }

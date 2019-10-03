@@ -9,6 +9,8 @@ Building
 ```
 cd go/src/github/com/gwos/tng
 go build .
+# build tng shared module
+go build -o tng.so -buildmode=c-shared .
 ```
 
 Running 
@@ -19,3 +21,41 @@ go run .
 ```
 
 
+## C-API
+
+Requirements
+------------
+* The jansson library should be installed.
+* The libjansson-dev library package should be installed for development.
+
+Building shared library
+-----------------------
+```
+go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
+```
+
+Building and running tests
+--------------------------
+```
+gcc transit-c/test_libtransit.c -o ./libtransit-c.test -ldl && ./libtransit-c.test
+
+gcc transit-c/test_transit.c transit-c/transit_json.c -o ./transit-c.test -ljansson && ./transit-c.test
+```
+
+Building and running tests in Docker container
+----------------------------------------------
+```
+docker build -t groundworkdevelopment/tng .
+docker run --rm --name tng-test-c groundworkdevelopment/tng sh -c "gcc transit-c/test_transit.c transit-c/transit_json.c -o ./transit-c.test -ljansson && ./transit-c.test"
+```
+
+Development
+-----------
+The `clang-format` tool is used for formatting with the "Google" style option.
+* https://clang.llvm.org/docs/ClangFormat.html
+* https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+
+```
+cd transit-c
+clang-format -style=Google -i *.c *.h
+```
