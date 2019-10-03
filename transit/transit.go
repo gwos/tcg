@@ -598,12 +598,13 @@ type SpecialDate struct {
 
 func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
 	strInput := string(input)
-	strInput += "000000"
 
 	i, err := strconv.ParseInt(strInput, 10, 64)
 	if err != nil {
 		return err
 	}
+
+	i *= int64(time.Millisecond)
 
 	*sd = SpecialDate{time.Unix(0, i)}
 
