@@ -35,7 +35,7 @@ func TestMonitoredResource(str *C.char, errorMsg *C.char) *C.char {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.char {
-	var resourceWithMetrics []transit.ResourceWithMetrics
+	var resourceWithMetrics transit.TransitSendMetricsRequest
 
 	err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
 	if err != nil {
@@ -43,13 +43,19 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.cha
 		return nil
 	}
 
-	err = transitPackage.SendResourcesWithMetrics(resourceWithMetrics)
+	operationResults, err := transitPackage.SendResourcesWithMetrics(&resourceWithMetrics)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
 	}
 
-	return C.CString("Success")
+	operationResultsJson, err := json.Marshal(operationResults)
+	if err != nil {
+		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+		return nil
+	}
+
+	return C.CString(string(operationResultsJson))
 }
 
 //export ListMetrics
@@ -70,34 +76,28 @@ func ListMetrics(errorMsg  *C.char) *C.char {
 }
 
 //export SynchronizeInventory
-func SynchronizeInventory(monitoredResourcesJson, groupsJson, errorMsg *C.char) *C.char {
-	var monitoredResources []transit.MonitoredResource
-	var groups []transit.Group
+func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
+	var inventory transit.TransitSendInventoryRequest
 
-	err := json.Unmarshal([]byte(C.GoString(monitoredResourcesJson)), &monitoredResources)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-	err = json.Unmarshal([]byte(C.GoString(groupsJson)), &groups)
+	err := json.Unmarshal([]byte(C.GoString(inventoryJson)), &inventory)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
 	}
 
-	transitSynchronize, err := transitPackage.SynchronizeInventory(&monitoredResources, &groups)
+	operationResults, err := transitPackage.SynchronizeInventory(&inventory)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
 	}
 
-	transitSynchronizeJson, err := json.Marshal(transitSynchronize)
+	operationResultsJson, err := json.Marshal(operationResults)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
 	}
 
-	return C.CString(string(transitSynchronizeJson))
+	return C.CString(string(operationResultsJson))
 }
 
 //TODO:

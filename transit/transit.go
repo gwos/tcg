@@ -14,34 +14,26 @@ import (
 //   "GAUGE" - An instantaneous measurement of a value.
 //   "DELTA" - The change in a value during a time interval.
 //   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-type MetricKindEnum int
+type MetricKindEnum string
 
 const (
-	GAUGE MetricKindEnum = iota + 1
-	DELTA
-	CUMULATIVE
-	METRIC_KIND_UNSPECIFIED
+	GAUGE MetricKindEnum = "GAUGE"
+	DELTA = "DELTA"
+	CUMULATIVE = "CUMULATIVE"
+	METRIC_KIND_UNSPECIFIED = "METRIC_KIND_UNSPECIFIED"
 )
-
-func (metricKind MetricKindEnum) String() string {
-	return [...]string{"GAUGE", "DELTA", "CUMULATIVE", "METRIC_KIND_UNSPECIFIED"}[metricKind]
-}
 
 // ValueType defines the data type of the value of a metric
-type ValueTypeEnum int
+type ValueTypeEnum string
 
 const (
-	IntegerType ValueTypeEnum = iota + 1
-	DoubleType
-	StringType
-	BooleanType
-	DateType
-	UnspecifiedType
+	IntegerType ValueTypeEnum = "IntegerType"
+	DoubleType = "DoubleType"
+	StringType = "StringType"
+	BooleanType = "BooleanType"
+	DateType = "DateType"
+	UnspecifiedType = "UnspecifiedType"
 )
-
-func (valueType ValueTypeEnum) String() string {
-	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "DateType", "UnspecifiedType"}[valueType]
-}
 
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
@@ -52,45 +44,34 @@ const (
 )
 
 // CloudHub Compute Types
-type ComputeTypeEnum int
+type ComputeTypeEnum string
 
 const (
-	Query ComputeTypeEnum = iota + 1
-	Regex
-	Synthetic
-	Info
-	Performance
-	Health
+	Query ComputeTypeEnum = "Query"
+	Regex = "Regex"
+	Synthetic = "Synthetic"
+	Info = "Info"
+	Performance = "Performance"
+	Health = "Health"
 )
-
-func (computeType ComputeTypeEnum) String() string {
-	return [...]string{"query", "regex", "synthetic", "info", "performance", "health"}[computeType]
-}
 
 // MonitorStatusEnum represents Groundwork service monitor status
-type MonitorStatusEnum int
+type MonitorStatusEnum string
 
 const (
-	SERVICE_OK MonitorStatusEnum = iota + 1
-	SERVICE_UNSCHEDULED_CRITICAL
-	SERVICE_WARNING
-	SERVICE_PENDING
-	SERVICE_SCHEDULED_CRITICAL
-	SERVICE_UNKNOWN
-	HOST_UP
-	HOST_UNSCHEDULED_DOWN
-	HOST_WARNING
-	HOST_PENDING
-	HOST_SCHEDULED_DOWN
-	HOST_UNREACHABLE
+	SERVICE_OK MonitorStatusEnum = "SERVICE_OK"
+	SERVICE_UNSCHEDULED_CRITICAL = "SERVICE_UNSCHEDULED_CRITICAL"
+	SERVICE_WARNING = "SERVICE_WARNING"
+	SERVICE_PENDING = "SERVICE_PENDING"
+	SERVICE_SCHEDULED_CRITICAL = "SERVICE_SCHEDULED_CRITICAL"
+	SERVICE_UNKNOWN = "SERVICE_UNKNOWN"
+	HOST_UP = "HOST_UP"
+	HOST_UNSCHEDULED_DOWN = "HOST_UNSCHEDULED_DOWN"
+	HOST_WARNING = "HOST_WARNING"
+	HOST_PENDING = "HOST_PENDING"
+	HOST_SCHEDULED_DOWN = "HOST_SCHEDULED_DOWN"
+	HOST_UNREACHABLE = "HOST_UNREACHABLE"
 )
-
-func (status MonitorStatusEnum) String() string {
-	return [...]string{
-		"", "OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
-		"UP", "UNSCHEDULED DOWN", "WARNING", "PENDING", "SCHEDULED DOWN", "UNREACHABLE",
-	}[status]
-}
 
 // Groundwork Standard Monitored Resource Types
 const (
@@ -99,19 +80,15 @@ const (
 )
 
 // TimeSeries Metric Sample Possible Types
-type MetricSampleType int
+type MetricSampleType string
 
 const (
-	Value MetricSampleType = iota + 1
-	Critical
-	Warning
-	Min
-	Max
+	Value MetricSampleType = "Value"
+	Critical = "Critical"
+	Warning = "Warning"
+	Min = "Min"
+	Max = "Max"
 )
-
-func (metricSampleType MetricSampleType) String() string {
-	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
-}
 
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
@@ -349,6 +326,19 @@ type TransitSendInventoryRequest struct {
 type OperationResults struct {
 	ResourcesAdded   int `json:"successful"`
 	ResourcesDeleted int `json:"failed"`
+	EntityType string `json:"entityType"`
+	Operation string `json:"operation"`
+	Warning int `json:"warning"`
+	Count int `json:"count"`
+	Results *[]OperationResult	`json:"results"`
+}
+
+type OperationResult struct {
+	Entity string	`json:"entity"`
+	Status string	`json:"status"`
+	Message string	`json:"message"`
+	Location string	`json:"location"`
+	EntityId int	`json:"entityId"`
 }
 
 type Group struct {
@@ -444,27 +434,15 @@ func Disconnect(transit *Transit) bool {
 	return statusCode == 200
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources *[]ResourceWithMetrics) (*OperationResults, error) {
-	context := TracerContext{
-		AppType:    "GoClient",
-		AgentId:    "test-agent",
-		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  SpecialDate{},
-	}
-
-	transitSendMetricsRequest := transitSendMetricsRequest{
-		Trace:   context,
-		Metrics: resources,
-	}
-
+func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsRequest) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "6f4173ec-2bc5-486b-8bd8-6f8d983fa6a2",
+		"GWOS-API-TOKEN": "d6d5549e-c5b2-4224-9cbd-47944fcc5fbb",
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(transitSendMetricsRequest)
+	byteBody, err := json.Marshal(resources)
 	if err != nil {
 		return nil, err
 	}
@@ -473,6 +451,8 @@ func (transit Transit) SendResourcesWithMetrics(resources *[]ResourceWithMetrics
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println(string(byteResponse))
 
 	var operationResults OperationResults
 
@@ -546,11 +526,11 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	return &arr, nil
 }
 
-func (transit Transit) SynchronizeInventory(inventory *transitSendInventoryRequest) (*OperationResults, error) {
+func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "6f4173ec-2bc5-486b-8bd8-6f8d983fa6a2",
+		"GWOS-API-TOKEN": "d6d5549e-c5b2-4224-9cbd-47944fcc5fbb",
 		"GWOS-APP-NAME":  "gw8",
 	}
 
@@ -575,15 +555,9 @@ func (transit Transit) SynchronizeInventory(inventory *transitSendInventoryReque
 }
 
 // internal transit data
-type transitSendMetricsRequest struct {
+type TransitSendMetricsRequest struct {
 	Trace   TracerContext          `json:"context"`
 	Metrics *[]ResourceWithMetrics `json:"resources"`
-}
-
-type transitSendInventoryRequest struct {
-	Trace     TracerContext        `json:"context"`
-	Inventory *[]MonitoredResource `json:"resources"`
-	Groups    *[]Group             `json:"groups"`
 }
 
 type SpecialDate struct {
