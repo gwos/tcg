@@ -1,5 +1,4 @@
 package main
-
 import (
 	"flag"
 	"fmt"
@@ -17,7 +16,7 @@ func valueOf(x int64) *int64 {
 }
 
 // examples
-func main2() {
+func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 	// Example Usage with a host
@@ -25,8 +24,8 @@ func main2() {
 		Name: "geneva",
 		Type:   transit.HostResource,
 		Status: transit.HOST_UP,
-		LastCheckTime: time.Now(),
-		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastCheckTime: transit.SpecialDate{Time: time.Now()},
+		NextCheckTime: transit.SpecialDate{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Description: "Subversion Server",
 		Properties: map[string]transit.TypedValue{
@@ -35,15 +34,15 @@ func main2() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
+			"InceptionDate":   transit.TypedValue{DateValue: transit.SpecialDate{Time: time.Now()}},
 		},
 	}
 	localLoadService := transit.MonitoredResource{
 		Name: "local_load",
 		Type:   transit.ServiceResource,
 		Status: transit.SERVICE_OK,
-		LastCheckTime: time.Now(),
-		NextCheckTime: time.Now().Add(time.Minute * 5),
+		LastCheckTime: transit.SpecialDate{Time: time.Now()},
+		NextCheckTime: transit.SpecialDate{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Description: "Load on subversion",
 		Properties: map[string]transit.TypedValue{
@@ -52,7 +51,7 @@ func main2() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionDate":   transit.TypedValue{DateValue: time.Now()},
+			"InceptionDate":   transit.TypedValue{DateValue: transit.SpecialDate{Time: time.Now()}},
 		},
 	}
 	point := makePoint()
@@ -135,7 +134,7 @@ func main2() {
 
 func makePoint() *transit.Point {
 	random := rand.Float64()
-	now := time.Now()
+	now := transit.SpecialDate{Time: time.Now()}
 	return &transit.Point{
 		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
 		Value:    &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
@@ -146,7 +145,7 @@ func makePoints() []*transit.Point {
 	points := make([]*transit.Point, 3)
 	for i := range points {
 		random := rand.Float64()
-		now := time.Now()
+		now := transit.SpecialDate{Time: time.Now()}
 		points[i] = &transit.Point{
 
 			Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
