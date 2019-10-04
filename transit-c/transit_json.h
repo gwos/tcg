@@ -1,6 +1,12 @@
 #ifndef TRANSIT_JSON_H
 #define TRANSIT_JSON_H
 
+#ifndef NUL_TERM_LEN
+/* Size of a NUL-termination byte. Generally useful for documenting the meaning
+ * of +1 and -1 length adjustments having to do with such bytes. */
+#define NUL_TERM_LEN 1 /*  sizeof('\0') */
+#endif                 /* NUL_TERM_LEN */
+
 #include <stdlib.h>
 
 #include "transit.h"

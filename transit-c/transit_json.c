@@ -39,31 +39,31 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
 
     /* compute size for the target struct */
     size = sizeof(MonitoredResource);
-    size += json_string_length(jsonName) + 1;
-    size += json_string_length(jsonType) + 1;
+    size += json_string_length(jsonName) + NUL_TERM_LEN;
+    size += json_string_length(jsonType) + NUL_TERM_LEN;
 
     if (jsonOwner) {
-      size += json_string_length(jsonOwner) + 1;
+      size += json_string_length(jsonOwner) + NUL_TERM_LEN;
     }
     if (jsonCategory) {
-      size += json_string_length(jsonCategory) + 1;
+      size += json_string_length(jsonCategory) + NUL_TERM_LEN;
     }
     if (jsonDescription) {
-      size += json_string_length(jsonDescription) + 1;
+      size += json_string_length(jsonDescription) + NUL_TERM_LEN;
     }
     if (jsonLastPlugInOutput) {
-      size += json_string_length(jsonLastPlugInOutput) + 1;
+      size += json_string_length(jsonLastPlugInOutput) + NUL_TERM_LEN;
     }
     if (jsonProperties) {
       size += sizeof(TypedValuePairList);
       const char *key;
       json_object_foreach(jsonProperties, key, jsonProp) {
-        size += strlen(key) + 1;
+        size += strlen(key) + NUL_TERM_LEN;
         size += sizeof(TypedValuePair);
         size += sizeof(TypedValue);
         jsonPropValue = json_object_get(jsonProp, "stringValue");
         if (jsonPropValue) {
-          size += json_string_length(jsonPropValue) + 1;
+          size += json_string_length(jsonPropValue) + NUL_TERM_LEN;
         }
       }
     }
@@ -84,26 +84,26 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
 
     ptr += sizeof(MonitoredResource);
     resource->name = strcpy((char *)ptr, json_string_value(jsonName));
-    ptr += json_string_length(jsonName) + 1;
+    ptr += json_string_length(jsonName) + NUL_TERM_LEN;
     resource->type = strcpy((char *)ptr, json_string_value(jsonType));
-    ptr += json_string_length(jsonType) + 1;
+    ptr += json_string_length(jsonType) + NUL_TERM_LEN;
 
     if (jsonOwner) {
       resource->owner = strcpy((char *)ptr, json_string_value(jsonOwner));
-      ptr += json_string_length(jsonOwner) + 1;
+      ptr += json_string_length(jsonOwner) + NUL_TERM_LEN;
     }
     if (jsonCategory) {
       resource->owner = strcpy((char *)ptr, json_string_value(jsonCategory));
-      ptr += json_string_length(jsonCategory) + 1;
+      ptr += json_string_length(jsonCategory) + NUL_TERM_LEN;
     }
     if (jsonDescription) {
       resource->owner = strcpy((char *)ptr, json_string_value(jsonDescription));
-      ptr += json_string_length(jsonDescription) + 1;
+      ptr += json_string_length(jsonDescription) + NUL_TERM_LEN;
     }
     if (jsonLastPlugInOutput) {
       resource->owner =
           strcpy((char *)ptr, json_string_value(jsonLastPlugInOutput));
-      ptr += json_string_length(jsonLastPlugInOutput) + 1;
+      ptr += json_string_length(jsonLastPlugInOutput) + NUL_TERM_LEN;
     }
 
     if (jsonProperties) {
@@ -118,7 +118,7 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
       json_object_foreach(jsonProperties, key, jsonProp) {
         ptr += sizeof(TypedValuePair);
         resource->properties.items[i].key = strcpy((char *)ptr, key);
-        ptr += strlen(key) + 1;
+        ptr += strlen(key) + NUL_TERM_LEN;
 
         memcpy(ptr, &emptyTypedValue, sizeof(TypedValue));
         ptr += sizeof(TypedValue);
@@ -157,7 +157,7 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
             jsonPropValue = json_object_get(jsonProp, "stringValue");
             resource->properties.items[i].value.stringValue =
                 strcpy((char *)ptr, json_string_value(jsonPropValue));
-            ptr += json_string_length(jsonPropValue) + 1;
+            ptr += json_string_length(jsonPropValue) + NUL_TERM_LEN;
             break;
 
           default:
@@ -174,10 +174,10 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
           ptr += sizeof(MonitoredResource);
           resource->owner->name =
               strcpy((char *)ptr, json_string_value(jsonOwnerName));
-          ptr += json_string_length(jsonOwnerName) + 1;
+          ptr += json_string_length(jsonOwnerName) + NUL_TERM_LEN;
           resource->owner->type =
               strcpy((char *)ptr, json_string_value(jsonOwnerType));
-          ptr += json_string_length(jsonOwnerType) + 1;
+          ptr += json_string_length(jsonOwnerType) + NUL_TERM_LEN;
           resource->owner->status = indexOf(
               MONITOR_STATUS_STRING,
               sizeof(MONITOR_STATUS_STRING) / sizeof(*MONITOR_STATUS_STRING),
@@ -196,10 +196,10 @@ MonitoredResource *decodeMonitoredResource(const char *str) {
           json_object_foreach(jsonLabels, key, value) {
             ptr += sizeof(StringPair);
             resource->labels.items[i].key = strcpy((char *)ptr, key);
-            ptr += strlen(key) + 1;
+            ptr += strlen(key) + NUL_TERM_LEN;
             resource->labels.items[i].value =
                 strcpy((char *)ptr, json_string_value(value));
-            ptr += json_string_length(value) + 1;
+            ptr += json_string_length(value) + NUL_TERM_LEN;
             i++;
           }
           json_decref(value);
@@ -320,3 +320,5 @@ char *encodeMonitoredResource(const MonitoredResource *resource, size_t flags) {
   json_decref(json);
   return result;
 }
+
+
