@@ -1,5 +1,6 @@
 package org.groundwork.tng.transit;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,7 +19,8 @@ public class TransitServicesImpl implements TransitServices {
 
     public TransitServicesImpl() {
         this.objectMapper = new ObjectMapper();
-        this.tngTransitLibrary = Native.loadLibrary("libtransit.so", TngTransitLibrary.class);
+        this.objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        this.tngTransitLibrary = Native.loadLibrary("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
     }
 
@@ -30,6 +32,8 @@ public class TransitServicesImpl implements TransitServices {
         } catch (JsonProcessingException e) {
             throw new TransitException(e);
         }
+
+        System.out.println(resourcesJson);
 
         String operationResultsJson = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
         if (operationResultsJson == null) {
