@@ -9,22 +9,24 @@
 #include "util.h"
 
 void test_defineMonitoredResource() {
-  TypedValue prop0 = {BooleanType, true};
+  TypedValue prop0 = {BooleanType, boolValue : true};
   TypedValue prop1 = {DoubleType, doubleValue : 0.1};
   TypedValue prop2 = {StringType, stringValue : "val_002"};
   TypedValuePair props[] = {
       {"key0", prop0}, {"key01", prop1}, {"key002", prop2}};
 
-  MonitoredResource resource = {SERVICE_OK,
-                                "the-unique-name-of-the-instance-02",
-                                "instance-type",
-                                "instance-owner",
-                                "instance-category",
-                                "instance-description",
-                                "instance-lastPlugInOutput",
-                                0,
-                                0,
-                                {3, props}};
+  MonitoredResource resource = {
+    status : SERVICE_OK,
+    name : "the-unique-name-of-the-instance-02",
+    type : "instance-type",
+    owner : "instance-owner",
+    category : "instance-category",
+    description : "instance-description",
+    lastPlugInOutput : "instance-lastPlugInOutput",
+    lastCheckTime : 0,
+    nextCheckTime : 0,
+    properties : {count : 3, items : props}
+  };
 
   if (resource.status != SERVICE_OK) {
     fail("resource02.status != SERVICE_OK");
@@ -41,25 +43,30 @@ void test_encodeMonitoredResource() {
   MonitoredResource resource01 = {HOST_UP, "the-unique-name-of-the-instance-01",
                                   "gce_instance"};
   MonitoredResource resource02 = {
-      SERVICE_OK,
-      "the-unique-name-of-the-instance-02",
-      "instance-type",
-      "instance-owner",
-      "instance-category",
-      "instance-description",
-      "instance-lastPlugInOutput",
-      0,
-      0,
-      {3, (TypedValuePair[]){{"key--", {BooleanType, true}},
+    status : SERVICE_OK,
+    name : "the-unique-name-of-the-instance-02",
+    type : "instance-type",
+    owner : "instance-owner",
+    category : "instance-category",
+    description : "instance-description",
+    lastPlugInOutput : "instance-lastPlugInOutput",
+    lastCheckTime : 0,
+    nextCheckTime : 0,
+    properties : {
+      count : 3,
+      items :
+          (TypedValuePair[]){{"key--", {BooleanType, boolValue : true}},
                              {"key_1", {DoubleType, doubleValue : 0.1}},
-                             {"key-2", {StringType, stringValue : "val-2"}}}}};
+                             {"key-2", {StringType, stringValue : "val-2"}}}
+    }
+  };
 
   char *result = NULL;
   result = encodeMonitoredResource(&resource01, 0);
   if (!result || strcmp(result,
                         "{\"name\": \"the-unique-name-of-the-instance-01\", "
                         "\"status\": 7, \"type\": \"gce_instance\"}")) {
-    fail("!result");
+    fail(result);
   }
 
   free(result);
@@ -77,18 +84,18 @@ void test_encodeMonitoredResource() {
 
   //   printf("\n#test_encodeMonitoredResource: %s", result);
   if (!result || strcmp(result, expected)) {
-    fail("!result");
+    fail(result);
   }
 
   free(result);
 }
 
 void test_decodeMonitoredResource() {
-  char *resource_str01 =
+  char *resource_json01 =
       "{\"name\": \"the-unique-name-of-the-instance-01\", "
       "\"status\": 7, \"type\": \"gce_instance\"}";
 
-  char *resource_str02 =
+  char *resource_json02 =
       "{\"category\": \"instance-category\", \"description\": "
       "\"instance-description\", \"lastPlugInOutput\": "
       "\"instance-lastPlugInOutput\", \"name\": "
@@ -98,7 +105,7 @@ void test_decodeMonitoredResource() {
       "{\"doubleValue\": 0.10000000000000001, \"valueType\": 2}}, \"status\": "
       "1, \"type\": \"instance-type\"}";
 
-  MonitoredResource *resource = decodeMonitoredResource(resource_str01);
+  MonitoredResource *resource = decodeMonitoredResource(resource_json01);
 
   if (!resource) {
     fail("!resource");
@@ -114,16 +121,37 @@ void test_decodeMonitoredResource() {
   }
 
   free(resource);
-  resource = decodeMonitoredResource(resource_str02);
+  resource = decodeMonitoredResource(resource_json02);
 
   if (!resource) {
     fail("!resource");
   };
+  if (resource->status != SERVICE_OK) {
+    fail("resource->status != SERVICE_OK");
+  }
   if (strcmp(resource->name, "the-unique-name-of-the-instance-02")) {
     fail(resource->name);
   }
-  if (resource->status != SERVICE_OK) {
-    fail("resource->status != SERVICE_OK");
+  if (strcmp(resource->type, "instance-type")) {
+    fail(resource->type);
+  }
+  if (strcmp(resource->owner, "instance-owner")) {
+    fail(resource->owner);
+  }
+  if (strcmp(resource->category, "instance-category")) {
+    fail(resource->category);
+  }
+  if (strcmp(resource->description, "instance-description")) {
+    fail(resource->description);
+  }
+  if (strcmp(resource->lastPlugInOutput, "instance-lastPlugInOutput")) {
+    fail(resource->lastPlugInOutput);
+  }
+  if (resource->lastCheckTime != 0) {
+    fail("resource->lastCheckTime != 0");
+  }
+  if (resource->nextCheckTime != 0) {
+    fail("resource->nextCheckTime != 0");
   }
   if (resource->properties.count != 3) {
     fail("resource->properties.count");
@@ -159,10 +187,90 @@ void test_decodeMonitoredResource() {
   free(resource);
 }
 
+void test_encodeCredentials() {
+  Credentials creds = {"Username", "SecurePass"};
+  char *result = NULL;
+  result = encodeCredentials(&creds, 0);
+  //   printf("\n#test_encodeCredentials: %s", result);
+  if (!result ||
+      strcmp(result,
+             "{\"password\": \"SecurePass\", \"user\": \"Username\"}")) {
+    fail(result);
+  }
+  free(result);
+}
+
+void test_decodeCredentials() {
+  char *creds_json = "{\"password\": \"SecurePass\", \"user\": \"Username\"}";
+  Credentials *creds = decodeCredentials(creds_json);
+
+  if (!creds) {
+    fail("!creds");
+  };
+  if (strcmp(creds->user, "Username")) {
+    fail(creds->user);
+  }
+  if (strcmp(creds->password, "SecurePass")) {
+    fail(creds->password);
+  }
+
+  free(creds);
+}
+
+void test_encodeTransit() {
+  Transit transit = {
+    config : {
+      account : "Account",
+      hostName : "host-name",
+      token : "token-token",
+      ssl : true
+    }
+  };
+  char *result = NULL;
+  result = encodeTransit(&transit, 0);
+  //   printf("\n#test_encodeTransit: %s", result);
+  if (!result ||
+      strcmp(result,
+             "{\"config\": {\"account\": \"Account\", \"hostName\": "
+             "\"host-name\", \"ssl\": true, \"token\": \"token-token\"}}")) {
+    fail(result);
+  }
+  free(result);
+}
+
+void test_decodeTransit() {
+  char *transit_json =
+      "{\"config\": {\"account\": \"Account\", \"hostName\": "
+      "\"host-name\", \"ssl\": true, \"token\": \"token-token\"}}";
+  Transit *transit = decodeTransit(transit_json);
+
+  if (!transit) {
+    fail("!transit");
+  };
+  if (strcmp(transit->config.account, "Account")) {
+    fail(transit->config.account);
+  }
+  if (strcmp(transit->config.hostName, "host-name")) {
+    fail(transit->config.hostName);
+  }
+  if (strcmp(transit->config.token, "token-token")) {
+    fail(transit->config.token);
+  }
+  if (transit->config.ssl != true) {
+    fail("transit->config.ssl != true");
+  }
+
+  free(transit);
+}
+
 int main(void) {
-  test_defineMonitoredResource();
-  test_encodeMonitoredResource();
-  test_decodeMonitoredResource();
+//   test_defineMonitoredResource();
+//   test_encodeMonitoredResource();
+//   test_decodeMonitoredResource();
+  test_encodeCredentials();
+  test_decodeCredentials();
+  test_encodeTransit();
+  test_decodeTransit();
 
   fprintf(stdout, "\nall tests passed");
   return 0;
