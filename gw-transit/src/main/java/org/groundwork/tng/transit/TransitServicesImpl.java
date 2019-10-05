@@ -20,6 +20,7 @@ public class TransitServicesImpl implements TransitServices {
     public TransitServicesImpl() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        //this.tngTransitLibrary = Native.loadLibrary("/Users/dtaylor/go/src/github.com/gwos/tng/libtransit/libtransit.so", TngTransitLibrary.class);
         this.tngTransitLibrary = Native.loadLibrary("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
     }

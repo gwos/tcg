@@ -55,14 +55,17 @@ public class AppTest {
                 .build();
 
 
+        DtoMonitoredResource monitoredResource = DtoMonitoredResource.builder()
+                .setName("mc-test-host")
+                .setType("HOST")
+                .setStatus(DtoMonitorStatus.HOST_UP)
+                .setOwner("mc-test-host")
+                .build();
+        monitoredResource.getProperties().put("device", DtoTypedValue.builder().setStringValue(monitoredResource.getName()).build());
+
         resources.add(DtoResourceWithMetrics.builder()
                 .setMetrics(timeSeries)
-                .setResource(DtoMonitoredResource.builder()
-                        .setName("mc-test-host")
-                        .setType("HOST")
-                        .setStatus(DtoMonitorStatus.HOST_UP)
-                        .setOwner("mc-test-host")
-                        .build())
+                .setResource(monitoredResource)
                 .build());
 
         DtoOperationResults results = transit.SendResourcesWithMetrics(resources);
