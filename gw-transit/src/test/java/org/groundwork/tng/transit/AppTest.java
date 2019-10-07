@@ -50,7 +50,6 @@ public class AppTest {
                         .build())
                 .build());
 
-
         DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder()
                 .setContext(DtoTracerContext.builder()
                         .setAgentId("3939333393342")

@@ -53,7 +53,6 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.cha
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
 	}
-
 	return C.CString(string(operationResultsJson))
 }
 
@@ -85,6 +84,7 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
 	}
 
 	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
+
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
