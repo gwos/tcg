@@ -460,6 +460,8 @@ func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsReq
 		return nil, errors.New(string(byteResponse))
 	}
 
+	fmt.Println(string(byteResponse))
+
 	var operationResults OperationResults
 
 	err = json.Unmarshal(byteResponse, &operationResults)
