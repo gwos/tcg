@@ -9,7 +9,7 @@ import (
 	"log"
 )
 
-var transitPackage transit.Transit
+var transitConfig transit.Transit
 
 func main() {
 }
@@ -32,7 +32,6 @@ func TestMonitoredResource(str *C.char, errorMsg *C.char) *C.char {
 	return C.CString(string(buf))
 }
 
-
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.char {
 	var resourceWithMetrics transit.TransitSendMetricsRequest
@@ -43,7 +42,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.cha
 		return nil
 	}
 
-	operationResults, err := transitPackage.SendResourcesWithMetrics(&resourceWithMetrics)
+	operationResults, err := transitConfig.SendResourcesWithMetrics(&resourceWithMetrics)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
@@ -59,8 +58,8 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.cha
 }
 
 //export ListMetrics
-func ListMetrics(errorMsg  *C.char) *C.char {
-	monitorDescriptor, err := transitPackage.ListMetrics()
+func ListMetrics(errorMsg *C.char) *C.char {
+	monitorDescriptor, err := transitConfig.ListMetrics()
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
@@ -85,7 +84,7 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
 		return nil
 	}
 
-	operationResults, err := transitPackage.SynchronizeInventory(&inventory)
+	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return nil
@@ -105,41 +104,34 @@ func ListInventory() {
 }
 
 //export Connect
-func Connect(credentialsJson, errorMsg *C.char) *C.char {
+func Connect(credentialsJson, errorMsg *C.char) bool {
+	transitConfig = transit.Transit{}
+
 	var credentials transit.Credentials
 
 	err := json.Unmarshal([]byte(C.GoString(credentialsJson)), &credentials)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
+		return false
 	}
 
-	transitConfig, err := transit.Connect(credentials)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-
-	//start nats
-
-	transitJson, err := json.Marshal(transitConfig)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-
-	return C.CString(string(transitJson))
-}
-
-//export Disconnect
-func Disconnect(transitJson, errorMsg *C.char) bool {
-	var transitConfig transit.Transit
-
-	err := json.Unmarshal([]byte(C.GoString(transitJson)), &transitConfig)
+	err = transitConfig.Connect(credentials)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return false
 	}
 
-	return transit.Disconnect(&transitConfig)
+	//start nats
+
+	return true
+}
+
+//export Disconnect
+func Disconnect(errorMsg *C.char) bool {
+	err := transitConfig.Disconnect()
+	if err != nil {
+		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+		return false
+	}
+	return true
 }

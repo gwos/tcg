@@ -30,6 +30,12 @@ public class AppTest {
     public void shouldSendResourceAndMetrics() {
         TransitServices transit = new TransitServicesImpl();
 
+        DtoCredentials credentials = new DtoCredentials();
+        credentials.setUser("RESTAPIACCESS");
+        credentials.setPassword("***REMOVED***");
+
+        transit.Connect(credentials);
+
         List<DtoTimeSeries> timeSeries = new ArrayList<>();
         timeSeries.add(DtoTimeSeries.builder()
                 .setMetricName("mc-test-service-0")
@@ -66,6 +72,8 @@ public class AppTest {
                 .build());
 
         DtoOperationResults results = transit.SendResourcesWithMetrics(resources);
+
+        transit.Disconnect();
 
         assertEquals(1, (int) results.getCount());
         assertEquals(0, (int) results.getSuccessful());

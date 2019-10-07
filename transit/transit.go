@@ -3,6 +3,7 @@ package transit
 import "C"
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -136,7 +137,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a date stored as full timestamp
-	//DateValue SpecialDate `json:"dateValue,omitempty"`
+	DateValue SpecialDate `json:"dateValue,omitempty"`
 }
 
 // Point: A single data point in a time series.
@@ -382,7 +383,7 @@ type Transit struct {
 }
 
 // create and connect to a Transit instance from a Groundwork connection configuration
-func Connect(credentials Credentials) (*Transit, error) {
+func (transit *Transit) Connect(credentials Credentials) error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
 		"user":          credentials.User,
@@ -396,7 +397,7 @@ func Connect(credentials Credentials) (*Transit, error) {
 
 	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if statusCode == 200 {
@@ -406,16 +407,16 @@ func Connect(credentials Credentials) (*Transit, error) {
 			Token:    string(byteResponse),
 			SSL:      false,
 		}
-		transit := Transit{
+		*transit = Transit{
 			Config: config,
 		}
-		return &transit, nil
+		return nil
 	}
 
-	return nil, nil
+	return errors.New(string(byteResponse))
 }
 
-func Disconnect(transit *Transit) bool {
+func (transit Transit) Disconnect() (error) {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
 		"gwos-api-token": transit.Config.Token,
@@ -426,19 +427,23 @@ func Disconnect(transit *Transit) bool {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	statusCode, _, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
 	if err != nil {
-		return false
+		return err
 	}
 
-	return statusCode == 200
+	if statusCode == 200 {
+		return nil
+	}
+
+	return errors.New(string(byteResponse))
 }
 
 func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsRequest) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "d6d5549e-c5b2-4224-9cbd-47944fcc5fbb",
+		"GWOS-API-TOKEN": transit.Config.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
@@ -447,12 +452,13 @@ func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsReq
 		return nil, err
 	}
 
-	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println(string(byteResponse))
+	if statusCode == 401 {
+		return nil, errors.New(string(byteResponse))
+	}
 
 	var operationResults OperationResults
 
@@ -530,7 +536,7 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "d6d5549e-c5b2-4224-9cbd-47944fcc5fbb",
+		"GWOS-API-TOKEN": transit.Config.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
@@ -539,9 +545,12 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 		return nil, err
 	}
 
-	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
 	if err != nil {
 		return nil, err
+	}
+	if statusCode == 401 {
+		return nil, errors.New(string(byteResponse))
 	}
 
 	var operationResults OperationResults

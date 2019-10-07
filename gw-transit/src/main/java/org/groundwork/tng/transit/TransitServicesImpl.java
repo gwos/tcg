@@ -20,7 +20,7 @@ public class TransitServicesImpl implements TransitServices {
     public TransitServicesImpl() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        this.tngTransitLibrary = Native.loadLibrary("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
+        this.tngTransitLibrary = Native.load("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
     }
 
@@ -32,8 +32,6 @@ public class TransitServicesImpl implements TransitServices {
         } catch (JsonProcessingException e) {
             throw new TransitException(e);
         }
-
-        System.out.println(resourcesJson);
 
         String operationResultsJson = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
         if (operationResultsJson == null) {
@@ -80,6 +78,27 @@ public class TransitServicesImpl implements TransitServices {
             return objectMapper.readValue(operationResultsJson, DtoOperationResults.class);
         } catch (IOException e) {
             throw new TransitException(e);
+        }
+    }
+
+    @Override
+    public void Connect(DtoCredentials credentials) throws TransitException {
+        String credentialsJson;
+        try {
+            credentialsJson = objectMapper.writeValueAsString(credentials);
+        } catch (JsonProcessingException e) {
+            throw new TransitException(e);
+        }
+
+        if (!tngTransitLibrary.Connect(credentialsJson, errorMsg)) {
+            throw new TransitException(errorMsg.getValue());
+        }
+    }
+
+    @Override
+    public void Disconnect() throws TransitException {
+        if (!tngTransitLibrary.Disconnect(errorMsg)) {
+            throw new TransitException(errorMsg.getValue());
         }
     }
 }
