@@ -14,4 +14,8 @@ public interface TransitServices {
     List<DtoMetricDescriptor> ListMetrics() throws TransitException;
 
     DtoOperationResults SynchronizeInventory(DtoInventory inventory) throws TransitException;
+
+    void Connect(DtoCredentials credentials) throws TransitException;
+
+    void Disconnect() throws TransitException;
 }

@@ -8,6 +8,10 @@ import (
 	"net/url"
 )
 
+const (
+	RETRIES int = 2
+)
+
 func sendRequest(httpMethod string, requestUrl string, headers map[string]string, formValues map[string]string,
 	byteBody []byte) (int, []byte, error) {
 	tr := &http.Transport{
@@ -17,6 +21,7 @@ func sendRequest(httpMethod string, requestUrl string, headers map[string]string
 	client := http.Client{Transport: tr}
 
 	var request *http.Request
+	var response *http.Response
 	var err error
 
 	urlValues := url.Values{}
@@ -44,7 +49,12 @@ func sendRequest(httpMethod string, requestUrl string, headers map[string]string
 		request.Header.Add(key, value)
 	}
 
-	response, err := client.Do(request)
+	for i := 0; i < RETRIES; i++ {
+		response, err = client.Do(request)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return -1, nil, err
 	}
