@@ -5,11 +5,13 @@
 #include <stdint.h>
 #include <time.h>
 
-/* https://stackoverflow.com/a/10966395 */
+/* enums start from dumb value to conform upstream (iota + 1)
+ * inspired by: https://stackoverflow.com/a/10966395 */
 #define GENERATE_ENUM(ENUM) ENUM,
 #define GENERATE_STRING(STRING) #STRING,
 
 #define FOREACH_METRIC_KIND(METRIC_KIND) \
+  METRIC_KIND(_METRIC_KIND0)             \
   METRIC_KIND(GAUGE)                     \
   METRIC_KIND(DELTA)                     \
   METRIC_KIND(CUMULATIVE)                \
@@ -21,6 +23,7 @@ static const char *METRIC_KIND_STRING[] = {
 typedef enum { FOREACH_METRIC_KIND(GENERATE_ENUM) } METRIC_KIND_ENUM;
 
 #define FOREACH_VALUE_TYPE(VALUE_TYPE) \
+  VALUE_TYPE(_VALUE_TYPE0)             \
   VALUE_TYPE(IntegerType)              \
   VALUE_TYPE(DoubleType)               \
   VALUE_TYPE(StringType)               \
@@ -32,13 +35,14 @@ static const char *VALUE_TYPE_STRING[] = {FOREACH_VALUE_TYPE(GENERATE_STRING)};
 
 typedef enum { FOREACH_VALUE_TYPE(GENERATE_ENUM) } VALUE_TYPE_ENUM;
 
-#define FOREACH_UNIT(UNIT) UNIT(UnitCounter)
+#define FOREACH_UNIT(UNIT) UNIT(_UNIT0) UNIT(UnitCounter)
 
 static const char *UNIT_STRING[] = {FOREACH_UNIT(GENERATE_STRING)};
 
 typedef enum { FOREACH_UNIT(GENERATE_ENUM) } UNIT_ENUM;
 
 #define FOREACH_COMPUTE_TYPE(COMPUTE_TYPE) \
+  COMPUTE_TYPE(_COMPUTE_TYPE0)             \
   COMPUTE_TYPE(query)                      \
   COMPUTE_TYPE(regex)                      \
   COMPUTE_TYPE(synthetic)                  \
@@ -52,6 +56,7 @@ static const char *COMPUTE_TYPE_STRING[] = {
 typedef enum { FOREACH_COMPUTE_TYPE(GENERATE_ENUM) } COMPUTE_TYPE_ENUM;
 
 #define FOREACH_MONITOR_STATUS(MONITOR_STATUS) \
+  MONITOR_STATUS(_MONITOR_STATUS0)             \
   MONITOR_STATUS(SERVICE_OK)                   \
   MONITOR_STATUS(SERVICE_UNSCHEDULED_CRITICAL) \
   MONITOR_STATUS(SERVICE_WARNING)              \
@@ -71,6 +76,7 @@ static const char *MONITOR_STATUS_STRING[] = {
 typedef enum { FOREACH_MONITOR_STATUS(GENERATE_ENUM) } MONITOR_STATUS_ENUM;
 
 #define FOREACH_METRIC_SAMPLE_TYPE(METRIC_SAMPLE_TYPE) \
+  METRIC_SAMPLE_TYPE(_METRIC_SAMPLE_TYPE0)             \
   METRIC_SAMPLE_TYPE(Value)                            \
   METRIC_SAMPLE_TYPE(Critical)                         \
   METRIC_SAMPLE_TYPE(Warning)                          \
@@ -105,8 +111,8 @@ typedef struct {
   bool boolValue;
   double doubleValue;
   int64_t integerValue;
-  char *stringValue;
   time_t dateValue;  // go:time.Time
+  char *stringValue;
 } TypedValue;
 
 typedef struct {
@@ -127,8 +133,8 @@ typedef struct {
 typedef struct {
   MONITOR_STATUS_ENUM status;
   char *name, *type, *owner, *category, *description, *lastPlugInOutput;
-  time_t lastCheckTime;  // go:time.Time
-  time_t nextCheckTime;  // go:time.Time
+  time_t lastCheckTime;           // go:time.Time
+  time_t nextCheckTime;           // go:time.Time
   TypedValuePairList properties;  // go:map[string]TypedValue
 } MonitoredResource;
 

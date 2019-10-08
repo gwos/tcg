@@ -4,8 +4,8 @@ package main
 // #include <string.h> /* for strncpy error message */
 import "C"
 import (
-	"encoding/json"
 	"github.com/gwos/tng/transit"
+	"encoding/json"
 	"log"
 )
 
@@ -83,7 +83,11 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
 		return nil
 	}
 
-	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
+	operationResults, err := 
+  
+  
+  
+  .SynchronizeInventory(&inventory)
 
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
