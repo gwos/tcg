@@ -18,4 +18,6 @@ public interface TransitServices {
     void Connect(DtoCredentials credentials) throws TransitException;
 
     void Disconnect() throws TransitException;
+
+    void TestNats();
 }

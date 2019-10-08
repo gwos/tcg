@@ -6,12 +6,88 @@ import "C"
 import (
 	"encoding/json"
 	"github.com/gwos/tng/transit"
+	stan "github.com/nats-io/go-nats-streaming"
+	stand "github.com/nats-io/nats-streaming-server/server"
+	"github.com/nats-io/nats-streaming-server/stores"
 	"log"
+	"time"
 )
 
 var transitConfig transit.Transit
 
+const (
+	clusterID  = "test-cluster"
+	clientID   = "order-query-store1"
+	channel    = "order-notification"
+	durableID  = "store-durable"
+	queueGroup = "order-query-store-group"
+)
+
+var count = 0
+
 func main() {
+}
+
+func init() {
+	initNats()
+
+	initSubscriber()
+}
+
+func initNats() {
+	opts := stand.GetDefaultOptions()
+	opts.ID = "test-cluster"
+	opts.StoreType = stores.TypeFile
+	opts.FilestoreDir = "datastore"
+
+	_, err := stand.RunServerWithOpts(opts, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func initSubscriber() {
+	sc, err := stan.Connect(
+		clusterID,
+		clientID,
+		stan.NatsURL(stan.DefaultNatsURL),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = sc.QueueSubscribe("foo", queueGroup, func(msg *stan.Msg) {
+		log.Println("From subscriber", msg)
+
+		count++
+
+		if count < 3 {
+			_ = msg.Ack()
+		}
+	}, stan.SetManualAckMode(),
+		stan.AckWait(15*time.Second),
+		stan.DurableName(durableID),
+		stan.StartWithLastReceived(),
+	)
+}
+
+//export TestNats
+func TestNats(msg *C.char) {
+	sc, err := stan.Connect(
+		clusterID,
+		"publisherId",
+		stan.NatsURL(stan.DefaultNatsURL),
+	)
+	if err != nil {
+		log.Fatal("TestNats: ", err)
+	}
+
+	err = sc.Publish("foo", []byte(C.GoString(msg)))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = sc.Close()
 }
 
 //export TestMonitoredResource
