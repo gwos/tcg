@@ -7,6 +7,9 @@ import org.groundwork.rs.dto.DtoOperationResults;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -17,7 +20,7 @@ import java.util.List;
 public class AppTest {
     /**
      * Test sending resource and metrics
-     *
+     * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
      * 2. Generate GWOS-API-TOKEN and paste it to headers in SendResourceWithMetric function in transit package from TNG
@@ -27,55 +30,60 @@ public class AppTest {
      * 3. Run test
      */
     @Test
-    public void shouldSendResourceAndMetrics() {
+    public void shouldSendResourceAndMetrics() throws IOException {
         TransitServices transit = new TransitServicesImpl();
 
-        DtoCredentials credentials = new DtoCredentials();
-        credentials.setUser("RESTAPIACCESS");
-        credentials.setPassword("6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH");
+        transit.TestNats();
 
-        transit.Connect(credentials);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String name = reader.readLine();
 
-        List<DtoTimeSeries> timeSeries = new ArrayList<>();
-        timeSeries.add(DtoTimeSeries.builder()
-                .setMetricName("mc-test-service-0")
-                .setSampleType(DtoMetricSampleType.Warning)
-                .setInterval(DtoTimeInterval.builder()
-                        .setStartTime(new Date())
-                        .setEndTime(new Date())
-                        .build())
-                .setValue(DtoTypedValue.builder()
-                        .setValueType(DtoValueType.IntegerType)
-                        .setIntegerValue(1)
-                        .build())
-                .build());
-
-        DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder()
-                .setContext(DtoTracerContext.builder()
-                        .setAgentId("3939333393342")
-                        .setAppType("VEMA")
-                        .setTimeStamp(new Date())
-                        .setTraceToken("token-99e93")
-                        .build())
-                .build();
-
-
-        resources.add(DtoResourceWithMetrics.builder()
-                .setMetrics(timeSeries)
-                .setResource(DtoMonitoredResource.builder()
-                        .setName("mc-test-host")
-                        .setType("HOST")
-                        .setStatus(DtoMonitorStatus.HOST_UP)
-                        .setOwner("mc-test-host")
-                        .build())
-                .build());
-
-        DtoOperationResults results = transit.SendResourcesWithMetrics(resources);
-
-        transit.Disconnect();
-
-        assertEquals(1, (int) results.getCount());
-        assertEquals(0, (int) results.getSuccessful());
-        assertEquals(1, (int) results.getFailed());
+//        DtoCredentials credentials = new DtoCredentials();
+//        credentials.setUser("RESTAPIACCESS");
+//        credentials.setPassword("6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH");
+//
+//        transit.Connect(credentials);
+//
+//        List<DtoTimeSeries> timeSeries = new ArrayList<>();
+//        timeSeries.add(DtoTimeSeries.builder()
+//                .setMetricName("mc-test-service-0")
+//                .setSampleType(DtoMetricSampleType.Warning)
+//                .setInterval(DtoTimeInterval.builder()
+//                        .setStartTime(new Date())
+//                        .setEndTime(new Date())
+//                        .build())
+//                .setValue(DtoTypedValue.builder()
+//                        .setValueType(DtoValueType.IntegerType)
+//                        .setIntegerValue(1)
+//                        .build())
+//                .build());
+//
+//        DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder()
+//                .setContext(DtoTracerContext.builder()
+//                        .setAgentId("3939333393342")
+//                        .setAppType("VEMA")
+//                        .setTimeStamp(new Date())
+//                        .setTraceToken("token-99e93")
+//                        .build())
+//                .build();
+//
+//
+//        resources.add(DtoResourceWithMetrics.builder()
+//                .setMetrics(timeSeries)
+//                .setResource(DtoMonitoredResource.builder()
+//                        .setName("mc-test-host")
+//                        .setType("HOST")
+//                        .setStatus(DtoMonitorStatus.HOST_UP)
+//                        .setOwner("mc-test-host")
+//                        .build())
+//                .build());
+//
+//        DtoOperationResults results = transit.SendResourcesWithMetrics(resources);
+//
+//        transit.Disconnect();
+//
+//        assertEquals(1, (int) results.getCount());
+//        assertEquals(0, (int) results.getSuccessful());
+//        assertEquals(1, (int) results.getFailed());
     }
 }

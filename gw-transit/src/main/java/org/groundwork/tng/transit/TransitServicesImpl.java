@@ -101,6 +101,20 @@ public class TransitServicesImpl implements TransitServices {
             throw new TransitException(errorMsg.getValue());
         }
     }
+
+    @Override
+    public void TestNats() {
+
+        tngTransitLibrary.TestNats("FIRST MESSAGE!");
+
+        tngTransitLibrary.TestNats("SECOND MESSAGE!");
+
+        tngTransitLibrary.TestNats("THIRD MESSAGE!");
+
+        tngTransitLibrary.TestNats("FORTH MESSAGE!");
+
+        tngTransitLibrary.TestNats("FIVES MESSAGE!");
+    }
 }
 
 

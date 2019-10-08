@@ -11,4 +11,5 @@ public interface TngTransitLibrary extends Library {
     public void ListInventory(StringByReference errorMsg);
     public boolean Connect(String credentialsJson, StringByReference errorMsg);
     public boolean Disconnect(StringByReference errorMsg);
+    public void TestNats(String msg);
 }
