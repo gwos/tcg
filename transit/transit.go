@@ -435,7 +435,6 @@ func (transit Transit) Disconnect() (error) {
 	if statusCode == 200 {
 		return nil
 	}
-
 	return errors.New(string(byteResponse))
 }
 
@@ -569,6 +568,29 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 type TransitSendMetricsRequest struct {
 	Trace   TracerContext          `json:"context"`
 	Metrics *[]ResourceWithMetrics `json:"resources"`
+}
+
+type SpecialDate struct {
+	time.Time
+}
+
+func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
+	strInput := string(input)
+
+	i, err := strconv.ParseInt(strInput, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	i *= int64(time.Millisecond)
+
+	*sd = SpecialDate{time.Unix(0, i)}
+
+	return nil
+}
+
+func (sd SpecialDate) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }
 
 type SpecialDate struct {
