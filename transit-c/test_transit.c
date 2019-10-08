@@ -55,11 +55,25 @@ void test_encodeMonitoredResource() {
     properties : {
       count : 3,
       items :
-          (TypedValuePair[]){{"key--", {BooleanType, boolValue : true}},
-                             {"key_1", {DoubleType, doubleValue : 0.1}},
-                             {"key-2", {StringType, stringValue : "val-2"}}}
+          (TypedValuePair[]){
+	      {"key--", {BooleanType, boolValue : true}},
+              {"key_1", {DoubleType, doubleValue : 0.1}},
+              {"key-2", {StringType, stringValue : "val-2"}},
+	  }
     }
   };
+
+  // Initial development only:  Verify that the string type got populated as expected.
+  if (1) {
+      for (int i = resource02.properties.count; --i >= 0; ) {
+	  if (resource02.properties.items[i].value.stringValue) {
+	      printf ("key = %s, string = %s\n", resource02.properties.items[i].key, resource02.properties.items[i].value.stringValue);
+	  }
+	  else {
+	      printf ("key = %s, string = %p\n", resource02.properties.items[i].key, resource02.properties.items[i].value.stringValue);
+	  }
+      }
+  }
 
   char *result = NULL;
   result = encodeMonitoredResource(&resource01, 0);
@@ -72,17 +86,31 @@ void test_encodeMonitoredResource() {
   free(result);
   result = encodeMonitoredResource(&resource02, 0);
 
-  char *expected =
-      "{\"category\": \"instance-category\", \"description\": "
-      "\"instance-description\", \"lastPlugInOutput\": "
-      "\"instance-lastPlugInOutput\", \"name\": "
-      "\"the-unique-name-of-the-instance-02\", \"owner\": \"instance-owner\", "
-      "\"properties\": {\"key--\": {\"boolValue\": true, \"valueType\": 4}, "
-      "\"key-2\": {\"stringValue\": \"val-2\", \"valueType\": 3}, \"key_1\": "
-      "{\"doubleValue\": 0.10000000000000001, \"valueType\": 2}}, \"status\": "
-      "1, \"type\": \"instance-type\"}";
+  char *expected = "{"
+      "\"category\": \"instance-category\", "
+      "\"description\": \"instance-description\", "
+      "\"lastPlugInOutput\": \"instance-lastPlugInOutput\", "
+      "\"name\": \"the-unique-name-of-the-instance-02\", "
+      "\"owner\": \"instance-owner\", "
+      "\"properties\": {"
+	  "\"key--\": {"
+	      "\"boolValue\": true, "
+	      "\"valueType\": 4"
+	  "}, "
+	  "\"key-2\": {"
+	      "\"stringValue\": \"val-2\", "
+	      "\"valueType\": 3"
+	  "}, "
+	  "\"key_1\": {"
+	      "\"doubleValue\": 0.10000000000000001, "
+	      "\"valueType\": 2"
+	  "}"
+      "}, "
+      "\"status\": " "1, "
+      "\"type\": \"instance-type\""
+  "}";
 
-  //   printf("\n#test_encodeMonitoredResource: %s", result);
+  // printf("#test_encodeMonitoredResource: %s\n", result);
   if (!result || strcmp(result, expected)) {
     fail(result);
   }
@@ -95,17 +123,33 @@ void test_decodeMonitoredResource() {
       "{\"name\": \"the-unique-name-of-the-instance-01\", "
       "\"status\": 7, \"type\": \"gce_instance\"}";
 
-  char *resource_json02 =
-      "{\"category\": \"instance-category\", \"description\": "
-      "\"instance-description\", \"lastPlugInOutput\": "
-      "\"instance-lastPlugInOutput\", \"name\": "
-      "\"the-unique-name-of-the-instance-02\", \"owner\": \"instance-owner\", "
-      "\"properties\": {\"key--\": {\"boolValue\": true, \"valueType\": 4}, "
-      "\"key-2\": {\"stringValue\": \"val-2\", \"valueType\": 3}, \"key_1\": "
-      "{\"doubleValue\": 0.10000000000000001, \"valueType\": 2}}, \"status\": "
-      "1, \"type\": \"instance-type\"}";
+  char *resource_json02 = "{"
+      "\"category\": \"instance-category\", "
+      "\"description\": \"instance-description\", "
+      "\"lastPlugInOutput\": \"instance-lastPlugInOutput\", "
+      "\"name\": \"the-unique-name-of-the-instance-02\", "
+      "\"owner\": \"instance-owner\", "
+      "\"properties\": {"
+	  "\"key--\": {"
+	      "\"boolValue\": true, "
+	      "\"valueType\": 4"
+	  "}, "
+	  "\"key-2\": {"
+	      "\"stringValue\": \"val-2\", "
+	      "\"valueType\": 3"
+	  "}, "
+	  "\"key_1\": {"
+	      "\"doubleValue\": 0.10000000000000001, "
+	      "\"valueType\": 2"
+	  "}"
+      "}, "
+      "\"status\": 1, "
+      "\"type\": \"instance-type\""
+  "}";
 
   MonitoredResource *resource = decodeMonitoredResource(resource_json01);
+
+printf ("=== marker 1\n");
 
   if (!resource) {
     fail("!resource");
@@ -120,8 +164,11 @@ void test_decodeMonitoredResource() {
     fail("resource->status != HOST_UP");
   }
 
+printf ("=== marker 2\n");
   free(resource);
+printf ("=== marker 3\n");
   resource = decodeMonitoredResource(resource_json02);
+printf ("=== marker 4\n");
 
   if (!resource) {
     fail("!resource");
@@ -184,6 +231,7 @@ void test_decodeMonitoredResource() {
     fail("resource->properties.items[2].value.doubleValue != 0.1");
   }
 
+printf ("=== marker n\n");
   free(resource);
 }
 
@@ -264,14 +312,28 @@ void test_decodeTransit() {
 }
 
 int main(void) {
-//   test_defineMonitoredResource();
-//   test_encodeMonitoredResource();
-//   test_decodeMonitoredResource();
+  printf("<<< TESTING test_defineMonitoredResource >>>\n");
+  test_defineMonitoredResource();
+
+  printf("<<< TESTING test_encodeMonitoredResource >>>\n");
+  test_encodeMonitoredResource();
+
+  printf("<<< TESTING test_decodeMonitoredResource >>>\n");
+  test_decodeMonitoredResource();
+
+  printf("<<< TESTING test_encodeCredentials >>>\n");
   test_encodeCredentials();
+
+  printf("<<< TESTING test_decodeCredentials >>>\n");
   test_decodeCredentials();
+
+  printf("<<< TESTING test_encodeTransit >>>\n");
   test_encodeTransit();
+
+  printf("<<< TESTING test_decodeTransit >>>\n");
   test_decodeTransit();
 
-  fprintf(stdout, "\nall tests passed");
+  printf("all tests passed\n");
+
   return 0;
 }

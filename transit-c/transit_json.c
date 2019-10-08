@@ -1,6 +1,7 @@
 #include <jansson.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdalign.h>	// Needed to supply alignof(), available starting with C11.
 
 #include "transit_json.h"
 
@@ -17,27 +18,33 @@ Credentials *decodeCredentials(const char *json_str) {
   Credentials *credentials = NULL;
   size_t size = 0;
   json_error_t error;
-  json_t *json, *jsonUser, *jsonPass;
-  json = jsonUser = jsonPass = NULL;
+  json_t * json     = NULL;
+  json_t * jsonUser = NULL;
+  json_t * jsonPass = NULL;
+  size_t jsonUser_len;
+  size_t jsonPass_len;
 
   json = json_loads(json_str, 0, &error);
   if (json) {
     jsonUser = json_object_get(json, "user");
     jsonPass = json_object_get(json, "password");
+    jsonUser_len = json_string_length(jsonUser);
+    jsonPass_len = json_string_length(jsonPass);
 
-    /* compute size for the target struct */
+    // incrementally compute a total size for allocation of the
+    // target struct, including all the strings it refers to
     size = sizeof(Credentials);
-    size += json_string_length(jsonUser) + NUL_TERM_LEN;
-    size += json_string_length(jsonPass) + NUL_TERM_LEN;
+    size += jsonUser_len + NUL_TERM_LEN;
+    size += jsonPass_len + NUL_TERM_LEN;
 
     /* allocate and fill the target struct by pointer */
-    credentials = malloc(size);
+    credentials = (Credentials *) malloc(size);
     if (credentials) {
-      Credentials *ptr = credentials;
+      char *ptr = (char *) credentials;
       ptr += sizeof(Credentials);
-      credentials->user = strcpy((char *)ptr, json_string_value(jsonUser));
-      ptr += json_string_length(jsonUser) + NUL_TERM_LEN;
-      credentials->password = strcpy((char *)ptr, json_string_value(jsonPass));
+      credentials->user = strcpy(ptr, json_string_value(jsonUser));
+      ptr += jsonUser_len + NUL_TERM_LEN;
+      credentials->password = strcpy(ptr, json_string_value(jsonPass));
     } else {
       fprintf(stderr, "decodeCredentials error: %s\n", "malloc failed");
     }
@@ -56,50 +63,93 @@ MonitoredResource *decodeMonitoredResource(const char *json_str) {
   MonitoredResource *resource = NULL;
   size_t size = 0;
   json_error_t error;
-  json_t *json, *jsonStatus, *jsonName, *jsonType, *jsonOwner, *jsonCategory,
-      *jsonDescription, *jsonLastPlugInOutput, *jsonLastCheckTime,
-      *jsonNextCheckTime, *jsonProperties, *jsonProp, *jsonPropValue;
-  json = jsonStatus = jsonName = jsonType = jsonOwner = jsonCategory =
-      jsonDescription = jsonLastPlugInOutput = jsonLastCheckTime =
-          jsonNextCheckTime = jsonProperties = jsonProp = jsonPropValue = NULL;
+  json_t * json                 = NULL;
+  json_t * jsonStatus           = NULL;
+  json_t * jsonName             = NULL;
+  json_t * jsonType             = NULL;
+  json_t * jsonOwner            = NULL;
+  json_t * jsonCategory         = NULL;
+  json_t * jsonDescription      = NULL;
+  json_t * jsonLastPlugInOutput = NULL;
+  json_t * jsonLastCheckTime    = NULL;
+  json_t * jsonNextCheckTime    = NULL;
+  json_t * jsonProperties       = NULL;
+  json_t * jsonProp             = NULL;
+  json_t * jsonPropValue        = NULL;
+  size_t jsonName_len;
+  size_t jsonType_len;
+  size_t jsonOwner_len;
+  size_t jsonCategory_len;
+  size_t jsonDescription_len;
+  size_t jsonLastPlugInOutput_len;
+  // size_t TypedValuePairList_alignment = alignof(TypedValuePairList);
+  size_t     TypedValuePair_alignment = alignof(TypedValuePair);
+  // size_t         TypedValue_alignment = alignof(TypedValue);
+  // size_t TypedValuePairList_padding;
+  size_t     TypedValuePair_padding;
+  // size_t         TypedValue_padding;
 
   json = json_loads(json_str, 0, &error);
   if (json) {
-    jsonStatus = json_object_get(json, "status");
-    jsonName = json_object_get(json, "name");
-    jsonType = json_object_get(json, "type");
-    jsonOwner = json_object_get(json, "owner");
-    jsonCategory = json_object_get(json, "category");
-    jsonDescription = json_object_get(json, "description");
-    jsonLastPlugInOutput = json_object_get(json, "lastPlugInOutput");
-    jsonLastCheckTime = json_object_get(json, "lastCheckTime");
-    jsonNextCheckTime = json_object_get(json, "nextCheckTime");
-    jsonProperties = json_object_get(json, "properties");
+    jsonStatus           = json_object_get( json, "status" );
+    jsonName             = json_object_get( json, "name" );
+    jsonType             = json_object_get( json, "type" );
+    jsonOwner            = json_object_get( json, "owner" );
+    jsonCategory         = json_object_get( json, "category" );
+    jsonDescription      = json_object_get( json, "description" );
+    jsonLastPlugInOutput = json_object_get( json, "lastPlugInOutput" );
+    jsonLastCheckTime    = json_object_get( json, "lastCheckTime" );
+    jsonNextCheckTime    = json_object_get( json, "nextCheckTime" );
+    jsonProperties       = json_object_get( json, "properties" );
 
-    /* compute size for the target struct */
+    jsonName_len = json_string_length(jsonName);
+    jsonType_len = json_string_length(jsonType);
+
+    // incrementally compute a total size for allocation of the
+    // target struct, including all the strings and other objects
+    // it refers to
     size = sizeof(MonitoredResource);
-    size += json_string_length(jsonName) + NUL_TERM_LEN;
-    size += json_string_length(jsonType) + NUL_TERM_LEN;
+    size += jsonName_len + NUL_TERM_LEN;
+    size += jsonType_len + NUL_TERM_LEN;
 
     if (jsonOwner) {
-      size += json_string_length(jsonOwner) + NUL_TERM_LEN;
+      jsonOwner_len = json_string_length(jsonOwner);
+      size += jsonOwner_len + NUL_TERM_LEN;
     }
     if (jsonCategory) {
-      size += json_string_length(jsonCategory) + NUL_TERM_LEN;
+      jsonCategory_len = json_string_length(jsonCategory);
+      size += jsonCategory_len + NUL_TERM_LEN;
     }
     if (jsonDescription) {
-      size += json_string_length(jsonDescription) + NUL_TERM_LEN;
+      jsonDescription_len = json_string_length(jsonDescription);
+      size += jsonDescription_len + NUL_TERM_LEN;
     }
     if (jsonLastPlugInOutput) {
-      size += json_string_length(jsonLastPlugInOutput) + NUL_TERM_LEN;
+      jsonLastPlugInOutput_len = json_string_length(jsonLastPlugInOutput);
+      size += jsonLastPlugInOutput_len + NUL_TERM_LEN;
     }
     if (jsonProperties) {
-      size += sizeof(TypedValuePairList);
+      // Here we have to be very careful, to account for padding needed to
+      // align the additional structures in memory so their internal fields
+      // will naturally align on proper memory boundaries.
+
+      // Calculations such as this one must use only positive operands
+      // for the % operator, to avoid implementation-defined behavior.
+      // The clever expression is written to provide no padding bytes
+      // if the size is already aligned.
+
+      // TypedValuePairList_padding = ((TypedValuePairList_alignment - 1) * size) % TypedValuePairList_alignment;
+      // size += TypedValuePairList_padding + sizeof(TypedValuePairList);
+
+      TypedValuePair_padding = ((TypedValuePair_alignment - 1) * size) % TypedValuePair_alignment;
+      size += TypedValuePair_padding + json_object_size(jsonProperties) * sizeof(TypedValuePair);
+
+      // TypedValue_padding = ((TypedValue_alignment - 1) * size) % TypedValue_alignment;
+      // size += TypedValue_padding + json_object_size(jsonProperties) * sizeof(TypedValue);
+
       const char *key;
       json_object_foreach(jsonProperties, key, jsonProp) {
         size += strlen(key) + NUL_TERM_LEN;
-        size += sizeof(TypedValuePair);
-        size += sizeof(TypedValue);
         jsonPropValue = json_object_get(jsonProp, "stringValue");
         if (jsonPropValue) {
           size += json_string_length(jsonPropValue) + NUL_TERM_LEN;
@@ -109,9 +159,9 @@ MonitoredResource *decodeMonitoredResource(const char *json_str) {
     }
 
     /* allocate and fill the target struct by pointer */
-    resource = malloc(size);
+    resource = (MonitoredResource *) malloc(size);
     if (resource) {
-      MonitoredResource *ptr = resource;
+      char *ptr = (char *) resource;
 
       resource->status = json_integer_value(jsonStatus);
       resource->lastCheckTime = 0;
@@ -123,99 +173,120 @@ MonitoredResource *decodeMonitoredResource(const char *json_str) {
         resource->nextCheckTime = json_integer_value(jsonNextCheckTime);
       }
 
+printf ("about to process data\n");
+
       ptr += sizeof(MonitoredResource);
-      resource->name = strcpy((char *)ptr, json_string_value(jsonName));
-      ptr += json_string_length(jsonName) + NUL_TERM_LEN;
-      resource->type = strcpy((char *)ptr, json_string_value(jsonType));
-      ptr += json_string_length(jsonType) + NUL_TERM_LEN;
+      resource->name = strcpy(ptr, json_string_value(jsonName));
+printf ("resource->name = %s\n", resource->name);
+      ptr += jsonName_len + NUL_TERM_LEN;
+      resource->type = strcpy(ptr, json_string_value(jsonType));
+printf ("resource->type = %s\n", resource->type);
+      ptr += jsonType_len + NUL_TERM_LEN;
 
       if (jsonOwner) {
-        resource->owner = strcpy((char *)ptr, json_string_value(jsonOwner));
-        ptr += json_string_length(jsonOwner) + NUL_TERM_LEN;
+        resource->owner = strcpy(ptr, json_string_value(jsonOwner));
+printf ("resource->owner = %s\n", resource->owner);
+        ptr += jsonOwner_len + NUL_TERM_LEN;
       }
       if (jsonCategory) {
-        resource->category =
-            strcpy((char *)ptr, json_string_value(jsonCategory));
-        ptr += json_string_length(jsonCategory) + NUL_TERM_LEN;
+        resource->category = strcpy(ptr, json_string_value(jsonCategory));
+printf ("resource->category = %s\n", resource->category);
+        ptr += jsonCategory_len + NUL_TERM_LEN;
       }
       if (jsonDescription) {
-        resource->description =
-            strcpy((char *)ptr, json_string_value(jsonDescription));
-        ptr += json_string_length(jsonDescription) + NUL_TERM_LEN;
+        resource->description = strcpy(ptr, json_string_value(jsonDescription));
+printf ("resource->description = %s\n", resource->description);
+        ptr += jsonDescription_len + NUL_TERM_LEN;
       }
       if (jsonLastPlugInOutput) {
-        resource->lastPlugInOutput =
-            strcpy((char *)ptr, json_string_value(jsonLastPlugInOutput));
-        ptr += json_string_length(jsonLastPlugInOutput) + NUL_TERM_LEN;
+        resource->lastPlugInOutput = strcpy(ptr, json_string_value(jsonLastPlugInOutput));
+printf ("resource->lastPlugInOutput = %s\n", resource->lastPlugInOutput);
+        ptr += jsonLastPlugInOutput_len + NUL_TERM_LEN;
       }
 
       if (jsonProperties) {
+	ptr += TypedValuePair_padding;
         resource->properties.count = json_object_size(jsonProperties);
-        resource->properties.items =
-            (TypedValuePair *)(ptr + offsetof(TypedValuePairList, items));
-        ptr += sizeof(TypedValuePairList);
+        resource->properties.items = (TypedValuePair *)ptr;
+	ptr += json_object_size(jsonProperties) * sizeof(TypedValuePair);
+
+	// ptr += TypedValue_padding;
+	// TypedValue *typed_value = (TypedValue *) ptr;
+	// ptr += json_object_size(jsonProperties) * sizeof(TypedValue);
 
         size_t i = 0;
         const char *key;
         TypedValue emptyTypedValue = {0, false, 0, 0, 0};
         json_object_foreach(jsonProperties, key, jsonProp) {
-          ptr += sizeof(TypedValuePair);
-          resource->properties.items[i].key = strcpy((char *)ptr, key);
+          resource->properties.items[i].key = strcpy(ptr, key);
           ptr += strlen(key) + NUL_TERM_LEN;
-
-          memcpy(ptr, &emptyTypedValue, sizeof(TypedValue));
-          ptr += sizeof(TypedValue);
+	  memcpy(&resource->properties.items[i].value, &emptyTypedValue, sizeof(TypedValue));
 
           jsonPropValue = json_object_get(jsonProp, "valueType");
           VALUE_TYPE_ENUM valueType = json_integer_value(jsonPropValue);
           resource->properties.items[i].value.valueType = valueType;
           json_decref(jsonPropValue);
 
-          printf("\n #i:valueType %ld : %d", i, valueType);
-
           switch (valueType) {
             case IntegerType:
               jsonPropValue = json_object_get(jsonProp, "integerValue");
-              resource->properties.items[i].value.integerValue =
-                  json_integer_value(jsonPropValue);
+              resource->properties.items[i].value.integerValue = json_integer_value(jsonPropValue);
               json_decref(jsonPropValue);
               break;
 
             case DoubleType:
               jsonPropValue = json_object_get(jsonProp, "doubleValue");
-              resource->properties.items[i].value.doubleValue =
-                  json_real_value(jsonPropValue);
+printf ("+++ DoubleType: ptr=%p, key='%s', double=%d\n", ptr, resource->properties.items[i].key, json_real_value(jsonPropValue));
+              resource->properties.items[i].value.doubleValue = json_real_value(jsonPropValue);
               json_decref(jsonPropValue);
               break;
 
             case BooleanType:
               jsonPropValue = json_object_get(jsonProp, "boolValue");
-              resource->properties.items[i].value.boolValue =
-                  json_boolean_value(jsonPropValue);
+printf ("+++ BooleanType: ptr=%p, key='%s', bool=%d\n", ptr, resource->properties.items[i].key, json_boolean_value(jsonPropValue));
+              resource->properties.items[i].value.boolValue = json_boolean_value(jsonPropValue);
               json_decref(jsonPropValue);
               break;
 
             case DateType:
               /* TODO: millis number */
               jsonPropValue = json_object_get(jsonProp, "dateValue");
-              resource->properties.items[i].value.dateValue =
-                  json_integer_value(jsonPropValue);
+              resource->properties.items[i].value.dateValue = json_integer_value(jsonPropValue);
               json_decref(jsonPropValue);
               break;
 
             case StringType:
+printf ("+++ calling json_object_get\n");
               jsonPropValue = json_object_get(jsonProp, "stringValue");
-              resource->properties.items[i].value.stringValue =
-                  strcpy((char *)ptr, json_string_value(jsonPropValue));
+	      /*
+	      if (0 && json_is_object(jsonPropValue)) {
+printf ("+++ jsonPropValue is an object, not a string\n");
+const char *propkey;
+json_t * propprop = NULL;
+        json_object_foreach(jsonPropValue, propkey, propprop) {
+printf ("+++ jsonPropValue key is %s\n", propkey);
+if (strcmp(propkey, "stringValue") == 0) {
+// json_t *str = json_object_get(propprop, "stringValue");
+printf (">>> jsonPropValue string value is %s\n", json_string_value(propprop));
+}
+	}
+	      }
+	      */
+const char *string_value = json_string_value(jsonPropValue);
+printf ("+++ calling strcpy; ptr=%p, key='%s', jsonPropValue=%p, typeof=%d, string=%p\n", ptr, resource->properties.items[i].key, jsonPropValue, json_typeof(jsonPropValue), string_value);
+              resource->properties.items[i].value.stringValue = strcpy(ptr, json_string_value(jsonPropValue));
+printf ("+++ calling json_string_length\n");
               ptr += json_string_length(jsonPropValue) + NUL_TERM_LEN;
+printf ("+++ calling json_decref\n");
               json_decref(jsonPropValue);
+printf ("+++ StringType end\n");
               break;
 
             default:
               break;
           }
+printf ("+++ #10\n");
           i++;
-          //   json_decref(jsonPropValue);
         }
       }
     } else {
@@ -226,19 +297,21 @@ MonitoredResource *decodeMonitoredResource(const char *json_str) {
             error.text);
   }
 
-  json_decref(json);
-  json_decref(jsonStatus);
-  json_decref(jsonName);
-  json_decref(jsonType);
-  json_decref(jsonOwner);
-  json_decref(jsonCategory);
-  json_decref(jsonDescription);
-  json_decref(jsonLastPlugInOutput);
-  json_decref(jsonLastCheckTime);
-  json_decref(jsonNextCheckTime);
-  json_decref(jsonProperties);
+printf ("+++ #11\n");
+  // json_decref(json);
+  // json_decref(jsonStatus);
+  // json_decref(jsonName);
+  // json_decref(jsonType);
+  // json_decref(jsonOwner);
+  // json_decref(jsonCategory);
+  // json_decref(jsonDescription);
+  // json_decref(jsonLastPlugInOutput);
+  // json_decref(jsonLastCheckTime);
+  // json_decref(jsonNextCheckTime);
+  // json_decref(jsonProperties);
+
   //   json_decref(jsonProp);
-  //   json_decref(jsonPropValue);
+printf ("+++ #12\n");
 
   return resource;
 }
