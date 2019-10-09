@@ -3,7 +3,7 @@ package transit
 import "C"
 import (
 	"encoding/json"
-	"encoding/xml"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,34 +15,26 @@ import (
 //   "GAUGE" - An instantaneous measurement of a value.
 //   "DELTA" - The change in a value during a time interval.
 //   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-type MetricKindEnum int
+type MetricKindEnum string
 
 const (
-	GAUGE MetricKindEnum = iota + 1
-	DELTA
-	CUMULATIVE
-	METRIC_KIND_UNSPECIFIED
+	GAUGE                   MetricKindEnum = "GAUGE"
+	DELTA                                  = "DELTA"
+	CUMULATIVE                             = "CUMULATIVE"
+	METRIC_KIND_UNSPECIFIED                = "METRIC_KIND_UNSPECIFIED"
 )
-
-func (metricKind MetricKindEnum) String() string {
-	return [...]string{"GAUGE", "DELTA", "CUMULATIVE", "METRIC_KIND_UNSPECIFIED"}[metricKind]
-}
 
 // ValueType defines the data type of the value of a metric
-type ValueTypeEnum int
+type ValueTypeEnum string
 
 const (
-	IntegerType ValueTypeEnum = iota + 1
-	DoubleType
-	StringType
-	BooleanType
-	DateType
-	UnspecifiedType
+	IntegerType     ValueTypeEnum = "IntegerType"
+	DoubleType                    = "DoubleType"
+	StringType                    = "StringType"
+	BooleanType                   = "BooleanType"
+	DateType                      = "DateType"
+	UnspecifiedType               = "UnspecifiedType"
 )
-
-func (valueType ValueTypeEnum) String() string {
-	return [...]string{"IntegerType", "DoubleType", "StringType", "BooleanType", "DateType", "UnspecifiedType"}[valueType]
-}
 
 // Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
@@ -53,45 +45,34 @@ const (
 )
 
 // CloudHub Compute Types
-type ComputeTypeEnum int
+type ComputeTypeEnum string
 
 const (
-	Query ComputeTypeEnum = iota + 1
-	Regex
-	Synthetic
-	Info
-	Performance
-	Health
+	Query       ComputeTypeEnum = "Query"
+	Regex                       = "Regex"
+	Synthetic                   = "Synthetic"
+	Info                        = "Info"
+	Performance                 = "Performance"
+	Health                      = "Health"
 )
-
-func (computeType ComputeTypeEnum) String() string {
-	return [...]string{"query", "regex", "synthetic", "info", "performance", "health"}[computeType]
-}
 
 // MonitorStatusEnum represents Groundwork service monitor status
-type MonitorStatusEnum int
+type MonitorStatusEnum string
 
 const (
-	SERVICE_OK MonitorStatusEnum = iota + 1
-	SERVICE_UNSCHEDULED_CRITICAL
-	SERVICE_WARNING
-	SERVICE_PENDING
-	SERVICE_SCHEDULED_CRITICAL
-	SERVICE_UNKNOWN
-	HOST_UP
-	HOST_UNSCHEDULED_DOWN
-	HOST_WARNING
-	HOST_PENDING
-	HOST_SCHEDULED_DOWN
-	HOST_UNREACHABLE
+	SERVICE_OK                   MonitorStatusEnum = "SERVICE_OK"
+	SERVICE_UNSCHEDULED_CRITICAL                   = "SERVICE_UNSCHEDULED_CRITICAL"
+	SERVICE_WARNING                                = "SERVICE_WARNING"
+	SERVICE_PENDING                                = "SERVICE_PENDING"
+	SERVICE_SCHEDULED_CRITICAL                     = "SERVICE_SCHEDULED_CRITICAL"
+	SERVICE_UNKNOWN                                = "SERVICE_UNKNOWN"
+	HOST_UP                                        = "HOST_UP"
+	HOST_UNSCHEDULED_DOWN                          = "HOST_UNSCHEDULED_DOWN"
+	HOST_WARNING                                   = "HOST_WARNING"
+	HOST_PENDING                                   = "HOST_PENDING"
+	HOST_SCHEDULED_DOWN                            = "HOST_SCHEDULED_DOWN"
+	HOST_UNREACHABLE                               = "HOST_UNREACHABLE"
 )
-
-func (status MonitorStatusEnum) String() string {
-	return [...]string{
-		"", "OK", "UNSCHEDULED CRITICAL", "WARNING", "PENDING", "SCHEDULED CRITICAL", "UNKNOWN",
-		"UP", "UNSCHEDULED DOWN", "WARNING", "PENDING", "SCHEDULED DOWN", "UNREACHABLE",
-	}[status]
-}
 
 // Groundwork Standard Monitored Resource Types
 const (
@@ -100,19 +81,15 @@ const (
 )
 
 // TimeSeries Metric Sample Possible Types
-type MetricSampleType int
+type MetricSampleType string
 
 const (
-	Value MetricSampleType = iota + 1
-	Critical
-	Warning
-	Min
-	Max
+	Value    MetricSampleType = "Value"
+	Critical                  = "Critical"
+	Warning                   = "Warning"
+	Min                       = "Min"
+	Max                       = "Max"
 )
-
-func (metricSampleType MetricSampleType) String() string {
-	return [...]string{"Value", "Critical", "Warning", "Min", "Max"}[metricSampleType]
-}
 
 // TimeInterval: A closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
@@ -160,7 +137,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a date stored as full timestamp
-	DateValue SpecialDate `json:"dateValue,omitEmpty"`
+	DateValue SpecialDate `json:"dateValue,omitempty"`
 }
 
 // Point: A single data point in a time series.
@@ -341,20 +318,33 @@ type TracerContext struct {
 	TimeStamp  SpecialDate `json:"timeStamp"`
 }
 
-type TransitSendInventoryRequest struct {
-	context   *TracerContext
-	inventory *[]MonitoredResource
-	groups    *[]Group
+type SendInventoryRequest struct {
+	Context   *TracerContext       `json:"context"`
+	Inventory *[]MonitoredResource `json:"resources"`
+	Groups    *[]Group             `json:"groups"`
 }
 
-type TransitSynchronizeResponse struct {
-	ResourcesAdded   int `xml:"resourcesAdded"`
-	ResourcesDeleted int `xml:"resourcesDeleted"`
+type OperationResults struct {
+	ResourcesAdded   int                `json:"successful"`
+	ResourcesDeleted int                `json:"failed"`
+	EntityType       string             `json:"entityType"`
+	Operation        string             `json:"operation"`
+	Warning          int                `json:"warning"`
+	Count            int                `json:"count"`
+	Results          *[]OperationResult `json:"results"`
+}
+
+type OperationResult struct {
+	Entity   string `json:"entity"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
+	Location string `json:"location"`
+	EntityId int    `json:"entityId"`
 }
 
 type Group struct {
-	groupName string
-	resources []MonitoredResource
+	GroupName string	`json:"groupName"`
+	Resources []MonitoredResource	`json:"resources"`
 }
 
 type ResourceWithMetrics struct {
@@ -362,16 +352,16 @@ type ResourceWithMetrics struct {
 	Metrics  []TimeSeries      `json:"metrics"`
 }
 
-type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
+type ResourceWithMetricsRequest struct {
 	Context   TracerContext
 	Resources []ResourceWithMetrics
 }
 
 // Transit interfaces / operations
 type TransitServices interface {
-	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
+	SendResourcesWithMetrics(resources []byte) (*OperationResults, error)
 	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (TransitSynchronizeResponse, error)
+	SynchronizeInventory(inventory []byte) (*OperationResults, error)
 }
 
 // Groundwork Connection Configuration
@@ -390,10 +380,11 @@ type Credentials struct {
 // Implementation of TransitServices
 type Transit struct {
 	Config GroundworkConfig
+	Credentials *Credentials
 }
 
 // create and connect to a Transit instance from a Groundwork connection configuration
-func Connect(credentials Credentials) (*Transit, error) {
+func (transit *Transit) Connect(credentials Credentials) error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
 		"user":          credentials.User,
@@ -407,7 +398,7 @@ func Connect(credentials Credentials) (*Transit, error) {
 
 	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if statusCode == 200 {
@@ -417,16 +408,17 @@ func Connect(credentials Credentials) (*Transit, error) {
 			Token:    string(byteResponse),
 			SSL:      false,
 		}
-		transit := Transit{
+		*transit = Transit{
 			Config: config,
+			Credentials: &credentials,
 		}
-		return &transit, nil
+		return nil
 	}
 
-	return nil, nil
+	return errors.New(string(byteResponse))
 }
 
-func Disconnect(transit *Transit) bool {
+func (transit Transit) Disconnect() (error) {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
 		"gwos-api-token": transit.Config.Token,
@@ -437,45 +429,81 @@ func Disconnect(transit *Transit) bool {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	statusCode, _, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
 	if err != nil {
-		return false
+		return err
 	}
 
-	return statusCode == 200
+	if statusCode == 200 {
+		return nil
+	}
+	return errors.New(string(byteResponse))
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources []ResourceWithMetrics) error {
-	context := TracerContext{
-		AppType:    "GoClient",
-		AgentId:    "test-agent",
-		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  SpecialDate{},
-	}
+// Deprecated
+//func (transit Transit) SendResourcesWithMetrics(resources *SendMetricsRequest) (*OperationResults, error) {
+//	headers := map[string]string{
+//		"Accept":         "application/json",
+//		"Content-Type":   "application/json",
+//		"GWOS-API-TOKEN": transit.Config.Token,
+//		"GWOS-APP-NAME":  "gw8",
+//	}
+//
+//	byteBody, err := json.Marshal(resources)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if statusCode == 401 {
+//		return nil, errors.New(string(byteResponse))
+//	}
+//
+//	fmt.Println(string(byteResponse))
+//
+//	var operationResults OperationResults
+//
+//	err = json.Unmarshal(byteResponse, &operationResults)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &operationResults, nil
+//}
 
-	transitSendMetricsRequest := transitSendMetricsRequest{
-		Trace:   context,
-		Metrics: &resources,
-	}
-
+func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "82b3b063-998b-4d08-9498-f4c2a18b7f0e",
+		"GWOS-API-TOKEN": transit.Config.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(transitSendMetricsRequest)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, resources)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if statusCode == 401 {
+		err = transit.Connect(*transit.Credentials)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if statusCode != 200 {
+		return nil, errors.New(string(byteResponse))
 	}
 
-	_, _, err = sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	var operationResults OperationResults
+
+	err = json.Unmarshal(byteResponse, &operationResults)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &operationResults, nil
 }
 
 // TODO: implement
@@ -540,56 +568,74 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	return &arr, nil
 }
 
-func (transit Transit) SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (*TransitSynchronizeResponse, error) {
-	context := TracerContext{
-		AppType:    "GoClient",
-		AgentId:    "test-agent",
-		TraceToken: "t_o_k_e_n__e_x_a_m_p_l_e",
-		TimeStamp:  SpecialDate{},
-	}
+// Deprecated
+//func (transit Transit) SynchronizeInventory(inventory *SendInventoryRequest) (*OperationResults, error) {
+//	headers := map[string]string{
+//		"Accept":         "application/json",
+//		"Content-Type":   "application/json",
+//		"GWOS-API-TOKEN": transit.Config.Token,
+//		"GWOS-APP-NAME":  "gw8",
+//	}
+//
+//	byteBody, err := json.Marshal(inventory)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if statusCode == 401 {
+//		return nil, errors.New(string(byteResponse))
+//	}
+//
+//	var operationResults OperationResults
+//
+//	err = json.Unmarshal(byteResponse, &operationResults)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &operationResults, nil
+//}
 
-	transitInventoryRequest := transitSendInventoryRequest{
-		Trace:     context,
-		Inventory: inventory,
-		Groups:    groups,
-	}
-
+func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
+		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": "3768b1d7-00d8-4e0f-b96a-0aafde97eb39",
+		"GWOS-API-TOKEN": transit.Config.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(transitInventoryRequest)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, inventory)
+	if err != nil {
+		return nil, err
+	}
+	if statusCode == 401 {
+		err = transit.Connect(*transit.Credentials)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if statusCode != 200 {
+		return nil, errors.New(string(byteResponse))
+	}
+
+	var operationResults OperationResults
+
+	err = json.Unmarshal(byteResponse, &operationResults)
 	if err != nil {
 		return nil, err
 	}
 
-	_, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/sync", headers, nil, byteBody)
-	if err != nil {
-		return nil, err
-	}
-
-	var transitSynchronize TransitSynchronizeResponse
-
-	err = xml.Unmarshal(byteResponse, &transitSynchronize)
-	if err != nil {
-		return nil, err
-	}
-
-	return &transitSynchronize, nil
+	return &operationResults, nil
 }
 
 // internal transit data
-type transitSendMetricsRequest struct {
+type SendMetricsRequest struct {
 	Trace   TracerContext          `json:"context"`
 	Metrics *[]ResourceWithMetrics `json:"resources"`
-}
-
-type transitSendInventoryRequest struct {
-	Trace     TracerContext        `json:"context"`
-	Inventory *[]MonitoredResource `json:"inventory"`
-	Groups    *[]Group             `json:"groups"`
 }
 
 type SpecialDate struct {
