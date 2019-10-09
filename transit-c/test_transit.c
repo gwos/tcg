@@ -63,18 +63,6 @@ void test_encodeMonitoredResource() {
     }
   };
 
-  // Initial development only:  Verify that the string type got populated as expected.
-  if (1) {
-      for (int i = resource02.properties.count; --i >= 0; ) {
-	  if (resource02.properties.items[i].value.stringValue) {
-	      printf ("key = %s, string = %s\n", resource02.properties.items[i].key, resource02.properties.items[i].value.stringValue);
-	  }
-	  else {
-	      printf ("key = %s, string = %p\n", resource02.properties.items[i].key, resource02.properties.items[i].value.stringValue);
-	  }
-      }
-  }
-
   char *result = NULL;
   result = encodeMonitoredResource(&resource01, 0);
   if (!result || strcmp(result,
@@ -149,8 +137,6 @@ void test_decodeMonitoredResource() {
 
   MonitoredResource *resource = decodeMonitoredResource(resource_json01);
 
-printf ("=== marker 1\n");
-
   if (!resource) {
     fail("!resource");
   };
@@ -164,11 +150,8 @@ printf ("=== marker 1\n");
     fail("resource->status != HOST_UP");
   }
 
-printf ("=== marker 2\n");
   free(resource);
-printf ("=== marker 3\n");
   resource = decodeMonitoredResource(resource_json02);
-printf ("=== marker 4\n");
 
   if (!resource) {
     fail("!resource");
@@ -231,7 +214,6 @@ printf ("=== marker 4\n");
     fail("resource->properties.items[2].value.doubleValue != 0.1");
   }
 
-printf ("=== marker n\n");
   free(resource);
 }
 
