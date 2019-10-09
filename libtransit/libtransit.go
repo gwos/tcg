@@ -4,90 +4,27 @@ package main
 // #include <string.h> /* for strncpy error message */
 import "C"
 import (
-	"github.com/gwos/tng/transit"
-	stan "github.com/nats-io/go-nats-streaming"
-	stand "github.com/nats-io/nats-streaming-server/server"
-	"github.com/nats-io/nats-streaming-server/stores"
 	"encoding/json"
+	"github.com/gwos/tng/nats"
+	"github.com/gwos/tng/transit"
 	"log"
-	"time"
 )
 
 var transitConfig transit.Transit
-
-const (
-	clusterID  = "test-cluster"
-	clientID   = "order-query-store1"
-	channel    = "order-notification"
-	durableID  = "store-durable"
-	queueGroup = "order-query-store-group"
-)
-
-var count = 0
 
 func main() {
 }
 
 func init() {
-	initNats()
-
-	initSubscriber()
-}
-
-func initNats() {
-	opts := stand.GetDefaultOptions()
-	opts.ID = "test-cluster"
-	opts.StoreType = stores.TypeFile
-	opts.FilestoreDir = "datastore"
-
-	_, err := stand.RunServerWithOpts(opts, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func initSubscriber() {
-	sc, err := stan.Connect(
-		clusterID,
-		clientID,
-		stan.NatsURL(stan.DefaultNatsURL),
-	)
+	_, err := nats.StartServer()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = sc.QueueSubscribe("foo", queueGroup, func(msg *stan.Msg) {
-		log.Println("From subscriber", msg)
-
-		count++
-
-		if count < 3 {
-			_ = msg.Ack()
-		}
-	}, stan.SetManualAckMode(),
-		stan.AckWait(15*time.Second),
-		stan.DurableName(durableID),
-		stan.StartWithLastReceived(),
-	)
-}
-
-//export TestNats
-func TestNats(msg *C.char) {
-	sc, err := stan.Connect(
-		clusterID,
-		"publisherId",
-		stan.NatsURL(stan.DefaultNatsURL),
-	)
-	if err != nil {
-		log.Fatal("TestNats: ", err)
-	}
-
-	err = sc.Publish("foo", []byte(C.GoString(msg)))
+	_, _, err = nats.StartSubscriber(&transitConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	err = sc.Close()
 }
 
 //export TestMonitoredResource
@@ -109,27 +46,35 @@ func TestMonitoredResource(str *C.char, errorMsg *C.char) *C.char {
 }
 
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) *C.char {
-	var resourceWithMetrics transit.TransitSendMetricsRequest
+func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) bool {
+	//var resourceWithMetrics transit.TransitSendMetricsRequest
 
-	err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
+	//err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+
+	//operationResults, err := transitConfig.SendResourcesWithMetrics(&resourceWithMetrics)
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+
+	err := nats.Publish(C.GoString(resourcesWithMetricsJson))
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
+		return false
 	}
 
-	operationResults, err := transitConfig.SendResourcesWithMetrics(&resourceWithMetrics)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
+	return true
 
-	operationResultsJson, err := json.Marshal(operationResults)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-	return C.CString(string(operationResultsJson))
+	//operationResultsJson, err := json.Marshal(operationResults)
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+	//return C.CString(string(operationResultsJson))
 }
 
 //export ListMetrics
@@ -159,7 +104,7 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
 		return nil
 	}
 
-	operationResults, err := transit.SynchronizeInventory(&inventory)
+	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
 
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)

@@ -352,16 +352,16 @@ type ResourceWithMetrics struct {
 	Metrics  []TimeSeries      `json:"metrics"`
 }
 
-type ResourceWithMetricsRequest struct { // DtoResourceWithMetricsList
+type ResourceWithMetricsRequest struct {
 	Context   TracerContext
 	Resources []ResourceWithMetrics
 }
 
 // Transit interfaces / operations
 type TransitServices interface {
-	SendResourcesWithMetrics(resources []ResourceWithMetrics) error
+	SendResourcesWithMetrics(resources []byte) (*OperationResults, error)
 	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory *[]MonitoredResource, groups *[]Group) (OperationResults, error)
+	SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error)
 }
 
 // Groundwork Connection Configuration
@@ -438,7 +438,41 @@ func (transit Transit) Disconnect() (error) {
 	return errors.New(string(byteResponse))
 }
 
-func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsRequest) (*OperationResults, error) {
+// Deprecated
+//func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsRequest) (*OperationResults, error) {
+//	headers := map[string]string{
+//		"Accept":         "application/json",
+//		"Content-Type":   "application/json",
+//		"GWOS-API-TOKEN": transit.Config.Token,
+//		"GWOS-APP-NAME":  "gw8",
+//	}
+//
+//	byteBody, err := json.Marshal(resources)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if statusCode == 401 {
+//		return nil, errors.New(string(byteResponse))
+//	}
+//
+//	fmt.Println(string(byteResponse))
+//
+//	var operationResults OperationResults
+//
+//	err = json.Unmarshal(byteResponse, &operationResults)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &operationResults, nil
+//}
+
+func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -446,20 +480,16 @@ func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsReq
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(resources)
-	if err != nil {
-		return nil, err
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/not/monitoring", headers, nil, resources)
 	if err != nil {
 		return nil, err
 	}
 	if statusCode == 401 {
 		return nil, errors.New(string(byteResponse))
 	}
-
-	fmt.Println(string(byteResponse))
+	if statusCode != 200 {
+		return nil, errors.New(string(byteResponse))
+	}
 
 	var operationResults OperationResults
 
@@ -568,29 +598,6 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 type TransitSendMetricsRequest struct {
 	Trace   TracerContext          `json:"context"`
 	Metrics *[]ResourceWithMetrics `json:"resources"`
-}
-
-type SpecialDate struct {
-	time.Time
-}
-
-func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
-	strInput := string(input)
-
-	i, err := strconv.ParseInt(strInput, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	i *= int64(time.Millisecond)
-
-	*sd = SpecialDate{time.Unix(0, i)}
-
-	return nil
-}
-
-func (sd SpecialDate) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }
 
 type SpecialDate struct {
