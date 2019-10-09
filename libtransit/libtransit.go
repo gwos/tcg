@@ -4,11 +4,11 @@ package main
 // #include <string.h> /* for strncpy error message */
 import "C"
 import (
-	"encoding/json"
 	"github.com/gwos/tng/transit"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
+	"encoding/json"
 	"log"
 	"time"
 )
@@ -159,7 +159,7 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
 		return nil
 	}
 
-	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
+	operationResults, err := transit.SynchronizeInventory(&inventory)
 
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)

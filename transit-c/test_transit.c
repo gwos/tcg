@@ -9,53 +9,56 @@
 #include "util.h"
 
 void test_defineMonitoredResource() {
-  MonitoredResource resource01 = {"the-unique-name-of-the-instance-01",
-                                  "gce_instance", HOST_UP};
+  TypedValue prop0 = {BooleanType, true};
+  TypedValue prop1 = {DoubleType, doubleValue : 0.1};
+  TypedValue prop2 = {StringType, stringValue : "val_002"};
+  TypedValuePair props[] = {
+      {"key0", prop0}, {"key01", prop1}, {"key002", prop2}};
 
-  StringPair labels[] = {
-      {"key_1", "val_1"}, {"key_02", "val_02"}, {"key_003", "val_003"}};
+  MonitoredResource resource = {SERVICE_OK,
+                                "the-unique-name-of-the-instance-02",
+                                "instance-type",
+                                "instance-owner",
+                                "instance-category",
+                                "instance-description",
+                                "instance-lastPlugInOutput",
+                                0,
+                                0,
+                                {3, props}};
 
-  MonitoredResource resource02 = {"the-unique-name-of-the-instance-02",
-                                  "gce_instance",
-                                  SERVICE_OK,
-                                  &resource01,
-                                  {3, labels}};
-
-  if (strcmp(resource02.type, "gce_instance")) {
-    fail(resource02.type);
+  if (resource.status != SERVICE_OK) {
+    fail("resource02.status != SERVICE_OK");
   }
-  if (strcmp(MONITOR_STATUS_STRING[resource02.status], "SERVICE_OK")) {
-    fail(MONITOR_STATUS_STRING[resource02.status]);
+  if (strcmp(resource.type, "instance-type")) {
+    fail(resource.type);
   }
-  if (strcmp(resource02.labels.items[1].value, "val_02")) {
-    fail(resource02.labels.items[1].value);
-  }
-  if (strcmp(resource02.owner->type, "gce_instance")) {
-    fail(resource02.owner->type);
-  }
-  if (strcmp(MONITOR_STATUS_STRING[resource02.owner->status], "HOST_UP")) {
-    fail(MONITOR_STATUS_STRING[resource02.owner->status]);
+  if (strcmp(resource.properties.items[2].value.stringValue, "val_002")) {
+    fail(resource.properties.items[2].value.stringValue);
   }
 }
 
 void test_encodeMonitoredResource() {
-  MonitoredResource resource01 = {"the-unique-name-of-the-instance-01",
-                                  "gce_instance", HOST_UP};
-
-  MonitoredResource resource02 = {"the-unique-name-of-the-instance-02",
-                                  "gce_instance",
-                                  SERVICE_OK,
-                                  &resource01,
-                                  {3, (StringPair[]){{"key_1", "val_1"},
-                                                     {"key_02", "val_02"},
-                                                     {"key_003", "val_003"}}}};
+  MonitoredResource resource01 = {HOST_UP, "the-unique-name-of-the-instance-01",
+                                  "gce_instance"};
+  MonitoredResource resource02 = {
+      SERVICE_OK,
+      "the-unique-name-of-the-instance-02",
+      "instance-type",
+      "instance-owner",
+      "instance-category",
+      "instance-description",
+      "instance-lastPlugInOutput",
+      0,
+      0,
+      {3, (TypedValuePair[]){{"key--", {BooleanType, true}},
+                             {"key_1", {DoubleType, doubleValue : 0.1}},
+                             {"key-2", {StringType, stringValue : "val-2"}}}}};
 
   char *result = NULL;
   result = encodeMonitoredResource(&resource01, 0);
-  if (!result ||
-      strcmp(result,
-             "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
-             "\"HOST_UP\", \"type\": \"gce_instance\"}")) {
+  if (!result || strcmp(result,
+                        "{\"name\": \"the-unique-name-of-the-instance-01\", "
+                        "\"status\": 7, \"type\": \"gce_instance\"}")) {
     fail("!result");
   }
 
@@ -63,12 +66,14 @@ void test_encodeMonitoredResource() {
   result = encodeMonitoredResource(&resource02, 0);
 
   char *expected =
-      "{\"labels\": {\"key_003\": \"val_003\", \"key_02\": \"val_02\", "
-      "\"key_1\": \"val_1\"}, \"name\": "
-      "\"the-unique-name-of-the-instance-02\", \"owner\": {\"name\": "
-      "\"the-unique-name-of-the-instance-01\", \"status\": \"HOST_UP\", "
-      "\"type\": \"gce_instance\"}, \"status\": \"SERVICE_OK\", \"type\": "
-      "\"gce_instance\"}";
+      "{\"category\": \"instance-category\", \"description\": "
+      "\"instance-description\", \"lastPlugInOutput\": "
+      "\"instance-lastPlugInOutput\", \"name\": "
+      "\"the-unique-name-of-the-instance-02\", \"owner\": \"instance-owner\", "
+      "\"properties\": {\"key--\": {\"boolValue\": true, \"valueType\": 4}, "
+      "\"key-2\": {\"stringValue\": \"val-2\", \"valueType\": 3}, \"key_1\": "
+      "{\"doubleValue\": 0.10000000000000001, \"valueType\": 2}}, \"status\": "
+      "1, \"type\": \"instance-type\"}";
 
   //   printf("\n#test_encodeMonitoredResource: %s", result);
   if (!result || strcmp(result, expected)) {
@@ -80,16 +85,18 @@ void test_encodeMonitoredResource() {
 
 void test_decodeMonitoredResource() {
   char *resource_str01 =
-      "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
-      "\"HOST_UP\", \"type\": \"gce_instance\"}";
+      "{\"name\": \"the-unique-name-of-the-instance-01\", "
+      "\"status\": 7, \"type\": \"gce_instance\"}";
 
   char *resource_str02 =
-      "{\"labels\": {\"key_003\": \"val_003\", \"key_02\": \"val_02\", "
-      "\"key_1\": \"val_1\"}, \"name\": "
-      "\"the-unique-name-of-the-instance-02\", \"owner\": {\"name\": "
-      "\"the-unique-name-of-the-instance-01\", \"status\": \"HOST_UP\", "
-      "\"type\": \"gce_instance\"}, \"status\": \"SERVICE_OK\", \"type\": "
-      "\"gce_instance\"}";
+      "{\"category\": \"instance-category\", \"description\": "
+      "\"instance-description\", \"lastPlugInOutput\": "
+      "\"instance-lastPlugInOutput\", \"name\": "
+      "\"the-unique-name-of-the-instance-02\", \"owner\": \"instance-owner\", "
+      "\"properties\": {\"key--\": {\"boolValue\": true, \"valueType\": 4}, "
+      "\"key-2\": {\"stringValue\": \"val-2\", \"valueType\": 3}, \"key_1\": "
+      "{\"doubleValue\": 0.10000000000000001, \"valueType\": 2}}, \"status\": "
+      "1, \"type\": \"instance-type\"}";
 
   MonitoredResource *resource = decodeMonitoredResource(resource_str01);
 
@@ -112,39 +119,43 @@ void test_decodeMonitoredResource() {
   if (!resource) {
     fail("!resource");
   };
-  if (resource->labels.count != 3) {
-    fail("resource->labels.count");
-  }
-  if (strcmp(resource->labels.items[0].key, "key_003")) {
-    fail(resource->labels.items[0].key);
-  }
-  if (strcmp(resource->labels.items[1].key, "key_02")) {
-    fail(resource->labels.items[1].key);
-  }
-  if (strcmp(resource->labels.items[2].key, "key_1")) {
-    fail(resource->labels.items[2].key);
-  }
-  if (strcmp(resource->labels.items[0].value, "val_003")) {
-    fail(resource->labels.items[0].value);
-  }
-  if (strcmp(resource->labels.items[1].value, "val_02")) {
-    fail(resource->labels.items[1].value);
-  }
-  if (strcmp(resource->labels.items[2].value, "val_1")) {
-    fail(resource->labels.items[2].value);
-  }
   if (strcmp(resource->name, "the-unique-name-of-the-instance-02")) {
     fail(resource->name);
-  }
-  if (strcmp(resource->owner->name, "the-unique-name-of-the-instance-01")) {
-    fail(resource->owner->name);
   }
   if (resource->status != SERVICE_OK) {
     fail("resource->status != SERVICE_OK");
   }
-  if (resource->owner->status != HOST_UP) {
-    fail("resource->owner->status != HOST_UP");
+  if (resource->properties.count != 3) {
+    fail("resource->properties.count");
   }
+  if (strcmp(resource->properties.items[0].key, "key--")) {
+    fail(resource->properties.items[0].key);
+  }
+  if (strcmp(resource->properties.items[1].key, "key-2")) {
+    fail(resource->properties.items[1].key);
+  }
+  if (strcmp(resource->properties.items[2].key, "key_1")) {
+    fail(resource->properties.items[2].key);
+  }
+  if (resource->properties.items[0].value.valueType != BooleanType) {
+    fail("resource->properties.items[0].value.valueType != BooleanType");
+  }
+  if (resource->properties.items[0].value.boolValue != true) {
+    fail("resource->properties.items[0].value.boolValue != true");
+  }
+  if (resource->properties.items[1].value.valueType != StringType) {
+    fail("resource->properties.items[1].value.valueType != StringType");
+  }
+  if (strcmp(resource->properties.items[1].value.stringValue, "val-2")) {
+    fail(resource->properties.items[1].value.stringValue);
+  }
+  if (resource->properties.items[2].value.valueType != DoubleType) {
+    fail("resource->properties.items[2].value.valueType != DoubleType");
+  }
+  if (resource->properties.items[2].value.doubleValue != 0.1) {
+    fail("resource->properties.items[2].value.doubleValue != 0.1");
+  }
+
   free(resource);
 }
 
