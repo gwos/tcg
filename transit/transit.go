@@ -18,22 +18,22 @@ import (
 type MetricKindEnum string
 
 const (
-	GAUGE MetricKindEnum = "GAUGE"
-	DELTA = "DELTA"
-	CUMULATIVE = "CUMULATIVE"
-	METRIC_KIND_UNSPECIFIED = "METRIC_KIND_UNSPECIFIED"
+	GAUGE                   MetricKindEnum = "GAUGE"
+	DELTA                                  = "DELTA"
+	CUMULATIVE                             = "CUMULATIVE"
+	METRIC_KIND_UNSPECIFIED                = "METRIC_KIND_UNSPECIFIED"
 )
 
 // ValueType defines the data type of the value of a metric
 type ValueTypeEnum string
 
 const (
-	IntegerType ValueTypeEnum = "IntegerType"
-	DoubleType = "DoubleType"
-	StringType = "StringType"
-	BooleanType = "BooleanType"
-	DateType = "DateType"
-	UnspecifiedType = "UnspecifiedType"
+	IntegerType     ValueTypeEnum = "IntegerType"
+	DoubleType                    = "DoubleType"
+	StringType                    = "StringType"
+	BooleanType                   = "BooleanType"
+	DateType                      = "DateType"
+	UnspecifiedType               = "UnspecifiedType"
 )
 
 // Supported units are a subset of The Unified Code for Units of Measure
@@ -48,30 +48,30 @@ const (
 type ComputeTypeEnum string
 
 const (
-	Query ComputeTypeEnum = "Query"
-	Regex = "Regex"
-	Synthetic = "Synthetic"
-	Info = "Info"
-	Performance = "Performance"
-	Health = "Health"
+	Query       ComputeTypeEnum = "Query"
+	Regex                       = "Regex"
+	Synthetic                   = "Synthetic"
+	Info                        = "Info"
+	Performance                 = "Performance"
+	Health                      = "Health"
 )
 
 // MonitorStatusEnum represents Groundwork service monitor status
 type MonitorStatusEnum string
 
 const (
-	SERVICE_OK MonitorStatusEnum = "SERVICE_OK"
-	SERVICE_UNSCHEDULED_CRITICAL = "SERVICE_UNSCHEDULED_CRITICAL"
-	SERVICE_WARNING = "SERVICE_WARNING"
-	SERVICE_PENDING = "SERVICE_PENDING"
-	SERVICE_SCHEDULED_CRITICAL = "SERVICE_SCHEDULED_CRITICAL"
-	SERVICE_UNKNOWN = "SERVICE_UNKNOWN"
-	HOST_UP = "HOST_UP"
-	HOST_UNSCHEDULED_DOWN = "HOST_UNSCHEDULED_DOWN"
-	HOST_WARNING = "HOST_WARNING"
-	HOST_PENDING = "HOST_PENDING"
-	HOST_SCHEDULED_DOWN = "HOST_SCHEDULED_DOWN"
-	HOST_UNREACHABLE = "HOST_UNREACHABLE"
+	SERVICE_OK                   MonitorStatusEnum = "SERVICE_OK"
+	SERVICE_UNSCHEDULED_CRITICAL                   = "SERVICE_UNSCHEDULED_CRITICAL"
+	SERVICE_WARNING                                = "SERVICE_WARNING"
+	SERVICE_PENDING                                = "SERVICE_PENDING"
+	SERVICE_SCHEDULED_CRITICAL                     = "SERVICE_SCHEDULED_CRITICAL"
+	SERVICE_UNKNOWN                                = "SERVICE_UNKNOWN"
+	HOST_UP                                        = "HOST_UP"
+	HOST_UNSCHEDULED_DOWN                          = "HOST_UNSCHEDULED_DOWN"
+	HOST_WARNING                                   = "HOST_WARNING"
+	HOST_PENDING                                   = "HOST_PENDING"
+	HOST_SCHEDULED_DOWN                            = "HOST_SCHEDULED_DOWN"
+	HOST_UNREACHABLE                               = "HOST_UNREACHABLE"
 )
 
 // Groundwork Standard Monitored Resource Types
@@ -84,11 +84,11 @@ const (
 type MetricSampleType string
 
 const (
-	Value MetricSampleType = "Value"
-	Critical = "Critical"
-	Warning = "Warning"
-	Min = "Min"
-	Max = "Max"
+	Value    MetricSampleType = "Value"
+	Critical                  = "Critical"
+	Warning                   = "Warning"
+	Min                       = "Min"
+	Max                       = "Max"
 )
 
 // TimeInterval: A closed time interval. It extends from the start time
@@ -319,32 +319,32 @@ type TracerContext struct {
 }
 
 type TransitSendInventoryRequest struct {
-	context   *TracerContext
-	inventory *[]MonitoredResource
-	groups    *[]Group
+	Context   *TracerContext       `json:"context"`
+	Inventory *[]MonitoredResource `json:"resources"`
+	Groups    *[]Group             `json:"groups"`
 }
 
 type OperationResults struct {
-	ResourcesAdded   int `json:"successful"`
-	ResourcesDeleted int `json:"failed"`
-	EntityType string `json:"entityType"`
-	Operation string `json:"operation"`
-	Warning int `json:"warning"`
-	Count int `json:"count"`
-	Results *[]OperationResult	`json:"results"`
+	ResourcesAdded   int                `json:"successful"`
+	ResourcesDeleted int                `json:"failed"`
+	EntityType       string             `json:"entityType"`
+	Operation        string             `json:"operation"`
+	Warning          int                `json:"warning"`
+	Count            int                `json:"count"`
+	Results          *[]OperationResult `json:"results"`
 }
 
 type OperationResult struct {
-	Entity string	`json:"entity"`
-	Status string	`json:"status"`
-	Message string	`json:"message"`
-	Location string	`json:"location"`
-	EntityId int	`json:"entityId"`
+	Entity   string `json:"entity"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
+	Location string `json:"location"`
+	EntityId int    `json:"entityId"`
 }
 
 type Group struct {
-	groupName string
-	resources []MonitoredResource
+	GroupName string	`json:"groupName"`
+	Resources []MonitoredResource	`json:"resources"`
 }
 
 type ResourceWithMetrics struct {
@@ -361,7 +361,7 @@ type ResourceWithMetricsRequest struct {
 type TransitServices interface {
 	SendResourcesWithMetrics(resources []byte) (*OperationResults, error)
 	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error)
+	SynchronizeInventory(inventory []byte) (*OperationResults, error)
 }
 
 // Groundwork Connection Configuration
@@ -439,7 +439,7 @@ func (transit Transit) Disconnect() (error) {
 }
 
 // Deprecated
-//func (transit Transit) SendResourcesWithMetrics(resources *TransitSendMetricsRequest) (*OperationResults, error) {
+//func (transit Transit) SendResourcesWithMetrics(resources *SendMetricsRequest) (*OperationResults, error) {
 //	headers := map[string]string{
 //		"Accept":         "application/json",
 //		"Content-Type":   "application/json",
@@ -480,7 +480,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/not/monitoring", headers, nil, resources)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +563,39 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	return &arr, nil
 }
 
-func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error) {
+// Deprecated
+//func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error) {
+//	headers := map[string]string{
+//		"Accept":         "application/json",
+//		"Content-Type":   "application/json",
+//		"GWOS-API-TOKEN": transit.Config.Token,
+//		"GWOS-APP-NAME":  "gw8",
+//	}
+//
+//	byteBody, err := json.Marshal(inventory)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
+//	if err != nil {
+//		return nil, err
+//	}
+//	if statusCode == 401 {
+//		return nil, errors.New(string(byteResponse))
+//	}
+//
+//	var operationResults OperationResults
+//
+//	err = json.Unmarshal(byteResponse, &operationResults)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return &operationResults, nil
+//}
+
+func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -571,16 +603,14 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	byteBody, err := json.Marshal(inventory)
-	if err != nil {
-		return nil, err
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, inventory)
 	if err != nil {
 		return nil, err
 	}
 	if statusCode == 401 {
+		return nil, errors.New(string(byteResponse))
+	}
+	if statusCode != 200 {
 		return nil, errors.New(string(byteResponse))
 	}
 
@@ -595,7 +625,7 @@ func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryReque
 }
 
 // internal transit data
-type TransitSendMetricsRequest struct {
+type SendMetricsRequest struct {
 	Trace   TracerContext          `json:"context"`
 	Metrics *[]ResourceWithMetrics `json:"resources"`
 }

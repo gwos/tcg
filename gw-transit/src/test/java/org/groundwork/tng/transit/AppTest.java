@@ -84,4 +84,46 @@ public class AppTest {
 //        assertEquals(0, (int) results.getSuccessful());
 //        assertEquals(1, (int) results.getFailed());
     }
+
+    @Test
+    public void shouldSynchronizeInventory() throws IOException {
+        TransitServices transit = new TransitServicesImpl();
+
+        DtoCredentials credentials = new DtoCredentials();
+        credentials.setUser("RESTAPIACCESS");
+        credentials.setPassword("6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH");
+
+        transit.Connect(credentials);
+
+        DtoTracerContext context = DtoTracerContext.builder()
+                .setAgentId("3939333393342")
+                .setAppType("VEMA")
+                .setTimeStamp(new Date())
+                .setTraceToken("token-99e93")
+                .build();
+
+        DtoMonitoredResource resource = DtoMonitoredResource.builder()
+                .setName("mc-test-host")
+                .setType("HOST")
+                .setStatus(DtoMonitorStatus.HOST_UP)
+                .setOwner("mc-test-host")
+                .build();
+
+        DtoGroup group = new DtoGroup();
+        List<DtoMonitoredResource> resources = new ArrayList<>();
+        group.setGroupName("GW8");
+        group.setResources(resources);
+
+        DtoInventory dtoInventory = new DtoInventory();
+        dtoInventory.setContext(context);
+        dtoInventory.add(resource);
+        dtoInventory.add(group);
+
+        transit.SynchronizeInventory(dtoInventory);
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String name = reader.readLine();
+
+        transit.Disconnect();
+    }
 }

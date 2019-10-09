@@ -21,7 +21,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	_, _, err = nats.StartSubscriber(&transitConfig)
+	err = nats.StartSubscriber(&transitConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,7 +47,7 @@ func TestMonitoredResource(str *C.char, errorMsg *C.char) *C.char {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) bool {
-	//var resourceWithMetrics transit.TransitSendMetricsRequest
+	//var resourceWithMetrics transit.SendMetricsRequest
 
 	//err := json.Unmarshal([]byte(C.GoString(resourcesWithMetricsJson)), &resourceWithMetrics)
 	//if err != nil {
@@ -61,7 +61,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) bool {
 	//	return nil
 	//}
 
-	err := nats.Publish(C.GoString(resourcesWithMetricsJson))
+	err := nats.Publish(C.GoString(resourcesWithMetricsJson), nats.SendResourceWithMetricsSubject)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return false
@@ -95,29 +95,37 @@ func ListMetrics(errorMsg *C.char) *C.char {
 }
 
 //export SynchronizeInventory
-func SynchronizeInventory(inventoryJson, errorMsg *C.char) *C.char {
-	var inventory transit.TransitSendInventoryRequest
+func SynchronizeInventory(inventoryJson, errorMsg *C.char) bool {
+	//fmt.Println(C.GoString(inventoryJson))
 
-	err := json.Unmarshal([]byte(C.GoString(inventoryJson)), &inventory)
+	//var inventory transit.TransitSendInventoryRequest
+	//
+	//err := json.Unmarshal([]byte(C.GoString(inventoryJson)), &inventory)
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+
+	err := nats.Publish(C.GoString(inventoryJson), nats.SynchronizeInventorySubject)
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
+		return false
 	}
 
-	operationResults, err := transitConfig.SynchronizeInventory(&inventory)
+	return true
 
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-
-	operationResultsJson, err := json.Marshal(operationResults)
-	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-		return nil
-	}
-
-	return C.CString(string(operationResultsJson))
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+	//
+	//operationResultsJson, err := json.Marshal(operationResults)
+	//if err != nil {
+	//	C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+	//	return nil
+	//}
+	//
+	//return C.CString(string(operationResultsJson))
 }
 
 //TODO:

@@ -1,6 +1,5 @@
 package nats
 
-import "C"
 import (
 	"github.com/gwos/tng/transit"
 	stan "github.com/nats-io/go-nats-streaming"
@@ -16,6 +15,8 @@ const (
 	QueueGroup  = "gw8-query-store-group"
 	PublisherID = "tng-publisher"
 	DurableID   = "store-durable"
+	SendResourceWithMetricsSubject = "send-resource-with-metrics"
+	SynchronizeInventorySubject = "synchronize-inventory"
 )
 
 func StartServer() (*stand.StanServer, error) {
@@ -32,18 +33,18 @@ func StartServer() (*stand.StanServer, error) {
 	return server, nil
 }
 
-func StartSubscriber(transitConfig *transit.Transit) (*stan.Conn, *stan.Subscription, error) {
+func StartSubscriber(transitConfig *transit.Transit) error {
 	connection, err := stan.Connect(
 		ClusterID,
 		ClientID,
 		stan.NatsURL(stan.DefaultNatsURL),
 	)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	subscription, err := connection.QueueSubscribe("resource-with-metrics", QueueGroup, func(msg *stan.Msg) {
-		_, err := transitConfig.SendResourcesWithMetrics(msg.Data)
+	_, err = connection.QueueSubscribe(SendResourceWithMetricsSubject, QueueGroup, func(msg *stan.Msg) {
+			_, err = transitConfig.SendResourcesWithMetrics(msg.Data)
 		if err == nil {
 			_ = msg.Ack()
 			log.Println("Delivered")
@@ -56,13 +57,31 @@ func StartSubscriber(transitConfig *transit.Transit) (*stan.Conn, *stan.Subscrip
 		stan.StartWithLastReceived(),
 	)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
-	return &connection, &subscription, nil
+	_, err = connection.QueueSubscribe(SynchronizeInventorySubject, QueueGroup, func(msg *stan.Msg) {
+		_, err = transitConfig.SynchronizeInventory(msg.Data)
+		if err == nil {
+			_ = msg.Ack()
+			log.Println("Delivered")
+		} else {
+			log.Println("Not delivered")
+		}
+	}, stan.SetManualAckMode(),
+		stan.AckWait(15*time.Second),
+		stan.DurableName(DurableID),
+		stan.StartWithLastReceived(),
+	)
+	if err != nil {
+		return err
+	}
+
+
+	return nil
 }
 
-func Publish(msg string) error {
+func Publish(msg string, subject string) error {
 	connection, err := stan.Connect(
 		ClusterID,
 		PublisherID,
@@ -72,7 +91,7 @@ func Publish(msg string) error {
 		return err
 	}
 
-	err = connection.Publish("resource-with-metrics", []byte(msg))
+	err = connection.Publish(subject, []byte(msg))
 	if err != nil {
 		return err
 	}

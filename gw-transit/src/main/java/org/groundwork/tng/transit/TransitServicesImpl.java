@@ -55,7 +55,7 @@ public class TransitServicesImpl implements TransitServices {
     }
 
     @Override
-    public DtoOperationResults SynchronizeInventory(DtoInventory inventory) throws TransitException {
+    public void SynchronizeInventory(DtoInventory inventory) throws TransitException {
         String inventoryJson;
         try {
             inventoryJson = objectMapper.writeValueAsString(inventory);
@@ -63,15 +63,9 @@ public class TransitServicesImpl implements TransitServices {
             throw new TransitException(e);
         }
 
-        String operationResultsJson = tngTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg);
-        if (operationResultsJson == null) {
+        boolean isPublished = tngTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg);
+        if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
-        }
-
-        try {
-            return objectMapper.readValue(operationResultsJson, DtoOperationResults.class);
-        } catch (IOException e) {
-            throw new TransitException(e);
         }
     }
 
@@ -94,20 +88,6 @@ public class TransitServicesImpl implements TransitServices {
         if (!tngTransitLibrary.Disconnect(errorMsg)) {
             throw new TransitException(errorMsg.getValue());
         }
-    }
-
-    @Override
-    public void TestNats() {
-
-        tngTransitLibrary.TestNats("FIRST MESSAGE!");
-
-        tngTransitLibrary.TestNats("SECOND MESSAGE!");
-
-        tngTransitLibrary.TestNats("THIRD MESSAGE!");
-
-        tngTransitLibrary.TestNats("FORTH MESSAGE!");
-
-        tngTransitLibrary.TestNats("FIVES MESSAGE!");
     }
 }
 
