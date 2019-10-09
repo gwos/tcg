@@ -10,18 +10,34 @@ import (
 	"log"
 )
 
+const (
+	SendResourceWithMetricsSubject = "send-resource-with-metrics"
+	SynchronizeInventorySubject    = "synchronize-inventory"
+)
+
 var transitConfig transit.Transit
 
 func main() {
 }
 
 func init() {
+	dispatcherMap := nats.DispatcherMap{
+		SendResourceWithMetricsSubject: func(b []byte) error {
+			_, err := transitConfig.SendResourcesWithMetrics(b)
+			return err
+		},
+		SynchronizeInventorySubject: func(b []byte) error {
+			_, err := transitConfig.SynchronizeInventory(b)
+			return err
+		},
+	}
+
 	_, err := nats.StartServer()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = nats.StartSubscriber(&transitConfig)
+	err = nats.StartDispatcher(&dispatcherMap)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,7 +77,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) bool {
 	//	return nil
 	//}
 
-	err := nats.Publish(C.GoString(resourcesWithMetricsJson), nats.SendResourceWithMetricsSubject)
+	err := nats.Publish(SendResourceWithMetricsSubject, []byte(C.GoString(resourcesWithMetricsJson)))
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return false
@@ -106,7 +122,7 @@ func SynchronizeInventory(inventoryJson, errorMsg *C.char) bool {
 	//	return nil
 	//}
 
-	err := nats.Publish(C.GoString(inventoryJson), nats.SynchronizeInventorySubject)
+	err := nats.Publish(SynchronizeInventorySubject, []byte(C.GoString(inventoryJson)))
 	if err != nil {
 		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
 		return false
