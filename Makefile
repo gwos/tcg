@@ -6,7 +6,7 @@
 
 JANSSON_VERSION = 2.12
 
-all	: local/lib/libjansson.so
+all	: local/lib/libjansson.so libtransit/libtransit.h
 
 # For no good reason, the upstream code does not follow the universal
 # standard for naming the release tarball after the top-level directory
@@ -24,6 +24,9 @@ local/lib/libjansson.so	: jansson-${JANSSON_VERSION}/configure
 	cd jansson-${JANSSON_VERSION}; ./configure --prefix=${PWD}/local
 	cd jansson-${JANSSON_VERSION}; make
 	cd jansson-${JANSSON_VERSION}; make install
+
+libtransit/libtransit.h	:
+	cd libtransit ; make
 
 clean	:
 	rm -rf jansson-${JANSSON_VERSION}
