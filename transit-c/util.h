@@ -3,7 +3,8 @@
 
 /* inspired by:
  * https://github.com/akheron/jansson/blob/master/test/suites/api/util.h */
-#define failhdr fprintf(stderr, "FAIL %s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__)
+#define failhdr \
+  fprintf(stderr, "FAIL %s:%s:%d: ", __FILE__, __FUNCTION__, __LINE__)
 
 #define fail(msg)                 \
   do {                            \

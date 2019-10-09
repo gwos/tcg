@@ -54,12 +54,11 @@ void test_encodeMonitoredResource() {
     nextCheckTime : 0,
     properties : {
       count : 3,
-      items :
-          (TypedValuePair[]){
-	      {"key--", {BooleanType, boolValue : true}},
-              {"key_1", {DoubleType, doubleValue : 0.1}},
-              {"key-2", {StringType, stringValue : "val-2"}},
-	  }
+      items : (TypedValuePair[]){
+          {"key--", {BooleanType, boolValue : true}},
+          {"key_1", {DoubleType, doubleValue : 0.1}},
+          {"key-2", {StringType, stringValue : "val-2"}},
+      }
     }
   };
 
@@ -74,29 +73,31 @@ void test_encodeMonitoredResource() {
   free(result);
   result = encodeMonitoredResource(&resource02, 0);
 
-  char *expected = "{"
+  char *expected =
+      "{"
       "\"category\": \"instance-category\", "
       "\"description\": \"instance-description\", "
       "\"lastPlugInOutput\": \"instance-lastPlugInOutput\", "
       "\"name\": \"the-unique-name-of-the-instance-02\", "
       "\"owner\": \"instance-owner\", "
       "\"properties\": {"
-	  "\"key--\": {"
-	      "\"boolValue\": true, "
-	      "\"valueType\": 4"
-	  "}, "
-	  "\"key-2\": {"
-	      "\"stringValue\": \"val-2\", "
-	      "\"valueType\": 3"
-	  "}, "
-	  "\"key_1\": {"
-	      "\"doubleValue\": 0.10000000000000001, "
-	      "\"valueType\": 2"
-	  "}"
+      "\"key--\": {"
+      "\"boolValue\": true, "
+      "\"valueType\": 4"
       "}, "
-      "\"status\": " "1, "
+      "\"key-2\": {"
+      "\"stringValue\": \"val-2\", "
+      "\"valueType\": 3"
+      "}, "
+      "\"key_1\": {"
+      "\"doubleValue\": 0.10000000000000001, "
+      "\"valueType\": 2"
+      "}"
+      "}, "
+      "\"status\": "
+      "1, "
       "\"type\": \"instance-type\""
-  "}";
+      "}";
 
   // printf("#test_encodeMonitoredResource: %s\n", result);
   if (!result || strcmp(result, expected)) {
@@ -111,29 +112,30 @@ void test_decodeMonitoredResource() {
       "{\"name\": \"the-unique-name-of-the-instance-01\", "
       "\"status\": 7, \"type\": \"gce_instance\"}";
 
-  char *resource_json02 = "{"
+  char *resource_json02 =
+      "{"
       "\"category\": \"instance-category\", "
       "\"description\": \"instance-description\", "
       "\"lastPlugInOutput\": \"instance-lastPlugInOutput\", "
       "\"name\": \"the-unique-name-of-the-instance-02\", "
       "\"owner\": \"instance-owner\", "
       "\"properties\": {"
-	  "\"key--\": {"
-	      "\"boolValue\": true, "
-	      "\"valueType\": 4"
-	  "}, "
-	  "\"key-2\": {"
-	      "\"stringValue\": \"val-2\", "
-	      "\"valueType\": 3"
-	  "}, "
-	  "\"key_1\": {"
-	      "\"doubleValue\": 0.10000000000000001, "
-	      "\"valueType\": 2"
-	  "}"
+      "\"key--\": {"
+      "\"boolValue\": true, "
+      "\"valueType\": 4"
+      "}, "
+      "\"key-2\": {"
+      "\"stringValue\": \"val-2\", "
+      "\"valueType\": 3"
+      "}, "
+      "\"key_1\": {"
+      "\"doubleValue\": 0.10000000000000001, "
+      "\"valueType\": 2"
+      "}"
       "}, "
       "\"status\": 1, "
       "\"type\": \"instance-type\""
-  "}";
+      "}";
 
   MonitoredResource *resource = decodeMonitoredResource(resource_json01);
 
