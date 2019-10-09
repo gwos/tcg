@@ -318,7 +318,7 @@ type TracerContext struct {
 	TimeStamp  SpecialDate `json:"timeStamp"`
 }
 
-type TransitSendInventoryRequest struct {
+type SendInventoryRequest struct {
 	Context   *TracerContext       `json:"context"`
 	Inventory *[]MonitoredResource `json:"resources"`
 	Groups    *[]Group             `json:"groups"`
@@ -380,6 +380,7 @@ type Credentials struct {
 // Implementation of TransitServices
 type Transit struct {
 	Config GroundworkConfig
+	Credentials *Credentials
 }
 
 // create and connect to a Transit instance from a Groundwork connection configuration
@@ -409,6 +410,7 @@ func (transit *Transit) Connect(credentials Credentials) error {
 		}
 		*transit = Transit{
 			Config: config,
+			Credentials: &credentials,
 		}
 		return nil
 	}
@@ -485,7 +487,10 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 		return nil, err
 	}
 	if statusCode == 401 {
-		return nil, errors.New(string(byteResponse))
+		err = transit.Connect(*transit.Credentials)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if statusCode != 200 {
 		return nil, errors.New(string(byteResponse))
@@ -564,7 +569,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 }
 
 // Deprecated
-//func (transit Transit) SynchronizeInventory(inventory *TransitSendInventoryRequest) (*OperationResults, error) {
+//func (transit Transit) SynchronizeInventory(inventory *SendInventoryRequest) (*OperationResults, error) {
 //	headers := map[string]string{
 //		"Accept":         "application/json",
 //		"Content-Type":   "application/json",
@@ -608,7 +613,10 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 		return nil, err
 	}
 	if statusCode == 401 {
-		return nil, errors.New(string(byteResponse))
+		err = transit.Connect(*transit.Credentials)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if statusCode != 200 {
 		return nil, errors.New(string(byteResponse))
