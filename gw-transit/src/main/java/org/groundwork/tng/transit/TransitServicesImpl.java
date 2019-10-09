@@ -25,7 +25,7 @@ public class TransitServicesImpl implements TransitServices {
     }
 
     @Override
-    public DtoOperationResults SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException {
+    public void SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException {
         String resourcesJson;
         try {
             resourcesJson = objectMapper.writeValueAsString(resources);
@@ -33,15 +33,9 @@ public class TransitServicesImpl implements TransitServices {
             throw new TransitException(e);
         }
 
-        String operationResultsJson = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
-        if (operationResultsJson == null) {
+        boolean isPublished = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
+        if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
-        }
-
-        try {
-            return objectMapper.readValue(operationResultsJson, DtoOperationResults.class);
-        } catch (IOException e) {
-            throw new TransitException(e);
         }
     }
 

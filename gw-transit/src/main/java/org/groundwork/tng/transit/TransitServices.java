@@ -9,7 +9,7 @@ import java.util.List;
 
 public interface TransitServices {
 
-    DtoOperationResults SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException;
+    void SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException;
 
     List<DtoMetricDescriptor> ListMetrics() throws TransitException;
 
