@@ -98,7 +98,7 @@ func ListMetrics(errorMsg *C.char) *C.char {
 func SynchronizeInventory(inventoryJson, errorMsg *C.char) bool {
 	//fmt.Println(C.GoString(inventoryJson))
 
-	//var inventory transit.TransitSendInventoryRequest
+	//var inventory transit.SendInventoryRequest
 	//
 	//err := json.Unmarshal([]byte(C.GoString(inventoryJson)), &inventory)
 	//if err != nil {
