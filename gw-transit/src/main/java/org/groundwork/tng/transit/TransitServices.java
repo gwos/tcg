@@ -15,7 +15,5 @@ public interface TransitServices {
 
     void SynchronizeInventory(DtoInventory inventory) throws TransitException;
 
-    void Connect(DtoCredentials credentials) throws TransitException;
-
     void Disconnect() throws TransitException;
 }

@@ -23,8 +23,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate GWOS-API-TOKEN and paste it to headers in SendResourceWithMetric function in transit package from TNG
-     * 3. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
+     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
      * libtransit package on TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
@@ -32,12 +31,6 @@ public class AppTest {
     @Test
     public void shouldSendResourceAndMetrics() throws IOException {
         TransitServices transit = new TransitServicesImpl();
-
-        DtoCredentials credentials = new DtoCredentials();
-        credentials.setUser("RESTAPIACCESS");
-        credentials.setPassword("6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH");
-
-        transit.Connect(credentials);
 
         List<DtoTimeSeries> timeSeries = new ArrayList<>();
         timeSeries.add(DtoTimeSeries.builder()
@@ -85,15 +78,20 @@ public class AppTest {
 //        assertEquals(1, (int) results.getFailed());
     }
 
+
+    /**
+     * Test synchronize inventory
+     * <p>
+     * Usage:
+     * 1. Start GroundWork Foundation server
+     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
+     * libtransit package on TNG
+     * 4. Set path to '.so' file in TransitServiceImpl constructor.
+     * 3. Run test
+     */
     @Test
     public void shouldSynchronizeInventory() throws IOException {
         TransitServices transit = new TransitServicesImpl();
-
-        DtoCredentials credentials = new DtoCredentials();
-        credentials.setUser("RESTAPIACCESS");
-        credentials.setPassword("6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH");
-
-        transit.Connect(credentials);
 
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")

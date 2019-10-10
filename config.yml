@@ -1,0 +1,10 @@
+actions:
+  synchronizeInventoryAction:
+    entrypoint: "http://localhost/api/synchronizer"
+  sendResourceWithMetricsAction:
+    entrypoint: "http://localhost/api/monitoring"
+config:
+  host: "gw8-host"
+  account: "RESTAPIACCESS"
+  password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+  ssl: True
