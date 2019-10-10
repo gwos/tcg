@@ -1,10 +1,10 @@
 package main
 
-//#define ERROR_LEN 250 /* for strncpy error message */
-//#include <string.h> /* for strncpy error message */
+//#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
 	"github.com/gwos/tng/transit"
+	"unsafe"
 )
 
 var transitService transit.Service
@@ -12,42 +12,52 @@ var transitService transit.Service
 func main() {
 }
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func putError(errorBuf *C.char, err error) {
+	buf := (*[C.ERROR_LEN]byte)(unsafe.Pointer(errorBuf))
+	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
+}
+
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsJson, errorMsg *C.char) bool {
+func SendResourcesWithMetrics(resourcesWithMetricsJson, errorBuf *C.char) bool {
 	err := transitService.SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsJson)))
 	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+		putError(errorBuf, err)
 		return false
 	}
-
 	return true
 }
 
 ////export ListMetrics
-//func ListMetrics(errorMsg *C.char) *C.char {
-//	monitorDescriptor, err := transitService.ListMetrics()
-//	if err != nil {
-//		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-//		return nil
-//	}
+// func ListMetrics(errorBuf *C.char) *C.char {
+// 	monitorDescriptor, err := transitService.ListMetrics()
+// 	if err != nil {
+// 		putError(errorBuf, err)
+// 		return nil
+// 	}
 //
-//	bytes, err := json.Marshal(monitorDescriptor)
-//	if err != nil {
-//		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
-//		return nil
-//	}
+// 	bytes, err := json.Marshal(monitorDescriptor)
+// 	if err != nil {
+// 		putError(errorBuf, err)
+// 		return nil
+// 	}
 //
-//	return C.CString(string(bytes))
-//}
+// 	return C.CString(string(bytes))
+// }
 
 //export SynchronizeInventory
-func SynchronizeInventory(inventoryJson, errorMsg *C.char) bool {
+func SynchronizeInventory(inventoryJson, errorBuf *C.char) bool {
 	err := transitService.SynchronizeInventory([]byte(C.GoString(inventoryJson)))
 	if err != nil {
-		C.strncpy((*C.char)(errorMsg), C.CString(err.Error()), C.ERROR_LEN)
+		putError(errorBuf, err)
 		return false
 	}
-
 	return true
 }
 
