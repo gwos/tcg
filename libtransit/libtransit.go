@@ -25,8 +25,8 @@ func putError(errorBuf *C.char, err error) {
 }
 
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsJson, errorBuf *C.char) bool {
-	err := transitService.SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsJson)))
+func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char) bool {
+	err := transitService.SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJson)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -52,8 +52,8 @@ func SendResourcesWithMetrics(resourcesWithMetricsJson, errorBuf *C.char) bool {
 // }
 
 //export SynchronizeInventory
-func SynchronizeInventory(inventoryJson, errorBuf *C.char) bool {
-	err := transitService.SynchronizeInventory([]byte(C.GoString(inventoryJson)))
+func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
+	err := transitService.SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJson)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
