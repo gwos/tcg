@@ -20,8 +20,7 @@ typedef struct { const char *p; ptrdiff_t n; } _GoString_;
 
 
 #line 3 "libtransit.go"
-#define ERROR_LEN 250 /* for strncpy error message */
-#include <string.h> /* for strncpy error message */
+#define ERROR_LEN 250 /* buffer for error message */
 
 #line 1 "cgo-generated-wrapper"
 
