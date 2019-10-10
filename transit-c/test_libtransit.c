@@ -40,8 +40,36 @@ void test_dlMonitoredResource() {
   dlclose(handle);
 }
 
+void test_dlSendResourcesWithMetrics() {
+  void *handle;
+  char *error;
+
+  handle = dlopen("./libtransit.so", RTLD_LAZY);
+  if (!handle) {
+    fprintf(stderr, "\nlibtransit error: %s\n", dlerror());
+    exit(1);
+  }
+
+  bool (*sendResourcesWithMetrics)(char *, char *) =
+      dlsym(handle, "SendResourcesWithMetrics");
+  if ((error = dlerror()) != NULL) {
+    fprintf(stderr, "\nlibtransit error: %s\n", error);
+    exit(1);
+  }
+
+  char *resource_str01 =
+      "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
+      "\"HOST_UP\", \"type\": \"gce_instance\"}";
+
+  char err[ERROR_LEN] = "";
+  bool res = sendResourcesWithMetrics(resource_str01, (char *)&err);
+  printf("\n_res:err: %d : %s", res, err);
+  dlclose(handle);
+}
+
 int main(void) {
   test_dlMonitoredResource();
+  test_dlSendResourcesWithMetrics();
 
   fprintf(stdout, "\nall tests passed");
   return 0;
