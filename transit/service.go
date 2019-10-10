@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 )
 
 const (
@@ -15,17 +16,25 @@ const (
 	SynchronizeInventorySubject    = "synchronize-inventory"
 )
 
+var serviceActions Actions
+
 func init() {
-	configFile, err := os.Open("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/libtransit/config.yml")
+	workDir, err := os.Getwd()
+	configFile, err := os.Open(path.Join(workDir, "config.yml"))
+
+	combinedConfig := struct {
+		Actions          `yaml:"actions"`
+		GroundworkConfig `yaml:"config"`
+	}{}
+
+	decoder := yaml.NewDecoder(configFile)
+	err = decoder.Decode(&combinedConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(&config)
-	if err != nil {
-		log.Fatal(err)
-	}
+	serviceActions = combinedConfig.Actions
+	config.Config = combinedConfig.GroundworkConfig
 
 	err = config.connect()
 	if err != nil {
@@ -79,7 +88,7 @@ func (transit Transit) synchronizeInventory(inventory []byte) (*OperationResults
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, inventory)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, serviceActions.SynchronizeInventory.EntryPoint, headers, nil, inventory)
 	if err != nil {
 		return nil, err
 	}
@@ -111,7 +120,8 @@ func (transit Transit) sendResourcesWithMetrics(resources []byte) (*OperationRes
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, resources)
+	statusCode, byteResponse, err := sendRequest(http.MethodPost, serviceActions.SendResourceWithMetrics.EntryPoint,
+		headers, nil, resources)
 	if err != nil {
 		return nil, err
 	}

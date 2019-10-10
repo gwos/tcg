@@ -1,6 +1,0 @@
-config:
-  host: "gw8-host"
-  account: "RESTAPIACCESS"
-  password: "***REMOVED***"
-  ssl: True
-

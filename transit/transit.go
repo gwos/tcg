@@ -381,6 +381,19 @@ type Transit struct {
 	Config GroundworkConfig `yaml:"config",envconfig:"CONFIG"`
 }
 
+type Actions struct {
+	SynchronizeInventory    SynchronizeInventoryAction    `yaml:"synchronizeInventoryAction",envconfig:"SYNCHRONIZE_INVENTORY_ACTION"`
+	SendResourceWithMetrics SendResourceWithMetricsAction `yaml:"sendResourceWithMetricsAction",envconfig:"SEND_RESOURCE_WITH_METRICS_ACTION"`
+}
+
+type SynchronizeInventoryAction struct {
+	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
+}
+
+type SendResourceWithMetricsAction struct {
+	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
+}
+
 type SpecialDate struct {
 	time.Time
 }
