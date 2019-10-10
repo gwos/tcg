@@ -70,20 +70,6 @@ public class TransitServicesImpl implements TransitServices {
     }
 
     @Override
-    public void Connect(DtoCredentials credentials) throws TransitException {
-        String credentialsJson;
-        try {
-            credentialsJson = objectMapper.writeValueAsString(credentials);
-        } catch (JsonProcessingException e) {
-            throw new TransitException(e);
-        }
-
-        if (!tngTransitLibrary.Connect(credentialsJson, errorMsg)) {
-            throw new TransitException(errorMsg.getValue());
-        }
-    }
-
-    @Override
     public void Disconnect() throws TransitException {
         if (!tngTransitLibrary.Disconnect(errorMsg)) {
             throw new TransitException(errorMsg.getValue());

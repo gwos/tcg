@@ -57,6 +57,7 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 					_ = msg.Ack()
 					log.Println("Delivered", msg)
 				} else {
+					log.Println(err.Error())
 					log.Println("Not delivered", msg)
 				}
 			},

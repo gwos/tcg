@@ -2,10 +2,7 @@ package transit
 
 import "C"
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"time"
 )
@@ -343,8 +340,8 @@ type OperationResult struct {
 }
 
 type Group struct {
-	GroupName string	`json:"groupName"`
-	Resources []MonitoredResource	`json:"resources"`
+	GroupName string              `json:"groupName"`
+	Resources []MonitoredResource `json:"resources"`
 }
 
 type ResourceWithMetrics struct {
@@ -357,285 +354,31 @@ type ResourceWithMetricsRequest struct {
 	Resources []ResourceWithMetrics
 }
 
+// internal transit dta
+type SendMetricsRequest struct {
+	Trace   TracerContext          `json:"context"`
+	Metrics *[]ResourceWithMetrics `json:"resources"`
+}
+
 // Transit interfaces / operations
-type TransitServices interface {
-	SendResourcesWithMetrics(resources []byte) (*OperationResults, error)
-	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory []byte) (*OperationResults, error)
+type Services interface {
+	sendResourcesWithMetrics(resources []byte) (*OperationResults, error)
+	listMetrics() (*[]MetricDescriptor, error)
+	synchronizeInventory(inventory []byte) (*OperationResults, error)
 }
 
 // Groundwork Connection Configuration
 type GroundworkConfig struct {
-	HostName string
-	Account  string
+	HostName string `yaml:"host",envconfig:"HOST"`
+	Account  string `yaml:"account",envconfig:"ACCOUNT"`
+	Password string `yaml:"password",envconfig:"PASSWORD"`
 	Token    string
-	SSL      bool
+	SSL      bool `yaml:"ssl",envconfig:"SSL"`
 }
 
-type Credentials struct {
-	User     string
-	Password string
-}
-
-// Implementation of TransitServices
+// Implementation of Services
 type Transit struct {
-	Config GroundworkConfig
-	Credentials *Credentials
-}
-
-// create and connect to a Transit instance from a Groundwork connection configuration
-func (transit *Transit) Connect(credentials Credentials) error {
-	formValues := map[string]string{
-		"gwos-app-name": "gw8",
-		"user":          credentials.User,
-		"password":      credentials.Password,
-	}
-
-	headers := map[string]string{
-		"Accept":       "text/plain",
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
-	if err != nil {
-		return err
-	}
-
-	if statusCode == 200 {
-		config := GroundworkConfig{
-			HostName: "Test",
-			Account:  credentials.User,
-			Token:    string(byteResponse),
-			SSL:      false,
-		}
-		*transit = Transit{
-			Config: config,
-			Credentials: &credentials,
-		}
-		return nil
-	}
-
-	return errors.New(string(byteResponse))
-}
-
-func (transit Transit) Disconnect() (error) {
-	formValues := map[string]string{
-		"gwos-app-name":  "gw8",
-		"gwos-api-token": transit.Config.Token,
-	}
-
-	headers := map[string]string{
-		"Accept":       "text/plain",
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
-	if err != nil {
-		return err
-	}
-
-	if statusCode == 200 {
-		return nil
-	}
-	return errors.New(string(byteResponse))
-}
-
-// Deprecated
-//func (transit Transit) SendResourcesWithMetrics(resources *SendMetricsRequest) (*OperationResults, error) {
-//	headers := map[string]string{
-//		"Accept":         "application/json",
-//		"Content-Type":   "application/json",
-//		"GWOS-API-TOKEN": transit.Config.Token,
-//		"GWOS-APP-NAME":  "gw8",
-//	}
-//
-//	byteBody, err := json.Marshal(resources)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, byteBody)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if statusCode == 401 {
-//		return nil, errors.New(string(byteResponse))
-//	}
-//
-//	fmt.Println(string(byteResponse))
-//
-//	var operationResults OperationResults
-//
-//	err = json.Unmarshal(byteResponse, &operationResults)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return &operationResults, nil
-//}
-
-func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.Config.Token,
-		"GWOS-APP-NAME":  "gw8",
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/monitoring", headers, nil, resources)
-	if err != nil {
-		return nil, err
-	}
-	if statusCode == 401 {
-		err = transit.Connect(*transit.Credentials)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
-	}
-
-	var operationResults OperationResults
-
-	err = json.Unmarshal(byteResponse, &operationResults)
-	if err != nil {
-		return nil, err
-	}
-
-	return &operationResults, nil
-}
-
-// TODO: implement
-func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
-	// setup label descriptor samples
-	cores := LabelDescriptor{
-		Description: "Number of Cores",
-		Key:         "cores",
-		ValueType:   StringType,
-	}
-	sampleTime := LabelDescriptor{
-		Description: "Sample Time",
-		Key:         "sampleTime",
-		ValueType:   IntegerType,
-	}
-	load1 := MetricDescriptor{
-		Type:        "local_load_1",
-		Description: "Local Load for 1 minute",
-		DisplayName: "LocalLoad1",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
-		ComputeType: Query,
-		CustomName:  "load-one-minute",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 200},
-			&ThresholdDescriptor{Key: "warning", Value: 100},
-		},
-	}
-	load5 := MetricDescriptor{
-		Type:        "local_load_5",
-		Description: "Local Load for 5 minute",
-		DisplayName: "LocalLoad5",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
-		ComputeType: Query,
-		CustomName:  "load-five-minutes",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 205},
-			&ThresholdDescriptor{Key: "warning", Value: 105},
-		},
-	}
-	load15 := MetricDescriptor{
-		Type:        "local_load_15",
-		Description: "Local Load for 15 minute",
-		DisplayName: "LocalLoad15",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
-		ComputeType: Query,
-		CustomName:  "load-fifteen-minutes",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 215},
-			&ThresholdDescriptor{Key: "warning", Value: 115},
-		},
-	}
-	arr := []MetricDescriptor{load1, load5, load15}
-	return &arr, nil
-}
-
-// Deprecated
-//func (transit Transit) SynchronizeInventory(inventory *SendInventoryRequest) (*OperationResults, error) {
-//	headers := map[string]string{
-//		"Accept":         "application/json",
-//		"Content-Type":   "application/json",
-//		"GWOS-API-TOKEN": transit.Config.Token,
-//		"GWOS-APP-NAME":  "gw8",
-//	}
-//
-//	byteBody, err := json.Marshal(inventory)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, byteBody)
-//	if err != nil {
-//		return nil, err
-//	}
-//	if statusCode == 401 {
-//		return nil, errors.New(string(byteResponse))
-//	}
-//
-//	var operationResults OperationResults
-//
-//	err = json.Unmarshal(byteResponse, &operationResults)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return &operationResults, nil
-//}
-
-func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.Config.Token,
-		"GWOS-APP-NAME":  "gw8",
-	}
-
-	statusCode, byteResponse, err := sendRequest(http.MethodPost, "http://localhost/api/synchronizer", headers, nil, inventory)
-	if err != nil {
-		return nil, err
-	}
-	if statusCode == 401 {
-		err = transit.Connect(*transit.Credentials)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
-	}
-
-	var operationResults OperationResults
-
-	err = json.Unmarshal(byteResponse, &operationResults)
-	if err != nil {
-		return nil, err
-	}
-
-	return &operationResults, nil
-}
-
-// internal transit data
-type SendMetricsRequest struct {
-	Trace   TracerContext          `json:"context"`
-	Metrics *[]ResourceWithMetrics `json:"resources"`
+	Config GroundworkConfig `yaml:"config",envconfig:"CONFIG"`
 }
 
 type SpecialDate struct {
