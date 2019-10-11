@@ -1,6 +1,6 @@
 package controller
 
-import "time"
+import "github.com/gwos/tng/transit"
 
 // Agent possible status
 type StatusEnum int
@@ -17,11 +17,11 @@ type AgentStats struct {
 	bytesSent int
 	metricsSent int
 	messagesSent int
-	lastInventoryRun time.Time
-	lastMetricsRun time.Time
+	lastInventoryRun MillisecondTimestamp
+	lastMetricsRun MillisecondTimestamp
 	executionTimeInventory time.Duration
 	executionTimeMetrics time.Duration
-	upSince time.Duration
+	upSince MillisecondTimestamp
 	lastError string
 }
 
