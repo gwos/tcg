@@ -2,9 +2,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/transit"
-	"math/rand"
 	"time"
 )
 
