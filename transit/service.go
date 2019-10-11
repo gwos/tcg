@@ -20,7 +20,14 @@ var serviceActions Actions
 
 func init() {
 	workDir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	configFile, err := os.Open(path.Join(workDir, "config.yml"))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	combinedConfig := struct {
 		Actions          `yaml:"actions"`

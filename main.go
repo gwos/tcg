@@ -24,8 +24,8 @@ func main() {
 		Name: "geneva",
 		Type:   transit.HostResource,
 		Status: transit.HOST_UP,
-		LastCheckTime: transit.SpecialDate{Time: time.Now()},
-		NextCheckTime: transit.SpecialDate{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Description: "Subversion Server",
 		Properties: map[string]transit.TypedValue{
@@ -34,15 +34,15 @@ func main() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionDate":   transit.TypedValue{DateValue: transit.SpecialDate{Time: time.Now()}},
+			"InceptionTime":   transit.TypedValue{TimeValue: transit.MillisecondTimestamp{Time: time.Now()}},
 		},
 	}
 	localLoadService := transit.MonitoredResource{
 		Name: "local_load",
 		Type:   transit.ServiceResource,
 		Status: transit.SERVICE_OK,
-		LastCheckTime: transit.SpecialDate{Time: time.Now()},
-		NextCheckTime: transit.SpecialDate{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Description: "Load on subversion",
 		Properties: map[string]transit.TypedValue{
@@ -51,44 +51,60 @@ func main() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionDate":   transit.TypedValue{DateValue: transit.SpecialDate{Time: time.Now()}},
+			"InceptionTime":   transit.TypedValue{TimeValue: transit.MillisecondTimestamp{Time: time.Now()}},
 		},
 	}
-	point := makePoint()
+	metricSample := makeMetricSample()
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
-		SampleType: transit.Value,
+		// Labels:      []*LabelDescriptor{&cores, &sampleTime},
+		MetricSamples: []*transit.MetricSample{
+		    &transit.MetricSample{
+			SampleType: transit.Value,
+			Interval:   metricSample.Interval,
+			Value:      metricSample.Value,
+		    },
+		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		Interval: point.Interval,
-		Value:    point.Value,
+		Unit: "%{cpu}",
 	}
-	point = makePoint()
+	metricSample = makeMetricSample()
 	sampleCritical := transit.TimeSeries{
 		MetricName: "local_load_5_cr",
-		SampleType: transit.Critical,
+		MetricSamples: []*transit.MetricSample{
+		    &transit.MetricSample{
+			SampleType: transit.Critical,
+			Interval:   metricSample.Interval,
+			Value:      metricSample.Value,
+		    },
+		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		Interval: point.Interval,
-		Value:    point.Value,
+		Unit: "%{cpu}",
 	}
-	point = makePoint()
+	metricSample = makeMetricSample()
 	sampleWarning := transit.TimeSeries{
 		MetricName: "local_load_5_wn",
-		SampleType: transit.Warning,
+		MetricSamples: []*transit.MetricSample{
+		    &transit.MetricSample{
+			SampleType: transit.Warning,
+			Interval:   metricSample.Interval,
+			Value:      metricSample.Value,
+		    },
+		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
 			"httpMethodTag": "POST",
 			"httpStatusTag": "200",
 		},
-		Interval: point.Interval,
-		Value:    point.Value,
+		Unit: "%{cpu}",
 	}
 
 	// Build Payload
@@ -132,25 +148,26 @@ func main() {
 	fmt.Println(*stats)
 }
 
-func makePoint() *transit.Point {
-	random := rand.Float64()
-	now := transit.SpecialDate{Time: time.Now()}
-	return &transit.Point{
-		Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
-		Value:    &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
+func makeMetricSample() *transit.MetricSample {
+	random := rand.Float64() * 100.0
+	now := transit.MillisecondTimestamp{Time: time.Now()}
+	return &transit.MetricSample{
+		SampleType: transit.Value,
+		Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
+		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
 	}
 }
 
-func makePoints() []*transit.Point {
-	points := make([]*transit.Point, 3)
-	for i := range points {
-		random := rand.Float64()
-		now := transit.SpecialDate{Time: time.Now()}
-		points[i] = &transit.Point{
-
-			Interval: &transit.TimeInterval{EndTime: now, StartTime: now},
-			Value:    &transit.TypedValue{DoubleValue: random},
+func makeMetricSamples() []*transit.MetricSample {
+	metricSamples := make([]*transit.MetricSample, 3)
+	for i := range metricSamples {
+		random := rand.Float64() * 100.0
+		now := transit.MillisecondTimestamp{Time: time.Now()}
+		metricSamples[i] = &transit.MetricSample{
+			SampleType: transit.Value,
+			Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
+			Value:      &transit.TypedValue{DoubleValue: random},
 		}
 	}
-	return points;
+	return metricSamples;
 }
