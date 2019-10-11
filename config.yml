@@ -8,3 +8,4 @@ config:
   account: "RESTAPIACCESS"
   password: "***REMOVED***"
   ssl: True
+  port: 8080

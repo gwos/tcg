@@ -377,8 +377,9 @@ type GroundworkConfig struct {
 	HostName string `yaml:"host",envconfig:"HOST"`
 	Account  string `yaml:"account",envconfig:"ACCOUNT"`
 	Password string `yaml:"password",envconfig:"PASSWORD"`
-	Token    string
+	Token    string	`yaml:"token",envconfig:"TOKEN"`
 	SSL      bool `yaml:"ssl",envconfig:"SSL"`
+	Port     int `yaml:"port",envconfig:"PORT"`
 }
 
 // Implementation of Services
