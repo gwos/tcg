@@ -21,7 +21,7 @@ func TestMarshalMonitoredResource(t *testing.T) {
 
 	buf, _ = json.Marshal(&resource)
 	log.Println(resource, (string)(buf))
-	expected := `{"name":"","type":"","status":4,"lastCheckTime":"0001-01-01T00:00:00Z","nextCheckTime":"0001-01-01T00:00:00Z","properties":{"key01":{"valueType":3,"stringValue":"some string","dateValue":"0001-01-01T00:00:00Z"},"key02":{"valueType":4,"boolValue":true,"dateValue":"0001-01-01T00:00:00Z"}}}`
+	expected := `{"name":"","type":"","status":4,"lastCheckTime":"0001-01-01T00:00:00Z","nextCheckTime":"0001-01-01T00:00:00Z","properties":{"key01":{"valueType":3,"stringValue":"some string","timeValue":"0001-01-01T00:00:00Z"},"key02":{"valueType":4,"boolValue":true,"timeValue":"0001-01-01T00:00:00Z"}}}`
 
 	if expected != (string)(buf) {
 		t.Error("resource.Status")

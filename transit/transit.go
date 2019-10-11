@@ -29,16 +29,18 @@ const (
 	DoubleType                    = "DoubleType"
 	StringType                    = "StringType"
 	BooleanType                   = "BooleanType"
-	DateType                      = "DateType"
+	TimeType                      = "TimeType"
 	UnspecifiedType               = "UnspecifiedType"
 )
 
 // Supported units are a subset of The Unified Code for Units of Measure
-// (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
+// (http://unitsofmeasure.org/ucum.html) standard, added as we encounter
+// the need for them in monitoring contexts.
 type UnitEnum string
 
 const (
 	UnitCounter = "1"
+	PercentCPU  = "%{cpu}"
 )
 
 // CloudHub Compute Types
@@ -58,14 +60,13 @@ type MonitorStatusEnum string
 
 const (
 	SERVICE_OK                   MonitorStatusEnum = "SERVICE_OK"
-	SERVICE_UNSCHEDULED_CRITICAL                   = "SERVICE_UNSCHEDULED_CRITICAL"
 	SERVICE_WARNING                                = "SERVICE_WARNING"
+	SERVICE_UNSCHEDULED_CRITICAL                   = "SERVICE_UNSCHEDULED_CRITICAL"
 	SERVICE_PENDING                                = "SERVICE_PENDING"
 	SERVICE_SCHEDULED_CRITICAL                     = "SERVICE_SCHEDULED_CRITICAL"
 	SERVICE_UNKNOWN                                = "SERVICE_UNKNOWN"
 	HOST_UP                                        = "HOST_UP"
 	HOST_UNSCHEDULED_DOWN                          = "HOST_UNSCHEDULED_DOWN"
-	HOST_WARNING                                   = "HOST_WARNING"
 	HOST_PENDING                                   = "HOST_PENDING"
 	HOST_SCHEDULED_DOWN                            = "HOST_SCHEDULED_DOWN"
 	HOST_UNREACHABLE                               = "HOST_UNREACHABLE"
@@ -82,8 +83,8 @@ type MetricSampleType string
 
 const (
 	Value    MetricSampleType = "Value"
-	Critical                  = "Critical"
 	Warning                   = "Warning"
+	Critical                  = "Critical"
 	Min                       = "Min"
 	Max                       = "Max"
 )
@@ -92,26 +93,26 @@ const (
 // to the end time, and includes both: [startTime, endTime]. Valid time
 // intervals depend on the MetricKind of the metric value. In no case
 // can the end time be earlier than the start time.
-// For a GAUGE metric, the startTime value is technically optional; if
+// For a GAUGE metric, the StartTime value is technically optional; if
 // no value is specified, the start time defaults to the value of the
 // end time, and the interval represents a single point in time. Such an
-//  interval is valid only for GAUGE metrics, which are point-in-time
+// interval is valid only for GAUGE metrics, which are point-in-time
 // measurements.
 // For DELTA and CUMULATIVE metrics, the start time must be earlier
 // than the end time.
-// In all cases, the start time of the next interval must be  at least a
+// In all cases, the start time of the next interval must be at least a
 // microsecond after the end time of the previous interval.  Because the
-// interval is closed, if the start time of a new interval  is the same
-// as the end time of the previous interval, data written  at the new
-// start time could overwrite data written at the previous  end time.
+// interval is closed, if the start time of a new interval is the same
+// as the end time of the previous interval, data written at the new
+// start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime SpecialDate `json:"endTime,omitempty"`
+	EndTime MillisecondTimestamp `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime SpecialDate `json:"startTime,omitempty"`
+	StartTime MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
 // TypedValue: A single strongly-typed value.
@@ -133,36 +134,39 @@ type TypedValue struct {
 	// StringValue: A variable-length string value.
 	StringValue string `json:"stringValue,omitempty"`
 
-	// a date stored as full timestamp
-	DateValue SpecialDate `json:"dateValue,omitempty"`
+	// a time stored as full timestamp
+	TimeValue MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
-// Point: A single data point in a time series.
-type Point struct {
-	// Interval: The time interval to which the data point applies. For
+// MetricSample: A single data sample in a time series, which may represent
+// either a measurement at a single point in time or data aggregated over a
+// time duration.
+type MetricSample struct {
+	// SampleType: The kind of value this particular metric represents.
+	SampleType MetricSampleType `json:"sampleType"`
+
+	// Interval: The time interval to which the data sample applies. For
 	// GAUGE metrics, only the end time of the interval is used. For DELTA
 	// metrics, the start and end time should specify a non-zero interval,
-	// with subsequent points specifying contiguous and non-overlapping
+	// with subsequent samples specifying contiguous and non-overlapping
 	// intervals. For CUMULATIVE metrics, the start and end time should
-	// specify a non-zero interval, with subsequent points specifying the
+	// specify a non-zero interval, with subsequent samples specifying the
 	// same start time and increasing end times, until an event resets the
 	// cumulative value to zero and sets a new start time for the following
-	// points.
+	// samples.
 	Interval *TimeInterval `json:"interval,omitempty"`
 
-	// Value: The value of the data point.
+	// Value: The value of the metric sample.
 	Value *TypedValue `json:"value,omitempty"`
 }
 
-// TimeSeries: A collection of data points that describes the
+// TimeSeries: A collection of data samples that describes the
 // time-varying values of a metric.
 type TimeSeries struct {
-	MetricName string            `json:"metricName"`
-	SampleType MetricSampleType  `json:"sampleType"`
-	Tags       map[string]string `json:"tags,omitempty"`
-	Interval   *TimeInterval     `json:"interval,omitempty"`
-	Value      *TypedValue       `json:"value,omitempty"`
-	Unit       string            `json:"unit,omitempty"`
+	MetricName    string            `json:"metricName"`
+	MetricSamples []*MetricSample   `json:"metricSamples"`
+	Tags          map[string]string `json:"tags,omitempty"`
+	Unit          UnitEnum          `json:"unit,omitempty"`
 }
 
 // MetricDescriptor: Defines a metric type and its schema
@@ -207,7 +211,8 @@ type MetricDescriptor struct {
 	// Unit: The unit in which the metric value is reported. It is only
 	// applicable if the value_type is INT64, DOUBLE, or DISTRIBUTION. The
 	// supported units are a subset of The Unified Code for Units of Measure
-	// (http://unitsofmeasure.org/ucum.html) standard:Basic units (UNIT)
+	// (http://unitsofmeasure.org/ucum.html) standard, added as we encounter
+	// the need for them in monitoring contexts.
 	Unit UnitEnum `json:"unit,omitempty"`
 
 	// ValueType: Whether the measurement is an integer, a floating-point
@@ -233,7 +238,7 @@ type MetricDescriptor struct {
 	//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
 	// measurements in a time series should have the same start time and
 	// increasing end times, until an event resets the cumulative value to
-	// zero and sets a new start time for the following points.
+	// zero and sets a new start time for the following samples.
 	MetricKind MetricKindEnum `json:"metricKind"`
 }
 
@@ -294,9 +299,9 @@ type MonitoredResource struct {
 	//  Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// The last status check time on this resource
-	LastCheckTime SpecialDate `json:"lastCheckTime,omitempty"`
+	LastCheckTime MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The last status check time on this resource
-	NextCheckTime SpecialDate `json:"nextCheckTime,omitempty"`
+	NextCheckTime MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
@@ -309,16 +314,16 @@ type MonitoredResource struct {
 
 // Trace Context of a Transit call
 type TracerContext struct {
-	AppType    string      `json:"appType"`
-	AgentId    string      `json:"agentId"`
-	TraceToken string      `json:"traceToken"`
-	TimeStamp  SpecialDate `json:"timeStamp"`
+	AppType    string               `json:"appType"`
+	AgentId    string               `json:"agentId"`
+	TraceToken string               `json:"traceToken"`
+	TimeStamp  MillisecondTimestamp `json:"timeStamp"`
 }
 
 type SendInventoryRequest struct {
 	Context   *TracerContext       `json:"context"`
 	Inventory *[]MonitoredResource `json:"resources"`
-	Groups    *[]Group             `json:"groups"`
+	Groups    *[]ResourceGroup     `json:"groups"`
 }
 
 type OperationResults struct {
@@ -339,7 +344,7 @@ type OperationResult struct {
 	EntityId int    `json:"entityId"`
 }
 
-type Group struct {
+type ResourceGroup struct {
 	GroupName string              `json:"groupName"`
 	Resources []MonitoredResource `json:"resources"`
 }
@@ -394,11 +399,75 @@ type SendResourceWithMetricsAction struct {
 	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
 }
 
-type SpecialDate struct {
+// MillisecondTimestamp refers to the JSON representation of timestamps, for
+// time-data interchange, as a single integer representing a modified version of
+// whole milliseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
+// Individual languages (Go, C, Java) will typically implement this structure
+// using a more-complex contruction in their repective contexts, containing even
+// finer granularity for local data storage, typically at the nanosecond level.
+//
+// The "modified version" comment reflects the following simplification.
+// Despite the already fine-grained representation as milliseconds, this data
+// value takes no account of leap seconds; for all of our calculations, we
+// simply pretend they don't exist.  Individual feeders will typically map a
+// 00:00:60 value for a leap second, obtained as a string so the presence of the
+// leap second is obvious, as 00:01:00, and the fact that 00:01:00 will occur
+// again in the following second will be silently ignored.  This means that any
+// monitoring which really wants to accurately reflect International Atomic Time
+// (TAI), UT1, or similar time coordinates will be subject to some disruption.
+// It also means that even in ordinary circumstances, any calculations of
+// sub-second time differences might run into surprises, since the following
+// timestamps could appear in temporal order:
+//
+//         actual time   relative reported time in milliseconds
+//     A:  00:00:59.000  59000
+//     B:  00:00:60.000  60000
+//     C:  00:00:60.700  60700
+//     D:  00:01:00.000  60000
+//     E:  00:01:00.300  60300
+//     F:  00:01:01.000  61000
+//
+// In such a situation, (D - C) and (E - C) would be negative numbers.
+//
+// In other situations, a feeder might obtain a timestamp from a system hardware
+// clock which, say, counts local nanoseconds and has no notion of any leap
+// seconds having been inserted into human-readable string-time representations.
+// So there could be some amount of offset if such values are compared across
+// such a boundary.
+//
+// Beyond that, there is always the issue of computer clocks not being directly
+// tied to atomic clocks, using inexpensive non-temperature-compensated crystals
+// for timekeeping.  Such hardware can easily drift dramatically off course, and
+// the local timekeeping may or may not be subject to course correction using
+// HTP, chrony, or similar software that periodically adjusts the system time
+// to keep it synchronized with the Internet.  Also, there may be large jumps
+// in either a positive or negative direction when a drifted clock is suddenly
+// brought back into synchronization with the rest of the world.
+//
+// In addition, we ignore here all temporal effects of Special Relativity, not
+// to mention further adjustments needed to account for General Relativity.
+// This is not a theoretical joke; those who monitor GPS satellites should take
+// note of the limitations of this data type, and use some other data type for
+// time-critical data exchange and calculations.
+//
+// The point of all this being, fine resolution of clock values should never be
+// taken too seriously unless one is sure that the clocks being compared are
+// directly hitched together, and even then one must allow for quantum leaps
+// into the future and time travel into the past.
+//
+// Finally, note that the Go zero-value of the internal implementation object
+// we use in that language does not have a reasonable value when interpreted
+// as milliseconds since the UNIX epoch.  For that reason, the general rule is
+// that the JSON representation of a zero-value for any field of this type, no
+// matter what the originating language, will be to simply omit it from the
+// JSON string.  That fact must be taken into account when marshalling and
+// unmarshalling data structures that contain such fields.
+//
+type MillisecondTimestamp struct {
 	time.Time
 }
 
-func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
+func (sd *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	strInput := string(input)
 
 	i, err := strconv.ParseInt(strInput, 10, 64)
@@ -408,11 +477,11 @@ func (sd *SpecialDate) UnmarshalJSON(input []byte) error {
 
 	i *= int64(time.Millisecond)
 
-	*sd = SpecialDate{time.Unix(0, i)}
+	*sd = MillisecondTimestamp{time.Unix(0, i)}
 
 	return nil
 }
 
-func (sd SpecialDate) MarshalJSON() ([]byte, error) {
+func (sd MillisecondTimestamp) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }

@@ -16,7 +16,12 @@ void test_dlSendResourcesWithMetrics() {
   void *handle;
   char *error;
 
-  handle = dlopen("./libtransit.so", RTLD_LAZY);
+  // The test_libtransit program needs to be run from the top-level
+  // gwos/tng/ directory, which is where the config.yml file lives that
+  // sendResourcesWithMetrics() will end up wanting to open.  So the
+  // path we use here to access libtransit.so has to reflect where this
+  // library will be found, relative to that location.
+  handle = dlopen("libtransit/libtransit.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "\nlibtransit error: %s\n", dlerror());
     exit(1);
