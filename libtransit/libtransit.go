@@ -3,11 +3,11 @@ package main
 //#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tng/services"
 	"unsafe"
 )
 
-var transitService transit.Service
+var transitService services.Service
 
 func main() {
 }
@@ -20,7 +20,7 @@ func min(a, b int) int {
 }
 
 func putError(errorBuf *C.char, err error) {
-	buf := (*[C.ERROR_LEN]byte)(unsafe.Pointer(errorBuf))
+	buf := (*[int(C.ERROR_LEN)]byte)(unsafe.Pointer(errorBuf))
 	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
 }
 

@@ -2,7 +2,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/transit"
+	"math/rand"
 	"time"
 )
 
@@ -135,13 +137,13 @@ func main() {
 		fmt.Println(metric)
 	}
 	// complete
-	transit.Disconnect(transitServices)
+	//transit.Disconnect(transitServices)
 
 	// Controller Example
-	var controllerServices = controller.CreateController()
-	controllerServices.Start()
-	controllerServices.Stop()
-	controllerServices.Status()
+	var controllerServices = controller.NewController()
+	_, _ = controllerServices.Start()
+	_, _ = controllerServices.Stop()
+	_, _ = controllerServices.Status()
 	stats, _ := controllerServices.Stats()
 	fmt.Println(*stats)
 }
