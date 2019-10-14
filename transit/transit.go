@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
 )
@@ -375,28 +376,47 @@ type Services interface {
 	SynchronizeInventory(inventory []byte) (*OperationResults, error)
 }
 
-// Groundwork Connection Configuration
+// GroundworkAction defines configurable options for an action
+type GroundworkAction struct {
+	Entrypoint string `yaml:"entrypoint"`
+}
+
+// GroundworkActions configures Groundwork actions
+type GroundworkActions struct {
+	Connect                 GroundworkAction `yaml:"connect"`
+	Disconnect              GroundworkAction `yaml:"disconnect"`
+	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
+	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
+}
+
+// GroundworkConfig defines Groundwork Connection configuration
 type GroundworkConfig struct {
-	HostName string `yaml:"host",envconfig:"HOST"`
-	Account  string `yaml:"account",envconfig:"ACCOUNT"`
-	Password string `yaml:"password",envconfig:"PASSWORD"`
-	Token    string `yaml:"token",envconfig:"TOKEN"`
-	SSL      bool   `yaml:"ssl",envconfig:"SSL"`
-	Port     int    `yaml:"port",envconfig:"PORT"`
+	Host     string `yaml:"host",envconfig:"GW_HOST"`
+	Account  string `yaml:"account",envconfig:"GW_ACCOUNT"`
+	Password string `yaml:"password",envconfig:"GW_PASSWORD"`
+	Token    string
+}
+
+// AgentConfig defines TNG Transit Agent configuration
+type AgentConfig struct {
+	Port int  `yaml:"port",envconfig:"AGENT_PORT"`
+	SSL  bool `yaml:"ssl",envconfig:"AGENT_SSL"`
 }
 
 var Config Transit
 
 // Implementation of Services
 type Transit struct {
-	Config GroundworkConfig `yaml:"config",envconfig:"CONFIG"`
+	AgentConfig       `yaml:"agentConfig"`
+	GroundworkConfig  `yaml:"groundworkConfig"`
+	GroundworkActions `yaml:"groundworkActions"`
 }
 
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
-		"user":          transit.Config.Account,
-		"password":      transit.Config.Password,
+		"user":          transit.GroundworkConfig.Account,
+		"password":      transit.GroundworkConfig.Password,
 	}
 
 	headers := map[string]string{
@@ -404,12 +424,17 @@ func (transit *Transit) Connect() error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, "http://localhost/api/auth/login", headers, formValues, nil)
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   Config.GroundworkConfig.Host,
+		Path:   Config.GroundworkActions.Connect.Entrypoint,
+	}
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
 		return err
 	}
 	if statusCode == 200 {
-		transit.Config.Token = string(byteResponse)
+		transit.GroundworkConfig.Token = string(byteResponse)
 		return nil
 	}
 
@@ -419,7 +444,7 @@ func (transit *Transit) Connect() error {
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
-		"gwos-api-token": transit.Config.Token,
+		"gwos-api-token": transit.GroundworkConfig.Token,
 	}
 
 	headers := map[string]string{
@@ -427,7 +452,12 @@ func (transit Transit) Disconnect() error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, "http://localhost/api/auth/logout", headers, formValues, nil)
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   Config.GroundworkConfig.Host,
+		Path:   Config.GroundworkActions.Disconnect.Entrypoint,
+	}
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
 		return err
 	}
@@ -442,11 +472,16 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.Config.Token,
+		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, ServiceActions.SynchronizeInventory.EntryPoint, headers, nil, inventory)
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   Config.GroundworkConfig.Host,
+		Path:   Config.GroundworkActions.SynchronizeInventory.Entrypoint,
+	}
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
 	if err != nil {
 		return nil, err
 	}
@@ -474,12 +509,16 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.Config.Token,
+		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
 		"GWOS-APP-NAME":  "gw8",
 	}
 
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, ServiceActions.SendResourceWithMetrics.EntryPoint,
-		headers, nil, resources)
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   Config.GroundworkConfig.Host,
+		Path:   Config.GroundworkActions.SendResourceWithMetrics.Entrypoint,
+	}
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
 	if err != nil {
 		return nil, err
 	}
@@ -563,21 +602,6 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	}
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
-}
-
-var ServiceActions Actions
-
-type Actions struct {
-	SynchronizeInventory    SynchronizeInventoryAction    `yaml:"synchronizeInventoryAction",envconfig:"SYNCHRONIZE_INVENTORY_ACTION"`
-	SendResourceWithMetrics SendResourceWithMetricsAction `yaml:"sendResourceWithMetricsAction",envconfig:"SEND_RESOURCE_WITH_METRICS_ACTION"`
-}
-
-type SynchronizeInventoryAction struct {
-	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
-}
-
-type SendResourceWithMetricsAction struct {
-	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
 }
 
 var AgentStatistics AgentStats

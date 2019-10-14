@@ -22,24 +22,16 @@ func init() {
 		log.Fatal(err)
 	}
 
-	configFile, err := os.Open(path.Join(workDir, "Config.yml"))
+	configFile, err := os.Open(path.Join(workDir, "config.yml"))
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	combinedConfig := struct {
-		transit.Actions          `yaml:"actions"`
-		transit.GroundworkConfig `yaml:"Config"`
-	}{}
 
 	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(&combinedConfig)
+	err = decoder.Decode(&transit.Config)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	transit.ServiceActions = combinedConfig.Actions
-	transit.Config.Config = combinedConfig.GroundworkConfig
 
 	err = transit.Config.Connect()
 	if err != nil {
@@ -73,7 +65,7 @@ func init() {
 		log.Fatal(err)
 	}
 
-	err = controller.StartServer(transit.Config.Config.SSL, transit.Config.Config.Port)
+	err = controller.StartServer(transit.Config.AgentConfig.SSL, transit.Config.AgentConfig.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
