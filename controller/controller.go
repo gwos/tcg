@@ -2,7 +2,6 @@ package controller
 
 import (
 	"github.com/gwos/tng/transit"
-	"time"
 )
 
 // Agent possible status
@@ -16,28 +15,12 @@ const (
 	userKey string     = "user"
 )
 
-type AgentStats struct {
-	AgentId                string
-	AppType                string
-	BytesSent              int
-	MetricsSent            int
-	MessagesSent           int
-	LastInventoryRun       transit.MillisecondTimestamp
-	LastMetricsRun         transit.MillisecondTimestamp
-	ExecutionTimeInventory time.Duration
-	ExecutionTimeMetrics   time.Duration
-	UpSince                transit.MillisecondTimestamp
-	LastError              string
-}
-
-var AgentStatistics AgentStats
-
 // TNG Control Plane interfaces
 type Services interface {
 	Start() (StatusEnum, error)
 	Stop() (StatusEnum, error)
 	Status() (StatusEnum, error)
-	Stats() (*AgentStats, error)
+	Stats() (*transit.AgentStats, error)
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
@@ -64,6 +47,6 @@ func (controller *Controller) Status() (StatusEnum, error) {
 	return controller.State, nil
 }
 
-func (controller *Controller) Stats() (*AgentStats, error) {
-	return &AgentStatistics, nil
+func (controller *Controller) Stats() (*transit.AgentStats, error) {
+	return &transit.AgentStatistics, nil
 }
