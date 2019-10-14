@@ -1,7 +1,7 @@
 package nats
 
 import (
-	"github.com/gwos/tng/controller"
+	"github.com/gwos/tng/transit"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
@@ -56,11 +56,11 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 				err = dispatcherFn(msg.Data)
 				if err == nil {
 					_ = msg.Ack()
-					controller.AgentStatistics.BytesSent += len(msg.Data)
-					controller.AgentStatistics.MessagesSent++
+					transit.AgentStatistics.BytesSent += len(msg.Data)
+					transit.AgentStatistics.MessagesSent++
 					log.Println("Delivered\nMessage:", msg)
 				} else {
-					controller.AgentStatistics.LastError = err.Error()
+					transit.AgentStatistics.LastError = err.Error()
 					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
 				}
 			},
