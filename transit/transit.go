@@ -580,6 +580,22 @@ type SendResourceWithMetricsAction struct {
 	EntryPoint string `yaml:"entrypoint",envconfig:"ENTRYPOINT"`
 }
 
+var AgentStatistics AgentStats
+
+type AgentStats struct {
+	AgentId                string
+	AppType                string
+	BytesSent              int
+	MetricsSent            int
+	MessagesSent           int
+	LastInventoryRun       MillisecondTimestamp
+	LastMetricsRun         MillisecondTimestamp
+	ExecutionTimeInventory time.Duration
+	ExecutionTimeMetrics   time.Duration
+	UpSince                MillisecondTimestamp
+	LastError              string
+}
+
 // MillisecondTimestamp refers to the JSON representation of timestamps, for
 // time-data interchange, as a single integer representing a modified version of
 // whole milliseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
