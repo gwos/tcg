@@ -93,7 +93,7 @@ const (
 	Max                       = "Max"
 )
 
-// TimeInterval: A closed time interval. It extends from the start time
+// TimeInterval defines a closed time interval. It extends from the start time
 // to the end time, and includes both: [startTime, endTime]. Valid time
 // intervals depend on the MetricKind of the metric value. In no case
 // can the end time be earlier than the start time.
@@ -119,7 +119,7 @@ type TimeInterval struct {
 	StartTime MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
-// TypedValue: A single strongly-typed value.
+// TypedValue defines a single strongly-typed value.
 type TypedValue struct {
 	ValueType ValueTypeEnum `json:"valueType"`
 
@@ -142,7 +142,7 @@ type TypedValue struct {
 	TimeValue MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
-// MetricSample: A single data sample in a time series, which may represent
+// MetricSample defines a single data sample in a time series, which may represent
 // either a measurement at a single point in time or data aggregated over a
 // time duration.
 type MetricSample struct {
@@ -164,7 +164,7 @@ type MetricSample struct {
 	Value *TypedValue `json:"value,omitempty"`
 }
 
-// TimeSeries: A collection of data samples that describes the
+// TimeSeries defines a collection of data samples that describes the
 // time-varying values of a metric.
 type TimeSeries struct {
 	MetricName    string            `json:"metricName"`
@@ -173,7 +173,7 @@ type TimeSeries struct {
 	Unit          UnitEnum          `json:"unit,omitempty"`
 }
 
-// MetricDescriptor: Defines a metric type and its schema
+// MetricDescriptor defines a metric type and its schema
 type MetricDescriptor struct {
 	// Custom Name: Override the resource type with a custom name of the metric descriptor.
 	CustomName string `json:"name,omitempty"`
@@ -250,7 +250,7 @@ func (md MetricDescriptor) String() string {
 	return fmt.Sprintf("%s - %s", md.Type, md.CustomName)
 }
 
-// LabelDescriptor: A description of a label.
+// LabelDescriptor defines a Label.
 type LabelDescriptor struct {
 	// Description: A human-readable description for the label.
 	Description string `json:"description,omitempty"`
@@ -267,14 +267,14 @@ type LabelDescriptor struct {
 	ValueType ValueTypeEnum `json:"valueType,omitempty"`
 }
 
-// A definition of a Threshold
+// ThresholdDescriptor defines a Threshold
 type ThresholdDescriptor struct {
 	// Key: The threshold key.
 	Key   string `json:"key"`
 	Value int32  `json:"value"`
 }
 
-// MonitoredResource: An object representing a live resource instance that
+// MonitoredResource is an object representing a live resource instance that
 // can be used  for monitoring. Examples include for example:
 // * virtual machine instances
 // * databases
@@ -316,7 +316,7 @@ type MonitoredResource struct {
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
-// Trace Context of a Transit call
+// TracerContext describes a Transit call
 type TracerContext struct {
 	AppType    string               `json:"appType"`
 	AgentId    string               `json:"agentId"`
@@ -358,22 +358,18 @@ type ResourceWithMetrics struct {
 	Metrics  []TimeSeries      `json:"metrics"`
 }
 
+// ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
 type ResourceWithMetricsRequest struct {
-	Context   TracerContext
-	Resources []ResourceWithMetrics
+	Context   TracerContext         `json:"context"`
+	Resources []ResourceWithMetrics `json:"resources"`
 }
 
-// internal transit dta
-type SendMetricsRequest struct {
-	Trace   TracerContext          `json:"context"`
-	Metrics *[]ResourceWithMetrics `json:"resources"`
-}
-
-// Transit interfaces / operations
+// Services defines operations
+// TODO: clarify args
 type Services interface {
-	SendResourcesWithMetrics(resources []byte) (*OperationResults, error)
+	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
 	ListMetrics() (*[]MetricDescriptor, error)
-	SynchronizeInventory(inventory []byte) (*OperationResults, error)
+	SynchronizeInventory(request []byte) (*OperationResults, error)
 }
 
 // GroundworkAction defines configurable options for an action
@@ -688,6 +684,7 @@ type MillisecondTimestamp struct {
 	time.Time
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
 func (sd *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	strInput := string(input)
 
@@ -703,6 +700,7 @@ func (sd *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+// MarshalJSON implements json.Marshaler.
 func (sd MillisecondTimestamp) MarshalJSON() ([]byte, error) {
 	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
 }
