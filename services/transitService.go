@@ -71,16 +71,20 @@ func init() {
 	}
 }
 
+// Service implements transit.Services
 type Service struct{}
 
-func (transitService Service) SendResourceWithMetrics(resourcesWithMetricsJson []byte) error {
-	return nats.Publish(SendResourceWithMetricsSubject, resourcesWithMetricsJson)
+// SendResourceWithMetrics implements transit.Services.SendResourceWithMetrics
+func (transitService Service) SendResourceWithMetrics(request []byte) error {
+	return nats.Publish(SendResourceWithMetricsSubject, request)
 }
 
-func (transitService Service) SynchronizeInventory(inventoryJson []byte) error {
-	return nats.Publish(SynchronizeInventorySubject, inventoryJson)
+// SynchronizeInventory implements transit.Services.SynchronizeInventory
+func (transitService Service) SynchronizeInventory(request []byte) error {
+	return nats.Publish(SynchronizeInventorySubject, request)
 }
 
+// ListMetrics implements transit.Services.ListMetrics
 func (transitService Service) ListMetrics() (*[]transit.MetricDescriptor, error) {
 	return transit.Config.ListMetrics()
 }
