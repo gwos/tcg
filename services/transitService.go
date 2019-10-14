@@ -50,14 +50,14 @@ func init() {
 		SendResourceWithMetricsSubject: func(b []byte) error {
 			_, err := transit.Config.SendResourcesWithMetrics(b)
 			if err == nil {
-				controller.AgentStatistics.LastMetricsRun = transit.MillisecondTimestamp{Time: time.Now()}
+				transit.AgentStatistics.LastMetricsRun = transit.MillisecondTimestamp{Time: time.Now()}
 			}
 			return err
 		},
 		SynchronizeInventorySubject: func(b []byte) error {
 			_, err := transit.Config.SynchronizeInventory(b)
 			if err != nil {
-				controller.AgentStatistics.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
+				transit.AgentStatistics.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
 			}
 			return err
 		},
