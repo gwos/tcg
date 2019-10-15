@@ -210,7 +210,7 @@ typedef struct {
 } MetricDescriptor;
 
 typedef struct {
-  char *appType, *agentId, *traceToken;
+  char *appType, *agentID, *traceToken;
   time_t timeStamp;  // go:time.Time
 } TracerContext;
 

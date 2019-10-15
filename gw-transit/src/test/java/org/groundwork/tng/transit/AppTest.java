@@ -30,7 +30,7 @@ public class AppTest {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentId("3939333393342")
+                .setAgentID("3939333393342")
                 .setAppType("VEMA")
                 .setTimeStamp(new Date())
                 .setTraceToken("token-99e93")
@@ -92,7 +92,7 @@ public class AppTest {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentId("3939333393342")
+                .setAgentID("3939333393342")
                 .setAppType("VEMA")
                 .setTimeStamp(new Date())
                 .setTraceToken("token-99e93")

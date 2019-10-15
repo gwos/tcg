@@ -28,7 +28,6 @@ func TestMarshalMonitoredResource(t *testing.T) {
 	}
 }
 
-
 func TestSendResourcesWithMetrics(t *testing.T) {
 	var transit Transit
 
@@ -53,7 +52,7 @@ func TestSendResourcesWithMetrics(t *testing.T) {
 func TestSynchronizeInventory(t *testing.T) {
 	var transit Transit
 
-	inventoryJson := "{\"context\":{\"appType\":\"test-app\",\"agentId\":\"test-agent\",\"traceToken\":\"test-token\",\"timeStamp\":1570030732928},\"resources\":[{\"properties\":{},\"name\":\"test-name1\",\"type\":\"HOST\",\"status\":1},{\"properties\":{},\"name\":\"test-name2\",\"type\":\"SERVICE\",\"status\":1,\"owner\":\"test-name1\"}],\"groups\":[{\"groupName\":\"test-groupName1\",\"resources\":[{\"properties\":{},\"name\":\"test-name1\",\"type\":\"HOST\",\"status\":1},{\"properties\":{},\"name\":\"test-name2\",\"type\":\"SERVICE\",\"status\":1,\"owner\":\"test-name1\"}]},{\"groupName\": \"test-groupName2\",\"resources\": [{\"properties\": {},\"name\": \"test-name1\",\"type\": \"HOST\",\"status\": 1},{\"properties\": {},\"name\": \"test-name2\",\"type\": \"SERVICE\",\"status\": 1,\"owner\": \"test-name1\"}]}]}"
+	inventoryJson := "{\"context\":{\"appType\":\"test-app\",\"agentID\":\"test-agent\",\"traceToken\":\"test-token\",\"timeStamp\":1570030732928},\"resources\":[{\"properties\":{},\"name\":\"test-name1\",\"type\":\"HOST\",\"status\":1},{\"properties\":{},\"name\":\"test-name2\",\"type\":\"SERVICE\",\"status\":1,\"owner\":\"test-name1\"}],\"groups\":[{\"groupName\":\"test-groupName1\",\"resources\":[{\"properties\":{},\"name\":\"test-name1\",\"type\":\"HOST\",\"status\":1},{\"properties\":{},\"name\":\"test-name2\",\"type\":\"SERVICE\",\"status\":1,\"owner\":\"test-name1\"}]},{\"groupName\": \"test-groupName2\",\"resources\": [{\"properties\": {},\"name\": \"test-name1\",\"type\": \"HOST\",\"status\": 1},{\"properties\": {},\"name\": \"test-name2\",\"type\": \"SERVICE\",\"status\": 1,\"owner\": \"test-name1\"}]}]}"
 
 	var inventory transitSendInventoryRequest
 

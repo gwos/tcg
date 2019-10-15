@@ -273,6 +273,7 @@ type ThresholdDescriptor struct {
 	Key   string `json:"key"`
 	Value int32  `json:"value"`
 }
+
 // InventoryResource is an object representing a live resource instance that
 // can be included in a monitoring inventory. Examples include for example:
 // 	* virtual machine instances
@@ -298,7 +299,7 @@ type InventoryResource struct {
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
-// The current status of a monitored resource
+// ResourceStatus defines the current status of a monitored resource
 type ResourceStatus struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
@@ -319,6 +320,7 @@ type ResourceStatus struct {
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
+// MonitoredResource defines the resource entity
 type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
@@ -332,17 +334,19 @@ type MonitoredResource struct {
 // TracerContext describes a Transit call
 type TracerContext struct {
 	AppType    string               `json:"appType"`
-	AgentId    string               `json:"agentId"`
+	AgentID    string               `json:"agentID"`
 	TraceToken string               `json:"traceToken"`
 	TimeStamp  MillisecondTimestamp `json:"timeStamp"`
 }
 
-	type SendInventoryRequest struct {
+// SendInventoryRequest defines SendInventory payload
+type SendInventoryRequest struct {
 	// Context   *TracerContext       `json:"context"`
 	Inventory *[]InventoryResource `json:"resources"`
 	Groups    *[]ResourceGroup     `json:"groups"`
 }
 
+// OperationResults defines API answer
 type OperationResults struct {
 	ResourcesAdded   int                `json:"successful"`
 	ResourcesDeleted int                `json:"failed"`
@@ -353,22 +357,25 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
+// OperationResult defines API answer
 type OperationResult struct {
 	Entity   string `json:"entity"`
 	Status   string `json:"status"`
 	Message  string `json:"message"`
 	Location string `json:"location"`
-	EntityId int    `json:"entityId"`
+	EntityID int    `json:"entityID"`
 }
 
+// ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName string               `json:"groupName"`
-	Resources []MonitoredResource  `json:"resources"`
+	GroupName string              `json:"groupName"`
+	Resources []MonitoredResource `json:"resources"`
 }
 
+// ResourceWithMetrics combines resource data
 type ResourceWithMetrics struct {
 	Resource ResourceStatus `json:"resource"`
-	Metrics  []TimeSeries      `json:"metrics"`
+	Metrics  []TimeSeries   `json:"metrics"`
 }
 
 // ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
@@ -414,13 +421,14 @@ type AgentConfig struct {
 
 var Config Transit
 
-// Implementation of Services
+// Transit defines TNG configuration
 type Transit struct {
 	AgentConfig       `yaml:"agentConfig"`
 	GroundworkConfig  `yaml:"groundworkConfig"`
 	GroundworkActions `yaml:"groundworkActions"`
 }
 
+// Connect authorizes Agent in Groundwork
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
@@ -450,6 +458,7 @@ func (transit *Transit) Connect() error {
 	return errors.New(string(byteResponse))
 }
 
+// Disconnect closes Agent's session in Groundwork
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
@@ -477,6 +486,7 @@ func (transit Transit) Disconnect() error {
 	return errors.New(string(byteResponse))
 }
 
+// SynchronizeInventory sends inventory payload
 func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -514,6 +524,7 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 	return &operationResults, nil
 }
 
+// SendResourcesWithMetrics sends metric payload
 func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -551,6 +562,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 	return &operationResults, nil
 }
 
+// ListMetrics requests metrics
 // TODO: implement
 func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	// setup label descriptor samples
@@ -615,8 +627,9 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 
 var AgentStatistics AgentStats
 
+// AgentStats defines Agent statistics
 type AgentStats struct {
-	AgentId                string
+	AgentID                string
 	AppType                string
 	BytesSent              int
 	MetricsSent            int
