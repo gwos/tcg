@@ -210,10 +210,10 @@ MonitoredResource *decodeMonitoredResource(const char *json_str) {
                   json_boolean_value(jsonPropValue);
               break;
 
-            case DateType:
+            case TimeType:
               /* TODO: millis number */
-              jsonPropValue = json_object_get(jsonProp, "dateValue");
-              resource->properties.items[i].value.dateValue =
+              jsonPropValue = json_object_get(jsonProp, "timeValue");
+              resource->properties.items[i].value.timeValue =
                   json_integer_value(jsonPropValue);
               break;
 
@@ -374,11 +374,11 @@ char *encodeMonitoredResource(const MonitoredResource *resource, size_t flags) {
               json_boolean(resource->properties.items[i].value.boolValue));
           break;
 
-        case DateType:
+        case TimeType:
           /* TODO: millis number */
           json_object_set_new(
-              jsonProp, "dateValue",
-              json_integer(resource->properties.items[i].value.dateValue));
+              jsonProp, "timeValue",
+              json_integer(resource->properties.items[i].value.timeValue));
           break;
 
         default:

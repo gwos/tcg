@@ -1,10 +1,16 @@
-actions:
-  synchronizeInventoryAction:
-    entrypoint: "http://localhost/api/synchronizer"
-  sendResourceWithMetricsAction:
-    entrypoint: "http://localhost/api/monitoring"
-config:
-  host: "gw8-host"
+agentConfig:
+  port: 8081
+  ssl: True
+groundworkConfig:
+  host: "localhost:8080"
   account: "RESTAPIACCESS"
   password: "***REMOVED***"
-  ssl: True
+groundworkActions:
+  connect:
+    entrypoint: "/api/auth/login"
+  disconnect:
+    entrypoint: "/api/synchronizer"
+  synchronizeInventory:
+    entrypoint: "/api/synchronizer"
+  sendResourceWithMetrics:
+    entrypoint: "/api/monitoring"
