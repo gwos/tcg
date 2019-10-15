@@ -24,22 +24,28 @@ type DispatcherFn func([]byte) error
 /* DispatcherMap */
 type DispatcherMap map[string]DispatcherFn
 
-func StartServer() (*stand.StanServer, error) {
+func StartServer() error {
 	opts := stand.GetDefaultOptions()
 	opts.ID = ClusterID
 	opts.StoreType = stores.TypeFile
 	opts.FilestoreDir = FilestoreDir
 
-	server, err := stand.RunServerWithOpts(opts, nil)
+	var err error
+	Server, err = stand.RunServerWithOpts(opts, nil)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
-	return server, nil
+	return nil
+}
+
+func StopServer() {
+	Server.Shutdown()
 }
 
 func StartDispatcher(dispatcherMap *DispatcherMap) error {
-	connection, err := stan.Connect(
+	var err error
+	Connection, err = stan.Connect(
 		ClusterID,
 		DispatcherClientID,
 		stan.NatsURL(stan.DefaultNatsURL),
@@ -49,7 +55,7 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	}
 
 	for subject, dispatcherFn := range *dispatcherMap {
-		_, err = connection.QueueSubscribe(
+		_, err = Connection.QueueSubscribe(
 			subject,
 			QueueGroup,
 			func(msg *stan.Msg) {
@@ -76,6 +82,10 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	return nil
 }
 
+func StopDispatcher() error {
+	return Connection.Close()
+}
+
 func Publish(subject string, msg []byte) error {
 	connection, err := stan.Connect(
 		ClusterID,
@@ -97,8 +107,4 @@ func Publish(subject string, msg []byte) error {
 	}
 
 	return nil
-}
-
-func Stop(server *stand.StanServer) {
-	server.Shutdown()
 }
