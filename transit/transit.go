@@ -273,47 +273,56 @@ type ThresholdDescriptor struct {
 	Key   string `json:"key"`
 	Value int32  `json:"value"`
 }
-
-// MonitoredResource is an object representing a live resource instance that
-// can be used  for monitoring. Examples include for example:
-// * virtual machine instances
-// * databases
-// * storage devices such as disks
-// * webapps, serverless functions(lambdas)
-// * real hosts and services on those hosts
-// The type field identifies a MonitoredResourceDescriptor object
-// that describes the resource's schema. Information in the labels field
-// identifies the actual resource and its attributes according to the
-// schema. For example, a particular Compute Engine VM instance could be
-// represented by the following object, because the
-// MonitoredResourceDescriptor for "gce_instance" has labels
-// "instance_id" and "zone":
-// { "type": "gce_instance",
-//   "labels": { "instance_id": "12345678901234",
-//               "zone": "us-central1-a" }}
-//
-type MonitoredResource struct {
+// InventoryResource is an object representing a live resource instance that
+// can be included in a monitoring inventory. Examples include for example:
+// 	* virtual machine instances
+// 	* databases
+// 	* storage devices such as disks
+// 	* webapps, serverless functions(lambdas)
+// 	* real hosts and services on those hosts
+type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The monitored resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub
+	// Type: Required. The resource type uniquely defining the resource type
+	// General Nagios Types are host and service, where as CloudHub can be more rich
+	Type string `json:"type,required"`
+	//  Owner relationship for associations like host->service
+	Owner string `json:"owner,omitempty"`
+	// CloudHub Categorization of resources, translate to Foundation Metric Type
+	Category string `json:"category,omitempty"`
+	// Optional description of this resource, such as Nagios notes
+	Description string `json:"description,omitempty"`
+	// Device (usually IP address), leave empty if not available, will default to name
+	Device string `json:"device,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+// The current status of a monitored resource
+type ResourceStatus struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type uniquely defining the resource type
+	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatusEnum `json:"status,required"`
-	//  Owner relationship for associations like host->service
-	Owner string `json:"owner,omitempty"`
 	// The last status check time on this resource
 	LastCheckTime MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The last status check time on this resource
+	// The next status check time on this resource
 	NextCheckTime MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
-	// CloudHub Categorization of resources, translate to Foundation Metric Type
-	Category string `json:"category,omitempty"`
-	// CloudHub Categorization of resources, translate to Foundation Metric Type
-	Description string `json:"description,omitempty"`
-	// General Foundation Properties
+	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+type MonitoredResource struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type uniquely defining the resource type
+	// General Nagios Types are host and service, where as CloudHub can be more rich
+	Type string `json:"type,required"`
 }
 
 // TracerContext describes a Transit call
@@ -324,9 +333,9 @@ type TracerContext struct {
 	TimeStamp  MillisecondTimestamp `json:"timeStamp"`
 }
 
-type SendInventoryRequest struct {
-	Context   *TracerContext       `json:"context"`
-	Inventory *[]MonitoredResource `json:"resources"`
+	type SendInventoryRequest struct {
+	// Context   *TracerContext       `json:"context"`
+	Inventory *[]InventoryResource `json:"resources"`
 	Groups    *[]ResourceGroup     `json:"groups"`
 }
 
@@ -349,12 +358,12 @@ type OperationResult struct {
 }
 
 type ResourceGroup struct {
-	GroupName string              `json:"groupName"`
-	Resources []MonitoredResource `json:"resources"`
+	GroupName string               `json:"groupName"`
+	Resources []MonitoredResource  `json:"resources"`
 }
 
 type ResourceWithMetrics struct {
-	Resource MonitoredResource `json:"resource"`
+	Resource ResourceStatus `json:"resource"`
 	Metrics  []TimeSeries      `json:"metrics"`
 }
 
