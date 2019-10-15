@@ -421,8 +421,6 @@ type AgentConfig struct {
 	StartTransport bool `yaml:"startTransport"`
 }
 
-var Config Transit
-
 // Transit defines TNG configuration
 type Transit struct {
 	AgentConfig       `yaml:"agentConfig"`
@@ -626,8 +624,6 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
 }
-
-var AgentStatistics AgentStats
 
 // AgentStats defines Agent statistics
 type AgentStats struct {
