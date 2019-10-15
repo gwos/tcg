@@ -20,14 +20,13 @@ func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 	// Example Usage with a host
-	geneva := transit.MonitoredResource{
+	geneva := transit.ResourceStatus{
 		Name: "geneva",
 		Type:   transit.HostResource,
 		Status: transit.HOST_UP,
 		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Description: "Subversion Server",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
 			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
@@ -37,14 +36,13 @@ func main() {
 			"InceptionTime":   transit.TypedValue{TimeValue: transit.MillisecondTimestamp{Time: time.Now()}},
 		},
 	}
-	localLoadService := transit.MonitoredResource{
+	localLoadService := transit.ResourceStatus{
 		Name: "local_load",
 		Type:   transit.ServiceResource,
 		Status: transit.SERVICE_OK,
 		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
-		Description: "Load on subversion",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
 			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
@@ -112,31 +110,15 @@ func main() {
 		{Resource: geneva, Metrics: make([]transit.TimeSeries, 0)},
 		{Resource: localLoadService, Metrics: []transit.TimeSeries{sampleValue, sampleCritical, sampleWarning}},
 	}
-
-
-	// create a Groundwork Configuration
-	//config := transit.GroundworkConfig{
-	//	HostName: "localhost",
-	//	Account:  "RESTAPIACCESS",
-	//	Token:    "63c5bt",
-	//	SSL:      false,
-	//}
-	// Connect with Transit...
-	var transitServices,_ = transit.Connect(transit.Credentials{
-		User:     "test",
-		Password: "test",
-	})
-
-	// Send Metrics with Transit ...
-	transitServices.SendResourcesWithMetrics(resources)
+	println(resources)
+	//var transitServices,_ = transit.Connect(transit.Credentials{
+	//	User:     "test",
+	//	Password: "test",
+	//})
+	//
+	//transitServices.SendResourcesWithMetrics(resources)
 
 	// Retrieve Metrics List with Transit
-	metrics, _ := transitServices.ListMetrics()
-	for _, metric := range *metrics {
-		// see transit.ListMetrics() for example creation of Metric definitions
-		fmt.Println(metric)
-	}
-	// complete
 	//transit.Disconnect(transitServices)
 
 	// Controller Example
