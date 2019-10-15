@@ -305,6 +305,8 @@ type ResourceStatus struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
+	//  Owner relationship for associations like host->service
+	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatusEnum `json:"status,required"`
 	// The last status check time on this resource
@@ -323,6 +325,8 @@ type MonitoredResource struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
+	//  Owner relationship for associations like host->service
+	Owner string `json:"owner,omitempty"`
 }
 
 // TracerContext describes a Transit call
