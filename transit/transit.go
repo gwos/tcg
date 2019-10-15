@@ -10,80 +10,88 @@ import (
 	"time"
 )
 
-// MetricKind: The metric kind of the time series.
-//   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.
-//   "GAUGE" - An instantaneous measurement of a value.
-//   "DELTA" - The change in a value during a time interval.
-//   "CUMULATIVE" - A value accumulated over a time interval. Cumulative
-type MetricKindEnum string
+// MetricKind defines the metric kind of the time series.
+type MetricKind string
 
+// MetricKindUnspecified - Do not use this default value.
+// Gauge - An instantaneous measurement of a value.
+// Delta - The change in a value during a time interval.
+// Cumulative - A value accumulated over a time interval. Cumulative
 const (
-	GAUGE                   MetricKindEnum = "GAUGE"
-	DELTA                                  = "DELTA"
-	CUMULATIVE                             = "CUMULATIVE"
-	METRIC_KIND_UNSPECIFIED                = "METRIC_KIND_UNSPECIFIED"
+	Gauge                 MetricKind = "GAUGE"
+	Delta                            = "DELTA"
+	Cumulative                       = "CUMULATIVE"
+	MetricKindUnspecified            = "METRIC_KIND_UNSPECIFIED"
 )
 
 // ValueType defines the data type of the value of a metric
-type ValueTypeEnum string
+type ValueType string
 
+// Data type of the value of a metric
 const (
-	IntegerType     ValueTypeEnum = "IntegerType"
-	DoubleType                    = "DoubleType"
-	StringType                    = "StringType"
-	BooleanType                   = "BooleanType"
-	TimeType                      = "TimeType"
-	UnspecifiedType               = "UnspecifiedType"
+	IntegerType     ValueType = "IntegerType"
+	DoubleType                = "DoubleType"
+	StringType                = "StringType"
+	BooleanType               = "BooleanType"
+	TimeType                  = "TimeType"
+	UnspecifiedType           = "UnspecifiedType"
 )
 
-// Supported units are a subset of The Unified Code for Units of Measure
+// UnitType - Supported units are a subset of The Unified Code for Units of Measure
 // (http://unitsofmeasure.org/ucum.html) standard, added as we encounter
 // the need for them in monitoring contexts.
-type UnitEnum string
+type UnitType string
 
+// Supported units
 const (
-	UnitCounter = "1"
-	PercentCPU  = "%{cpu}"
+	UnitCounter UnitType = "1"
+	PercentCPU           = "%{cpu}"
 )
+
+// ComputeType defines CloudHub Compute Types
+type ComputeType string
 
 // CloudHub Compute Types
-type ComputeTypeEnum string
-
 const (
-	Query       ComputeTypeEnum = "Query"
-	Regex                       = "Regex"
-	Synthetic                   = "Synthetic"
-	Info                        = "Info"
-	Performance                 = "Performance"
-	Health                      = "Health"
+	Query       ComputeType = "Query"
+	Regex                   = "Regex"
+	Synthetic               = "Synthetic"
+	Info                    = "Info"
+	Performance             = "Performance"
+	Health                  = "Health"
 )
 
-// MonitorStatusEnum represents Groundwork service monitor status
-type MonitorStatusEnum string
+// MonitorStatus represents Groundwork service monitor status
+type MonitorStatus string
 
+// Groundwork Standard Monitored Resource Statuses
 const (
-	SERVICE_OK                   MonitorStatusEnum = "SERVICE_OK"
-	SERVICE_WARNING                                = "SERVICE_WARNING"
-	SERVICE_UNSCHEDULED_CRITICAL                   = "SERVICE_UNSCHEDULED_CRITICAL"
-	SERVICE_PENDING                                = "SERVICE_PENDING"
-	SERVICE_SCHEDULED_CRITICAL                     = "SERVICE_SCHEDULED_CRITICAL"
-	SERVICE_UNKNOWN                                = "SERVICE_UNKNOWN"
-	HOST_UP                                        = "HOST_UP"
-	HOST_UNSCHEDULED_DOWN                          = "HOST_UNSCHEDULED_DOWN"
-	HOST_PENDING                                   = "HOST_PENDING"
-	HOST_SCHEDULED_DOWN                            = "HOST_SCHEDULED_DOWN"
-	HOST_UNREACHABLE                               = "HOST_UNREACHABLE"
+	ServiceOk                  MonitorStatus = "SERVICE_OK"
+	ServiceWarning                           = "SERVICE_WARNING"
+	ServiceUnscheduledCritical               = "SERVICE_UNSCHEDULED_CRITICAL"
+	ServicePending                           = "SERVICE_PENDING"
+	ServiceScheduledCritical                 = "SERVICE_SCHEDULED_CRITICAL"
+	ServiceUnknown                           = "SERVICE_UNKNOWN"
+	HostUp                                   = "HOST_UP"
+	HostUnscheduledDown                      = "HOST_UNSCHEDULED_DOWN"
+	HostPending                              = "HOST_PENDING"
+	HostScheduledDown                        = "HOST_SCHEDULED_DOWN"
+	HostUnreachable                          = "HOST_UNREACHABLE"
 )
+
+// MonitoredResourceType defines Groundwork Standard Monitored Resource Types
+type MonitoredResourceType string
 
 // Groundwork Standard Monitored Resource Types
 const (
-	ServiceResource = "service"
-	HostResource    = "host"
+	ServiceResource MonitoredResourceType = "service"
+	HostResource                          = "host"
 )
 
-// TimeSeries Metric Sample Possible Types
+// MetricSampleType defines TimeSeries Metric Sample Possible Types
 type MetricSampleType string
 
+// TimeSeries Metric Sample Possible Types
 const (
 	Value    MetricSampleType = "Value"
 	Warning                   = "Warning"
@@ -120,7 +128,7 @@ type TimeInterval struct {
 
 // TypedValue defines a single strongly-typed value.
 type TypedValue struct {
-	ValueType ValueTypeEnum `json:"valueType"`
+	ValueType ValueType `json:"valueType"`
 
 	// BoolValue: A Boolean value: true or false.
 	BoolValue bool `json:"boolValue,omitempty"`
@@ -169,7 +177,7 @@ type TimeSeries struct {
 	MetricName    string            `json:"metricName"`
 	MetricSamples []*MetricSample   `json:"metricSamples"`
 	Tags          map[string]string `json:"tags,omitempty"`
-	Unit          UnitEnum          `json:"unit,omitempty"`
+	Unit          UnitType          `json:"unit,omitempty"`
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -216,15 +224,15 @@ type MetricDescriptor struct {
 	// supported units are a subset of The Unified Code for Units of Measure
 	// (http://unitsofmeasure.org/ucum.html) standard, added as we encounter
 	// the need for them in monitoring contexts.
-	Unit UnitEnum `json:"unit,omitempty"`
+	Unit UnitType `json:"unit,omitempty"`
 
 	// ValueType: Whether the measurement is an integer, a floating-point
 	// number, etc. Some combinations of metric_kind and value_type might
 	// not be supported.
-	ValueType ValueTypeEnum `json:"valueType,omitempty"`
+	ValueType ValueType `json:"valueType,omitempty"`
 
 	// Groundwork Compute Type such as Synthetic
-	ComputeType ComputeTypeEnum `json:"computeType,omitempty"`
+	ComputeType ComputeType `json:"computeType,omitempty"`
 
 	// Metadata: Optional. Metadata which can be used to guide usage of the
 	// metric.
@@ -242,7 +250,7 @@ type MetricDescriptor struct {
 	// measurements in a time series should have the same start time and
 	// increasing end times, until an event resets the cumulative value to
 	// zero and sets a new start time for the following samples.
-	MetricKind MetricKindEnum `json:"metricKind"`
+	MetricKind MetricKind `json:"metricKind"`
 }
 
 func (md MetricDescriptor) String() string {
@@ -263,7 +271,7 @@ type LabelDescriptor struct {
 	//   "STRING" - A variable-length string. This is the default.
 	//   "BOOL" - Boolean; true or false.
 	//   "INT64" - A 64-bit signed integer.
-	ValueType ValueTypeEnum `json:"valueType,omitempty"`
+	ValueType ValueType `json:"valueType,omitempty"`
 }
 
 // ThresholdDescriptor defines a Threshold
@@ -308,7 +316,7 @@ type ResourceStatus struct {
 	//  Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatusEnum `json:"status,required"`
+	Status MonitorStatus `json:"status,required"`
 	// The last status check time on this resource
 	LastCheckTime MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
@@ -580,7 +588,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Description: "Local Load for 1 minute",
 		DisplayName: "LocalLoad1",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
+		MetricKind:  Gauge,
 		ComputeType: Query,
 		CustomName:  "load-one-minute",
 		Unit:        UnitCounter,
@@ -595,7 +603,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Description: "Local Load for 5 minute",
 		DisplayName: "LocalLoad5",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
+		MetricKind:  Gauge,
 		ComputeType: Query,
 		CustomName:  "load-five-minutes",
 		Unit:        UnitCounter,
@@ -610,7 +618,7 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Description: "Local Load for 15 minute",
 		DisplayName: "LocalLoad15",
 		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  GAUGE,
+		MetricKind:  Gauge,
 		ComputeType: Query,
 		CustomName:  "load-fifteen-minutes",
 		Unit:        UnitCounter,
@@ -708,7 +716,7 @@ type MillisecondTimestamp struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (sd *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
+func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	strInput := string(input)
 
 	i, err := strconv.ParseInt(strInput, 10, 64)
@@ -717,13 +725,11 @@ func (sd *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	}
 
 	i *= int64(time.Millisecond)
-
-	*sd = MillisecondTimestamp{time.Unix(0, i)}
-
+	*t = MillisecondTimestamp{time.Unix(0, i)}
 	return nil
 }
 
 // MarshalJSON implements json.Marshaler.
-func (sd MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", sd.UnixNano()/int64(time.Millisecond))), nil
+func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
+	return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
 }
