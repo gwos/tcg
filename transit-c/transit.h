@@ -28,16 +28,34 @@ typedef enum { FOREACH_METRIC_KIND(GENERATE_ENUM) } METRIC_KIND_ENUM;
   VALUE_TYPE(DoubleType)               \
   VALUE_TYPE(StringType)               \
   VALUE_TYPE(BooleanType)              \
-  VALUE_TYPE(DateType)                 \
+  VALUE_TYPE(TimeType)                 \
   VALUE_TYPE(UnspecifiedType)
 
 static const char *VALUE_TYPE_STRING[] = {FOREACH_VALUE_TYPE(GENERATE_STRING)};
 
 typedef enum { FOREACH_VALUE_TYPE(GENERATE_ENUM) } VALUE_TYPE_ENUM;
 
-#define FOREACH_UNIT(UNIT) UNIT(_UNIT0) UNIT(UnitCounter)
+// Our usual trick of using enumeration-constant names to generate equivalent
+// strings for JSON encoding is useless here, because the supported
+// units strings are a subset of The Unified Code for Units of Measure
+// (http://unitsofmeasure.org/ucum.html) standard, which defines units names
+// using arbitrary characters which may are not necessarily limited to the
+// alphanumerics that are valid for enumeration constants.  We must therefore
+// define the associated strings manually here, so JSON encoding and decoding
+// will have access to these definitions.  It is therefore mandatory to keep
+// the list of enumeration constants and the list of strings synchronized as
+// the code evolves.
 
-static const char *UNIT_STRING[] = {FOREACH_UNIT(GENERATE_STRING)};
+#define FOREACH_UNIT(UNIT) \
+  UNIT(_UNIT0)             \
+  UNIT(UnitCounter)        \
+  UNIT(PercentCPU)
+
+static const char *UNIT_STRING[] = {
+    "",            // _UNIT0, no units specified
+    "1",           // UnitCounter
+    "%{cpu}",      // PercentCPU, as in load measurements
+};
 
 typedef enum { FOREACH_UNIT(GENERATE_ENUM) } UNIT_ENUM;
 
@@ -58,14 +76,13 @@ typedef enum { FOREACH_COMPUTE_TYPE(GENERATE_ENUM) } COMPUTE_TYPE_ENUM;
 #define FOREACH_MONITOR_STATUS(MONITOR_STATUS) \
   MONITOR_STATUS(_MONITOR_STATUS0)             \
   MONITOR_STATUS(SERVICE_OK)                   \
-  MONITOR_STATUS(SERVICE_UNSCHEDULED_CRITICAL) \
   MONITOR_STATUS(SERVICE_WARNING)              \
+  MONITOR_STATUS(SERVICE_UNSCHEDULED_CRITICAL) \
   MONITOR_STATUS(SERVICE_PENDING)              \
   MONITOR_STATUS(SERVICE_SCHEDULED_CRITICAL)   \
   MONITOR_STATUS(SERVICE_UNKNOWN)              \
   MONITOR_STATUS(HOST_UP)                      \
   MONITOR_STATUS(HOST_UNSCHEDULED_DOWN)        \
-  MONITOR_STATUS(HOST_WARNING)                 \
   MONITOR_STATUS(HOST_PENDING)                 \
   MONITOR_STATUS(HOST_SCHEDULED_DOWN)          \
   MONITOR_STATUS(HOST_UNREACHABLE)
@@ -78,8 +95,8 @@ typedef enum { FOREACH_MONITOR_STATUS(GENERATE_ENUM) } MONITOR_STATUS_ENUM;
 #define FOREACH_METRIC_SAMPLE_TYPE(METRIC_SAMPLE_TYPE) \
   METRIC_SAMPLE_TYPE(_METRIC_SAMPLE_TYPE0)             \
   METRIC_SAMPLE_TYPE(Value)                            \
-  METRIC_SAMPLE_TYPE(Critical)                         \
   METRIC_SAMPLE_TYPE(Warning)                          \
+  METRIC_SAMPLE_TYPE(Critical)                         \
   METRIC_SAMPLE_TYPE(Min)                              \
   METRIC_SAMPLE_TYPE(Max)
 
@@ -111,7 +128,7 @@ typedef struct {
   bool boolValue;
   double doubleValue;
   int64_t integerValue;
-  time_t dateValue;  // go:time.Time
+  time_t timeValue;  // go:time.Time
   char *stringValue;
 } TypedValue;
 
@@ -126,9 +143,15 @@ typedef struct {
 } TypedValuePairList;
 
 typedef struct {
+  METRIC_SAMPLE_TYPE_ENUM sampleType;
   TimeInterval interval;
   TypedValue value;
-} Point;
+} MetricSample;
+
+typedef struct {
+  size_t count;
+  MetricSample *items;
+} MetricSampleList;
 
 typedef struct {
   MONITOR_STATUS_ENUM status;
@@ -144,12 +167,10 @@ typedef struct {
 } MonitoredResourceList;
 
 typedef struct {
-  char *metricName;
-  METRIC_SAMPLE_TYPE_ENUM sampleType;
-  StringPairList tags;  // go:map[string]string
-  TimeInterval interval;
-  TypedValue value;
-  UNIT_ENUM unit;
+  char *             metricName;
+  MetricSampleList * metricSamples; // go:[]*MetricSample
+  StringPairList     tags;          // go:map[string]string
+  UNIT_ENUM          unit;
 } TimeSeries;
 
 typedef struct {
@@ -158,7 +179,8 @@ typedef struct {
 } TimeSeriesList;
 
 typedef struct {
-  char *description, *key;
+  char *description;
+  char *key;
   VALUE_TYPE_ENUM valueType;
 } LabelDescriptor;
 
@@ -195,17 +217,17 @@ typedef struct {
 typedef struct {
   char *groupName;
   MonitoredResourceList resources;  // go:[]MonitoredResource
-} Group;
+} ResourceGroup;
 
 typedef struct {
   size_t count;
-  Group *items;
-} GroupList;
+  ResourceGroup *items;
+} ResourceGroupList;
 
 typedef struct {
-  TracerContext context;
+  TracerContext         context;
   MonitoredResourceList inventory;  // go:*[]MonitoredResource
-  GroupList groups;                 // go:*[]Group
+  ResourceGroupList     groups;     // go:*[]ResourceGroup
 } TransitSendInventoryRequest;
 
 typedef struct {

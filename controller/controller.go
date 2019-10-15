@@ -1,74 +1,52 @@
 package controller
 
-import "time"
-
-// Agent possible status
-type StatusEnum int
-const (
-	Running StatusEnum = iota
-	Stopped
-	Unknown
-	Pending
+import (
+	"github.com/gwos/tng/transit"
 )
 
-type AgentStats struct {
-	agentId string
-	appType string
-	bytesSent int
-	metricsSent int
-	messagesSent int
-	lastInventoryRun time.Time
-	lastMetricsRun time.Time
-	executionTimeInventory time.Duration
-	executionTimeMetrics time.Duration
-	upSince time.Duration
-	lastError string
-}
+// Agent possible status
+type StatusEnum string
+
+const (
+	Running StatusEnum = "Running"
+	Stopped            = "Stopped"
+	Unknown            = "Unknown"
+	Pending            = "Pending"
+	userKey string     = "user"
+)
 
 // TNG Control Plane interfaces
-type ControllerServices interface {
+type Services interface {
 	Start() (StatusEnum, error)
 	Stop() (StatusEnum, error)
 	Status() (StatusEnum, error)
-	Stats() (*AgentStats, error)
+	Stats() (*transit.AgentStats, error)
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
 
 type Controller struct {
-	state StatusEnum
+	State StatusEnum
 }
 
-func CreateController() *Controller {
-	return &Controller{state: Pending}
+func NewController() *Controller {
+	return &Controller{State: Pending}
 }
 
 func (controller *Controller) Start() (StatusEnum, error) {
-	controller.state = Running
-	return controller.state, nil
+	controller.State = Running
+	return controller.State, nil
 }
 
 func (controller *Controller) Stop() (StatusEnum, error) {
-	controller.state = Stopped
-	return controller.state, nil
+	controller.State = Stopped
+	return controller.State, nil
 }
 
 func (controller *Controller) Status() (StatusEnum, error) {
-	return controller.state, nil
+	return controller.State, nil
 }
 
-func (controller *Controller) Stats() (*AgentStats, error) {
-	return &AgentStats{
-		agentId:                "agent 007",
-		appType:				"nagios",
-		bytesSent:              8192,
-		metricsSent:            1024,
-		messagesSent:           512,
-		lastInventoryRun:       time.Time{},
-		lastMetricsRun:         time.Time{},
-		executionTimeInventory: 3949,
-		executionTimeMetrics:   21934,
-		upSince:                9393993,
-		lastError:              "",
-	}, nil
+func (controller *Controller) Stats() (*transit.AgentStats, error) {
+	return &transit.AgentStatistics, nil
 }

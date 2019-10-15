@@ -8,7 +8,7 @@ import (
 	"net/url"
 )
 
-func sendRequest(httpMethod string, requestUrl string, headers map[string]string, formValues map[string]string,
+func SendRequest(httpMethod string, requestUrl string, headers map[string]string, formValues map[string]string,
 	byteBody []byte) (int, []byte, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
