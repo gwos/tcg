@@ -1,6 +1,5 @@
 package transit
 
-import "C"
 import (
 	"encoding/json"
 	"errors"
