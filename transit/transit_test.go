@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"reflect"
 	"testing"
+	"time"
 )
 
 func TestMarshalMonitoredResource(t *testing.T) {
@@ -68,4 +70,60 @@ func TestSynchronizeInventory(t *testing.T) {
 
 	fmt.Println(operationResults.ResourcesAdded)
 	fmt.Println(operationResults.ResourcesDeleted)
+}
+
+func TestMillisecondTimestamp_UnmarshalJSON(t *testing.T) {
+	type fields struct {
+		Time time.Time
+	}
+	type args struct {
+		input []byte
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := &MillisecondTimestamp{
+				Time: tt.fields.Time,
+			}
+			if err := tr.UnmarshalJSON(tt.args.input); (err != nil) != tt.wantErr {
+				t.Errorf("MillisecondTimestamp.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
+	type fields struct {
+		Time time.Time
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    []byte
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tr := MillisecondTimestamp{
+				Time: tt.fields.Time,
+			}
+			got, err := tr.MarshalJSON()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("MillisecondTimestamp.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MillisecondTimestamp.MarshalJSON() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
