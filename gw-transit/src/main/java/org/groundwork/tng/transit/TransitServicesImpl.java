@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jna.Native;
-import org.groundwork.rs.dto.DtoOperationResults;
 import org.groundwork.rs.transit.*;
 
 import java.io.IOException;
@@ -70,8 +69,27 @@ public class TransitServicesImpl implements TransitServices {
     }
 
     @Override
-    public void Disconnect() throws TransitException {
-        if (!tngTransitLibrary.Disconnect(errorMsg)) {
+    public void StartNATS() throws TransitException {
+        if(!tngTransitLibrary.StartNATS(errorMsg)){
+            throw new TransitException(errorMsg.getValue());
+        }
+    }
+
+    @Override
+    public void StopNATS() throws TransitException {
+        tngTransitLibrary.StopNATS();
+    }
+
+    @Override
+    public void StartTransport() throws TransitException {
+        if(!tngTransitLibrary.StartTransport(errorMsg)){
+            throw new TransitException(errorMsg.getValue());
+        }
+    }
+
+    @Override
+    public void StopTransport() throws TransitException {
+        if(!tngTransitLibrary.StopTransport(errorMsg)){
             throw new TransitException(errorMsg.getValue());
         }
     }

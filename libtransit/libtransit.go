@@ -34,6 +34,55 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char)
 	return true
 }
 
+//export SynchronizeInventory
+func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
+	err := transitService.SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJson)))
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StartNATS
+func StartNATS(errorBuf *C.char) bool {
+	err := transitService.StartNATS()
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StopNATS
+func StopNATS() {
+	transitService.StopNATS()
+}
+
+//export StartTransport
+func StartTransport(errorBuf *C.char) bool {
+	err := transitService.StartTransport()
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StopTransport
+func StopTransport(errorBuf *C.char) bool {
+	err := transitService.StopTransport()
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//TODO:
+func ListInventory() {
+}
+
 ////export ListMetrics
 // func ListMetrics(errorBuf *C.char) *C.char {
 // 	monitorDescriptor, err := transitService.ListMetrics()
@@ -50,17 +99,3 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char)
 //
 // 	return C.CString(string(bytes))
 // }
-
-//export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
-	err := transitService.SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJson)))
-	if err != nil {
-		putError(errorBuf, err)
-		return false
-	}
-	return true
-}
-
-//TODO:
-func ListInventory() {
-}
