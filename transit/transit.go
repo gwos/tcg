@@ -725,7 +725,7 @@ func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 	}
 
 	i *= int64(time.Millisecond)
-	*t = MillisecondTimestamp{time.Unix(0, i)}
+	*t = MillisecondTimestamp{time.Unix(0, i).UTC()}
 	return nil
 }
 
