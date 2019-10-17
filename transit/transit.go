@@ -79,13 +79,11 @@ const (
 	HostUnreachable                          = "HOST_UNREACHABLE"
 )
 
-// MonitoredResourceType defines Groundwork Standard Monitored Resource Types
-type MonitoredResourceType string
-
-// Groundwork Standard Monitored Resource Types
+// The resource type uniquely defining the resource type
+// General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	ServiceResource MonitoredResourceType = "service"
-	HostResource                          = "host"
+	ServiceResource string = "service"
+	HostResource           = "host"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -294,7 +292,7 @@ type InventoryResource struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
 	Category string `json:"category,omitempty"`
@@ -313,7 +311,7 @@ type ResourceStatus struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
@@ -334,7 +332,7 @@ type MonitoredResource struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 }
 
@@ -415,16 +413,16 @@ type GroundworkActions struct {
 
 // GroundworkConfig defines Groundwork Connection configuration
 type GroundworkConfig struct {
-	Host     string `yaml:"host",envconfig:"GW_HOST"`
-	Account  string `yaml:"account",envconfig:"GW_ACCOUNT"`
-	Password string `yaml:"password",envconfig:"GW_PASSWORD"`
+	Host     string `yaml:"host" envconfig:"GW_HOST"`
+	Account  string `yaml:"account" envconfig:"GW_ACCOUNT"`
+	Password string `yaml:"password" envconfig:"GW_PASSWORD"`
 	Token    string
 }
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	Port           int  `yaml:"port",envconfig:"AGENT_PORT"`
-	SSL            bool `yaml:"ssl",envconfig:"AGENT_SSL"`
+	Port           int  `yaml:"port" envconfig:"AGENT_PORT"`
+	SSL            bool `yaml:"ssl" envconfig:"AGENT_SSL"`
 	StartNATS      bool `yaml:"startNATS"`
 	StartTransport bool `yaml:"startTransport"`
 }
