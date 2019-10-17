@@ -3,6 +3,7 @@ package nats
 import (
 	"fmt"
 	"github.com/gwos/tng/transit"
+	"github.com/nats-io/go-nats"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
@@ -50,41 +51,44 @@ func StopServer() {
 }
 
 func StartDispatcher(dispatcherMap *DispatcherMap) error {
-	var err error
-	Connection, err = stan.Connect(
-		ClusterID,
-		DispatcherClientID,
-		stan.NatsURL(stan.DefaultNatsURL),
-	)
-	if err != nil {
-		return err
-	}
-
-	for subject, dispatcherFn := range *dispatcherMap {
-		_, err = Connection.QueueSubscribe(
-			subject,
-			QueueGroup,
-			func(msg *stan.Msg) {
-				err = dispatcherFn(msg.Data)
-				if err == nil {
-					_ = msg.Ack()
-					transit.AgentStatistics.BytesSent += len(msg.Data)
-					transit.AgentStatistics.MessagesSent++
-					log.Println("Delivered\nMessage:", msg)
-				} else {
-					transit.AgentStatistics.LastError = err.Error()
-					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
-				}
-			},
-			stan.SetManualAckMode(),
-			stan.AckWait(15*time.Second),
-			stan.DurableName(DurableID),
-			stan.StartWithLastReceived(),
+	if Connection == nil || Connection.NatsConn().Status() == nats.CLOSED {
+		var err error
+		Connection, err = stan.Connect(
+			ClusterID,
+			DispatcherClientID,
+			stan.NatsURL(stan.DefaultNatsURL),
 		)
 		if err != nil {
 			return err
 		}
+
+		for subject, dispatcherFn := range *dispatcherMap {
+			_, err = Connection.QueueSubscribe(
+				subject,
+				QueueGroup,
+				func(msg *stan.Msg) {
+					err = dispatcherFn(msg.Data)
+					if err == nil {
+						_ = msg.Ack()
+						transit.AgentStatistics.BytesSent += len(msg.Data)
+						transit.AgentStatistics.MessagesSent++
+						log.Println("Delivered\nMessage:", msg)
+					} else {
+						transit.AgentStatistics.LastError = err.Error()
+						log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+					}
+				},
+				stan.SetManualAckMode(),
+				stan.AckWait(15*time.Second),
+				stan.DurableName(DurableID),
+				stan.StartWithLastReceived(),
+			)
+			if err != nil {
+				return err
+			}
+		}
 	}
+
 	return nil
 }
 

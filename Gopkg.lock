@@ -323,6 +323,7 @@
   input-imports = [
     "github.com/gin-gonic/contrib/sessions",
     "github.com/gin-gonic/gin",
+    "github.com/nats-io/go-nats",
     "github.com/nats-io/go-nats-streaming",
     "github.com/nats-io/nats-streaming-server/server",
     "github.com/nats-io/nats-streaming-server/stores",
