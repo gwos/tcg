@@ -391,12 +391,13 @@ type ResourceWithMetricsRequest struct {
 	Resources []ResourceWithMetrics `json:"resources"`
 }
 
-// Services defines operations
-// TODO: clarify args
+// Services defines Groundwork actions
 type Services interface {
+	Connect() error
+	Disconnect() error
 	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
-	ListMetrics() (*[]MetricDescriptor, error)
 	SynchronizeInventory(request []byte) (*OperationResults, error)
+	// ListMetrics() (*[]MetricDescriptor, error)
 }
 
 // GroundworkAction defines configurable options for an action
@@ -435,7 +436,7 @@ type Transit struct {
 	GroundworkActions `yaml:"groundworkActions"`
 }
 
-// Connect authorizes Agent in Groundwork
+// Connect implements Services.Connect.
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
@@ -465,7 +466,7 @@ func (transit *Transit) Connect() error {
 	return errors.New(string(byteResponse))
 }
 
-// Disconnect closes Agent's session in Groundwork
+// Disconnect implements Services.Disconnect.
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
@@ -493,7 +494,7 @@ func (transit Transit) Disconnect() error {
 	return errors.New(string(byteResponse))
 }
 
-// SynchronizeInventory sends inventory payload
+// SynchronizeInventory implements Services.SynchronizeInventory.
 func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -531,7 +532,7 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 	return &operationResults, nil
 }
 
-// SendResourcesWithMetrics sends metric payload
+// SendResourcesWithMetrics implements Services.SendResourcesWithMetrics.
 func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -569,7 +570,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 	return &operationResults, nil
 }
 
-// ListMetrics requests metrics
+// ListMetrics implements Services.ListMetrics.
 // TODO: implement
 func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	// setup label descriptor samples

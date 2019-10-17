@@ -54,32 +54,30 @@ func init() {
 	}
 }
 
-// Service implements transit.Services
+// Service implements TNG Agent operations
 type Service struct{}
 
-// SendResourceWithMetrics implements transit.Services.SendResourceWithMetrics
+// SendResourceWithMetrics provides fire and forget method
 func (transitService Service) SendResourceWithMetrics(request []byte) error {
 	return nats.Publish(SendResourceWithMetricsSubject, request)
 }
 
-// SynchronizeInventory implements transit.Services.SynchronizeInventory
+// SynchronizeInventory provides fire and forget method
 func (transitService Service) SynchronizeInventory(request []byte) error {
 	return nats.Publish(SynchronizeInventorySubject, request)
 }
 
-// ListMetrics implements transit.Services.ListMetrics
-func (transitService Service) ListMetrics() (*[]transit.MetricDescriptor, error) {
-	return transit.Config.ListMetrics()
-}
-
+// StartNATS starts internal NATS
 func (transitService Service) StartNATS() error {
 	return nats.StartServer()
 }
 
+// StopNATS stops internal NATS
 func (transitService Service) StopNATS() {
 	nats.StopServer()
 }
 
+// StartTransport starts dispatching NATS messages to Groundwork
 func (transitService Service) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
 		SendResourceWithMetricsSubject: func(b []byte) error {
@@ -99,9 +97,9 @@ func (transitService Service) StartTransport() error {
 	}
 
 	return nats.StartDispatcher(&dispatcherMap)
-
 }
 
+// StopTransport stops dispatching NATS messages to Groundwork
 func (transitService Service) StopTransport() error {
 	return nats.StopDispatcher()
 }
