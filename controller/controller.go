@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
+	"log"
 )
 
 // Agent possible status
@@ -15,10 +17,19 @@ const (
 	userKey string     = "user"
 )
 
+func init() {
+	err := StartServer(transit.Config.AgentConfig.SSL, transit.Config.AgentConfig.Port)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 // TNG Control Plane interfaces
 type Services interface {
-	Start() (StatusEnum, error)
-	Stop() (StatusEnum, error)
+	StartNATS() (StatusEnum, error)
+	StopNATS() (StatusEnum, error)
+	StartTransport() (StatusEnum, error)
+	StopTransport() (StatusEnum, error)
 	Status() (StatusEnum, error)
 	Stats() (*transit.AgentStats, error)
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
@@ -26,27 +37,49 @@ type Services interface {
 }
 
 type Controller struct {
-	State StatusEnum
+	NATSState      StatusEnum
+	TransportState StatusEnum
 }
+
+var service services.Service
 
 func NewController() *Controller {
-	return &Controller{State: Pending}
+	return &Controller{NATSState: Pending}
 }
 
-func (controller *Controller) Start() (StatusEnum, error) {
-	controller.State = Running
-	return controller.State, nil
+func (controller *Controller) StartNATS() error {
+	err := service.StartNATS()
+	if err != nil {
+		return err
+	}
+	controller.NATSState = Running
+	return nil
 }
 
-func (controller *Controller) Stop() (StatusEnum, error) {
-	controller.State = Stopped
-	return controller.State, nil
+func (controller *Controller) StopNATS() error {
+	service.StopNATS()
+	controller.NATSState = Stopped
+	return nil
 }
 
-func (controller *Controller) Status() (StatusEnum, error) {
-	return controller.State, nil
+func (controller *Controller) StartTransport() error {
+	err := service.StartTransport()
+	if err != nil {
+		return err
+	}
+	controller.TransportState = Running
+	return nil
 }
 
-func (controller *Controller) Stats() (*transit.AgentStats, error) {
+func (controller *Controller) StopTransport() error {
+	err := service.StopTransport()
+	if err != nil {
+		return err
+	}
+	controller.TransportState = Stopped
+	return nil
+}
+
+func (controller Controller) Stats() (*transit.AgentStats, error) {
 	return &transit.AgentStatistics, nil
 }

@@ -22,8 +22,10 @@ func StartServer(tls bool, port int) error {
 	{
 		basicAuth.GET("/stats", stats)
 		basicAuth.GET("/status", status)
-		basicAuth.POST("/start", start)
-		basicAuth.DELETE("/stop", stop)
+		basicAuth.POST("/nats/start", startNATS)
+		basicAuth.DELETE("/nats/stop", stopNATS)
+		basicAuth.POST("/nats/transport/start", startTransport)
+		basicAuth.DELETE("/nats/transport/stop", stopTransport)
 	}
 
 	if tls {
@@ -41,14 +43,38 @@ func StartServer(tls bool, port int) error {
 	return nil
 }
 
-func start(c *gin.Context) {
-	_, _ = TransitController.Start()
+func startNATS(c *gin.Context) {
+	err := TransitController.StartNATS()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
 
 	c.JSON(http.StatusOK, TransitController)
 }
 
-func stop(c *gin.Context) {
-	_, _ = TransitController.Stop()
+func stopNATS(c *gin.Context) {
+	err := TransitController.StopNATS()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	c.JSON(http.StatusOK, TransitController)
+}
+
+func startTransport(c *gin.Context) {
+	err := TransitController.StartTransport()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	c.JSON(http.StatusOK, TransitController)
+}
+
+func stopTransport(c *gin.Context) {
+	err := TransitController.StopTransport()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
 
 	c.JSON(http.StatusOK, TransitController)
 }
@@ -58,7 +84,10 @@ func status(c *gin.Context) {
 }
 
 func stats(c *gin.Context) {
-	stats, _ := TransitController.Stats()
+	stats, err := TransitController.Stats()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
 	c.JSON(http.StatusOK, stats)
 }
 

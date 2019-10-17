@@ -8,7 +8,8 @@ import (
 	"net/url"
 )
 
-func SendRequest(httpMethod string, requestUrl string, headers map[string]string, formValues map[string]string,
+// SendRequest wraps HTTP methods
+func SendRequest(httpMethod string, requestURL string, headers map[string]string, formValues map[string]string,
 	byteBody []byte) (int, []byte, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
@@ -30,12 +31,12 @@ func SendRequest(httpMethod string, requestUrl string, headers map[string]string
 
 	switch httpMethod {
 	case http.MethodGet:
-		request, err = http.NewRequest(http.MethodGet, requestUrl, nil)
+		request, err = http.NewRequest(http.MethodGet, requestURL, nil)
 		if err != nil {
 			return -1, nil, err
 		}
 	case http.MethodPost:
-		request, err = http.NewRequest(http.MethodPost, requestUrl, bytes.NewBuffer(byteBody))
+		request, err = http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(byteBody))
 		if err != nil {
 			return -1, nil, err
 		}

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/transit"
 	"gopkg.in/yaml.v2"
@@ -15,6 +14,8 @@ const (
 	SendResourceWithMetricsSubject = "send-resource-with-metrics"
 	SynchronizeInventorySubject    = "synchronize-inventory"
 )
+
+var service Service
 
 func init() {
 	workDir, err := os.Getwd()
@@ -38,6 +39,46 @@ func init() {
 		log.Fatal(err)
 	}
 
+	if transit.Config.StartNATS {
+		err = service.StartNATS()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if transit.Config.StartTransport {
+		err = service.StartTransport()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+// Service implements TNG Agent operations
+type Service struct{}
+
+// SendResourceWithMetrics provides fire and forget method
+func (transitService Service) SendResourceWithMetrics(request []byte) error {
+	return nats.Publish(SendResourceWithMetricsSubject, request)
+}
+
+// SynchronizeInventory provides fire and forget method
+func (transitService Service) SynchronizeInventory(request []byte) error {
+	return nats.Publish(SynchronizeInventorySubject, request)
+}
+
+// StartNATS starts internal NATS
+func (transitService Service) StartNATS() error {
+	return nats.StartServer()
+}
+
+// StopNATS stops internal NATS
+func (transitService Service) StopNATS() {
+	nats.StopServer()
+}
+
+// StartTransport starts dispatching NATS messages to Groundwork
+func (transitService Service) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
 		SendResourceWithMetricsSubject: func(b []byte) error {
 			_, err := transit.Config.SendResourcesWithMetrics(b)
@@ -55,36 +96,10 @@ func init() {
 		},
 	}
 
-	_, err = nats.StartServer()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = nats.StartDispatcher(&dispatcherMap)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = controller.StartServer(transit.Config.AgentConfig.SSL, transit.Config.AgentConfig.Port)
-	if err != nil {
-		log.Fatal(err)
-	}
+	return nats.StartDispatcher(&dispatcherMap)
 }
 
-// Service implements transit.Services
-type Service struct{}
-
-// SendResourceWithMetrics implements transit.Services.SendResourceWithMetrics
-func (transitService Service) SendResourceWithMetrics(request []byte) error {
-	return nats.Publish(SendResourceWithMetricsSubject, request)
-}
-
-// SynchronizeInventory implements transit.Services.SynchronizeInventory
-func (transitService Service) SynchronizeInventory(request []byte) error {
-	return nats.Publish(SynchronizeInventorySubject, request)
-}
-
-// ListMetrics implements transit.Services.ListMetrics
-func (transitService Service) ListMetrics() (*[]transit.MetricDescriptor, error) {
-	return transit.Config.ListMetrics()
+// StopTransport stops dispatching NATS messages to Groundwork
+func (transitService Service) StopTransport() error {
+	return nats.StopDispatcher()
 }
