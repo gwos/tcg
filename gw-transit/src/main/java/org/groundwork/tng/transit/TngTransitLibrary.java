@@ -1,6 +1,7 @@
 package org.groundwork.tng.transit;
 
 
+import com.sun.jna.Function;
 import com.sun.jna.Library;
 
 public interface TngTransitLibrary extends Library {
@@ -12,4 +13,5 @@ public interface TngTransitLibrary extends Library {
     public void StopNATS();
     public boolean StartTransport(StringByReference errorMsg);
     public boolean StopTransport(StringByReference errorMsg);
+    public void SendFunction(Function)
 }
