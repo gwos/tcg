@@ -4,7 +4,7 @@ agentConfig:
   startNATS: True
   startTransport: True
 groundworkConfig:
-  host: "localhost:8080"
+  host: "localhost:80"
   account: "RESTAPIACCESS"
   password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
 groundworkActions:

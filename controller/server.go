@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+const userKey string = "user"
+
 var TransitController = NewController()
 
 func StartServer(tls bool, port int) error {
@@ -29,13 +31,11 @@ func StartServer(tls bool, port int) error {
 	}
 
 	if tls {
-		if err := router.RunTLS(fmt.Sprintf(":%d", port), "controller/server.pem", "controller/server.key");
-			err != nil {
+		if err := router.RunTLS(fmt.Sprintf(":%d", port), "controller/server.pem", "controller/server.key"); err != nil {
 			return err
 		}
 	} else {
-		if err := router.Run(fmt.Sprintf(":%d", port));
-			err != nil {
+		if err := router.Run(fmt.Sprintf(":%d", port)); err != nil {
 			return err
 		}
 	}

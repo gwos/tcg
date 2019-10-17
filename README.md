@@ -67,3 +67,7 @@ Running
 $ cd go/src/github/com/gwos/tng
 $ go run .
 ```
+
+Testing
+-------
+The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.

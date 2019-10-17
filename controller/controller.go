@@ -6,15 +6,15 @@ import (
 	"log"
 )
 
-// Agent possible status
+// StatusEnum defines Agent Controller status
 type StatusEnum string
 
+// Agent Controller status
 const (
 	Running StatusEnum = "Running"
 	Stopped            = "Stopped"
 	Unknown            = "Unknown"
 	Pending            = "Pending"
-	userKey string     = "user"
 )
 
 func init() {
@@ -24,7 +24,7 @@ func init() {
 	}
 }
 
-// TNG Control Plane interfaces
+// Services defines TNG Control Plane interfaces
 type Services interface {
 	StartNATS() error
 	StopNATS() error
@@ -35,6 +35,7 @@ type Services interface {
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
 
+// Controller implements Services interface
 type Controller struct {
 	NATSState      StatusEnum
 	TransportState StatusEnum
@@ -42,10 +43,12 @@ type Controller struct {
 
 var service services.Service
 
+// NewController creates instance
 func NewController() *Controller {
 	return &Controller{NATSState: Pending}
 }
 
+// StartNATS implements Services.StartNATS
 func (controller *Controller) StartNATS() error {
 	err := service.StartNATS()
 	if err != nil {
@@ -55,12 +58,14 @@ func (controller *Controller) StartNATS() error {
 	return nil
 }
 
+// StopNATS implements Services.StopNATS
 func (controller *Controller) StopNATS() error {
 	service.StopNATS()
 	controller.NATSState = Stopped
 	return nil
 }
 
+// StartTransport implements Services.StartTransport
 func (controller *Controller) StartTransport() error {
 	err := service.StartTransport()
 	if err != nil {
@@ -70,6 +75,7 @@ func (controller *Controller) StartTransport() error {
 	return nil
 }
 
+// StopTransport implements Services.StopTransport
 func (controller *Controller) StopTransport() error {
 	err := service.StopTransport()
 	if err != nil {
@@ -79,6 +85,7 @@ func (controller *Controller) StopTransport() error {
 	return nil
 }
 
+// Stats implements Services.Stats
 func (controller Controller) Stats() (*transit.AgentStats, error) {
 	return &transit.AgentStatistics, nil
 }

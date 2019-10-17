@@ -23,7 +23,7 @@ func main() {
 	geneva := transit.ResourceStatus{
 		Name: "geneva",
 		Type:   transit.HostResource,
-		Status: transit.HOST_UP,
+		Status: transit.HostUp,
 		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
@@ -39,7 +39,7 @@ func main() {
 	localLoadService := transit.ResourceStatus{
 		Name: "local_load",
 		Type:   transit.ServiceResource,
-		Status: transit.SERVICE_OK,
+		Status: transit.ServiceOk,
 		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
@@ -123,11 +123,11 @@ func main() {
 
 	// Controller Example
 	var controllerServices = controller.NewController()
-	_, _ = controllerServices.Start()
-	_, _ = controllerServices.Stop()
-	_, _ = controllerServices.Status()
+	_ = controllerServices.StartNATS()
+	_ = controllerServices.StartTransport()
+	_ = controllerServices.StopNATS()
 	stats, _ := controllerServices.Stats()
-	fmt.Println(*stats)
+	fmt.Println(*stats, controllerServices.NATSState, controllerServices.TransportState)
 }
 
 func makeMetricSample() *transit.MetricSample {
