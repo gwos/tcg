@@ -1,6 +1,7 @@
 package org.groundwork.tng.transit;
 
 import static org.junit.Assert.assertEquals;
+
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
@@ -30,7 +31,7 @@ public class AppTest {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentID("3939333393342")
+                .setAgentId("3939333393342")
                 .setAppType("VEMA")
                 .setTimeStamp(new Date())
                 .setTraceToken("token-99e93")
@@ -69,8 +70,6 @@ public class AppTest {
 //        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 //        String name = reader.readLine();
 
-        transit.Disconnect();
-
 //        assertEquals(1, (int) results.getCount());
 //        assertEquals(0, (int) results.getSuccessful());
 //        assertEquals(1, (int) results.getFailed());
@@ -91,34 +90,38 @@ public class AppTest {
     public void shouldSynchronizeInventory() throws IOException {
         TransitServices transit = new TransitServicesImpl();
 
-        DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentID("3939333393342")
-                .setAppType("VEMA")
-                .setTimeStamp(new Date())
-                .setTraceToken("token-99e93")
-                .build();
+        transit.StartNATS();
 
-        DtoInventoryResource resource = DtoInventoryResource.builder()
-                .setName("mc-test-host")
-                .setType("HOST")
-                .setOwner("mc-test-host")
-                .build();
+        transit.StartNATS();
 
-        DtoGroup group = new DtoGroup();
-        List<DtoMonitoredResource> resources = new ArrayList<>();
-        group.setGroupName("GW8");
-        group.setResources(resources);
+        transit.StartNATS();
 
-        DtoInventory dtoInventory = new DtoInventory();
-        dtoInventory.setContext(context);
-        dtoInventory.add(resource);
-        dtoInventory.add(group);
-
-        transit.SynchronizeInventory(dtoInventory);
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
-
-        transit.Disconnect();
+//        DtoTracerContext context = DtoTracerContext.builder()
+//                .setAgentId("3939333393342")
+//                .setAppType("VEMA")
+//                .setTimeStamp(new Date())
+//                .setTraceToken("token-99e93")
+//                .build();
+//
+//        DtoInventoryResource resource = DtoInventoryResource.builder()
+//                .setName("mc-test-host")
+//                .setType("HOST")
+//                .setOwner("mc-test-host")
+//                .build();
+//
+//        DtoGroup group = new DtoGroup();
+//        List<DtoMonitoredResource> resources = new ArrayList<>();
+//        group.setGroupName("GW8");
+//        group.setResources(resources);
+//
+//        DtoInventory dtoInventory = new DtoInventory();
+//        dtoInventory.setContext(context);
+//        dtoInventory.add(resource);
+//        dtoInventory.add(group);
+//
+//        transit.SynchronizeInventory(dtoInventory);
+//
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//        String name = reader.readLine();
     }
 }

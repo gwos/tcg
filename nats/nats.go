@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"fmt"
 	"github.com/gwos/tng/transit"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
@@ -30,10 +31,15 @@ func StartServer() error {
 	opts.StoreType = stores.TypeFile
 	opts.FilestoreDir = FilestoreDir
 
-	var err error
-	Server, err = stand.RunServerWithOpts(opts, nil)
-	if err != nil {
-		return err
+	if Server == nil || Server.State() == stand.Shutdown {
+		var err error
+		Server, err = stand.RunServerWithOpts(opts, nil)
+		if err != nil {
+			return err
+		}
+		fmt.Println(Server.State().String())
+	} else {
+		fmt.Println("Already running")
 	}
 
 	return nil
