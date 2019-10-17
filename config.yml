@@ -1,6 +1,8 @@
 agentConfig:
   port: 8081
   ssl: True
+  startNATS: True
+  startTransport: True
 groundworkConfig:
   host: "localhost:8080"
   account: "RESTAPIACCESS"

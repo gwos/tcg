@@ -15,5 +15,11 @@ public interface TransitServices {
 
     void SynchronizeInventory(DtoInventory inventory) throws TransitException;
 
-    void Disconnect() throws TransitException;
+    void StartNATS() throws TransitException;
+
+    void StopNATS() throws TransitException;
+
+    void StartTransport() throws TransitException;
+
+    void StopTransport() throws TransitException;
 }
