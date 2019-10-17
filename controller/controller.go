@@ -26,11 +26,10 @@ func init() {
 
 // TNG Control Plane interfaces
 type Services interface {
-	StartNATS() (StatusEnum, error)
-	StopNATS() (StatusEnum, error)
-	StartTransport() (StatusEnum, error)
-	StopTransport() (StatusEnum, error)
-	Status() (StatusEnum, error)
+	StartNATS() error
+	StopNATS() error
+	StartTransport() error
+	StopTransport() error
 	Stats() (*transit.AgentStats, error)
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned

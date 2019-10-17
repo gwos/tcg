@@ -594,8 +594,8 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 200},
-			&ThresholdDescriptor{Key: "warning", Value: 100},
+			{Key: "critical", Value: 200},
+			{Key: "warning", Value: 100},
 		},
 	}
 	load5 := MetricDescriptor{
@@ -609,8 +609,8 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 205},
-			&ThresholdDescriptor{Key: "warning", Value: 105},
+			{Key: "critical", Value: 205},
+			{Key: "warning", Value: 105},
 		},
 	}
 	load15 := MetricDescriptor{
@@ -624,8 +624,8 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 215},
-			&ThresholdDescriptor{Key: "warning", Value: 115},
+			{Key: "critical", Value: 215},
+			{Key: "warning", Value: 115},
 		},
 	}
 	arr := []MetricDescriptor{load1, load5, load15}

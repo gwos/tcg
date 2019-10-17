@@ -1,0 +1,18 @@
+agentConfig:
+  port: 8081
+  ssl: True
+  startNATS: True
+  startTransport: True
+groundworkConfig:
+  host: "localhost:80"
+  account: "RESTAPIACCESS"
+  password: "***REMOVED***"
+groundworkActions:
+  connect:
+    entrypoint: "/api/auth/login"
+  disconnect:
+    entrypoint: "/api/synchronizer"
+  synchronizeInventory:
+    entrypoint: "/api/synchronizer"
+  sendResourceWithMetrics:
+    entrypoint: "/api/monitoring"
