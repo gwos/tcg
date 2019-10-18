@@ -1,0 +1,39 @@
+module github.com/gwos/tng
+
+go 1.13
+
+require (
+	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878
+	github.com/boj/redistore v0.0.0-20160128113310-fc113767cd6b
+	github.com/garyburd/redigo v1.6.0
+	github.com/gin-contrib/sse v0.1.0
+	github.com/gin-gonic/contrib v0.0.0-20190923054218-35076c1b2bea
+	github.com/gin-gonic/gin v1.4.0
+	github.com/gogo/protobuf v1.3.0
+	github.com/golang/protobuf v1.3.2
+	github.com/gorilla/context v1.1.1
+	github.com/gorilla/securecookie v1.1.1
+	github.com/gorilla/sessions v1.2.0
+	github.com/hashicorp/go-hclog v0.9.2
+	github.com/hashicorp/go-immutable-radix v1.1.0
+	github.com/hashicorp/go-msgpack v0.5.5
+	github.com/hashicorp/golang-lru v0.5.3
+	github.com/hashicorp/raft v1.1.1
+	github.com/json-iterator/go v1.1.7
+	github.com/mattn/go-isatty v0.0.10
+	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+	github.com/modern-go/reflect2 v1.0.1
+	github.com/nats-io/gnatsd v1.4.1
+	github.com/nats-io/go-nats v1.7.2
+	github.com/nats-io/go-nats-streaming v0.4.4
+	github.com/nats-io/nats-streaming-server v0.14.3
+	github.com/nats-io/nkeys v0.1.0
+	github.com/nats-io/nuid v1.0.1
+	github.com/prometheus/procfs v0.0.5
+	github.com/ugorji/go v1.1.7
+	go.etcd.io/bbolt v1.3.3
+	golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc
+	golang.org/x/sys v0.0.0-20191009170203-06d7bd2c5f4f
+	gopkg.in/go-playground/validator.v8 v8.18.2
+	gopkg.in/yaml.v2 v2.2.4
+)
