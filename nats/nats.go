@@ -62,7 +62,8 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			return err
 		}
 
-		for subject, dispatcherFn := range *dispatcherMap {
+		for subject, fn := range *dispatcherMap {
+			dispatcherFn := fn /* prevent loop override */
 			_, err = Connection.QueueSubscribe(
 				subject,
 				QueueGroup,
