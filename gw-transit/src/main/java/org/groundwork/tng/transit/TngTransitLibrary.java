@@ -13,5 +13,4 @@ public interface TngTransitLibrary extends Library {
     public void StopNATS();
     public boolean StartTransport(StringByReference errorMsg);
     public boolean StopTransport(StringByReference errorMsg);
-    public void SendFunction(Function)
 }

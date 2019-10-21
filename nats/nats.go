@@ -1,7 +1,6 @@
 package nats
 
 import (
-	"fmt"
 	"github.com/gwos/tng/transit"
 	"github.com/nats-io/go-nats"
 	stan "github.com/nats-io/go-nats-streaming"
@@ -38,9 +37,6 @@ func StartServer() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(Server.State().String())
-	} else {
-		fmt.Println("Already running")
 	}
 
 	return nil

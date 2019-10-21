@@ -22,7 +22,7 @@ public class AppTest {
      * Usage:
      * 1. Start GroundWork Foundation server
      * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package on TNG
+     * libtransit package in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */
@@ -64,15 +64,10 @@ public class AppTest {
                         .build())
                 .build());
 
-        // TODO: what happened to results????
-        // results = transit.SendResourcesWithMetrics(resources);
+        transit.SendResourcesWithMetrics(resources);
 
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-//        String name = reader.readLine();
-
-//        assertEquals(1, (int) results.getCount());
-//        assertEquals(0, (int) results.getSuccessful());
-//        assertEquals(1, (int) results.getFailed());
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String name = reader.readLine();
     }
 
 
@@ -82,7 +77,7 @@ public class AppTest {
      * Usage:
      * 1. Start GroundWork Foundation server
      * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package on TNG
+     * libtransit package in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */
@@ -96,32 +91,32 @@ public class AppTest {
 
         transit.StartNATS();
 
-//        DtoTracerContext context = DtoTracerContext.builder()
-//                .setAgentId("3939333393342")
-//                .setAppType("VEMA")
-//                .setTimeStamp(new Date())
-//                .setTraceToken("token-99e93")
-//                .build();
-//
-//        DtoInventoryResource resource = DtoInventoryResource.builder()
-//                .setName("mc-test-host")
-//                .setType("HOST")
-//                .setOwner("mc-test-host")
-//                .build();
-//
-//        DtoGroup group = new DtoGroup();
-//        List<DtoMonitoredResource> resources = new ArrayList<>();
-//        group.setGroupName("GW8");
-//        group.setResources(resources);
-//
-//        DtoInventory dtoInventory = new DtoInventory();
-//        dtoInventory.setContext(context);
-//        dtoInventory.add(resource);
-//        dtoInventory.add(group);
-//
-//        transit.SynchronizeInventory(dtoInventory);
-//
-//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-//        String name = reader.readLine();
+        DtoTracerContext context = DtoTracerContext.builder()
+                .setAgentId("3939333393342")
+                .setAppType("VEMA")
+                .setTimeStamp(new Date())
+                .setTraceToken("token-99e93")
+                .build();
+
+        DtoInventoryResource resource = DtoInventoryResource.builder()
+                .setName("mc-test-host")
+                .setType("HOST")
+                .setOwner("mc-test-host")
+                .build();
+
+        DtoGroup group = new DtoGroup();
+        List<DtoMonitoredResource> resources = new ArrayList<>();
+        group.setGroupName("GW8");
+        group.setResources(resources);
+
+        DtoInventory dtoInventory = new DtoInventory();
+        dtoInventory.setContext(context);
+        dtoInventory.add(resource);
+        dtoInventory.add(group);
+
+        transit.SynchronizeInventory(dtoInventory);
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String name = reader.readLine();
     }
 }
