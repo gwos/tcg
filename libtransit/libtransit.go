@@ -13,10 +13,6 @@ var transitService services.Service
 func main() {
 }
 
-func init() {
-	_ = controller.StartServer(false, 8081)
-}
-
 func min(a, b int) int {
 	if a < b {
 		return a

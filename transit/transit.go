@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/gwos/tng/config"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -389,53 +391,21 @@ type ResourceWithMetricsRequest struct {
 	Resources []ResourceWithMetrics `json:"resources"`
 }
 
-// Services defines Groundwork actions
-type Services interface {
+// Operations defines Groundwork operations interface
+type Operations interface {
 	Connect() error
 	Disconnect() error
+	Identity(appName, apiToken string) error
 	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
 	SynchronizeInventory(request []byte) (*OperationResults, error)
-	// ListMetrics() (*[]MetricDescriptor, error)
 }
 
-// GroundworkAction defines configurable options for an action
-type GroundworkAction struct {
-	Entrypoint string `yaml:"entrypoint"`
-}
-
-// GroundworkActions configures Groundwork actions
-type GroundworkActions struct {
-	Connect                 GroundworkAction `yaml:"connect"`
-	Disconnect              GroundworkAction `yaml:"disconnect"`
-	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
-	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
-	Identity                GroundworkAction `yaml:"identity"`
-}
-
-// GroundworkConfig defines Groundwork Connection configuration
-type GroundworkConfig struct {
-	Host     string `yaml:"host" envconfig:"GW_HOST"`
-	Account  string `yaml:"account" envconfig:"GW_ACCOUNT"`
-	Password string `yaml:"password" envconfig:"GW_PASSWORD"`
-	Token    string
-}
-
-// AgentConfig defines TNG Transit Agent configuration
-type AgentConfig struct {
-	Port           int  `yaml:"port" envconfig:"AGENT_PORT"`
-	SSL            bool `yaml:"ssl" envconfig:"AGENT_SSL"`
-	StartNATS      bool `yaml:"startNATS"`
-	StartTransport bool `yaml:"startTransport"`
-}
-
-// Transit defines TNG configuration
+// Transit implements Operations interface
 type Transit struct {
-	AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  `yaml:"groundworkConfig"`
-	GroundworkActions `yaml:"groundworkActions"`
+	config.Config
 }
 
-// Connect implements Services.Connect.
+// Connect implements Operations.Connect.
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
@@ -450,8 +420,8 @@ func (transit *Transit) Connect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.Connect.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.Connect.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
@@ -465,7 +435,7 @@ func (transit *Transit) Connect() error {
 	return errors.New(string(byteResponse))
 }
 
-// Disconnect implements Services.Disconnect.
+// Disconnect implements Operations.Disconnect.
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
@@ -479,8 +449,8 @@ func (transit Transit) Disconnect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.Disconnect.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.Disconnect.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
@@ -493,7 +463,34 @@ func (transit Transit) Disconnect() error {
 	return errors.New(string(byteResponse))
 }
 
-// SynchronizeInventory implements Services.SynchronizeInventory.
+// Identity implements Operations.Identity.
+func (transit Transit) Identity(appName, apiToken string) error {
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": apiToken,
+		"GWOS-APP-NAME":  appName,
+	}
+
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.Identity.Entrypoint,
+	}
+
+	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
+	if err == nil {
+		if statusCode == 200 {
+			return nil
+		} else {
+			return errors.New(string(byteResponse))
+		}
+	}
+
+	return err
+}
+
+// SynchronizeInventory implements Operations.SynchronizeInventory.
 func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -504,8 +501,8 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.SynchronizeInventory.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.SynchronizeInventory.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
 	if err != nil {
@@ -531,7 +528,7 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 	return &operationResults, nil
 }
 
-// SendResourcesWithMetrics implements Services.SendResourcesWithMetrics.
+// SendResourcesWithMetrics implements Operations.SendResourcesWithMetrics.
 func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -542,8 +539,8 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.SendResourceWithMetrics.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.SendResourceWithMetrics.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
 	if err != nil {
@@ -569,8 +566,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 	return &operationResults, nil
 }
 
-// ListMetrics implements Services.ListMetrics.
-// TODO: implement
+// ListMetrics TODO: implement
 func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	// setup label descriptor samples
 	cores := LabelDescriptor{
@@ -630,47 +626,6 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	}
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
-}
-
-func Identity(appName, apiToken string) error {
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": apiToken,
-		"GWOS-APP-NAME":  appName,
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.Identity.Entrypoint,
-	}
-
-	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
-	if err == nil {
-		if statusCode == 200 {
-			return nil
-		} else {
-			return errors.New(string(byteResponse))
-		}
-	}
-
-	return err
-}
-
-// AgentStats defines Agent statistics
-type AgentStats struct {
-	AgentID                string
-	AppType                string
-	BytesSent              int
-	MetricsSent            int
-	MessagesSent           int
-	LastInventoryRun       MillisecondTimestamp
-	LastMetricsRun         MillisecondTimestamp
-	ExecutionTimeInventory time.Duration
-	ExecutionTimeMetrics   time.Duration
-	UpSince                MillisecondTimestamp
-	LastError              string
 }
 
 // MillisecondTimestamp refers to the JSON representation of timestamps, for
