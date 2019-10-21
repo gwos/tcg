@@ -2,7 +2,7 @@ package controller
 
 import (
 	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"log"
 )
 
 // StatusEnum defines Agent Controller status
@@ -16,14 +16,23 @@ const (
 	Pending            = "Pending"
 )
 
+var service services.Service
+
+func init() {
+	err := StartServer(service.AgentConfig.SSL, service.AgentConfig.Port)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 // Services defines TNG Control Plane interfaces
 type Services interface {
+	Identity(appName, apiToken string) error
 	StartNATS() error
 	StopNATS() error
 	StartTransport() error
 	StopTransport() error
-	Stats() (*transit.AgentStats, error)
-	Identity(appName, apiToken string) error
+	Stats() (*services.AgentStats, error)
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
@@ -33,8 +42,6 @@ type Controller struct {
 	NATSState      StatusEnum
 	TransportState StatusEnum
 }
-
-var service services.Service
 
 // NewController creates instance
 func NewController() *Controller {
@@ -79,8 +86,8 @@ func (controller *Controller) StopTransport() error {
 }
 
 // Stats implements Services.Stats
-func (controller Controller) Stats() (*transit.AgentStats, error) {
-	return &transit.AgentStatistics, nil
+func (controller Controller) Stats() (*services.AgentStats, error) {
+	return &service.AgentStats, nil
 }
 
 // Identity implements Services.Identity
