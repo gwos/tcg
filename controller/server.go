@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/gwos/tng/cache"
 	"net/http"
-	"strings"
+	"time"
 )
 
 const userKey string = "user"
@@ -17,10 +18,9 @@ func StartServer(tls bool, port int) error {
 
 	router.Use(sessions.Sessions("mysession", sessions.NewCookieStore([]byte("secret"))))
 
-	router.POST("api/v1/login", login)
-
 	basicAuth := router.Group("/api/v1")
-	basicAuth.Use(authenticationRequired)
+
+	basicAuth.Use(authorizationValidation)
 	{
 		basicAuth.GET("/stats", stats)
 		basicAuth.GET("/status", status)
@@ -28,10 +28,12 @@ func StartServer(tls bool, port int) error {
 		basicAuth.DELETE("/nats/stop", stopNATS)
 		basicAuth.POST("/nats/transport/start", startTransport)
 		basicAuth.DELETE("/nats/transport/stop", stopTransport)
+
+		basicAuth.GET("/test", test)
 	}
 
 	if tls {
-		if err := router.RunTLS(fmt.Sprintf(":%d", port), "controller/server.pem", "controller/server.key"); err != nil {
+		if err := router.RunTLS(fmt.Sprintf(":%d", port), "../controller/server.pem", "../controller/server.key"); err != nil {
 			return err
 		}
 	} else {
@@ -41,6 +43,10 @@ func StartServer(tls bool, port int) error {
 	}
 
 	return nil
+}
+
+func test(context *gin.Context) {
+	context.JSON(http.StatusOK, "WORKS!")
 }
 
 func startNATS(c *gin.Context) {
@@ -91,37 +97,34 @@ func stats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
-func authenticationRequired(c *gin.Context) {
-	session := sessions.Default(c)
-	user := session.Get("user")
-	if user == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "user needs to be signed in to access this service"})
+func authorizationValidation(c *gin.Context) {
+	credentials := cache.Credentials{
+		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
+		GwosApiToken: c.Request.Header.Get("GWOS-API-TOKEN"),
+	}
+
+	if credentials.GwosAppName == "" || credentials.GwosApiToken == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid \"GWOS-APP-NAME\" or \"GWOS-API-TOKEN\""})
 		c.Abort()
 		return
 	}
-}
 
-func login(c *gin.Context) {
-	session := sessions.Default(c)
-	username := c.PostForm("username")
-	password := c.PostForm("password")
+	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosApiToken)
 
-	// Validate form input
-	if strings.Trim(username, " ") == "" || strings.Trim(password, " ") == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Parameters can't be empty"})
-		return
+	_, isCached := cache.AuthCache.Get(key)
+	if !isCached {
+		err := TransitController.Identity(credentials.GwosAppName, credentials.GwosApiToken)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			c.Abort()
+			return
+		}
+
+		err = cache.AuthCache.Add(key, credentials, 8*time.Hour)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.Abort()
+			return
+		}
 	}
-
-	if username != "vlad" || password != "gwos" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
-		return
-	}
-
-	session.Set(userKey, username) // In real world usage you'd set this to the users ID
-	if err := session.Save(); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save session"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Successfully authenticated user"})
 }

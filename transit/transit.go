@@ -409,6 +409,7 @@ type GroundworkActions struct {
 	Disconnect              GroundworkAction `yaml:"disconnect"`
 	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
 	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
+	Identity                GroundworkAction `yaml:"identity"`
 }
 
 // GroundworkConfig defines Groundwork Connection configuration
@@ -629,6 +630,32 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	}
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
+}
+
+func Identity(appName, apiToken string) error {
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": apiToken,
+		"GWOS-APP-NAME":  appName,
+	}
+
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   Config.GroundworkConfig.Host,
+		Path:   Config.GroundworkActions.Identity.Entrypoint,
+	}
+
+	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
+	if err == nil {
+		if statusCode == 200 {
+			return nil
+		} else {
+			return errors.New(string(byteResponse))
+		}
+	}
+
+	return err
 }
 
 // AgentStats defines Agent statistics

@@ -40,6 +40,7 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 		if err != nil {
 			return -1, nil, err
 		}
+		defer request.Body.Close()
 	}
 
 	for key, value := range headers {
@@ -51,8 +52,6 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 	if err != nil {
 		return -1, nil, err
 	}
-
-	defer request.Body.Close()
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
