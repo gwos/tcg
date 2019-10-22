@@ -52,18 +52,18 @@ func GetConfig() Config {
 
 	workDir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	configFile, err := os.Open(path.Join(workDir, "config.yml"))
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	decoder := yaml.NewDecoder(configFile)
 	err = decoder.Decode(&env)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err)
 	}
 
 	return env

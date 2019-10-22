@@ -11,10 +11,10 @@ groundworkActions:
   connect:
     entrypoint: "/api/auth/login"
   disconnect:
-    entrypoint: "/api/synchronizer"
+    entrypoint: "/api/auth/logout"
   synchronizeInventory:
     entrypoint: "/api/synchronizer"
   sendResourceWithMetrics:
     entrypoint: "/api/monitoring"
   identity:
-    entrypoint: "/api/users/identity"
+    entrypoint: "/api/validate/identity"
