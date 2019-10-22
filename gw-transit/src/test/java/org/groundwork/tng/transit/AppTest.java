@@ -55,11 +55,19 @@ public class AppTest {
 
 
         resources.add(DtoResourceWithMetrics.builder()
-                .setMetrics(timeSeries)
                 .setResource(DtoResourceStatus.builder()
                         .setName("mc-test-host")
                         .setType("HOST")
                         .setStatus(DtoMonitorStatus.HOST_UP)
+                        .build())
+                .build());
+
+        resources.add(DtoResourceWithMetrics.builder()
+                .setMetrics(timeSeries)
+                .setResource(DtoResourceStatus.builder()
+                        .setName("mc-test-service-0")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
                         .setOwner("mc-test-host")
                         .build())
                 .build());
@@ -98,9 +106,13 @@ public class AppTest {
                 .setTraceToken("token-99e93")
                 .build();
 
-        DtoInventoryResource resource = DtoInventoryResource.builder()
+        DtoInventoryResource host = DtoInventoryResource.builder()
                 .setName("mc-test-host")
-                .setType("HOST")
+                .setType("HOST") // TODO: use constant
+                .build();
+        DtoInventoryResource service = DtoInventoryResource.builder()
+                .setName("mc-test-service-0")
+                .setType("SERVICE") // TODO: use constant
                 .setOwner("mc-test-host")
                 .build();
 
@@ -111,7 +123,8 @@ public class AppTest {
 
         DtoInventory dtoInventory = new DtoInventory();
         dtoInventory.setContext(context);
-        dtoInventory.add(resource);
+        dtoInventory.add(host);
+        dtoInventory.add(service);
         dtoInventory.add(group);
 
         transit.SynchronizeInventory(dtoInventory);
