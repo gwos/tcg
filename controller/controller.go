@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"log"
-
 	"github.com/gwos/tng/services"
 )
 
@@ -16,14 +14,6 @@ const (
 	Unknown            = "Unknown"
 	Pending            = "Pending"
 )
-
-func init() {
-	service := services.GetTransitService()
-	err := StartServer(service.AgentConfig.SSL, service.AgentConfig.Port)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
 
 // Services defines TNG Control Plane interfaces
 type Services interface {
