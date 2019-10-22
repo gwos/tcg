@@ -8,8 +8,6 @@ import (
 	"unsafe"
 )
 
-var transitService services.Service
-
 func main() {
 }
 
@@ -26,8 +24,9 @@ func putError(errorBuf *C.char, err error) {
 }
 
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char) bool {
-	err := transitService.SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJson)))
+func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
+	err := services.GetTransitService().
+		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -36,8 +35,9 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char)
 }
 
 //export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
-	err := transitService.SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJson)))
+func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
+	err := services.GetTransitService().
+		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -47,7 +47,7 @@ func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
 
 //export StartNATS
 func StartNATS(errorBuf *C.char) bool {
-	err := transitService.StartNATS()
+	err := services.GetTransitService().StartNATS()
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -57,12 +57,12 @@ func StartNATS(errorBuf *C.char) bool {
 
 //export StopNATS
 func StopNATS() {
-	transitService.StopNATS()
+	services.GetTransitService().StopNATS()
 }
 
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
-	err := transitService.StartTransport()
+	err := services.GetTransitService().StartTransport()
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -72,7 +72,7 @@ func StartTransport(errorBuf *C.char) bool {
 
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
-	err := transitService.StopTransport()
+	err := services.GetTransitService().StopTransport()
 	if err != nil {
 		putError(errorBuf, err)
 		return false
