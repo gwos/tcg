@@ -103,3 +103,7 @@ func (transitService Service) StartTransport() error {
 func (transitService Service) StopTransport() error {
 	return nats.StopDispatcher()
 }
+
+func (transitService Service) Identity(appName, apiToken string) error {
+	return transit.Identity(appName, apiToken)
+}

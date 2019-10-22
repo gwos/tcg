@@ -3,6 +3,7 @@ package main
 //#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
+	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/services"
 	"unsafe"
 )
@@ -10,6 +11,10 @@ import (
 var transitService services.Service
 
 func main() {
+}
+
+func init() {
+	_ = controller.StartServer(false, 8081)
 }
 
 func min(a, b int) int {
