@@ -1,8 +1,9 @@
 package controller
 
 import (
-	"github.com/gwos/tng/services"
 	"log"
+
+	"github.com/gwos/tng/services"
 )
 
 // StatusEnum defines Agent Controller status
@@ -16,9 +17,8 @@ const (
 	Pending            = "Pending"
 )
 
-var service services.Service
-
 func init() {
+	service := services.GetTransitService()
 	err := StartServer(service.AgentConfig.SSL, service.AgentConfig.Port)
 	if err != nil {
 		log.Fatal(err)
@@ -50,7 +50,7 @@ func NewController() *Controller {
 
 // StartNATS implements Services.StartNATS
 func (controller *Controller) StartNATS() error {
-	err := service.StartNATS()
+	err := services.GetTransitService().StartNATS()
 	if err != nil {
 		return err
 	}
@@ -60,14 +60,14 @@ func (controller *Controller) StartNATS() error {
 
 // StopNATS implements Services.StopNATS
 func (controller *Controller) StopNATS() error {
-	service.StopNATS()
+	services.GetTransitService().StopNATS()
 	controller.NATSState = Stopped
 	return nil
 }
 
 // StartTransport implements Services.StartTransport
 func (controller *Controller) StartTransport() error {
-	err := service.StartTransport()
+	err := services.GetTransitService().StartTransport()
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func (controller *Controller) StartTransport() error {
 
 // StopTransport implements Services.StopTransport
 func (controller *Controller) StopTransport() error {
-	err := service.StopTransport()
+	err := services.GetTransitService().StopTransport()
 	if err != nil {
 		return err
 	}
@@ -86,11 +86,11 @@ func (controller *Controller) StopTransport() error {
 }
 
 // Stats implements Services.Stats
-func (controller Controller) Stats() (*services.AgentStats, error) {
-	return &service.AgentStats, nil
+func (controller Controller) Stats() (services.AgentStats, error) {
+	return services.GetTransitService().AgentStats, nil
 }
 
 // Identity implements Services.Identity
 func (controller Controller) Identity(appName, apiToken string) error {
-	return service.Identity(appName, apiToken)
+	return services.GetTransitService().Transit.Identity(appName, apiToken)
 }
