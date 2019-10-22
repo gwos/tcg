@@ -11,8 +11,14 @@ import (
 
 const userKey string = "user"
 
-var TransitController = NewController()
+var controller = NewController()
 
+// StopServer TODO: implement
+func StopServer() error {
+	return nil
+}
+
+// StartServer starts http server
 func StartServer(tls bool, port int) error {
 	router := gin.Default()
 
@@ -50,47 +56,47 @@ func test(context *gin.Context) {
 }
 
 func startNATS(c *gin.Context) {
-	err := TransitController.StartNATS()
+	err := controller.StartNATS()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, TransitController)
+	c.JSON(http.StatusOK, controller)
 }
 
 func stopNATS(c *gin.Context) {
-	err := TransitController.StopNATS()
+	err := controller.StopNATS()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, TransitController)
+	c.JSON(http.StatusOK, controller)
 }
 
 func startTransport(c *gin.Context) {
-	err := TransitController.StartTransport()
+	err := controller.StartTransport()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, TransitController)
+	c.JSON(http.StatusOK, controller)
 }
 
 func stopTransport(c *gin.Context) {
-	err := TransitController.StopTransport()
+	err := controller.StopTransport()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, TransitController)
+	c.JSON(http.StatusOK, controller)
 }
 
 func status(c *gin.Context) {
-	c.JSON(http.StatusOK, TransitController)
+	c.JSON(http.StatusOK, controller)
 }
 
 func stats(c *gin.Context) {
-	stats, err := TransitController.Stats()
+	stats, err := controller.Stats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -113,7 +119,7 @@ func authorizationValidation(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := TransitController.Identity(credentials.GwosAppName, credentials.GwosApiToken)
+		err := controller.Identity(credentials.GwosAppName, credentials.GwosApiToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
