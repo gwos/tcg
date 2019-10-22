@@ -44,12 +44,12 @@ Building
 $ cd tng
 $ go build .
 ```
-#####Building tng shared module:
+***Building tng shared module:***
 
 ```
 $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 ```
-######or use Makefiles
+***or use Makefiles***
 
 Running 
 --------
