@@ -42,12 +42,12 @@ type AgentConfig struct {
 // Config defines TNG Agent configuration
 type Config struct {
 	AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  `yaml:"groundworkConfig"`
+	*GroundworkConfig  `yaml:"groundworkConfig"`
 	GroundworkActions `yaml:"groundworkActions"`
 }
 
 // GetConfig returns configuration
-func GetConfig() Config {
+func GetConfig() *Config {
 	var env Config
 
 	workDir, err := os.Getwd()
@@ -66,5 +66,5 @@ func GetConfig() Config {
 		log.Println(err)
 	}
 
-	return env
+	return &env
 }

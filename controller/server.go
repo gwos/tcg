@@ -119,7 +119,7 @@ func authorizationValidation(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.Identity(credentials.GwosAppName, credentials.GwosApiToken)
+		err := controller.ValidateToken(credentials.GwosAppName, credentials.GwosApiToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
