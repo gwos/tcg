@@ -127,7 +127,7 @@ func main() {
 	_ = controllerServices.StartTransport()
 	_ = controllerServices.StopNATS()
 	stats, _ := controllerServices.Stats()
-	fmt.Println(*stats, controllerServices.NATSState, controllerServices.TransportState)
+	fmt.Println(stats, controllerServices.NATSState, controllerServices.TransportState)
 }
 
 func makeMetricSample() *transit.MetricSample {
