@@ -81,6 +81,6 @@ func (controller Controller) Stats() (services.AgentStats, error) {
 }
 
 // Identity implements Services.Identity
-func (controller Controller) Identity(appName, apiToken string) error {
-	return services.GetTransitService().Transit.Identity(appName, apiToken)
+func (controller Controller) ValidateToken(appName, apiToken string) error {
+	return services.GetTransitService().Transit.ValidateToken(appName, apiToken)
 }

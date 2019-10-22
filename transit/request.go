@@ -43,8 +43,10 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 		defer request.Body.Close()
 	}
 
-	for key, value := range headers {
-		request.Header.Add(key, value)
+	if headers != nil {
+		for key, value := range headers {
+			request.Header.Add(key, value)
+		}
 	}
 
 	response, err = client.Do(request)

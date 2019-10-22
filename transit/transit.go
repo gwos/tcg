@@ -402,7 +402,7 @@ type Operations interface {
 
 // Transit implements Operations interface
 type Transit struct {
-	config.Config
+	*config.Config
 }
 
 // Connect implements Operations.Connect.
@@ -427,6 +427,7 @@ func (transit *Transit) Connect() error {
 	if err != nil {
 		return err
 	}
+
 	if statusCode == 200 {
 		transit.GroundworkConfig.Token = string(byteResponse)
 		return nil
@@ -464,12 +465,15 @@ func (transit Transit) Disconnect() error {
 }
 
 // Identity implements Operations.Identity.
-func (transit Transit) Identity(appName, apiToken string) error {
+func (transit Transit) ValidateToken(appName, apiToken string) error {
 	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": apiToken,
-		"GWOS-APP-NAME":  appName,
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	formValues := map[string]string{
+		"gwos-app-name":  appName,
+		"gwos-api-token": apiToken,
 	}
 
 	entrypoint := url.URL{
@@ -478,10 +482,16 @@ func (transit Transit) Identity(appName, apiToken string) error {
 		Path:   transit.GroundworkActions.Identity.Entrypoint,
 	}
 
-	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
+
 	if err == nil {
 		if statusCode == 200 {
-			return nil
+			b, _ := strconv.ParseBool(string(byteResponse))
+			if b {
+				return nil
+			} else {
+				return errors.New("invalid gwos-app-name or gwos-api-token")
+			}
 		} else {
 			return errors.New(string(byteResponse))
 		}

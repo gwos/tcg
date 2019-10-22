@@ -14,6 +14,11 @@ func init() {
 	var err error
 	service := services.GetTransitService()
 
+	err = service.Connect()
+	if err != nil {
+		log.Println(err)
+	}
+
 	if service.AgentConfig.StartController {
 		err = controller.StartServer(service.AgentConfig.SSL, service.AgentConfig.Port)
 		if err != nil {
