@@ -22,7 +22,7 @@ var service *TransitService
 func GetTransitService() *TransitService {
 	once.Do(func() {
 		service = &TransitService{
-			transit.Transit{config.GetConfig()},
+			transit.Transit{Config: config.GetConfig()},
 			AgentStats{},
 		}
 	})
@@ -71,7 +71,7 @@ func (service TransitService) StartTransport() error {
 		},
 		SynchronizeInventorySubject: func(b []byte) error {
 			_, err := service.Transit.SynchronizeInventory(b)
-			if err != nil {
+			if err == nil {
 				service.AgentStats.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
 				service.AgentStats.BytesSent += len(b)
 				service.AgentStats.MessagesSent++
