@@ -1,10 +1,9 @@
 package services
 
 import (
+	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
-
-	"github.com/gwos/tng/transit"
 )
 
 // Services defines TNG Agent services interface
@@ -24,11 +23,11 @@ type AgentStats struct {
 	BytesSent              int
 	MetricsSent            int
 	MessagesSent           int
-	LastInventoryRun       transit.MillisecondTimestamp
-	LastMetricsRun         transit.MillisecondTimestamp
+	LastInventoryRun       milliseconds.MillisecondTimestamp
+	LastMetricsRun         milliseconds.MillisecondTimestamp
 	ExecutionTimeInventory time.Duration
 	ExecutionTimeMetrics   time.Duration
-	UpSince                transit.MillisecondTimestamp
+	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
 	sync.RWMutex
 }
