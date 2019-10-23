@@ -1,7 +1,5 @@
 package org.groundwork.tng.transit;
 
-import static org.junit.Assert.assertEquals;
-
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
@@ -21,8 +19,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */
@@ -52,7 +49,6 @@ public class AppTest {
                 .build());
 
         DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder().setContext(context).build();
-
 
         resources.add(DtoResourceWithMetrics.builder()
                 .setResource(DtoResourceStatus.builder()
@@ -84,8 +80,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */

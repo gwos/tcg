@@ -1,6 +1,7 @@
 package services
 
 import (
+	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
 
@@ -62,7 +63,7 @@ func (service TransitService) StartTransport() error {
 			_, err := service.Transit.SendResourcesWithMetrics(b)
 			if err == nil {
 				service.AgentStats.Lock()
-				service.AgentStats.LastMetricsRun = transit.MillisecondTimestamp{Time: time.Now()}
+				service.AgentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 				service.AgentStats.BytesSent += len(b)
 				service.AgentStats.MessagesSent++
 				service.AgentStats.Unlock()
@@ -77,7 +78,7 @@ func (service TransitService) StartTransport() error {
 			_, err := service.Transit.SynchronizeInventory(b)
 			if err == nil {
 				service.AgentStats.Lock()
-				service.AgentStats.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
+				service.AgentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 				service.AgentStats.BytesSent += len(b)
 				service.AgentStats.MessagesSent++
 				service.AgentStats.Unlock()

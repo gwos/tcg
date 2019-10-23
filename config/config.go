@@ -42,7 +42,7 @@ type AgentConfig struct {
 // Config defines TNG Agent configuration
 type Config struct {
 	AgentConfig       `yaml:"agentConfig"`
-	*GroundworkConfig  `yaml:"groundworkConfig"`
+	GroundworkConfig  `yaml:"groundworkConfig"`
 	GroundworkActions `yaml:"groundworkActions"`
 }
 
