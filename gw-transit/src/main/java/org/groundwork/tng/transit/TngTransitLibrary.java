@@ -1,7 +1,6 @@
 package org.groundwork.tng.transit;
 
 
-import com.sun.jna.Function;
 import com.sun.jna.Library;
 
 public interface TngTransitLibrary extends Library {

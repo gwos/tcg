@@ -1,6 +1,7 @@
 package services
 
 import (
+	"sync"
 	"time"
 
 	"github.com/gwos/tng/transit"
@@ -29,4 +30,5 @@ type AgentStats struct {
 	ExecutionTimeMetrics   time.Duration
 	UpSince                transit.MillisecondTimestamp
 	LastError              string
+	sync.RWMutex
 }

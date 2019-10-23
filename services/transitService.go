@@ -61,22 +61,30 @@ func (service TransitService) StartTransport() error {
 		SendResourceWithMetricsSubject: func(b []byte) error {
 			_, err := service.Transit.SendResourcesWithMetrics(b)
 			if err == nil {
+				service.AgentStats.Lock()
 				service.AgentStats.LastMetricsRun = transit.MillisecondTimestamp{Time: time.Now()}
 				service.AgentStats.BytesSent += len(b)
 				service.AgentStats.MessagesSent++
+				service.AgentStats.Unlock()
 			} else {
+				service.AgentStats.Lock()
 				service.AgentStats.LastError = err.Error()
+				service.AgentStats.Unlock()
 			}
 			return err
 		},
 		SynchronizeInventorySubject: func(b []byte) error {
 			_, err := service.Transit.SynchronizeInventory(b)
 			if err == nil {
+				service.AgentStats.Lock()
 				service.AgentStats.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
 				service.AgentStats.BytesSent += len(b)
 				service.AgentStats.MessagesSent++
+				service.AgentStats.Unlock()
 			} else {
+				service.AgentStats.Lock()
 				service.AgentStats.LastError = err.Error()
+				service.AgentStats.Unlock()
 			}
 			return err
 		},
