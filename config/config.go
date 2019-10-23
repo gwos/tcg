@@ -32,8 +32,9 @@ type GroundworkConfig struct {
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
+	CertFile        string
+	KeyFile         string
 	Port            int  `yaml:"port" envconfig:"AGENT_PORT"`
-	SSL             bool `yaml:"ssl" envconfig:"AGENT_SSL"`
 	StartController bool `yaml:"startController"`
 	StartNATS       bool `yaml:"startNATS"`
 	StartTransport  bool `yaml:"startTransport"`
