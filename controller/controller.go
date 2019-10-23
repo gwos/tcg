@@ -76,7 +76,7 @@ func (controller *Controller) StopTransport() error {
 }
 
 // Stats implements Services.Stats
-func (controller Controller) Stats() (services.AgentStats, error) {
+func (controller Controller) Stats() (*services.AgentStats, error) {
 	return services.GetTransitService().AgentStats, nil
 }
 
