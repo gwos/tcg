@@ -3,6 +3,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/controller"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"math/rand"
 	"time"
@@ -24,8 +25,8 @@ func main() {
 		Name: "geneva",
 		Type:   transit.HostResource,
 		Status: transit.HostUp,
-		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
@@ -33,15 +34,15 @@ func main() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: transit.MillisecondTimestamp{Time: time.Now()}},
+			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 	}
 	localLoadService := transit.ResourceStatus{
 		Name: "local_load",
 		Type:   transit.ServiceResource,
 		Status: transit.ServiceOk,
-		LastCheckTime: transit.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: transit.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
@@ -49,7 +50,7 @@ func main() {
 			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
 			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
 			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: transit.MillisecondTimestamp{Time: time.Now()}},
+			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 	}
 	metricSample := makeMetricSample()
@@ -132,7 +133,7 @@ func main() {
 
 func makeMetricSample() *transit.MetricSample {
 	random := rand.Float64() * 100.0
-	now := transit.MillisecondTimestamp{Time: time.Now()}
+	now := milliseconds.MillisecondTimestamp{Time: time.Now()}
 	return &transit.MetricSample{
 		SampleType: transit.Value,
 		Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
@@ -144,7 +145,7 @@ func makeMetricSamples() []*transit.MetricSample {
 	metricSamples := make([]*transit.MetricSample, 3)
 	for i := range metricSamples {
 		random := rand.Float64() * 100.0
-		now := transit.MillisecondTimestamp{Time: time.Now()}
+		now := milliseconds.MillisecondTimestamp{Time: time.Now()}
 		metricSamples[i] = &transit.MetricSample{
 			SampleType: transit.Value,
 			Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
