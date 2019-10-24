@@ -5,7 +5,15 @@ import (
 	"os"
 	"path"
 
-	"gopkg.in/yaml.v2"
+	"github.com/kelseyhightower/envconfig"
+	"gopkg.in/yaml.v3"
+)
+
+// ConfigEnv defines environment variable for config file path
+const (
+	ConfigEnv       = "TNG_CONFIG"
+	ConfigName      = "config.yml"
+	EnvConfigPrefix = "TNG"
 )
 
 // GroundworkAction defines configurable options for an action
@@ -19,52 +27,58 @@ type GroundworkActions struct {
 	Disconnect              GroundworkAction `yaml:"disconnect"`
 	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
 	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
-	Identity                GroundworkAction `yaml:"identity"`
+	ValidateToken           GroundworkAction `yaml:"validateToken"`
 }
 
 // GroundworkConfig defines Groundwork Connection configuration
 type GroundworkConfig struct {
-	Host     string `yaml:"host" envconfig:"GW_HOST"`
-	Account  string `yaml:"account" envconfig:"GW_ACCOUNT"`
-	Password string `yaml:"password" envconfig:"GW_PASSWORD"`
-	Token    string
+	Host     string
+	Account  string
+	Password string
+	Token    string `yaml:"-"`
 }
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	Port            int  `yaml:"port" envconfig:"AGENT_PORT"`
-	SSL             bool `yaml:"ssl" envconfig:"AGENT_SSL"`
-	StartController bool `yaml:"startController"`
-	StartNATS       bool `yaml:"startNATS"`
-	StartTransport  bool `yaml:"startTransport"`
+	Addr            string `yaml:"addr"`
+	CertFile        string `yaml:"certFile"`
+	KeyFile         string `yaml:"keyFile"`
+	StartController bool   `yaml:"startController"`
+	StartNATS       bool   `yaml:"startNATS"`
+	StartTransport  bool   `yaml:"startTransport"`
 }
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  `yaml:"groundworkConfig"`
-	GroundworkActions `yaml:"groundworkActions"`
+	AgentConfig       AgentConfig       `yaml:"agentConfig"`
+	GroundworkConfig  GroundworkConfig  `yaml:"groundworkConfig"`
+	GroundworkActions GroundworkActions `yaml:"groundworkActions"`
 }
 
 // GetConfig returns configuration
 func GetConfig() *Config {
-	var env Config
+	var cfg Config
 
-	workDir, err := os.Getwd()
+	configPath := os.Getenv(ConfigEnv)
+	if configPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Println(err)
+		}
+		configPath = path.Join(wd, ConfigName)
+	}
+
+	configFile, err := os.Open(configPath)
+	if err == nil {
+		err = yaml.NewDecoder(configFile).Decode(&cfg)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	err = envconfig.Process(EnvConfigPrefix, &cfg)
 	if err != nil {
 		log.Println(err)
 	}
-
-	configFile, err := os.Open(path.Join(workDir, "config.yml"))
-	if err != nil {
-		log.Println(err)
-	}
-
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(&env)
-	if err != nil {
-		log.Println(err)
-	}
-
-	return &env
+	return &cfg
 }

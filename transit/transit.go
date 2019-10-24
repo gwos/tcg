@@ -394,7 +394,7 @@ type ResourceWithMetricsRequest struct {
 type Operations interface {
 	Connect() error
 	Disconnect() error
-	Identity(appName, apiToken string) error
+	ValidateToken(appName, apiToken string) error
 	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
 	SynchronizeInventory(request []byte) (*OperationResults, error)
 }
@@ -463,7 +463,7 @@ func (transit Transit) Disconnect() error {
 	return errors.New(string(byteResponse))
 }
 
-// Identity implements Operations.Identity.
+// ValidateToken implements Operations.ValidateToken.
 func (transit Transit) ValidateToken(appName, apiToken string) error {
 	headers := map[string]string{
 		"Accept":       "text/plain",
@@ -478,7 +478,7 @@ func (transit Transit) ValidateToken(appName, apiToken string) error {
 	entrypoint := url.URL{
 		Scheme: "http",
 		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.Identity.Entrypoint,
+		Path:   transit.GroundworkActions.ValidateToken.Entrypoint,
 	}
 
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)

@@ -1,9 +1,8 @@
 agentConfig:
-  port: 8081
-  ssl: False
+  addr: ":8081"
   startNATS: True
   startTransport: True
-  startController: False
+  startController: True
 groundworkConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
@@ -17,5 +16,5 @@ groundworkActions:
     entrypoint: "/api/synchronizer"
   sendResourceWithMetrics:
     entrypoint: "/api/monitoring"
-  identity:
+  validateToken:
     entrypoint: "/api/auth/validatetoken"
