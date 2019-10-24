@@ -6,6 +6,8 @@ import org.junit.Test;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -24,23 +26,24 @@ public class AppTest {
      * 3. Run test
      */
     @Test
-    public void shouldSendResourceAndMetrics() throws IOException {
+    public void shouldSendResourceAndMetrics() throws IOException, ParseException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
                 .setAppType("VEMA")
-                .setTimeStamp(new Date())
+                .setTimeStamp(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
                 .setTraceToken("token-99e93")
                 .build();
 
         List<DtoTimeSeries> timeSeries = new ArrayList<>();
         timeSeries.add(DtoTimeSeries.builder()
-                .setMetricName("mc-test-service-0")
+                .setUnit("qwerty")
+                .setMetricName("MY_TEST_SERVICE_0")
                 .setSampleType(DtoMetricSampleType.Warning)
                 .setInterval(DtoTimeInterval.builder()
-                        .setStartTime(new Date())
-                        .setEndTime(new Date())
+                        .setStartTime(new SimpleDateFormat("dd/MM/yyyy").parse("21/10/2019"))
+                        .setEndTime(new SimpleDateFormat("dd/MM/yyyy").parse("23/10/2019"))
                         .build())
                 .setValue(DtoTypedValue.builder()
                         .setValueType(DtoValueType.IntegerType)
@@ -52,26 +55,52 @@ public class AppTest {
 
         resources.add(DtoResourceWithMetrics.builder()
                 .setResource(DtoResourceStatus.builder()
-                        .setName("mc-test-host")
+                        .setName("MY_TESTq_HOST")
                         .setType("HOST")
                         .setStatus(DtoMonitorStatus.HOST_UP)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
                         .build())
                 .build());
 
         resources.add(DtoResourceWithMetrics.builder()
                 .setMetrics(timeSeries)
                 .setResource(DtoResourceStatus.builder()
-                        .setName("mc-test-service-0")
+                        .setName("MY_TEST_SERVICE_0")
                         .setType("SERVICE")
                         .setStatus(DtoMonitorStatus.SERVICE_OK)
-                        .setOwner("mc-test-host")
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
                         .build())
                 .build());
 
+        resources.add(DtoResourceWithMetrics.builder()
+                .setMetrics(timeSeries)
+                .setResource(DtoResourceStatus.builder()
+                        .setName("MY_TEST_SERVICE_1")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
+                        .build())
+                .build());
+
+        resources.add(DtoResourceWithMetrics.builder()
+                .setMetrics(timeSeries)
+                .setResource(DtoResourceStatus.builder()
+                        .setName("MY_TEST_SERVICE_2")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
+                        .build())
+                .build());
+
+
+
         transit.SendResourcesWithMetrics(resources);
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//        String name = reader.readLine();
     }
 
 
@@ -102,13 +131,24 @@ public class AppTest {
                 .build();
 
         DtoInventoryResource host = DtoInventoryResource.builder()
-                .setName("mc-test-host")
+                .setName("MY_TESTq_HOST")
                 .setType("HOST") // TODO: use constant
                 .build();
         DtoInventoryResource service = DtoInventoryResource.builder()
-                .setName("mc-test-service-0")
+                .setName("MY_TEST_SERVICE_0")
                 .setType("SERVICE") // TODO: use constant
-                .setOwner("mc-test-host")
+                .setOwner("MY_TESTq_HOST")
+                .build();
+        DtoInventoryResource service1 = DtoInventoryResource.builder()
+                .setName("MY_TEST_SERVICE_1")
+                .setType("SERVICE") // TODO: use constant
+                .setOwner("MY_TESTq_HOST")
+                .build();
+
+        DtoInventoryResource service2 = DtoInventoryResource.builder()
+                .setName("MY_TEST_SERVICE_2")
+                .setType("SERVICE") // TODO: use constant
+                .setOwner("MY_TESTq_HOST")
                 .build();
 
         DtoGroup group = new DtoGroup();
@@ -120,11 +160,13 @@ public class AppTest {
         dtoInventory.setContext(context);
         dtoInventory.add(host);
         dtoInventory.add(service);
+        dtoInventory.add(service1);
+        dtoInventory.add(service2);
         dtoInventory.add(group);
 
         transit.SynchronizeInventory(dtoInventory);
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//        String name = reader.readLine();
     }
 }
