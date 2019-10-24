@@ -1,6 +1,5 @@
 agentConfig:
-  port: 8081
-  ssl: False
+  addr: ":8081"
   startNATS: True
   startTransport: True
   startController: True

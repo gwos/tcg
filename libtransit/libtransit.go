@@ -3,7 +3,6 @@ package main
 //#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
-	"fmt"
 	"log"
 	"unsafe"
 
@@ -17,7 +16,7 @@ func init() {
 
 	if service.AgentConfig.StartController {
 		err := controller.StartServer(
-			fmt.Sprintf(":%d", service.AgentConfig.Port),
+			service.AgentConfig.Addr,
 			service.AgentConfig.CertFile,
 			service.AgentConfig.KeyFile,
 		)
@@ -117,7 +116,7 @@ func StopTransport(errorBuf *C.char) bool {
 func StartController(errorBuf *C.char) bool {
 	service := services.GetTransitService()
 	err := controller.StartServer(
-		fmt.Sprintf(":%d", service.AgentConfig.Port),
+		service.AgentConfig.Addr,
 		service.AgentConfig.CertFile,
 		service.AgentConfig.KeyFile,
 	)
