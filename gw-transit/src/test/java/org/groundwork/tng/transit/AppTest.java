@@ -1,12 +1,13 @@
 package org.groundwork.tng.transit;
 
-import static org.junit.Assert.assertEquals;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -20,29 +21,29 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package on TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */
     @Test
-    public void shouldSendResourceAndMetrics() throws IOException {
+    public void shouldSendResourceAndMetrics() throws IOException, ParseException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentID("3939333393342")
+                .setAgentId("3939333393342")
                 .setAppType("VEMA")
-                .setTimeStamp(new Date())
+                .setTimeStamp(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
                 .setTraceToken("token-99e93")
                 .build();
 
         List<DtoTimeSeries> timeSeries = new ArrayList<>();
         timeSeries.add(DtoTimeSeries.builder()
-                .setMetricName("mc-test-service-0")
+                .setUnit("qwerty")
+                .setMetricName("MY_TEST_SERVICE_0")
                 .setSampleType(DtoMetricSampleType.Warning)
                 .setInterval(DtoTimeInterval.builder()
-                        .setStartTime(new Date())
-                        .setEndTime(new Date())
+                        .setStartTime(new SimpleDateFormat("dd/MM/yyyy").parse("21/10/2019"))
+                        .setEndTime(new SimpleDateFormat("dd/MM/yyyy").parse("23/10/2019"))
                         .build())
                 .setValue(DtoTypedValue.builder()
                         .setValueType(DtoValueType.IntegerType)
@@ -52,28 +53,54 @@ public class AppTest {
 
         DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder().setContext(context).build();
 
+        resources.add(DtoResourceWithMetrics.builder()
+                .setResource(DtoResourceStatus.builder()
+                        .setName("MY_TESTq_HOST")
+                        .setType("HOST")
+                        .setStatus(DtoMonitorStatus.HOST_UP)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .build())
+                .build());
 
         resources.add(DtoResourceWithMetrics.builder()
                 .setMetrics(timeSeries)
                 .setResource(DtoResourceStatus.builder()
-                        .setName("mc-test-host")
-                        .setType("HOST")
-                        .setStatus(DtoMonitorStatus.HOST_UP)
-                        .setOwner("mc-test-host")
+                        .setName("MY_TEST_SERVICE_0")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
                         .build())
                 .build());
 
-        // TODO: what happened to results????
-        // results = transit.SendResourcesWithMetrics(resources);
+        resources.add(DtoResourceWithMetrics.builder()
+                .setMetrics(timeSeries)
+                .setResource(DtoResourceStatus.builder()
+                        .setName("MY_TEST_SERVICE_1")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
+                        .build())
+                .build());
+
+        resources.add(DtoResourceWithMetrics.builder()
+                .setMetrics(timeSeries)
+                .setResource(DtoResourceStatus.builder()
+                        .setName("MY_TEST_SERVICE_2")
+                        .setType("SERVICE")
+                        .setStatus(DtoMonitorStatus.SERVICE_OK)
+                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                        .setOwner("MY_TESTq_HOST")
+                        .build())
+                .build());
+
+
+
+        transit.SendResourcesWithMetrics(resources);
 
 //        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
 //        String name = reader.readLine();
-
-        transit.Disconnect();
-
-//        assertEquals(1, (int) results.getCount());
-//        assertEquals(0, (int) results.getSuccessful());
-//        assertEquals(1, (int) results.getFailed());
     }
 
 
@@ -82,8 +109,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit.so -buildmode=c-shared libtransit.go` command from
-     * libtransit package on TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
      * 4. Set path to '.so' file in TransitServiceImpl constructor.
      * 3. Run test
      */
@@ -91,17 +117,38 @@ public class AppTest {
     public void shouldSynchronizeInventory() throws IOException {
         TransitServices transit = new TransitServicesImpl();
 
+        transit.StartNATS();
+
+        transit.StartNATS();
+
+        transit.StartNATS();
+
         DtoTracerContext context = DtoTracerContext.builder()
-                .setAgentID("3939333393342")
+                .setAgentId("3939333393342")
                 .setAppType("VEMA")
                 .setTimeStamp(new Date())
                 .setTraceToken("token-99e93")
                 .build();
 
-        DtoInventoryResource resource = DtoInventoryResource.builder()
-                .setName("mc-test-host")
-                .setType("HOST")
-                .setOwner("mc-test-host")
+        DtoInventoryResource host = DtoInventoryResource.builder()
+                .setName("MY_TESTq_HOST")
+                .setType("HOST") // TODO: use constant
+                .build();
+        DtoInventoryResource service = DtoInventoryResource.builder()
+                .setName("MY_TEST_SERVICE_0")
+                .setType("SERVICE") // TODO: use constant
+                .setOwner("MY_TESTq_HOST")
+                .build();
+        DtoInventoryResource service1 = DtoInventoryResource.builder()
+                .setName("MY_TEST_SERVICE_1")
+                .setType("SERVICE") // TODO: use constant
+                .setOwner("MY_TESTq_HOST")
+                .build();
+
+        DtoInventoryResource service2 = DtoInventoryResource.builder()
+                .setName("MY_TEST_SERVICE_2")
+                .setType("SERVICE") // TODO: use constant
+                .setOwner("MY_TESTq_HOST")
                 .build();
 
         DtoGroup group = new DtoGroup();
@@ -111,14 +158,15 @@ public class AppTest {
 
         DtoInventory dtoInventory = new DtoInventory();
         dtoInventory.setContext(context);
-        dtoInventory.add(resource);
+        dtoInventory.add(host);
+        dtoInventory.add(service);
+        dtoInventory.add(service1);
+        dtoInventory.add(service2);
         dtoInventory.add(group);
 
         transit.SynchronizeInventory(dtoInventory);
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
-
-        transit.Disconnect();
+//        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+//        String name = reader.readLine();
     }
 }

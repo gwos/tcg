@@ -3,11 +3,42 @@ package main
 //#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
-	"github.com/gwos/tng/services"
+	"log"
 	"unsafe"
+
+	"github.com/gwos/tng/controller"
+	"github.com/gwos/tng/services"
 )
 
-var transitService services.Service
+func init() {
+	var err error
+	service := services.GetTransitService()
+
+	if service.AgentConfig.StartController {
+		err := controller.StartServer(
+			service.AgentConfig.Addr,
+			service.AgentConfig.CertFile,
+			service.AgentConfig.KeyFile,
+		)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	if service.AgentConfig.StartNATS {
+		err = service.StartNATS()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+
+	if service.AgentConfig.StartTransport {
+		err = service.StartTransport()
+		if err != nil {
+			log.Println(err)
+		}
+	}
+}
 
 func main() {
 }
@@ -25,8 +56,9 @@ func putError(errorBuf *C.char, err error) {
 }
 
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char) bool {
-	err := transitService.SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJson)))
+func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
+	err := services.GetTransitService().
+		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -35,8 +67,9 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJson, errorBuf *C.char)
 }
 
 //export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
-	err := transitService.SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJson)))
+func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
+	err := services.GetTransitService().
+		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON)))
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -46,7 +79,7 @@ func SynchronizeInventory(sendInventoryRequestJson, errorBuf *C.char) bool {
 
 //export StartNATS
 func StartNATS(errorBuf *C.char) bool {
-	err := transitService.StartNATS()
+	err := services.GetTransitService().StartNATS()
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -56,12 +89,12 @@ func StartNATS(errorBuf *C.char) bool {
 
 //export StopNATS
 func StopNATS() {
-	transitService.StopNATS()
+	services.GetTransitService().StopNATS()
 }
 
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
-	err := transitService.StartTransport()
+	err := services.GetTransitService().StartTransport()
 	if err != nil {
 		putError(errorBuf, err)
 		return false
@@ -71,7 +104,32 @@ func StartTransport(errorBuf *C.char) bool {
 
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
-	err := transitService.StopTransport()
+	err := services.GetTransitService().StopTransport()
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StartController
+func StartController(errorBuf *C.char) bool {
+	service := services.GetTransitService()
+	err := controller.StartServer(
+		service.AgentConfig.Addr,
+		service.AgentConfig.CertFile,
+		service.AgentConfig.KeyFile,
+	)
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StopController
+func StopController(errorBuf *C.char) bool {
+	err := controller.StopServer()
 	if err != nil {
 		putError(errorBuf, err)
 		return false

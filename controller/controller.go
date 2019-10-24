@@ -2,53 +2,45 @@ package controller
 
 import (
 	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
-	"log"
 )
 
-// Agent possible status
+// StatusEnum defines Agent Controller status
 type StatusEnum string
 
+// Agent Controller status
 const (
 	Running StatusEnum = "Running"
 	Stopped            = "Stopped"
 	Unknown            = "Unknown"
 	Pending            = "Pending"
-	userKey string     = "user"
 )
 
-func init() {
-	err := StartServer(transit.Config.AgentConfig.SSL, transit.Config.AgentConfig.Port)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-// TNG Control Plane interfaces
+// Services defines TNG Control Plane interfaces
 type Services interface {
-	StartNATS() (StatusEnum, error)
-	StopNATS() (StatusEnum, error)
-	StartTransport() (StatusEnum, error)
-	StopTransport() (StatusEnum, error)
-	Status() (StatusEnum, error)
-	Stats() (*transit.AgentStats, error)
+	StartNATS() error
+	StopNATS() error
+	StartTransport() error
+	StopTransport() error
+	Stats() (*services.AgentStats, error)
+	ValidateToken(appName, apiToken string) error
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
 
+// Controller implements Services interface
 type Controller struct {
 	NATSState      StatusEnum
 	TransportState StatusEnum
 }
 
-var service services.Service
-
+// NewController creates instance
 func NewController() *Controller {
 	return &Controller{NATSState: Pending}
 }
 
+// StartNATS implements Services.StartNATS
 func (controller *Controller) StartNATS() error {
-	err := service.StartNATS()
+	err := services.GetTransitService().StartNATS()
 	if err != nil {
 		return err
 	}
@@ -56,14 +48,16 @@ func (controller *Controller) StartNATS() error {
 	return nil
 }
 
+// StopNATS implements Services.StopNATS
 func (controller *Controller) StopNATS() error {
-	service.StopNATS()
+	services.GetTransitService().StopNATS()
 	controller.NATSState = Stopped
 	return nil
 }
 
+// StartTransport implements Services.StartTransport
 func (controller *Controller) StartTransport() error {
-	err := service.StartTransport()
+	err := services.GetTransitService().StartTransport()
 	if err != nil {
 		return err
 	}
@@ -71,8 +65,9 @@ func (controller *Controller) StartTransport() error {
 	return nil
 }
 
+// StopTransport implements Services.StopTransport
 func (controller *Controller) StopTransport() error {
-	err := service.StopTransport()
+	err := services.GetTransitService().StopTransport()
 	if err != nil {
 		return err
 	}
@@ -80,6 +75,12 @@ func (controller *Controller) StopTransport() error {
 	return nil
 }
 
-func (controller Controller) Stats() (*transit.AgentStats, error) {
-	return &transit.AgentStatistics, nil
+// Stats implements Services.Stats
+func (controller Controller) Stats() (*services.AgentStats, error) {
+	return services.GetTransitService().AgentStats, nil
+}
+
+// ValidateToken implements Services.ValidateToken
+func (controller Controller) ValidateToken(appName, apiToken string) error {
+	return services.GetTransitService().Transit.ValidateToken(appName, apiToken)
 }

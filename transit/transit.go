@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/milliseconds"
 	"net/http"
 	"net/url"
 	"strconv"
-	"time"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -79,13 +80,11 @@ const (
 	HostUnreachable                          = "HOST_UNREACHABLE"
 )
 
-// MonitoredResourceType defines Groundwork Standard Monitored Resource Types
-type MonitoredResourceType string
-
-// Groundwork Standard Monitored Resource Types
+// The resource type uniquely defining the resource type
+// General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	ServiceResource MonitoredResourceType = "service"
-	HostResource                          = "host"
+	ServiceResource string = "service"
+	HostResource           = "host"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -118,12 +117,12 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime MillisecondTimestamp `json:"endTime,omitempty"`
+	EndTime milliseconds.MillisecondTimestamp `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime MillisecondTimestamp `json:"startTime,omitempty"`
+	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
 // TypedValue defines a single strongly-typed value.
@@ -146,7 +145,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue MillisecondTimestamp `json:"timeValue,omitempty"`
+	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
@@ -294,7 +293,7 @@ type InventoryResource struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
 	Category string `json:"category,omitempty"`
@@ -313,14 +312,14 @@ type ResourceStatus struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
 	// The last status check time on this resource
-	LastCheckTime MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// Foundation Properties
@@ -334,16 +333,16 @@ type MonitoredResource struct {
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
 	Type string `json:"type,required"`
-	//  Owner relationship for associations like host->service
+	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 }
 
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string               `json:"appType"`
-	AgentID    string               `json:"agentID"`
-	TraceToken string               `json:"traceToken"`
-	TimeStamp  MillisecondTimestamp `json:"timeStamp"`
+	AppType    string                            `json:"appType"`
+	AgentID    string                            `json:"agentID"`
+	TraceToken string                            `json:"traceToken"`
+	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
 }
 
 // SendInventoryRequest defines SendInventory payload
@@ -391,52 +390,21 @@ type ResourceWithMetricsRequest struct {
 	Resources []ResourceWithMetrics `json:"resources"`
 }
 
-// Services defines Groundwork actions
-type Services interface {
+// Operations defines Groundwork operations interface
+type Operations interface {
 	Connect() error
 	Disconnect() error
+	ValidateToken(appName, apiToken string) error
 	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
 	SynchronizeInventory(request []byte) (*OperationResults, error)
-	// ListMetrics() (*[]MetricDescriptor, error)
 }
 
-// GroundworkAction defines configurable options for an action
-type GroundworkAction struct {
-	Entrypoint string `yaml:"entrypoint"`
-}
-
-// GroundworkActions configures Groundwork actions
-type GroundworkActions struct {
-	Connect                 GroundworkAction `yaml:"connect"`
-	Disconnect              GroundworkAction `yaml:"disconnect"`
-	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
-	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
-}
-
-// GroundworkConfig defines Groundwork Connection configuration
-type GroundworkConfig struct {
-	Host     string `yaml:"host",envconfig:"GW_HOST"`
-	Account  string `yaml:"account",envconfig:"GW_ACCOUNT"`
-	Password string `yaml:"password",envconfig:"GW_PASSWORD"`
-	Token    string
-}
-
-// AgentConfig defines TNG Transit Agent configuration
-type AgentConfig struct {
-	Port           int  `yaml:"port",envconfig:"AGENT_PORT"`
-	SSL            bool `yaml:"ssl",envconfig:"AGENT_SSL"`
-	StartNATS      bool `yaml:"startNATS"`
-	StartTransport bool `yaml:"startTransport"`
-}
-
-// Transit defines TNG configuration
+// Transit implements Operations interface
 type Transit struct {
-	AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  `yaml:"groundworkConfig"`
-	GroundworkActions `yaml:"groundworkActions"`
+	*config.Config
 }
 
-// Connect implements Services.Connect.
+// Connect implements Operations.Connect.
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
 		"gwos-app-name": "gw8",
@@ -451,13 +419,14 @@ func (transit *Transit) Connect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.Connect.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.Connect.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
 		return err
 	}
+
 	if statusCode == 200 {
 		transit.GroundworkConfig.Token = string(byteResponse)
 		return nil
@@ -466,7 +435,7 @@ func (transit *Transit) Connect() error {
 	return errors.New(string(byteResponse))
 }
 
-// Disconnect implements Services.Disconnect.
+// Disconnect implements Operations.Disconnect.
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
 		"gwos-app-name":  "gw8",
@@ -480,8 +449,8 @@ func (transit Transit) Disconnect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.Disconnect.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.Disconnect.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 	if err != nil {
@@ -494,8 +463,44 @@ func (transit Transit) Disconnect() error {
 	return errors.New(string(byteResponse))
 }
 
-// SynchronizeInventory implements Services.SynchronizeInventory.
-func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
+// ValidateToken implements Operations.ValidateToken.
+func (transit Transit) ValidateToken(appName, apiToken string) error {
+	headers := map[string]string{
+		"Accept":       "text/plain",
+		"Content-Type": "application/x-www-form-urlencoded",
+	}
+
+	formValues := map[string]string{
+		"gwos-app-name":  appName,
+		"gwos-api-token": apiToken,
+	}
+
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.ValidateToken.Entrypoint,
+	}
+
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
+
+	if err == nil {
+		if statusCode == 200 {
+			b, _ := strconv.ParseBool(string(byteResponse))
+			if b {
+				return nil
+			} else {
+				return errors.New("invalid gwos-app-name or gwos-api-token")
+			}
+		} else {
+			return errors.New(string(byteResponse))
+		}
+	}
+
+	return err
+}
+
+// SynchronizeInventory implements Operations.SynchronizeInventory.
+func (transit *Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -505,18 +510,20 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.SynchronizeInventory.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.SynchronizeInventory.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
-	if err != nil {
-		return nil, err
-	}
 	if statusCode == 401 {
 		err = transit.Connect()
 		if err != nil {
 			return nil, err
 		}
+		headers["GWOS-API-TOKEN"] = transit.GroundworkConfig.Token
+		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
+	}
+	if err != nil {
+		return nil, err
 	}
 	if statusCode != 200 {
 		return nil, errors.New(string(byteResponse))
@@ -532,8 +539,8 @@ func (transit Transit) SynchronizeInventory(inventory []byte) (*OperationResults
 	return &operationResults, nil
 }
 
-// SendResourcesWithMetrics implements Services.SendResourcesWithMetrics.
-func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
+// SendResourcesWithMetrics implements Operations.SendResourcesWithMetrics.
+func (transit *Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -543,18 +550,20 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   Config.GroundworkConfig.Host,
-		Path:   Config.GroundworkActions.SendResourceWithMetrics.Entrypoint,
+		Host:   transit.GroundworkConfig.Host,
+		Path:   transit.GroundworkActions.SendResourceWithMetrics.Entrypoint,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
-	if err != nil {
-		return nil, err
-	}
 	if statusCode == 401 {
 		err = transit.Connect()
 		if err != nil {
 			return nil, err
 		}
+		headers["GWOS-API-TOKEN"] = transit.GroundworkConfig.Token
+		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
+	}
+	if err != nil {
+		return nil, err
 	}
 	if statusCode != 200 {
 		return nil, errors.New(string(byteResponse))
@@ -570,8 +579,7 @@ func (transit Transit) SendResourcesWithMetrics(resources []byte) (*OperationRes
 	return &operationResults, nil
 }
 
-// ListMetrics implements Services.ListMetrics.
-// TODO: implement
+// ListMetrics TODO: implement
 func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 	// setup label descriptor samples
 	cores := LabelDescriptor{
@@ -595,8 +603,8 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 200},
-			&ThresholdDescriptor{Key: "warning", Value: 100},
+			{Key: "critical", Value: 200},
+			{Key: "warning", Value: 100},
 		},
 	}
 	load5 := MetricDescriptor{
@@ -610,8 +618,8 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 205},
-			&ThresholdDescriptor{Key: "warning", Value: 105},
+			{Key: "critical", Value: 205},
+			{Key: "warning", Value: 105},
 		},
 	}
 	load15 := MetricDescriptor{
@@ -625,112 +633,10 @@ func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
 		Unit:        UnitCounter,
 		ValueType:   DoubleType,
 		Thresholds: []*ThresholdDescriptor{
-			&ThresholdDescriptor{Key: "critical", Value: 215},
-			&ThresholdDescriptor{Key: "warning", Value: 115},
+			{Key: "critical", Value: 215},
+			{Key: "warning", Value: 115},
 		},
 	}
 	arr := []MetricDescriptor{load1, load5, load15}
 	return &arr, nil
-}
-
-// AgentStats defines Agent statistics
-type AgentStats struct {
-	AgentID                string
-	AppType                string
-	BytesSent              int
-	MetricsSent            int
-	MessagesSent           int
-	LastInventoryRun       MillisecondTimestamp
-	LastMetricsRun         MillisecondTimestamp
-	ExecutionTimeInventory time.Duration
-	ExecutionTimeMetrics   time.Duration
-	UpSince                MillisecondTimestamp
-	LastError              string
-}
-
-// MillisecondTimestamp refers to the JSON representation of timestamps, for
-// time-data interchange, as a single integer representing a modified version of
-// whole milliseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
-// Individual languages (Go, C, Java) will typically implement this structure
-// using a more-complex contruction in their repective contexts, containing even
-// finer granularity for local data storage, typically at the nanosecond level.
-//
-// The "modified version" comment reflects the following simplification.
-// Despite the already fine-grained representation as milliseconds, this data
-// value takes no account of leap seconds; for all of our calculations, we
-// simply pretend they don't exist.  Individual feeders will typically map a
-// 00:00:60 value for a leap second, obtained as a string so the presence of the
-// leap second is obvious, as 00:01:00, and the fact that 00:01:00 will occur
-// again in the following second will be silently ignored.  This means that any
-// monitoring which really wants to accurately reflect International Atomic Time
-// (TAI), UT1, or similar time coordinates will be subject to some disruption.
-// It also means that even in ordinary circumstances, any calculations of
-// sub-second time differences might run into surprises, since the following
-// timestamps could appear in temporal order:
-//
-//         actual time   relative reported time in milliseconds
-//     A:  00:00:59.000  59000
-//     B:  00:00:60.000  60000
-//     C:  00:00:60.700  60700
-//     D:  00:01:00.000  60000
-//     E:  00:01:00.300  60300
-//     F:  00:01:01.000  61000
-//
-// In such a situation, (D - C) and (E - C) would be negative numbers.
-//
-// In other situations, a feeder might obtain a timestamp from a system hardware
-// clock which, say, counts local nanoseconds and has no notion of any leap
-// seconds having been inserted into human-readable string-time representations.
-// So there could be some amount of offset if such values are compared across
-// such a boundary.
-//
-// Beyond that, there is always the issue of computer clocks not being directly
-// tied to atomic clocks, using inexpensive non-temperature-compensated crystals
-// for timekeeping.  Such hardware can easily drift dramatically off course, and
-// the local timekeeping may or may not be subject to course correction using
-// HTP, chrony, or similar software that periodically adjusts the system time
-// to keep it synchronized with the Internet.  Also, there may be large jumps
-// in either a positive or negative direction when a drifted clock is suddenly
-// brought back into synchronization with the rest of the world.
-//
-// In addition, we ignore here all temporal effects of Special Relativity, not
-// to mention further adjustments needed to account for General Relativity.
-// This is not a theoretical joke; those who monitor GPS satellites should take
-// note of the limitations of this data type, and use some other data type for
-// time-critical data exchange and calculations.
-//
-// The point of all this being, fine resolution of clock values should never be
-// taken too seriously unless one is sure that the clocks being compared are
-// directly hitched together, and even then one must allow for quantum leaps
-// into the future and time travel into the past.
-//
-// Finally, note that the Go zero-value of the internal implementation object
-// we use in that language does not have a reasonable value when interpreted
-// as milliseconds since the UNIX epoch.  For that reason, the general rule is
-// that the JSON representation of a zero-value for any field of this type, no
-// matter what the originating language, will be to simply omit it from the
-// JSON string.  That fact must be taken into account when marshalling and
-// unmarshalling data structures that contain such fields.
-//
-type MillisecondTimestamp struct {
-	time.Time
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
-	strInput := string(input)
-
-	i, err := strconv.ParseInt(strInput, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	i *= int64(time.Millisecond)
-	*t = MillisecondTimestamp{time.Unix(0, i).UTC()}
-	return nil
-}
-
-// MarshalJSON implements json.Marshaler.
-func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
 }
