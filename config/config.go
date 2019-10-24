@@ -19,7 +19,7 @@ type GroundworkActions struct {
 	Disconnect              GroundworkAction `yaml:"disconnect"`
 	SynchronizeInventory    GroundworkAction `yaml:"synchronizeInventory"`
 	SendResourceWithMetrics GroundworkAction `yaml:"sendResourceWithMetrics"`
-	Identity                GroundworkAction `yaml:"identity"`
+	ValidateToken           GroundworkAction `yaml:"validateToken"`
 }
 
 // GroundworkConfig defines Groundwork Connection configuration
