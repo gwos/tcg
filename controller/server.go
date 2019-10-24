@@ -34,8 +34,6 @@ func StartServer(tls bool, port int) error {
 		basicAuth.DELETE("/nats/stop", stopNATS)
 		basicAuth.POST("/nats/transport/start", startTransport)
 		basicAuth.DELETE("/nats/transport/stop", stopTransport)
-
-		basicAuth.GET("/test", test)
 	}
 
 	if tls {
@@ -49,10 +47,6 @@ func StartServer(tls bool, port int) error {
 	}
 
 	return nil
-}
-
-func test(context *gin.Context) {
-	context.JSON(http.StatusOK, "WORKS!")
 }
 
 func startNATS(c *gin.Context) {
