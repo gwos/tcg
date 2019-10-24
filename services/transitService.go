@@ -1,96 +1,91 @@
 package services
 
 import (
+	"github.com/gwos/tng/milliseconds"
+	"sync"
+	"time"
+
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/transit"
-	"gopkg.in/yaml.v2"
-	"log"
-	"os"
-	"path"
-	"time"
 )
 
+// Define NATS subjects
 const (
 	SendResourceWithMetricsSubject = "send-resource-with-metrics"
 	SynchronizeInventorySubject    = "synchronize-inventory"
 )
 
-var service Service
+var once sync.Once
+var service *TransitService
 
-func init() {
-	workDir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	configFile, err := os.Open(path.Join(workDir, "config.yml"))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	decoder := yaml.NewDecoder(configFile)
-	err = decoder.Decode(&transit.Config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = transit.Config.Connect()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if transit.Config.StartNATS {
-		err = service.StartNATS()
-		if err != nil {
-			log.Fatal(err)
+// GetTransitService implements Singleton pattern
+func GetTransitService() *TransitService {
+	once.Do(func() {
+		service = &TransitService{
+			transit.Transit{Config: config.GetConfig()},
+			&AgentStats{},
 		}
-	}
-
-	if transit.Config.StartTransport {
-		err = service.StartTransport()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	})
+	return service
 }
 
-// Service implements TNG Agent operations
-type Service struct{}
+// TransitService implements Services interface
+type TransitService struct {
+	transit.Transit
+	AgentStats *AgentStats
+}
 
-// SendResourceWithMetrics provides fire and forget method
-func (transitService Service) SendResourceWithMetrics(request []byte) error {
+// SendResourceWithMetrics implements Services.SendResourceWithMetrics interface
+func (service *TransitService) SendResourceWithMetrics(request []byte) error {
 	return nats.Publish(SendResourceWithMetricsSubject, request)
 }
 
-// SynchronizeInventory provides fire and forget method
-func (transitService Service) SynchronizeInventory(request []byte) error {
+// SynchronizeInventory implements Services.SynchronizeInventory interface
+func (service *TransitService) SynchronizeInventory(request []byte) error {
 	return nats.Publish(SynchronizeInventorySubject, request)
 }
 
-// StartNATS starts internal NATS
-func (transitService Service) StartNATS() error {
+// StartNATS implements Services.StartNATS interface
+func (service *TransitService) StartNATS() error {
 	return nats.StartServer()
 }
 
-// StopNATS stops internal NATS
-func (transitService Service) StopNATS() {
+// StopNATS implements Services.StopNATS interface
+func (service *TransitService) StopNATS() {
 	nats.StopServer()
 }
 
-// StartTransport starts dispatching NATS messages to Groundwork
-func (transitService Service) StartTransport() error {
+// StartTransport implements Services.StartTransport interface
+func (service *TransitService) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
 		SendResourceWithMetricsSubject: func(b []byte) error {
-			_, err := transit.Config.SendResourcesWithMetrics(b)
+			_, err := service.Transit.SendResourcesWithMetrics(b)
 			if err == nil {
-				transit.AgentStatistics.LastMetricsRun = transit.MillisecondTimestamp{Time: time.Now()}
+				service.AgentStats.Lock()
+				service.AgentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.AgentStats.BytesSent += len(b)
+				service.AgentStats.MessagesSent++
+				service.AgentStats.Unlock()
+			} else {
+				service.AgentStats.Lock()
+				service.AgentStats.LastError = err.Error()
+				service.AgentStats.Unlock()
 			}
 			return err
 		},
 		SynchronizeInventorySubject: func(b []byte) error {
-			_, err := transit.Config.SynchronizeInventory(b)
-			if err != nil {
-				transit.AgentStatistics.LastInventoryRun = transit.MillisecondTimestamp{Time: time.Now()}
+			_, err := service.Transit.SynchronizeInventory(b)
+			if err == nil {
+				service.AgentStats.Lock()
+				service.AgentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.AgentStats.BytesSent += len(b)
+				service.AgentStats.MessagesSent++
+				service.AgentStats.Unlock()
+			} else {
+				service.AgentStats.Lock()
+				service.AgentStats.LastError = err.Error()
+				service.AgentStats.Unlock()
 			}
 			return err
 		},
@@ -99,7 +94,7 @@ func (transitService Service) StartTransport() error {
 	return nats.StartDispatcher(&dispatcherMap)
 }
 
-// StopTransport stops dispatching NATS messages to Groundwork
-func (transitService Service) StopTransport() error {
+// StopTransport implements Services.StopTransport interface
+func (service *TransitService) StopTransport() error {
 	return nats.StopDispatcher()
 }

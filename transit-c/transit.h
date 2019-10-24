@@ -61,12 +61,12 @@ typedef enum { FOREACH_UNIT(GENERATE_ENUM) } UNIT_ENUM;
 
 #define FOREACH_COMPUTE_TYPE(COMPUTE_TYPE) \
   COMPUTE_TYPE(_COMPUTE_TYPE0)             \
-  COMPUTE_TYPE(query)                      \
-  COMPUTE_TYPE(regex)                      \
-  COMPUTE_TYPE(synthetic)                  \
-  COMPUTE_TYPE(info)                       \
-  COMPUTE_TYPE(performance)                \
-  COMPUTE_TYPE(health)
+  COMPUTE_TYPE(Query)                      \
+  COMPUTE_TYPE(Regex)                      \
+  COMPUTE_TYPE(Synthetic)                  \
+  COMPUTE_TYPE(Info)                       \
+  COMPUTE_TYPE(Performance)                \
+  COMPUTE_TYPE(Health)
 
 static const char *COMPUTE_TYPE_STRING[] = {
     FOREACH_COMPUTE_TYPE(GENERATE_STRING)};
@@ -120,7 +120,7 @@ typedef struct {
 } StringPairList;
 
 typedef struct {
-  time_t endTime, startTime;  // go:time.Time
+  time_t endTime, startTime;  // go:MillisecondTimestamp
 } TimeInterval;
 
 typedef struct {
@@ -128,7 +128,7 @@ typedef struct {
   bool boolValue;
   double doubleValue;
   int64_t integerValue;
-  time_t timeValue;  // go:time.Time
+  time_t timeValue;  // go:MillisecondTimestamp
   char *stringValue;
 } TypedValue;
 
@@ -154,11 +154,26 @@ typedef struct {
 } MetricSampleList;
 
 typedef struct {
-  MONITOR_STATUS_ENUM status;
-  char *name, *type, *owner, *category, *description, *lastPlugInOutput;
-  time_t lastCheckTime;           // go:time.Time
-  time_t nextCheckTime;           // go:time.Time
+  char *name, *type, *owner, *category, *description, *device;
   TypedValuePairList properties;  // go:map[string]TypedValue
+} InventoryResource;
+
+typedef struct {
+  size_t count;
+  InventoryResource *items;
+} InventoryResourceList;
+
+typedef struct {
+  MONITOR_STATUS_ENUM status;
+  char *name, *type, *owner, *lastPlugInOutput;
+  time_t lastCheckTime;                          // go:MillisecondTimestamp
+  time_t nextCheckTime;                          // go:MillisecondTimestamp
+  TypedValuePairList properties;                 // go:map[string]TypedValue
+} ResourceStatus;
+
+typedef struct {
+  MONITOR_STATUS_ENUM status;
+  char *name, *type, *owner;
 } MonitoredResource;
 
 typedef struct {
@@ -167,10 +182,10 @@ typedef struct {
 } MonitoredResourceList;
 
 typedef struct {
-  char *             metricName;
-  MetricSampleList * metricSamples; // go:[]*MetricSample
-  StringPairList     tags;          // go:map[string]string
-  UNIT_ENUM          unit;
+  char *metricName;
+  MetricSampleList *metricSamples;  // go:[]MetricSample
+  StringPairList tags;              // go:map[string]string
+  UNIT_ENUM unit;
 } TimeSeries;
 
 typedef struct {
@@ -201,8 +216,8 @@ typedef struct {
 
 typedef struct {
   char *name, *description, *displayName, *type;
-  LabelDescriptorList *labels;          // go:[]*LabelDescriptor
-  ThresholdDescriptorList *thresholds;  // go:[]*ThresholdDescriptor
+  LabelDescriptorList *labels;          // go:[]LabelDescriptor
+  ThresholdDescriptorList *thresholds;  // go:[]ThresholdDescriptor
   UNIT_ENUM unit;
   VALUE_TYPE_ENUM valueType;
   COMPUTE_TYPE_ENUM computeType;
@@ -211,7 +226,7 @@ typedef struct {
 
 typedef struct {
   char *appType, *agentID, *traceToken;
-  time_t timeStamp;  // go:time.Time
+  time_t timeStamp;  // go:MillisecondTimestamp
 } TracerContext;
 
 typedef struct {
@@ -225,17 +240,13 @@ typedef struct {
 } ResourceGroupList;
 
 typedef struct {
-  TracerContext         context;
-  MonitoredResourceList inventory;  // go:*[]MonitoredResource
-  ResourceGroupList     groups;     // go:*[]ResourceGroup
-} TransitSendInventoryRequest;
+  //   TracerContext         context;
+  InventoryResourceList resources;  // go:[]InventoryResource
+  ResourceGroupList groups;         // go:[]ResourceGroup
+} SendInventoryRequest;
 
 typedef struct {
-  int resourcesAdded, resourcesDeleted;
-} TransitSynchronizeResponse;
-
-typedef struct {
-  MonitoredResource resource;
+  ResourceStatus resource;
   TimeSeriesList metrics;  // go:[]TimeSeries
 } ResourceWithMetrics;
 
@@ -250,16 +261,19 @@ typedef struct {
 } ResourceWithMetricsRequest;
 
 typedef struct {
-  char *hostName, *account, *token;
-  bool ssl;
-} GroundworkConfig;
+  char *entity, *status, *message, *location;
+  int64_t entityID;
+} OperationResult;
 
 typedef struct {
-  char *user, *password;
-} Credentials;
+  size_t count;
+  OperationResult *items;
+} OperationResultList;
 
 typedef struct {
-  GroundworkConfig config;
-} Transit;
+  char *entityType, *operation;
+  int64_t successful, failed, warning, count;
+  OperationResultList results;  // go:[]OperationResult
+} OperationResults;
 
 #endif /* TRANSIT_H */

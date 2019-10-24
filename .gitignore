@@ -5,15 +5,20 @@
 *.so
 *.dylib
 *.iml
+tng
 
 # Test binary, build with `go test -c`
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+libtransit/libtransit.h
 
 # Intellij
 .idea
 
 # Vendor
 vendor
+
+# NATS Datastore
+datastore
