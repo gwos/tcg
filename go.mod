@@ -18,6 +18,7 @@ require (
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/hashicorp/raft v1.1.1 // indirect
 	github.com/json-iterator/go v1.1.7 // indirect
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lib/pq v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
 	github.com/nats-io/gnatsd v1.4.1 // indirect
@@ -34,5 +35,6 @@ require (
 	golang.org/x/crypto v0.0.0-20191002192127-34f69633bfdc // indirect
 	golang.org/x/sys v0.0.0-20191009170203-06d7bd2c5f4f // indirect
 	google.golang.org/appengine v1.6.5 // indirect
-	gopkg.in/yaml.v2 v2.2.4
+	gopkg.in/yaml.v2 v2.2.4 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20191010095647-fc94e3f71652
 )

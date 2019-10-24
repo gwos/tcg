@@ -1,31 +1,50 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
+	"log"
 	"net/http"
 	"time"
 )
 
-const userKey string = "user"
+const shutdownTimeout = 5 * time.Second
 
 var controller = NewController()
+var srv *http.Server
 
-// StopServer TODO: implement
+// StopServer gracefully shutdowns the server
 func StopServer() error {
+	log.Println("controller: shutdown ...")
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Println("controller: shutdown error:", err)
+	}
+	// catching ctx.Done() timeout
+	select {
+	case <-ctx.Done():
+		log.Println("controller: shutdown: timeout")
+	}
+	log.Println("controller: exiting")
+	srv = nil
 	return nil
 }
 
 // StartServer starts http server
-func StartServer(tls bool, port int) error {
-	router := gin.Default()
-
-	router.Use(sessions.Sessions("mysession", sessions.NewCookieStore([]byte("secret"))))
+func StartServer(addr, certFile, keyFile string) error {
+	if srv != nil {
+		return fmt.Errorf("controller: already started")
+	}
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(sessions.Sessions("tng-session", sessions.NewCookieStore([]byte("secret"))))
 
 	basicAuth := router.Group("/api/v1")
-
 	basicAuth.Use(authorizationValidation)
 	{
 		basicAuth.GET("/stats", stats)
@@ -36,15 +55,32 @@ func StartServer(tls bool, port int) error {
 		basicAuth.DELETE("/nats/transport/stop", stopTransport)
 	}
 
-	if tls {
-		if err := router.RunTLS(fmt.Sprintf(":%d", port), "../controller/server.pem", "../controller/server.key"); err != nil {
-			return err
-		}
-	} else {
-		if err := router.Run(fmt.Sprintf(":%d", port)); err != nil {
-			return err
-		}
+	srv = &http.Server{
+		Addr:    addr,
+		Handler: router,
 	}
+	go func() {
+		if certFile != "" && keyFile != "" {
+			log.Println("controller: start listen TLS", addr)
+			if err := srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				log.Println("controller: start error:", err)
+			}
+		} else {
+			log.Println("controller: start listen", addr)
+			if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Println("controller: start error:", err)
+			}
+		}
+	}()
+	// TODO: ensure signal processing in case of linked library
+	// // Wait for interrupt signal to gracefully shutdown the server
+	// quit := make(chan os.Signal)
+	// // kill (no param) default send syscall.SIGTERM
+	// // kill -2 is syscall.SIGINT
+	// // kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
+	// signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	// <-quit
+	// StopServer()
 
 	return nil
 }
