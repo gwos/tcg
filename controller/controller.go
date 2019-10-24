@@ -17,12 +17,12 @@ const (
 
 // Services defines TNG Control Plane interfaces
 type Services interface {
-	Identity(appName, apiToken string) error
 	StartNATS() error
 	StopNATS() error
 	StartTransport() error
 	StopTransport() error
 	Stats() (*services.AgentStats, error)
+	ValidateToken(appName, apiToken string) error
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
@@ -80,7 +80,7 @@ func (controller Controller) Stats() (*services.AgentStats, error) {
 	return services.GetTransitService().AgentStats, nil
 }
 
-// Identity implements Services.Identity
+// ValidateToken implements Services.ValidateToken
 func (controller Controller) ValidateToken(appName, apiToken string) error {
 	return services.GetTransitService().Transit.ValidateToken(appName, apiToken)
 }

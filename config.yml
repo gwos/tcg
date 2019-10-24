@@ -17,5 +17,5 @@ groundworkActions:
     entrypoint: "/api/synchronizer"
   sendResourceWithMetrics:
     entrypoint: "/api/monitoring"
-  identity:
+  validateToken:
     entrypoint: "/api/auth/validatetoken"
