@@ -10,8 +10,8 @@ import (
 )
 
 var config = Config{
-	AgentConfig:      AgentConfig{":8081", "", "", true, true, true},
-	GroundworkConfig: GroundworkConfig{"localhost:80", "RESTAPIACCESS", "***REMOVED***", ""},
+	AgentConfig:      AgentConfig{":8081", "", "", "src/main/resources/datastore", "FILE", true, true, true},
+	GroundworkConfig: GroundworkConfig{"localhost:80", "RESTAPIACCESS", "***REMOVED***", "", "gw8"},
 	GroundworkActions: GroundworkActions{
 		GroundworkAction{"/api/auth/login"},
 		GroundworkAction{"/api/auth/logout"},
@@ -23,9 +23,9 @@ var config = Config{
 
 func TestGetConfig(t *testing.T) {
 	os.Setenv(ConfigEnv, path.Join("..", ConfigName))
-	os.Setenv("TNG_AGENTCONFIG_ADDR", ":1111")
+	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
 	expected := config
-	expected.AgentConfig.Addr = ":1111"
+	expected.AgentConfig.NATSStoreType = "MEMORY"
 
 	tests := []struct {
 		name string

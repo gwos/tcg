@@ -1,5 +1,7 @@
 agentConfig:
-  addr: ":8081"
+  controllerAddr: ":8081"
+  natsFilestoreDir: "src/main/resources/datastore"
+  natsStoreType: "FILE"
   startNATS: True
   startTransport: True
   startController: False
@@ -7,6 +9,7 @@ groundworkConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
   password: "***REMOVED***"
+  appName: "gw8"
 groundworkActions:
   connect:
     entrypoint: "/api/auth/login"

@@ -75,7 +75,7 @@ func config() (map[string]string, error) {
 
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  "gw8",
+		"GWOS-APP-NAME":  service.GroundworkConfig.AppName,
 		"GWOS-API-TOKEN": service.GroundworkConfig.Token,
 	}
 
