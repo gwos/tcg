@@ -3,9 +3,7 @@ package org.groundwork.tng.transit;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -16,6 +14,12 @@ import java.util.List;
  * Unit test for simple App.
  */
 public class AppTest {
+
+    private static final String TEST_HOST_NAME = "GW8_TNG_TEST_HOST";
+    private static final String TEST_SERVICE_NAME = "GW8_TNG_TEST_SERVICE";
+    private static final String HOST_RESOURCE_TYPE = "HOST";
+    private static final String SERVICE_RESOURCE_TYPE = "SERVICE";
+
     /**
      * Test sending resource and metrics
      * <p>
@@ -38,8 +42,7 @@ public class AppTest {
 
         List<DtoTimeSeries> timeSeries = new ArrayList<>();
         timeSeries.add(DtoTimeSeries.builder()
-                .setUnit("qwerty")
-                .setMetricName("MY_TEST_SERVICE_0")
+                .setMetricName(TEST_SERVICE_NAME)
                 .setSampleType(DtoMetricSampleType.Warning)
                 .setInterval(DtoTimeInterval.builder()
                         .setStartTime(new SimpleDateFormat("dd/MM/yyyy").parse("21/10/2019"))
@@ -55,8 +58,8 @@ public class AppTest {
 
         resources.add(DtoResourceWithMetrics.builder()
                 .setResource(DtoResourceStatus.builder()
-                        .setName("MY_TESTq_HOST")
-                        .setType("HOST")
+                        .setName(TEST_HOST_NAME)
+                        .setType(HOST_RESOURCE_TYPE)
                         .setStatus(DtoMonitorStatus.HOST_UP)
                         .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
                         .build())
@@ -65,37 +68,13 @@ public class AppTest {
         resources.add(DtoResourceWithMetrics.builder()
                 .setMetrics(timeSeries)
                 .setResource(DtoResourceStatus.builder()
-                        .setName("MY_TEST_SERVICE_0")
-                        .setType("SERVICE")
+                        .setName(TEST_SERVICE_NAME)
+                        .setType(SERVICE_RESOURCE_TYPE)
                         .setStatus(DtoMonitorStatus.SERVICE_OK)
                         .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .setOwner("MY_TESTq_HOST")
+                        .setOwner(TEST_HOST_NAME)
                         .build())
                 .build());
-
-        resources.add(DtoResourceWithMetrics.builder()
-                .setMetrics(timeSeries)
-                .setResource(DtoResourceStatus.builder()
-                        .setName("MY_TEST_SERVICE_1")
-                        .setType("SERVICE")
-                        .setStatus(DtoMonitorStatus.SERVICE_OK)
-                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .setOwner("MY_TESTq_HOST")
-                        .build())
-                .build());
-
-        resources.add(DtoResourceWithMetrics.builder()
-                .setMetrics(timeSeries)
-                .setResource(DtoResourceStatus.builder()
-                        .setName("MY_TEST_SERVICE_2")
-                        .setType("SERVICE")
-                        .setStatus(DtoMonitorStatus.SERVICE_OK)
-                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .setOwner("MY_TESTq_HOST")
-                        .build())
-                .build());
-
-
 
         transit.SendResourcesWithMetrics(resources);
 
@@ -131,24 +110,13 @@ public class AppTest {
                 .build();
 
         DtoInventoryResource host = DtoInventoryResource.builder()
-                .setName("MY_TESTq_HOST")
-                .setType("HOST") // TODO: use constant
+                .setName(TEST_HOST_NAME)
+                .setType(HOST_RESOURCE_TYPE)
                 .build();
         DtoInventoryResource service = DtoInventoryResource.builder()
-                .setName("MY_TEST_SERVICE_0")
-                .setType("SERVICE") // TODO: use constant
-                .setOwner("MY_TESTq_HOST")
-                .build();
-        DtoInventoryResource service1 = DtoInventoryResource.builder()
-                .setName("MY_TEST_SERVICE_1")
-                .setType("SERVICE") // TODO: use constant
-                .setOwner("MY_TESTq_HOST")
-                .build();
-
-        DtoInventoryResource service2 = DtoInventoryResource.builder()
-                .setName("MY_TEST_SERVICE_2")
-                .setType("SERVICE") // TODO: use constant
-                .setOwner("MY_TESTq_HOST")
+                .setName(TEST_SERVICE_NAME)
+                .setType(SERVICE_RESOURCE_TYPE)
+                .setOwner(TEST_HOST_NAME)
                 .build();
 
         DtoGroup group = new DtoGroup();
@@ -160,8 +128,6 @@ public class AppTest {
         dtoInventory.setContext(context);
         dtoInventory.add(host);
         dtoInventory.add(service);
-        dtoInventory.add(service1);
-        dtoInventory.add(service2);
         dtoInventory.add(group);
 
         transit.SynchronizeInventory(dtoInventory);

@@ -2,7 +2,7 @@ agentConfig:
   addr: ":8081"
   startNATS: True
   startTransport: True
-  startController: True
+  startController: False
 groundworkConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
