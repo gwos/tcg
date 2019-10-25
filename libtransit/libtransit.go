@@ -16,9 +16,9 @@ func init() {
 
 	if service.AgentConfig.StartController {
 		err := controller.StartServer(
-			service.AgentConfig.Addr,
-			service.AgentConfig.CertFile,
-			service.AgentConfig.KeyFile,
+			service.AgentConfig.ControllerAddr,
+			service.AgentConfig.ControllerCertFile,
+			service.AgentConfig.ControllerKeyFile,
 		)
 		if err != nil {
 			log.Println(err)
@@ -116,9 +116,9 @@ func StopTransport(errorBuf *C.char) bool {
 func StartController(errorBuf *C.char) bool {
 	service := services.GetTransitService()
 	err := controller.StartServer(
-		service.AgentConfig.Addr,
-		service.AgentConfig.CertFile,
-		service.AgentConfig.KeyFile,
+		service.AgentConfig.ControllerAddr,
+		service.AgentConfig.ControllerCertFile,
+		service.AgentConfig.ControllerKeyFile,
 	)
 	if err != nil {
 		putError(errorBuf, err)

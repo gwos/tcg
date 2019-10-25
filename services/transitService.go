@@ -48,7 +48,7 @@ func (service *TransitService) SynchronizeInventory(request []byte) error {
 
 // StartNATS implements Services.StartNATS interface
 func (service *TransitService) StartNATS() error {
-	return nats.StartServer()
+	return nats.StartServer(service.AgentConfig.NATSStoreType, service.AgentConfig.NATSFilestoreDir)
 }
 
 // StopNATS implements Services.StopNATS interface

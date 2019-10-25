@@ -35,14 +35,19 @@ type GroundworkConfig struct {
 	Host     string
 	Account  string
 	Password string
-	Token    string `yaml:"-"`
+	Token    string
+	AppName  string `yaml:"appName"`
 }
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	Addr            string `yaml:"addr"`
-	CertFile        string `yaml:"certFile"`
-	KeyFile         string `yaml:"keyFile"`
+	// ControllerAddr accepts value for `http.Server{Addr}`: TCP address to listen on, ":http" if empty
+	ControllerAddr     string `yaml:"controllerAddr"`
+	ControllerCertFile string `yaml:"controllerCertFile"`
+	ControllerKeyFile  string `yaml:"controllerKeyFile"`
+	NATSFilestoreDir   string `yaml:"natsFilestoreDir"`
+	// NATSStoreType accepts "FILE"|"MEMORY"
+	NATSStoreType   string `yaml:"natsStoreType"`
 	StartController bool   `yaml:"startController"`
 	StartNATS       bool   `yaml:"startNATS"`
 	StartTransport  bool   `yaml:"startTransport"`
