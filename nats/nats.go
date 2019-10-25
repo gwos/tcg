@@ -9,26 +9,34 @@ import (
 	"time"
 )
 
-var (
+// Define NATS IDs
+const (
 	ClusterID          = "tng-cluster"
 	DispatcherClientID = "tng-dispatcher"
 	DurableID          = "tng-store-durable"
-	FilestoreDir       = "src/main/resources/datastore"
 	PublisherID        = "tng-publisher"
 	QueueGroup         = "tng-query-store-group"
 )
 
-/* DispatcherFn */
+// DispatcherFn defines message processor
 type DispatcherFn func([]byte) error
 
-/* DispatcherMap */
+// DispatcherMap maps subject-processor
 type DispatcherMap map[string]DispatcherFn
 
-func StartServer() error {
+// StartServer runs NATS
+func StartServer(storeType, filestoreDir string) error {
 	opts := stand.GetDefaultOptions()
 	opts.ID = ClusterID
-	opts.StoreType = stores.TypeFile
-	opts.FilestoreDir = FilestoreDir
+	opts.FilestoreDir = filestoreDir
+	switch storeType {
+	case "MEMORY":
+		opts.StoreType = stores.TypeMemory
+	case "FILE":
+		opts.StoreType = stores.TypeFile
+	default:
+		opts.StoreType = stores.TypeFile
+	}
 
 	if Server == nil || Server.State() == stand.Shutdown {
 		var err error
@@ -41,10 +49,12 @@ func StartServer() error {
 	return nil
 }
 
+// StopServer shutdowns NATS
 func StopServer() {
 	Server.Shutdown()
 }
 
+// StartDispatcher subscribes processors by subject
 func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	if Connection == nil || Connection.NatsConn().Status() == nats.CLOSED {
 		var err error
@@ -85,10 +95,12 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	return nil
 }
 
+// StopDispatcher ends dispatching
 func StopDispatcher() error {
 	return Connection.Close()
 }
 
+// Publish adds message in queue
 func Publish(subject string, msg []byte) error {
 	connection, err := stan.Connect(
 		ClusterID,
