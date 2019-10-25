@@ -407,7 +407,7 @@ type Transit struct {
 // Connect implements Operations.Connect.
 func (transit *Transit) Connect() error {
 	formValues := map[string]string{
-		"gwos-app-name": "gw8",
+		"gwos-app-name": transit.GroundworkConfig.AppName,
 		"user":          transit.GroundworkConfig.Account,
 		"password":      transit.GroundworkConfig.Password,
 	}
@@ -438,7 +438,7 @@ func (transit *Transit) Connect() error {
 // Disconnect implements Operations.Disconnect.
 func (transit Transit) Disconnect() error {
 	formValues := map[string]string{
-		"gwos-app-name":  "gw8",
+		"gwos-app-name":  transit.GroundworkConfig.AppName,
 		"gwos-api-token": transit.GroundworkConfig.Token,
 	}
 
@@ -505,7 +505,7 @@ func (transit *Transit) SynchronizeInventory(inventory []byte) (*OperationResult
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
-		"GWOS-APP-NAME":  "gw8",
+		"GWOS-APP-NAME":  transit.GroundworkConfig.AppName,
 	}
 
 	entrypoint := url.URL{
@@ -545,7 +545,7 @@ func (transit *Transit) SendResourcesWithMetrics(resources []byte) (*OperationRe
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
-		"GWOS-APP-NAME":  "gw8",
+		"GWOS-APP-NAME":  transit.GroundworkConfig.AppName,
 	}
 
 	entrypoint := url.URL{
