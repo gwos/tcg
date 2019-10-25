@@ -41,6 +41,11 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 			return -1, nil, err
 		}
 		defer request.Body.Close()
+	case http.MethodDelete:
+		request, err = http.NewRequest(http.MethodDelete, requestURL, nil)
+		if err != nil {
+			return -1, nil, err
+		}
 	}
 
 	if headers != nil {
