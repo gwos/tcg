@@ -32,8 +32,6 @@ public class TransitServicesImpl implements TransitServices {
             e.printStackTrace();
         }
 
-        System.out.println(resourcesJson);
-
         boolean isPublished = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
         if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
