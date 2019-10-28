@@ -8,6 +8,7 @@ import (
 	"github.com/gwos/tng/cache"
 	"log"
 	"net/http"
+	"net/http/pprof"
 	"time"
 )
 
@@ -43,17 +44,7 @@ func StartServer(addr, certFile, keyFile string) error {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(sessions.Sessions("tng-session", sessions.NewCookieStore([]byte("secret"))))
-
-	basicAuth := router.Group("/api/v1")
-	basicAuth.Use(authorizationValidation)
-	{
-		basicAuth.GET("/stats", stats)
-		basicAuth.GET("/status", status)
-		basicAuth.POST("/nats/start", startNATS)
-		basicAuth.DELETE("/nats/stop", stopNATS)
-		basicAuth.POST("/nats/transport/start", startTransport)
-		basicAuth.DELETE("/nats/transport/stop", stopTransport)
-	}
+	registerAPI1(router)
 
 	srv = &http.Server{
 		Addr:    addr,
@@ -163,4 +154,30 @@ func authorizationValidation(c *gin.Context) {
 			return
 		}
 	}
+}
+
+func registerAPI1(router *gin.Engine) {
+	apiV1Group := router.Group("/api/v1")
+	apiV1Group.Use(authorizationValidation)
+
+	apiV1Group.GET("/stats", stats)
+	apiV1Group.GET("/status", status)
+	apiV1Group.POST("/nats/start", startNATS)
+	apiV1Group.DELETE("/nats/stop", stopNATS)
+	apiV1Group.POST("/nats/transport/start", startTransport)
+	apiV1Group.DELETE("/nats/transport/stop", stopTransport)
+
+	pprofGroup := apiV1Group.Group("/pprof")
+	pprofGroup.GET("/", gin.WrapF(pprof.Index))
+	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
+	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
+	pprofGroup.GET("/symbol", gin.WrapF(pprof.Symbol))
+	pprofGroup.POST("/symbol", gin.WrapF(pprof.Symbol))
+	pprofGroup.GET("/trace", gin.WrapF(pprof.Trace))
+	pprofGroup.GET("/allocs", gin.WrapF(pprof.Handler("allocs").ServeHTTP))
+	pprofGroup.GET("/block", gin.WrapF(pprof.Handler("block").ServeHTTP))
+	pprofGroup.GET("/goroutine", gin.WrapF(pprof.Handler("goroutine").ServeHTTP))
+	pprofGroup.GET("/heap", gin.WrapF(pprof.Handler("heap").ServeHTTP))
+	pprofGroup.GET("/mutex", gin.WrapF(pprof.Handler("mutex").ServeHTTP))
+	pprofGroup.GET("/threadcreate", gin.WrapF(pprof.Handler("threadcreate").ServeHTTP))
 }
