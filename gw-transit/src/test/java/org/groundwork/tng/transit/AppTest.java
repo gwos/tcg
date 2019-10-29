@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Unit test for simple App.
@@ -32,7 +33,7 @@ public class AppTest {
      * 4. Run test.
      */
     @Test
-    public void shouldSendResourceAndMetrics() throws IOException, ParseException {
+    public void shouldSendResourceAndMetrics() throws IOException, ParseException, TimeoutException, InterruptedException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -92,7 +93,7 @@ public class AppTest {
      * 4. Run test.
      */
     @Test
-    public void shouldSynchronizeInventory() throws IOException {
+    public void shouldSynchronizeInventory() throws IOException, TimeoutException, InterruptedException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -127,7 +128,7 @@ public class AppTest {
     }
 
     private static final Integer TEST_SERVICES_COUNT = 10;
-    private static final Integer TEST_METRICS_COUNT = 1;
+    private static final Integer TEST_METRICS_COUNT = 5;
 
     /**
      * Test synchronize inventory
@@ -140,7 +141,7 @@ public class AppTest {
      * 5. Run test.
      */
     @Test
-    public void testSynchronizeInventoryPerformance() throws IOException {
+    public void testSynchronizeInventoryPerformance() throws IOException, TimeoutException, InterruptedException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -188,7 +189,7 @@ public class AppTest {
      * 5. Run test.
      */
     @Test
-    public void testSendResourceWithMetricsPerformance() throws ParseException, IOException {
+    public void testSendResourceWithMetricsPerformance() throws ParseException, IOException, TimeoutException, InterruptedException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -246,6 +247,14 @@ public class AppTest {
                 transit.SendResourcesWithMetrics(resources);
             }
         }
+
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        String name = reader.readLine();
+    }
+
+    @Test
+    public void testListMetrics() throws IOException, InterruptedException, TimeoutException {
+        TransitServices transit = new TransitServicesImpl();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         String name = reader.readLine();

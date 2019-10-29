@@ -4,7 +4,7 @@ agentConfig:
   natsStoreType: "FILE"
   startNATS: True
   startTransport: True
-  startController: False
+  startController: True
 groundworkConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"

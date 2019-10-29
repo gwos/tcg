@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
+	stan "github.com/nats-io/go-nats-streaming"
 )
 
 // StatusEnum defines Agent Controller status
@@ -23,6 +25,7 @@ type Services interface {
 	StopTransport() error
 	Stats() (*services.AgentStats, error)
 	ValidateToken(appName, apiToken string) error
+	ListMetrics() error
 	// LoadConfig() (StatusEnum, error)  // TODO: define configs to be passed in
 	// ListConfig() (StatusEnum, error)  // TODO: define configs to be returned
 }
@@ -78,6 +81,29 @@ func (controller *Controller) StopTransport() error {
 // Stats implements Services.Stats
 func (controller Controller) Stats() (*services.AgentStats, error) {
 	return services.GetTransitService().AgentStats, nil
+}
+
+func (controller Controller) ListMetrics() ([]byte, error) {
+	ch := make(chan []byte)
+	defer close(ch)
+
+	go func(c chan []byte) {
+		done := make(chan bool)
+		defer close(done)
+		sub, _ := nats.Connection.Subscribe("list-metrics-response", func(msg *stan.Msg) {
+			c <- msg.Data
+			done <- true
+		})
+		<-done
+		sub.Close()
+	}(ch)
+
+	err := nats.Publish("list-metrics-request", []byte("REQUEST"))
+	if err != nil {
+		return nil, err
+	}
+
+	return <-ch, nil
 }
 
 // ValidateToken implements Services.ValidateToken
