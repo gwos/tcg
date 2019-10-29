@@ -124,6 +124,15 @@ func stats(c *gin.Context) {
 	c.JSON(http.StatusOK, stats)
 }
 
+func listMetrics(c *gin.Context) {
+	metrics, err := controller.ListMetrics()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+
+	c.JSON(http.StatusOK, string(metrics))
+}
+
 func authorizationValidation(c *gin.Context) {
 	credentials := cache.Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
@@ -162,6 +171,7 @@ func registerAPI1(router *gin.Engine) {
 
 	apiV1Group.GET("/stats", stats)
 	apiV1Group.GET("/status", status)
+	router.GET("/listMetrics", listMetrics)
 	apiV1Group.POST("/nats/start", startNATS)
 	apiV1Group.DELETE("/nats/stop", stopNATS)
 	apiV1Group.POST("/nats/transport/start", startTransport)

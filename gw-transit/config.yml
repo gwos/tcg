@@ -4,11 +4,11 @@ agentConfig:
   natsStoreType: "FILE"
   startNATS: True
   startTransport: True
-  startController: False
+  startController: True
 groundworkConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
-  password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
+  password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
   appName: "gw8"
 groundworkActions:
   connect:
