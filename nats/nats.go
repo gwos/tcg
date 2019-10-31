@@ -75,6 +75,9 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			stan.NatsURL(stan.DefaultNatsURL),
 		)
 	}
+	if err != nil {
+		return err
+	}
 
 	for subject, fn := range *dispatcherMap {
 		dispatcherFn := fn /* prevent loop override */
@@ -83,10 +86,10 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			DispatcherQueueGroup,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
+					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+				} else {
 					_ = msg.Ack()
 					log.Println("Delivered\nMessage:", msg)
-				} else {
-					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
 				}
 			},
 			stan.SetManualAckMode(),
