@@ -3,41 +3,29 @@ package main
 //#define ERROR_LEN 250 /* buffer for error message */
 import "C"
 import (
+	"github.com/gwos/tng/services"
 	"log"
 	"unsafe"
-
-	"github.com/gwos/tng/controller"
-	"github.com/gwos/tng/services"
 )
 
 func init() {
-	var err error
-	service := services.GetTransitService()
-
-	if service.AgentConfig.StartController {
-		err := controller.StartServer(
-			service.AgentConfig.ControllerAddr,
-			service.AgentConfig.ControllerCertFile,
-			service.AgentConfig.ControllerKeyFile,
-		)
-		if err != nil {
+	transitService := services.GetTransitService()
+	if transitService.AgentConfig.StartController {
+		if err := transitService.StartController(); err != nil {
 			log.Println(err)
 		}
 	}
-
-	if service.AgentConfig.StartNATS {
-		err = service.StartNATS()
-		if err != nil {
+	if transitService.AgentConfig.StartNATS {
+		if err := transitService.StartNATS(); err != nil {
 			log.Println(err)
 		}
 	}
-
-	if service.AgentConfig.StartTransport {
-		err = service.StartTransport()
-		if err != nil {
+	if transitService.AgentConfig.StartTransport {
+		if err := transitService.StartTransport(); err != nil {
 			log.Println(err)
 		}
 	}
+	log.Println("libtransit:", transitService.Status())
 }
 
 func main() {
@@ -57,9 +45,8 @@ func putError(errorBuf *C.char, err error) {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
-	err := services.GetTransitService().
-		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON)))
-	if err != nil {
+	if err := services.GetTransitService().
+		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -68,9 +55,26 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 
 //export SynchronizeInventory
 func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
-	err := services.GetTransitService().
-		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON)))
-	if err != nil {
+	if err := services.GetTransitService().
+		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StartController
+func StartController(errorBuf *C.char) bool {
+	if err := services.GetTransitService().StartController(); err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
+}
+
+//export StopController
+func StopController(errorBuf *C.char) bool {
+	if err := services.GetTransitService().StopController(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -79,8 +83,7 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 
 //export StartNATS
 func StartNATS(errorBuf *C.char) bool {
-	err := services.GetTransitService().StartNATS()
-	if err != nil {
+	if err := services.GetTransitService().StartNATS(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -94,8 +97,7 @@ func StopNATS() {
 
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
-	err := services.GetTransitService().StartTransport()
-	if err != nil {
+	if err := services.GetTransitService().StartTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -104,56 +106,9 @@ func StartTransport(errorBuf *C.char) bool {
 
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
-	err := services.GetTransitService().StopTransport()
-	if err != nil {
+	if err := services.GetTransitService().StopTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
-
-//export StartController
-func StartController(errorBuf *C.char) bool {
-	service := services.GetTransitService()
-	err := controller.StartServer(
-		service.AgentConfig.ControllerAddr,
-		service.AgentConfig.ControllerCertFile,
-		service.AgentConfig.ControllerKeyFile,
-	)
-	if err != nil {
-		putError(errorBuf, err)
-		return false
-	}
-	return true
-}
-
-//export StopController
-func StopController(errorBuf *C.char) bool {
-	err := controller.StopServer()
-	if err != nil {
-		putError(errorBuf, err)
-		return false
-	}
-	return true
-}
-
-//TODO:
-func ListInventory() {
-}
-
-////export ListMetrics
-// func ListMetrics(errorBuf *C.char) *C.char {
-// 	monitorDescriptor, err := transitService.ListMetrics()
-// 	if err != nil {
-// 		putError(errorBuf, err)
-// 		return nil
-// 	}
-//
-// 	bytes, err := json.Marshal(monitorDescriptor)
-// 	if err != nil {
-// 		putError(errorBuf, err)
-// 		return nil
-// 	}
-//
-// 	return C.CString(string(bytes))
-// }
