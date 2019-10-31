@@ -6,15 +6,24 @@ import (
 	"time"
 )
 
-// Services defines TNG Agent services interface
-type Services interface {
-	SendResourceWithMetrics(request []byte) error
-	SynchronizeInventory(request []byte) error
-	StartNATS() error
-	StopNATS()
-	StartTransport()
-	StopTransport() error
-}
+// Define NATS subjects
+const (
+	SubjListMetricsRequest      = "list-metrics-request"
+	SubjListMetricsResponse     = "list-metrics-response"
+	SubjSendResourceWithMetrics = "send-resource-with-metrics"
+	SubjSynchronizeInventory    = "synchronize-inventory"
+)
+
+// StatusEnum defines status value
+type StatusEnum string
+
+// Status
+const (
+	Pending StatusEnum = "Pending"
+	Running            = "Running"
+	Stopped            = "Stopped"
+	Unknown            = "Unknown"
+)
 
 // AgentStats defines TNG Agent statistics
 type AgentStats struct {
@@ -30,4 +39,35 @@ type AgentStats struct {
 	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
 	sync.RWMutex
+}
+
+// AgentStatus defines TNG Agent status
+type AgentStatus struct {
+	Controller StatusEnum
+	NATS       StatusEnum
+	Transport  StatusEnum
+	sync.Mutex
+}
+
+// AgentServices defines TNG Agent services interface
+type AgentServices interface {
+	StartController() error
+	StopController() error
+	StartNATS() error
+	StopNATS() error
+	StartTransport() error
+	StopTransport() error
+	Stats() *AgentStats
+	Status() *AgentStatus
+}
+
+// TransitServices defines TNG Agent services interface
+type TransitServices interface {
+	SendResourceWithMetrics([]byte) error
+	SynchronizeInventory([]byte) error
+}
+
+// Controllers defines TNG Agent controllers interface
+type Controllers interface {
+	ListMetrics() ([]byte, error)
 }
