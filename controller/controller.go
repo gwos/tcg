@@ -83,6 +83,7 @@ func (controller Controller) Stats() (*services.AgentStats, error) {
 	return services.GetTransitService().AgentStats, nil
 }
 
+// ListMetrics implements Services.ListMetrics
 func (controller Controller) ListMetrics() ([]byte, error) {
 	ch := make(chan []byte)
 	defer close(ch)
@@ -90,12 +91,14 @@ func (controller Controller) ListMetrics() ([]byte, error) {
 	go func(c chan []byte) {
 		done := make(chan bool)
 		defer close(done)
-		sub, _ := nats.Connection.Subscribe("list-metrics-response", func(msg *stan.Msg) {
+		natsConn, _ := nats.Connect()
+		natsSub, _ := natsConn.Subscribe("list-metrics-response", func(msg *stan.Msg) {
 			c <- msg.Data
 			done <- true
 		})
 		<-done
-		sub.Close()
+		natsSub.Close()
+		natsConn.Close()
 	}(ch)
 
 	err := nats.Publish("list-metrics-request", []byte("REQUEST"))
