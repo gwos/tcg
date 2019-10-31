@@ -91,7 +91,7 @@ func (controller Controller) ListMetrics() ([]byte, error) {
 	go func(c chan []byte) {
 		done := make(chan bool)
 		defer close(done)
-		natsConn, _ := nats.Connect()
+		natsConn, _ := nats.Connect("tng-controller")
 		natsSub, _ := natsConn.Subscribe("list-metrics-response", func(msg *stan.Msg) {
 			c <- msg.Data
 			done <- true

@@ -31,10 +31,10 @@ type DispatcherFn func([]byte) error
 type DispatcherMap map[string]DispatcherFn
 
 // Connect returns connection
-func Connect() (stan.Conn, error) {
+func Connect(clientID string) (stan.Conn, error) {
 	return stan.Connect(
 		ClusterID,
-		DispatcherClientID,
+		clientID,
 		stan.NatsURL(stan.DefaultNatsURL),
 	)
 }
