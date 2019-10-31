@@ -11,11 +11,17 @@ import (
 
 // Define NATS IDs
 const (
-	ClusterID          = "tng-cluster"
-	DispatcherClientID = "tng-dispatcher"
-	DurableID          = "tng-store-durable"
-	PublisherID        = "tng-publisher"
-	QueueGroup         = "tng-query-store-group"
+	ClusterID            = "tng-cluster"
+	DispatcherAckWait    = 15 * time.Second
+	DispatcherClientID   = "tng-dispatcher"
+	DispatcherDurableID  = "tng-store-dispatcher"
+	DispatcherQueueGroup = "tng-queue-dispatcher"
+	PublisherID          = "tng-publisher"
+)
+
+var (
+	dispatcherConn stan.Conn
+	stanServer     *stand.StanServer
 )
 
 // DispatcherFn defines message processor
@@ -23,6 +29,15 @@ type DispatcherFn func([]byte) error
 
 // DispatcherMap maps subject-processor
 type DispatcherMap map[string]DispatcherFn
+
+// Connect returns connection
+func Connect(clientID string) (stan.Conn, error) {
+	return stan.Connect(
+		ClusterID,
+		clientID,
+		stan.NatsURL(stan.DefaultNatsURL),
+	)
+}
 
 // StartServer runs NATS
 func StartServer(storeType, filestoreDir string) error {
@@ -38,66 +53,60 @@ func StartServer(storeType, filestoreDir string) error {
 		opts.StoreType = stores.TypeFile
 	}
 
-	if Server == nil || Server.State() == stand.Shutdown {
-		var err error
-		Server, err = stand.RunServerWithOpts(opts, nil)
-		if err != nil {
-			return err
-		}
+	var err error
+	if stanServer == nil || stanServer.State() == stand.Shutdown {
+		stanServer, err = stand.RunServerWithOpts(opts, nil)
 	}
-
-	return nil
+	return err
 }
 
 // StopServer shutdowns NATS
 func StopServer() {
-	Server.Shutdown()
+	stanServer.Shutdown()
 }
 
 // StartDispatcher subscribes processors by subject
 func StartDispatcher(dispatcherMap *DispatcherMap) error {
-	if Connection == nil || Connection.NatsConn().Status() == nats.CLOSED {
-		var err error
-		Connection, err = stan.Connect(
+	var err error
+	if dispatcherConn == nil || dispatcherConn.NatsConn().Status() == nats.CLOSED {
+		dispatcherConn, err = stan.Connect(
 			ClusterID,
 			DispatcherClientID,
 			stan.NatsURL(stan.DefaultNatsURL),
 		)
-		if err != nil {
-			return err
-		}
-
-		for subject, fn := range *dispatcherMap {
-			dispatcherFn := fn /* prevent loop override */
-			_, err = Connection.QueueSubscribe(
-				subject,
-				QueueGroup,
-				func(msg *stan.Msg) {
-					err = dispatcherFn(msg.Data)
-					if err == nil {
-						_ = msg.Ack()
-						log.Println("Delivered\nMessage:", msg)
-					} else {
-						log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
-					}
-				},
-				stan.SetManualAckMode(),
-				stan.AckWait(15*time.Second),
-				stan.DurableName(DurableID),
-				stan.StartWithLastReceived(),
-			)
-			if err != nil {
-				return err
-			}
-		}
+	}
+	if err != nil {
+		return err
 	}
 
-	return nil
+	for subject, fn := range *dispatcherMap {
+		dispatcherFn := fn /* prevent loop override */
+		_, err = dispatcherConn.QueueSubscribe(
+			subject,
+			DispatcherQueueGroup,
+			func(msg *stan.Msg) {
+				if err := dispatcherFn(msg.Data); err != nil {
+					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+				} else {
+					_ = msg.Ack()
+					log.Println("Delivered\nMessage:", msg)
+				}
+			},
+			stan.SetManualAckMode(),
+			stan.AckWait(DispatcherAckWait),
+			stan.DurableName(DispatcherDurableID),
+			stan.StartWithLastReceived(),
+		)
+		if err != nil {
+			break
+		}
+	}
+	return err
 }
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	return Connection.Close()
+	return dispatcherConn.Close()
 }
 
 // Publish adds message in queue
@@ -117,9 +126,5 @@ func Publish(subject string, msg []byte) error {
 	}
 
 	err = connection.Close()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }

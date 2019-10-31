@@ -1,100 +1,143 @@
 package services
 
 import (
-	"github.com/gwos/tng/milliseconds"
-	"sync"
-	"time"
-
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/transit"
+	"sync"
+	"time"
 )
 
-// Define NATS subjects
-const (
-	SendResourceWithMetricsSubject = "send-resource-with-metrics"
-	SynchronizeInventorySubject    = "synchronize-inventory"
-)
+// TransitService implements AgentServices, TransitServices interfaces
+type TransitService struct {
+	transit.Transit
+	agentStats  *AgentStats
+	agentStatus *AgentStatus
+}
 
-var once sync.Once
-var service *TransitService
+var onceTransitService sync.Once
+var transitService *TransitService
 
 // GetTransitService implements Singleton pattern
 func GetTransitService() *TransitService {
-	once.Do(func() {
-		service = &TransitService{
+	onceTransitService.Do(func() {
+		transitService = &TransitService{
 			transit.Transit{Config: config.GetConfig()},
 			&AgentStats{},
+			&AgentStatus{
+				Controller: Pending,
+				NATS:       Pending,
+				Transport:  Pending,
+			},
 		}
 	})
-	return service
+	return transitService
 }
 
-// TransitService implements Services interface
-type TransitService struct {
-	transit.Transit
-	AgentStats *AgentStats
-}
-
-// SendResourceWithMetrics implements Services.SendResourceWithMetrics interface
+// SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(request []byte) error {
-	return nats.Publish(SendResourceWithMetricsSubject, request)
+	return nats.Publish(SubjSendResourceWithMetrics, request)
 }
 
-// SynchronizeInventory implements Services.SynchronizeInventory interface
+// SynchronizeInventory implements TransitServices.SynchronizeInventory interface
 func (service *TransitService) SynchronizeInventory(request []byte) error {
-	return nats.Publish(SynchronizeInventorySubject, request)
+	return nats.Publish(SubjSynchronizeInventory, request)
 }
 
-// StartNATS implements Services.StartNATS interface
+// StartController implements AgentServices.StartController interface
+func (service *TransitService) StartController() error {
+	// NOTE: the service.agentStatus.Controller will be updated by controller itself
+	return GetController().StartServer(
+		service.AgentConfig.ControllerAddr,
+		service.AgentConfig.ControllerCertFile,
+		service.AgentConfig.ControllerKeyFile,
+	)
+}
+
+// StopController implements AgentServices.StopController interface
+func (service *TransitService) StopController() error {
+	// NOTE: the service.agentStatus.Controller will be updated by controller itself
+	return GetController().StopServer()
+}
+
+// StartNATS implements AgentServices.StartNATS interface
 func (service *TransitService) StartNATS() error {
-	return nats.StartServer(service.AgentConfig.NATSStoreType, service.AgentConfig.NATSFilestoreDir)
+	err := nats.StartServer(service.AgentConfig.NATSStoreType, service.AgentConfig.NATSFilestoreDir)
+	if err == nil {
+		service.agentStatus.Lock()
+		service.agentStatus.NATS = Running
+		service.agentStatus.Unlock()
+	}
+	return err
 }
 
-// StopNATS implements Services.StopNATS interface
-func (service *TransitService) StopNATS() {
+// StopNATS implements AgentServices.StopNATS interface
+func (service *TransitService) StopNATS() error {
 	nats.StopServer()
+	service.agentStatus.Lock()
+	service.agentStatus.NATS = Stopped
+	service.agentStatus.Unlock()
+	return nil
 }
 
-// StartTransport implements Services.StartTransport interface
+// StartTransport implements AgentServices.StartTransport interface
 func (service *TransitService) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
-		SendResourceWithMetricsSubject: func(b []byte) error {
+		SubjSendResourceWithMetrics: func(b []byte) error {
 			_, err := service.Transit.SendResourcesWithMetrics(b)
+			service.agentStats.Lock()
 			if err == nil {
-				service.AgentStats.Lock()
-				service.AgentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
-				service.AgentStats.BytesSent += len(b)
-				service.AgentStats.MessagesSent++
-				service.AgentStats.Unlock()
+				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.BytesSent += len(b)
+				service.agentStats.MessagesSent++
 			} else {
-				service.AgentStats.Lock()
-				service.AgentStats.LastError = err.Error()
-				service.AgentStats.Unlock()
+				service.agentStats.LastError = err.Error()
 			}
+			service.agentStats.Unlock()
 			return err
 		},
-		SynchronizeInventorySubject: func(b []byte) error {
+		SubjSynchronizeInventory: func(b []byte) error {
 			_, err := service.Transit.SynchronizeInventory(b)
+			service.agentStats.Lock()
 			if err == nil {
-				service.AgentStats.Lock()
-				service.AgentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
-				service.AgentStats.BytesSent += len(b)
-				service.AgentStats.MessagesSent++
-				service.AgentStats.Unlock()
+				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.BytesSent += len(b)
+				service.agentStats.MessagesSent++
 			} else {
-				service.AgentStats.Lock()
-				service.AgentStats.LastError = err.Error()
-				service.AgentStats.Unlock()
+				service.agentStats.LastError = err.Error()
 			}
+			service.agentStats.Unlock()
 			return err
 		},
 	}
 
-	return nats.StartDispatcher(&dispatcherMap)
+	err := nats.StartDispatcher(&dispatcherMap)
+	if err == nil {
+		service.agentStatus.Lock()
+		service.agentStatus.Transport = Running
+		service.agentStatus.Unlock()
+	}
+	return err
 }
 
-// StopTransport implements Services.StopTransport interface
+// StopTransport implements AgentServices.StopTransport interface
 func (service *TransitService) StopTransport() error {
-	return nats.StopDispatcher()
+	err := nats.StopDispatcher()
+	if err == nil {
+		service.agentStatus.Lock()
+		service.agentStatus.Transport = Stopped
+		service.agentStatus.Unlock()
+	}
+	return err
+}
+
+// Stats implements AgentServices.Stats interface
+func (service *TransitService) Stats() *AgentStats {
+	return service.agentStats
+}
+
+// Status implements AgentServices.Status interface
+func (service *TransitService) Status() *AgentStatus {
+	return service.agentStatus
 }
