@@ -8,8 +8,9 @@ import (
 	"unsafe"
 )
 
+var transitService = services.GetTransitService()
+
 func init() {
-	transitService := services.GetTransitService()
 	if transitService.AgentConfig.StartController {
 		if err := transitService.StartController(); err != nil {
 			log.Println(err)
@@ -42,7 +43,7 @@ func putError(errorBuf *C.char, err error) {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
-	if err := services.GetTransitService().
+	if err := transitService.
 		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -52,7 +53,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 
 //export SynchronizeInventory
 func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
-	if err := services.GetTransitService().
+	if err := transitService.
 		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -62,7 +63,7 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 
 //export StartController
 func StartController(errorBuf *C.char) bool {
-	if err := services.GetTransitService().StartController(); err != nil {
+	if err := transitService.StartController(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -71,7 +72,7 @@ func StartController(errorBuf *C.char) bool {
 
 //export StopController
 func StopController(errorBuf *C.char) bool {
-	if err := services.GetTransitService().StopController(); err != nil {
+	if err := transitService.StopController(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -80,7 +81,7 @@ func StopController(errorBuf *C.char) bool {
 
 //export StartNATS
 func StartNATS(errorBuf *C.char) bool {
-	if err := services.GetTransitService().StartNATS(); err != nil {
+	if err := transitService.StartNATS(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -89,12 +90,12 @@ func StartNATS(errorBuf *C.char) bool {
 
 //export StopNATS
 func StopNATS() {
-	services.GetTransitService().StopNATS()
+	transitService.StopNATS()
 }
 
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
-	if err := services.GetTransitService().StartTransport(); err != nil {
+	if err := transitService.StartTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
@@ -103,7 +104,7 @@ func StartTransport(errorBuf *C.char) bool {
 
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
-	if err := services.GetTransitService().StopTransport(); err != nil {
+	if err := transitService.StopTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
