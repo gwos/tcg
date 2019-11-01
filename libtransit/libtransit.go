@@ -20,11 +20,8 @@ func init() {
 			log.Println(err)
 		}
 	}
-	if transitService.AgentConfig.StartTransport {
-		if err := transitService.StartTransport(); err != nil {
-			log.Println(err)
-		}
-	}
+	// NOTE: the transitService.AgentConfig.StartTransport
+	// processed by transitService.StartNATS itself
 	log.Println("libtransit:", transitService.Status())
 }
 
