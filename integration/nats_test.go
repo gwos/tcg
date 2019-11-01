@@ -25,14 +25,53 @@ const (
 var deliveredCount = 0
 var droppedCount = 0
 
-func TestNATS(t *testing.T) {
+// Test for ensuring that all data is stored in NATS and later resent
+// if Groundwork Foundation is unavailable
+func TestNATSQueue_1(t *testing.T) {
 	err := configNATS()
 	if err != nil {
 		t.Error(err)
 		return
 	}
+	log.Println("Invalid path:")
+	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringInvalidPath
 
-	con, err := nats.Connect(TestNatsClientID)
+	connection, subscription, err := connectAndSubscribe()
+	if err != nil {
+		t.Error(err)
+	}
+	defer cleanNATS(connection, subscription, t)
+
+	for i := 0; i < TestMessagesCount; i++ {
+		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if deliveredCount != 0 {
+		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
+			deliveredCount, 0)
+		return
+	}
+
+	log.Println("Valid path:")
+	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringValidPath
+
+	time.Sleep(TestMessagesCount * 2 * time.Second)
+
+	if deliveredCount == 0 {
+		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
+			deliveredCount, "'>0'")
+	}
+}
+
+// Test for ensuring that all data is stored in NATS and later resent
+// after NATS streaming server restarting
+func TestNATSQueue_2(t *testing.T) {
+	err := configNATS()
 	if err != nil {
 		t.Error(err)
 		return
@@ -41,37 +80,11 @@ func TestNATS(t *testing.T) {
 	log.Println("Invalid path:")
 	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringInvalidPath
 
-	subscription, err := con.QueueSubscribe(
-		TestSendResourceWithMetricsSubject,
-		QueueGroup,
-		func(msg *stan.Msg) {
-			_, err = services.GetTransitService().Transit.SendResourcesWithMetrics(msg.Data)
-			if err == nil {
-				_ = msg.Ack()
-				deliveredCount++
-				log.Println("Delivered")
-			} else {
-				droppedCount++
-				log.Println("Not delivered")
-			}
-		},
-		stan.SetManualAckMode(),
-		stan.AckWait(2*TestMessagesCount*time.Second),
-		stan.DurableName(DurableID),
-		stan.StartWithLastReceived(),
-	)
+	connection, subscription, err := connectAndSubscribe()
 	if err != nil {
 		t.Error(err)
-		return
 	}
-	defer subscription.Close()
-	defer func() {
-		cmd := exec.Command("rm", "-rf", "src")
-		_, err = cmd.Output()
-		if err != nil {
-			log.Println(err)
-		}
-	}()
+	defer cleanNATS(connection, subscription, t)
 
 	for i := 0; i < TestMessagesCount; i++ {
 		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
@@ -87,15 +100,58 @@ func TestNATS(t *testing.T) {
 		return
 	}
 
+	err = services.GetTransitService().StopNATS()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
 	log.Println("Valid path:")
 	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringValidPath
 
-	time.Sleep(TestMessagesCount * 3 * time.Second)
+	err = services.GetTransitService().StartNATS()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	time.Sleep(TestMessagesCount * 2 * time.Second)
 
 	if deliveredCount == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
 			deliveredCount, "'>0'")
 	}
+}
+
+func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
+	connection, err := nats.Connect(TestNatsClientID)
+	if err != nil {
+		return nil, nil, err
+	}
+	subscription, err := connection.QueueSubscribe(
+		TestSendResourceWithMetricsSubject,
+		QueueGroup,
+		func(msg *stan.Msg) {
+			_, err := services.GetTransitService().Transit.SendResourcesWithMetrics(msg.Data)
+			if err == nil {
+				_ = msg.Ack()
+				deliveredCount++
+				log.Println("Delivered")
+			} else {
+				droppedCount++
+				log.Println("Not delivered")
+			}
+		},
+		stan.SetManualAckMode(),
+		stan.AckWait(2*TestMessagesCount*time.Second),
+		stan.DurableName(DurableID),
+		stan.StartWithLastReceived(),
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return connection, subscription, nil
 }
 
 func configNATS() error {
@@ -122,6 +178,26 @@ func configNATS() error {
 	}
 
 	return nil
+}
+
+func cleanNATS(connection stan.Conn, subscription stan.Subscription, t *testing.T) {
+	err := subscription.Unsubscribe()
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = connection.Close()
+	if err != nil {
+		t.Error(err)
+	}
+
+	cmd := exec.Command("rm", "-rf", "src")
+	_, err = cmd.Output()
+	if err != nil {
+		t.Error(err)
+	}
+	deliveredCount = 0
+	droppedCount = 0
 }
 
 var testMessage = `{"context": {"appType":"VEMA","agentId":"3939333393342","traceToken":"token-99e93",
