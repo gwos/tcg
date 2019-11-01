@@ -54,17 +54,24 @@ func (service *AgentService) StartNATS() error {
 		service.agentStatus.Lock()
 		service.agentStatus.NATS = Running
 		service.agentStatus.Unlock()
+		// StartTransport as dependency
+		if service.AgentConfig.StartTransport {
+			err = service.StartTransport()
+		}
 	}
 	return err
 }
 
 // StopNATS implements AgentServices.StopNATS interface
 func (service *AgentService) StopNATS() error {
+	// StopTransport as dependency
+	err := service.StopTransport()
+	// skip StopTransport error checking
 	nats.StopServer()
 	service.agentStatus.Lock()
 	service.agentStatus.NATS = Stopped
 	service.agentStatus.Unlock()
-	return nil
+	return err
 }
 
 // StartTransport implements AgentServices.StartTransport interface
