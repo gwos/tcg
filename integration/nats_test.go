@@ -191,6 +191,11 @@ func cleanNATS(connection stan.Conn, subscription stan.Subscription, t *testing.
 		t.Error(err)
 	}
 
+	err = services.GetTransitService().StopNATS()
+	if err != nil {
+		t.Error(err)
+	}
+
 	cmd := exec.Command("rm", "-rf", "src")
 	_, err = cmd.Output()
 	if err != nil {

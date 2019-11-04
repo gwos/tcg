@@ -1,8 +1,8 @@
 package main
+
 import (
 	"flag"
 	"fmt"
-	"github.com/gwos/tng/controller"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"math/rand"
@@ -22,11 +22,11 @@ func main() {
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 	// Example Usage with a host
 	geneva := transit.ResourceStatus{
-		Name: "geneva",
-		Type:   transit.HostResource,
-		Status: transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		Name:             "geneva",
+		Type:             transit.HostResource,
+		Status:           transit.HostUp,
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
@@ -38,11 +38,11 @@ func main() {
 		},
 	}
 	localLoadService := transit.ResourceStatus{
-		Name: "local_load",
-		Type:   transit.ServiceResource,
-		Status: transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		Name:             "local_load",
+		Type:             transit.ServiceResource,
+		Status:           transit.ServiceOk,
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Properties: map[string]transit.TypedValue{
 			"stateType":       transit.TypedValue{StringValue: "SOFT"},
@@ -58,11 +58,11 @@ func main() {
 		MetricName: "local_load_5",
 		// Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricSamples: []*transit.MetricSample{
-		    &transit.MetricSample{
-			SampleType: transit.Value,
-			Interval:   metricSample.Interval,
-			Value:      metricSample.Value,
-		    },
+			&transit.MetricSample{
+				SampleType: transit.Value,
+				Interval:   metricSample.Interval,
+				Value:      metricSample.Value,
+			},
 		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
@@ -75,11 +75,11 @@ func main() {
 	sampleCritical := transit.TimeSeries{
 		MetricName: "local_load_5_cr",
 		MetricSamples: []*transit.MetricSample{
-		    &transit.MetricSample{
-			SampleType: transit.Critical,
-			Interval:   metricSample.Interval,
-			Value:      metricSample.Value,
-		    },
+			&transit.MetricSample{
+				SampleType: transit.Critical,
+				Interval:   metricSample.Interval,
+				Value:      metricSample.Value,
+			},
 		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
@@ -92,11 +92,11 @@ func main() {
 	sampleWarning := transit.TimeSeries{
 		MetricName: "local_load_5_wn",
 		MetricSamples: []*transit.MetricSample{
-		    &transit.MetricSample{
-			SampleType: transit.Warning,
-			Interval:   metricSample.Interval,
-			Value:      metricSample.Value,
-		    },
+			&transit.MetricSample{
+				SampleType: transit.Warning,
+				Interval:   metricSample.Interval,
+				Value:      metricSample.Value,
+			},
 		},
 		Tags: map[string]string{
 			"deviceTag":     "127.0.0.1",
@@ -121,14 +121,6 @@ func main() {
 
 	// Retrieve Metrics List with Transit
 	//transit.Disconnect(transitServices)
-
-	// Controller Example
-	var controllerServices = controller.NewController()
-	_ = controllerServices.StartNATS()
-	_ = controllerServices.StartTransport()
-	_ = controllerServices.StopNATS()
-	stats, _ := controllerServices.Stats()
-	fmt.Println(stats, controllerServices.NATSState, controllerServices.TransportState)
 }
 
 func makeMetricSample() *transit.MetricSample {

@@ -61,3 +61,12 @@ $ go run .
 Testing
 -------
 The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
+
+***Testing package:***
+>Without logs
+
+    $ go test ./<package_name>/
+    
+>With logs: 
+    
+    $ go test -v ./<package_name>/
