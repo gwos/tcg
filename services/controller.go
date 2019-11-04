@@ -15,9 +15,9 @@ import (
 	"time"
 )
 
-// Controller implements Controllers interface
+// Controller implements AgentServices, Controllers interface
 type Controller struct {
-	*TransitService
+	*AgentService
 	srv *http.Server
 }
 
@@ -29,7 +29,7 @@ var controller *Controller
 // GetController implements Singleton pattern
 func GetController() *Controller {
 	onceController.Do(func() {
-		controller = &Controller{GetTransitService(), nil}
+		controller = &Controller{GetAgentService(), nil}
 	})
 	return controller
 }
@@ -60,11 +60,18 @@ func (controller *Controller) ListMetrics() ([]byte, error) {
 	return <-ch, nil
 }
 
-// StartServer starts the http server
-func (controller *Controller) StartServer(addr, certFile, keyFile string) error {
+// StartController implements AgentServices.StartController interface
+// overrides AgentService implementation
+// starts the http server
+func (controller *Controller) StartController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("controller: already started")
 	}
+
+	addr := controller.AgentConfig.ControllerAddr
+	certFile := controller.AgentConfig.ControllerCertFile
+	keyFile := controller.AgentConfig.ControllerKeyFile
+
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -111,8 +118,10 @@ func (controller *Controller) StartServer(addr, certFile, keyFile string) error 
 	return nil
 }
 
-// StopServer gracefully shutdowns the http server
-func (controller *Controller) StopServer() error {
+// StopController implements AgentServices.StopController interface
+// overrides AgentService implementation
+// gracefully shutdowns the http server
+func (controller *Controller) StopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartServer itself
 	log.Println("controller: shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
