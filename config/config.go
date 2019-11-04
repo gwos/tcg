@@ -50,6 +50,7 @@ type AgentConfig struct {
 	NATSStoreType   string `yaml:"natsStoreType"`
 	StartController bool   `yaml:"startController"`
 	StartNATS       bool   `yaml:"startNATS"`
+	// StartTransport defines that NATS starts with Transport
 	StartTransport  bool   `yaml:"startTransport"`
 }
 
