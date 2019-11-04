@@ -5,7 +5,6 @@ import com.sun.jna.Native;
 import io.nats.streaming.Options;
 import io.nats.streaming.StreamingConnection;
 import io.nats.streaming.StreamingConnectionFactory;
-import io.nats.streaming.Subscription;
 import org.groundwork.rs.common.ConfiguredObjectMapper;
 import org.groundwork.rs.transit.*;
 
@@ -24,7 +23,7 @@ public class TransitServicesImpl implements TransitServices {
 
     public TransitServicesImpl() throws IOException, InterruptedException, TimeoutException {
         this.objectMapper = new ConfiguredObjectMapper();
-        this.tngTransitLibrary = Native.load("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
+        this.tngTransitLibrary = Native.load("/home/vsenkevich/Projects/effectivesoft/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
         // TODO: load this from Maven this.tngTransitLibrary = Native.load("/Users/dtaylor/gw8/tng/libtransit/libtransit.so", TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
 

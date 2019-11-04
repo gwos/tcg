@@ -110,3 +110,18 @@ func StopTransport(errorBuf *C.char) bool {
 	}
 	return true
 }
+
+//export IsControllerRunning
+func IsControllerRunning() bool {
+	return transitService.Status().Controller == services.Running
+}
+
+//export IsNATSRunning
+func IsNATSRunning() bool {
+	return transitService.Status().NATS == services.Running
+}
+
+//export IsTransportRunning
+func IsTransportRunning() bool {
+	return transitService.Status().Transport == services.Running
+}
