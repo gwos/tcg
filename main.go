@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
@@ -111,7 +112,12 @@ func main() {
 		{Resource: geneva, Metrics: make([]transit.TimeSeries, 0)},
 		{Resource: localLoadService, Metrics: []transit.TimeSeries{sampleValue, sampleCritical, sampleWarning}},
 	}
-	println(resources)
+	println("Resources: ", resources[0].Resource.Name)
+	bytes, error := json.Marshal(resources)
+	if error == nil {
+		s := string(bytes)
+		println(s);
+	}
 	//var transitServices,_ = transit.Connect(transit.Credentials{
 	//	User:     "test",
 	//	Password: "test",
