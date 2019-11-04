@@ -1,7 +1,6 @@
 package nats
 
 import (
-	"github.com/nats-io/go-nats"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
@@ -68,7 +67,7 @@ func StopServer() {
 // StartDispatcher subscribes processors by subject
 func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	var err error
-	if dispatcherConn == nil || dispatcherConn.NatsConn().Status() == nats.CLOSED {
+	if dispatcherConn == nil {
 		dispatcherConn, err = stan.Connect(
 			ClusterID,
 			DispatcherClientID,
@@ -106,7 +105,9 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	return dispatcherConn.Close()
+	err := dispatcherConn.Close()
+	dispatcherConn = nil
+	return err
 }
 
 // Publish adds message in queue
