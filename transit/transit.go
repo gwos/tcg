@@ -80,11 +80,14 @@ const (
 	HostUnreachable                          = "HOST_UNREACHABLE"
 )
 
+// ResourceType defines the resource
+type ResourceType string
+
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	ServiceResource string = "service"
-	HostResource           = "host"
+	ServiceResource ResourceType = "service"
+	HostResource                 = "host"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -292,7 +295,7 @@ type InventoryResource struct {
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
-	Type string `json:"type,required"`
+	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// CloudHub Categorization of resources, translate to Foundation Metric Type
@@ -311,7 +314,7 @@ type ResourceStatus struct {
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
-	Type string `json:"type,required"`
+	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
