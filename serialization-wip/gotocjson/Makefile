@@ -14,6 +14,9 @@ default	: all
 
 all	: gotocjson
 
+test	: tjunit
+	tjunit
+
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
 
@@ -51,4 +54,4 @@ clean	:
 	rm -f gotocjson *.o config.h config.c milliseconds.h milliseconds.c transit.h transit.c
 
 realclean	: clean
-	rm -f ,c ,e ,g ,m ,t foo.o foo
+	rm -f ,c ,e ,g ,m ,t foo.o foo tjunit

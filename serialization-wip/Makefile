@@ -9,7 +9,8 @@ export GOPATH := $(realpath ..):$(realpath .)
 
 JANSSON_VERSION = 2.12
 
-all	: local/lib/libjansson.so libtransit/libtransit.h
+# all	: local/lib/libjansson.so libtransit/libtransit.h
+all	: local/lib/libjansson.so
 
 # Fetch all third-party Go packages needed either directly or indirectly
 # by the TNG software.

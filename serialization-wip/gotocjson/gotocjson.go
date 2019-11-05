@@ -1032,6 +1032,7 @@ extern "C" {
 typedef int64_t int64;
 typedef double  float64;
 typedef int32_t int32;
+typedef struct timespec struct_timespec;
 
 // FIX MAJOR:  this is just for initial development, to allow the generated code
 // to compile until we are able to handle *ast.SelectorExpr struct fields
@@ -1071,7 +1072,7 @@ typedef int32_t int32;
 //
 // Note that a similar routine:
 //
-//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *StructTypeName_ptr);
+//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr);
 //
 // is also available.  It has a very similar purpose, but it is intended for use
 // with a tree of data structures which are manually allocated in application code,
@@ -1402,14 +1403,44 @@ func print_type_declarations(
 				    struct_field_C_types[decl_kind.type_name][name.Name] = type_name
 				    struct_field_tags   [decl_kind.type_name][name.Name] = field_tag
 				case *ast.SelectorExpr:
+				    type_selectorexpr := field.Type.(*ast.SelectorExpr)
+				    var x_type_ident *ast.Ident
+				    var ok bool
+				    if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
+					// fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+				    } else {
+					fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+					    file_line, type_selectorexpr.X)
+					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					// panic_message = "aborting due to previous errors"
+					// break node_loop
+				    }
+				    if type_selectorexpr.Sel == nil {
+					fmt.Printf("ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					// panic_message = "aborting due to previous errors"
+					// break node_loop
+				    }
+				    name_ident := new(ast.Ident)
+				    // We used to append an underscore in this construction of name_ident.Name, but we
+				    // are backing off from that until and unless we find it to actually be necessary.
+				    // (The backoff is not yet done, pending testing.)
+				    name_ident.Name = x_type_ident.Name + "_" + type_selectorexpr.Sel.Name
+
+				    // special handling for "struct timespec"
+				    if name_ident.Name == "time_Time" {
+					name_ident.Name = "struct_timespec"
+				    }
+
 				    // FIX MAJOR:  clean this up
 				    struct_definition += fmt.Sprintf("    %s %s;  // go:  %s\n",
 					// "*ast.SelectorExpr.typename",
-					"FIX_MAJOR_dummy_typename",
+					// "FIX_MAJOR_dummy_typename",
+					name_ident.Name,
 					name.Name, struct_field_typedefs[decl_kind.type_name][name.Name])
 				    // struct_definition += fmt.Sprintf("    %s %s;  // go: %[1]s\n", struct_field_typedefs[decl_kind.type_name][name.Name], name)
 				    struct_fields[decl_kind.type_name] = append(struct_fields[decl_kind.type_name], name.Name)
-				    struct_field_C_types[decl_kind.type_name][name.Name] = "FIX_MAJOR_dummy_typename"
+				    // struct_field_C_types[decl_kind.type_name][name.Name] = "FIX_MAJOR_dummy_typename"
+				    struct_field_C_types[decl_kind.type_name][name.Name] = name_ident.Name
 				    struct_field_tags   [decl_kind.type_name][name.Name] = field_tag
 				case *ast.StarExpr:
 				    star_base_type := leading_star.ReplaceAllLiteralString(struct_field_typedefs[decl_kind.type_name][name.Name], "")
@@ -1551,8 +1582,8 @@ func print_type_declarations(
 		    package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("#define  make_empty_%s_%s() make_empty_%[1]s_%[2]s_array(1)\n",
 		    package_name, decl_kind.type_name)
-		struct_definition += fmt.Sprintf("extern bool destroy_%s_%s_tree(%[1]s_%[2]s *%[2]s_ptr);\n", package_name, decl_kind.type_name)
-		struct_definition += fmt.Sprintf("extern char *encode_%s_%s_as_json(const %[1]s_%[2]s *%[2]s_ptr, size_t flags);\n",
+		struct_definition += fmt.Sprintf("extern bool destroy_%s_%s_tree(%[1]s_%[2]s *%[1]s_%[2]s_ptr);\n", package_name, decl_kind.type_name)
+		struct_definition += fmt.Sprintf("extern char *encode_%s_%s_as_json(const %[1]s_%[2]s *%[1]s_%[2]s_ptr, size_t flags);\n",
 		    package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("extern %s_%s *decode_json_%[1]s_%[2]s(const char *json_str);\n", package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("#define free_%s_%s_tree destroy_%[1]s_%[2]s_tree\n", package_name, decl_kind.type_name)
@@ -2143,7 +2174,7 @@ var destroy_routine_footer_template = `}
 // has embedded within it in contiguous memory, the top-level data structure and all of its possibly
 // multi-generational offspring.  The recursive-destroy routines are what I am calling above:
 //
-//     extern bool destroy_StructTypeName_tree(StructTypeName *StructTypeName_ptr);
+//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr);
 //
 func print_type_conversions(
 	other_headers         string,

@@ -29,6 +29,7 @@ extern "C" {
 typedef int64_t int64;
 typedef double  float64;
 typedef int32_t int32;
+typedef struct timespec struct_timespec;
 
 // FIX MAJOR:  this is just for initial development, to allow the generated code
 // to compile until we are able to handle *ast.SelectorExpr struct fields
@@ -41,9 +42,9 @@ typedef int32_t int32;
 #endif  // string
 
 // --------------------------------------------------------------------------------
-// Each encode_StructTypeName_as_json() routine declared in this header file:
+// Each encode_PackageName_StructTypeName_as_json() routine declared in this header file:
 //
-//     extern char *encode_StructTypeName_as_json(const StructTypeName *StructTypeName_ptr, size_t flags);
+//     extern char *encode_PackageName_StructTypeName_as_json(const PackageName_StructTypeName *StructTypeName_ptr, size_t flags);
 //
 // returns the JSON representation of the structure as a string, or NULL on error.
 // The returned string must ultimately be deallocated by the caller using a single
@@ -51,38 +52,39 @@ typedef int32_t int32;
 //
 //     https://jansson.readthedocs.io/en/2.12/apiref.html#encoding
 //
-// The JSON_SORT_KEYS flag is used by default.
+// The JSON_SORT_KEYS flag is used by default.  This is mostly for initial
+// development purposes; we might not want the sorting overhead in production.
 // --------------------------------------------------------------------------------
-// Each decode_json_StructTypeName() routine declared in this header file:
+// Each decode_json_PackageName_StructTypeName() routine declared in this header file:
 //
-//     extern StructTypeName *decode_json_StructTypeName(const char *json_str);
+//     extern StructTypeName *decode_json_PackageName_StructTypeName(const char *json_str);
 //
 // returns a pointer to a new object, or NULL on error.  The returned object must
 // ultimately be deallocated by the caller using a single call to this routine:
 //
-//     extern bool free_StructTypeName_tree(StructTypeName *StructTypeName_ptr);
+//     extern bool free_PackageName_StructTypeName_tree(PackageName_StructTypeName *StructTypeName_ptr);
 //
 // That one call will at the same time free memory for all of the connected
 // subsidary objects.
 //
 // Note that a similar routine:
 //
-//     extern bool destroy_StructTypeName_tree(StructTypeName *StructTypeName_ptr);
+//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr);
 //
 // is also available.  It has a very similar purpose, but it is intended for use
 // with a tree of data structures which are manually allocated in application code,
-// where the individual parts are likely not contiguous in memory.  In contrast,
-// the free_StructTypeName_tree() implementation will be kept definitively matched
-// to the decode_json_StructTypeName() implementation.  So whether the decoding
+// where the individual parts are likely not contiguous in memory.  In contrast, the
+// free_PackageName_StructTypeName_tree() implementation will be kept definitively matched
+// to the decode_json_PackageName_StructTypeName() implementation.  So whether the decoding
 // creates just a single large block of memory that contains not only the initial
 // StructTypeName object but all of the subsidiary objects it recursively refers to,
 // or whether it splays things out via independently floating allocations, a call to
 // free_StructTypeName_tree() is guaranteed to match the internal requirements of
-// releasing all of the memory allocated by decode_json_StructTypeName().
+// releasing all of the memory allocated by decode_json_PackageName_StructTypeName().
 // --------------------------------------------------------------------------------
 
 extern const string const MetricKind_String[];
-typedef enum MetricKind MetricKind;
+typedef enum MetricKind transit_MetricKind;
 
 enum MetricKind {
     Gauge,
@@ -92,7 +94,7 @@ enum MetricKind {
 };
 
 extern const string const ValueType_String[];
-typedef enum ValueType ValueType;
+typedef enum ValueType transit_ValueType;
 
 enum ValueType {
     IntegerType,
@@ -104,7 +106,7 @@ enum ValueType {
 };
 
 extern const string const UnitType_String[];
-typedef enum UnitType UnitType;
+typedef enum UnitType transit_UnitType;
 
 enum UnitType {
     UnitCounter,
@@ -112,7 +114,7 @@ enum UnitType {
 };
 
 extern const string const ComputeType_String[];
-typedef enum ComputeType ComputeType;
+typedef enum ComputeType transit_ComputeType;
 
 enum ComputeType {
     Query,
@@ -124,7 +126,7 @@ enum ComputeType {
 };
 
 extern const string const MonitorStatus_String[];
-typedef enum MonitorStatus MonitorStatus;
+typedef enum MonitorStatus transit_MonitorStatus;
 
 enum MonitorStatus {
     ServiceOk,
@@ -141,7 +143,7 @@ enum MonitorStatus {
 };
 
 extern const string const MonitoredResourceType_String[];
-typedef enum MonitoredResourceType MonitoredResourceType;
+typedef enum MonitoredResourceType transit_MonitoredResourceType;
 
 enum MonitoredResourceType {
     ServiceResource,
@@ -149,7 +151,7 @@ enum MonitoredResourceType {
 };
 
 extern const string const MetricSampleType_String[];
-typedef enum MetricSampleType MetricSampleType;
+typedef enum MetricSampleType transit_MetricSampleType;
 
 enum MetricSampleType {
     Value,
@@ -159,57 +161,69 @@ enum MetricSampleType {
     Max,
 };
 
-typedef struct {
-    FIX_MAJOR_dummy_typename EndTime;  // go:  MillisecondTimestamp
-    FIX_MAJOR_dummy_typename StartTime;  // go:  MillisecondTimestamp
-} TimeInterval;
+typedef struct _transit_TimeInterval_ {
+    milliseconds_MillisecondTimestamp EndTime;  // go:  milliseconds.MillisecondTimestamp
+    milliseconds_MillisecondTimestamp StartTime;  // go:  milliseconds.MillisecondTimestamp
+} transit_TimeInterval;
 
-#define  make_empty_TimeInterval_array(n) (TimeInterval *) calloc((n), sizeof (TimeInterval))
-#define  make_empty_TimeInterval() make_empty_TimeInterval_array(1)
-extern bool destroy_TimeInterval_tree(TimeInterval *TimeInterval_ptr);
-extern char *encode_TimeInterval_as_json(const TimeInterval *TimeInterval_ptr, size_t flags);
-extern TimeInterval *decode_json_TimeInterval(const char *json_str);
-#define free_TimeInterval_tree destroy_TimeInterval_tree
+#define  make_empty_transit_TimeInterval_array(n) (transit_TimeInterval *) calloc((n), sizeof (transit_TimeInterval))
+#define  make_empty_transit_TimeInterval() make_empty_transit_TimeInterval_array(1)
+extern bool destroy_transit_TimeInterval_tree(transit_TimeInterval *transit_TimeInterval_ptr);
+extern char *encode_transit_TimeInterval_as_json(const transit_TimeInterval *transit_TimeInterval_ptr, size_t flags);
+extern transit_TimeInterval *decode_json_transit_TimeInterval(const char *json_str);
+#define free_transit_TimeInterval_tree destroy_transit_TimeInterval_tree
+extern json_t *transit_TimeInterval_as_JSON(const transit_TimeInterval *transit_TimeInterval);
+extern char *transit_TimeInterval_as_JSON_str(const transit_TimeInterval *transit_TimeInterval);
+extern transit_TimeInterval *JSON_as_transit_TimeInterval(json_t *json);
+extern transit_TimeInterval *JSON_str_as_transit_TimeInterval(const char *json_str);
 
-typedef struct {
-    ValueType ValueType;
+typedef struct _transit_TypedValue_ {
+    transit_ValueType ValueType;
     bool BoolValue;
     float64 DoubleValue;
     int64 IntegerValue;
     string StringValue;
-    FIX_MAJOR_dummy_typename TimeValue;  // go:  MillisecondTimestamp
-} TypedValue;
+    milliseconds_MillisecondTimestamp TimeValue;  // go:  milliseconds.MillisecondTimestamp
+} transit_TypedValue;
 
-#define  make_empty_TypedValue_array(n) (TypedValue *) calloc((n), sizeof (TypedValue))
-#define  make_empty_TypedValue() make_empty_TypedValue_array(1)
-extern bool destroy_TypedValue_tree(TypedValue *TypedValue_ptr);
-extern char *encode_TypedValue_as_json(const TypedValue *TypedValue_ptr, size_t flags);
-extern TypedValue *decode_json_TypedValue(const char *json_str);
-#define free_TypedValue_tree destroy_TypedValue_tree
+#define  make_empty_transit_TypedValue_array(n) (transit_TypedValue *) calloc((n), sizeof (transit_TypedValue))
+#define  make_empty_transit_TypedValue() make_empty_transit_TypedValue_array(1)
+extern bool destroy_transit_TypedValue_tree(transit_TypedValue *transit_TypedValue_ptr);
+extern char *encode_transit_TypedValue_as_json(const transit_TypedValue *transit_TypedValue_ptr, size_t flags);
+extern transit_TypedValue *decode_json_transit_TypedValue(const char *json_str);
+#define free_transit_TypedValue_tree destroy_transit_TypedValue_tree
+extern json_t *transit_TypedValue_as_JSON(const transit_TypedValue *transit_TypedValue);
+extern char *transit_TypedValue_as_JSON_str(const transit_TypedValue *transit_TypedValue);
+extern transit_TypedValue *JSON_as_transit_TypedValue(json_t *json);
+extern transit_TypedValue *JSON_str_as_transit_TypedValue(const char *json_str);
 
-typedef TimeInterval *TimeInterval_Ptr;
+typedef transit_TimeInterval *transit_TimeInterval_Ptr;
 
-typedef TypedValue *TypedValue_Ptr;
+typedef transit_TypedValue *transit_TypedValue_Ptr;
 
-typedef struct {
-    MetricSampleType SampleType;
-    TimeInterval_Ptr Interval;  // go: *TimeInterval
-    TypedValue_Ptr Value;  // go: *TypedValue
-} MetricSample;
+typedef struct _transit_MetricSample_ {
+    transit_MetricSampleType SampleType;
+    transit_TimeInterval_Ptr Interval;  // go: *TimeInterval
+    transit_TypedValue_Ptr Value;  // go: *TypedValue
+} transit_MetricSample;
 
-#define  make_empty_MetricSample_array(n) (MetricSample *) calloc((n), sizeof (MetricSample))
-#define  make_empty_MetricSample() make_empty_MetricSample_array(1)
-extern bool destroy_MetricSample_tree(MetricSample *MetricSample_ptr);
-extern char *encode_MetricSample_as_json(const MetricSample *MetricSample_ptr, size_t flags);
-extern MetricSample *decode_json_MetricSample(const char *json_str);
-#define free_MetricSample_tree destroy_MetricSample_tree
+#define  make_empty_transit_MetricSample_array(n) (transit_MetricSample *) calloc((n), sizeof (transit_MetricSample))
+#define  make_empty_transit_MetricSample() make_empty_transit_MetricSample_array(1)
+extern bool destroy_transit_MetricSample_tree(transit_MetricSample *transit_MetricSample_ptr);
+extern char *encode_transit_MetricSample_as_json(const transit_MetricSample *transit_MetricSample_ptr, size_t flags);
+extern transit_MetricSample *decode_json_transit_MetricSample(const char *json_str);
+#define free_transit_MetricSample_tree destroy_transit_MetricSample_tree
+extern json_t *transit_MetricSample_as_JSON(const transit_MetricSample *transit_MetricSample);
+extern char *transit_MetricSample_as_JSON_str(const transit_MetricSample *transit_MetricSample);
+extern transit_MetricSample *JSON_as_transit_MetricSample(json_t *json);
+extern transit_MetricSample *JSON_str_as_transit_MetricSample(const char *json_str);
 
-typedef MetricSample *MetricSample_Ptr;
+typedef transit_MetricSample *transit_MetricSample_Ptr;
 
 typedef struct {
     size_t count;
-    MetricSample_Ptr *items;
-} MetricSample_Ptr_List;
+    transit_MetricSample_Ptr *items;
+} transit_MetricSample_Ptr_List;
 
 typedef struct {
     string key;
@@ -221,270 +235,326 @@ typedef struct {
     string_string_Pair *items;
 } string_string_Pair_List;
 
-typedef struct {
+typedef struct _transit_TimeSeries_ {
     string MetricName;
-    MetricSample_Ptr_List MetricSamples;  // go: []*MetricSample
+    transit_MetricSample_Ptr_List MetricSamples;  // go: []*MetricSample
     string_string_Pair_List Tags;  // go: map[string]string
-    UnitType Unit;
-} TimeSeries;
+    transit_UnitType Unit;
+} transit_TimeSeries;
 
-#define  make_empty_TimeSeries_array(n) (TimeSeries *) calloc((n), sizeof (TimeSeries))
-#define  make_empty_TimeSeries() make_empty_TimeSeries_array(1)
-extern bool destroy_TimeSeries_tree(TimeSeries *TimeSeries_ptr);
-extern char *encode_TimeSeries_as_json(const TimeSeries *TimeSeries_ptr, size_t flags);
-extern TimeSeries *decode_json_TimeSeries(const char *json_str);
-#define free_TimeSeries_tree destroy_TimeSeries_tree
+#define  make_empty_transit_TimeSeries_array(n) (transit_TimeSeries *) calloc((n), sizeof (transit_TimeSeries))
+#define  make_empty_transit_TimeSeries() make_empty_transit_TimeSeries_array(1)
+extern bool destroy_transit_TimeSeries_tree(transit_TimeSeries *transit_TimeSeries_ptr);
+extern char *encode_transit_TimeSeries_as_json(const transit_TimeSeries *transit_TimeSeries_ptr, size_t flags);
+extern transit_TimeSeries *decode_json_transit_TimeSeries(const char *json_str);
+#define free_transit_TimeSeries_tree destroy_transit_TimeSeries_tree
+extern json_t *transit_TimeSeries_as_JSON(const transit_TimeSeries *transit_TimeSeries);
+extern char *transit_TimeSeries_as_JSON_str(const transit_TimeSeries *transit_TimeSeries);
+extern transit_TimeSeries *JSON_as_transit_TimeSeries(json_t *json);
+extern transit_TimeSeries *JSON_str_as_transit_TimeSeries(const char *json_str);
 
-typedef struct {
+typedef struct _transit_LabelDescriptor_ {
     string Description;
     string Key;
-    ValueType ValueType;
-} LabelDescriptor;
+    transit_ValueType ValueType;
+} transit_LabelDescriptor;
 
-#define  make_empty_LabelDescriptor_array(n) (LabelDescriptor *) calloc((n), sizeof (LabelDescriptor))
-#define  make_empty_LabelDescriptor() make_empty_LabelDescriptor_array(1)
-extern bool destroy_LabelDescriptor_tree(LabelDescriptor *LabelDescriptor_ptr);
-extern char *encode_LabelDescriptor_as_json(const LabelDescriptor *LabelDescriptor_ptr, size_t flags);
-extern LabelDescriptor *decode_json_LabelDescriptor(const char *json_str);
-#define free_LabelDescriptor_tree destroy_LabelDescriptor_tree
+#define  make_empty_transit_LabelDescriptor_array(n) (transit_LabelDescriptor *) calloc((n), sizeof (transit_LabelDescriptor))
+#define  make_empty_transit_LabelDescriptor() make_empty_transit_LabelDescriptor_array(1)
+extern bool destroy_transit_LabelDescriptor_tree(transit_LabelDescriptor *transit_LabelDescriptor_ptr);
+extern char *encode_transit_LabelDescriptor_as_json(const transit_LabelDescriptor *transit_LabelDescriptor_ptr, size_t flags);
+extern transit_LabelDescriptor *decode_json_transit_LabelDescriptor(const char *json_str);
+#define free_transit_LabelDescriptor_tree destroy_transit_LabelDescriptor_tree
+extern json_t *transit_LabelDescriptor_as_JSON(const transit_LabelDescriptor *transit_LabelDescriptor);
+extern char *transit_LabelDescriptor_as_JSON_str(const transit_LabelDescriptor *transit_LabelDescriptor);
+extern transit_LabelDescriptor *JSON_as_transit_LabelDescriptor(json_t *json);
+extern transit_LabelDescriptor *JSON_str_as_transit_LabelDescriptor(const char *json_str);
 
-typedef struct {
+typedef struct _transit_ThresholdDescriptor_ {
     string Key;
     int32 Value;
-} ThresholdDescriptor;
+} transit_ThresholdDescriptor;
 
-#define  make_empty_ThresholdDescriptor_array(n) (ThresholdDescriptor *) calloc((n), sizeof (ThresholdDescriptor))
-#define  make_empty_ThresholdDescriptor() make_empty_ThresholdDescriptor_array(1)
-extern bool destroy_ThresholdDescriptor_tree(ThresholdDescriptor *ThresholdDescriptor_ptr);
-extern char *encode_ThresholdDescriptor_as_json(const ThresholdDescriptor *ThresholdDescriptor_ptr, size_t flags);
-extern ThresholdDescriptor *decode_json_ThresholdDescriptor(const char *json_str);
-#define free_ThresholdDescriptor_tree destroy_ThresholdDescriptor_tree
+#define  make_empty_transit_ThresholdDescriptor_array(n) (transit_ThresholdDescriptor *) calloc((n), sizeof (transit_ThresholdDescriptor))
+#define  make_empty_transit_ThresholdDescriptor() make_empty_transit_ThresholdDescriptor_array(1)
+extern bool destroy_transit_ThresholdDescriptor_tree(transit_ThresholdDescriptor *transit_ThresholdDescriptor_ptr);
+extern char *encode_transit_ThresholdDescriptor_as_json(const transit_ThresholdDescriptor *transit_ThresholdDescriptor_ptr, size_t flags);
+extern transit_ThresholdDescriptor *decode_json_transit_ThresholdDescriptor(const char *json_str);
+#define free_transit_ThresholdDescriptor_tree destroy_transit_ThresholdDescriptor_tree
+extern json_t *transit_ThresholdDescriptor_as_JSON(const transit_ThresholdDescriptor *transit_ThresholdDescriptor);
+extern char *transit_ThresholdDescriptor_as_JSON_str(const transit_ThresholdDescriptor *transit_ThresholdDescriptor);
+extern transit_ThresholdDescriptor *JSON_as_transit_ThresholdDescriptor(json_t *json);
+extern transit_ThresholdDescriptor *JSON_str_as_transit_ThresholdDescriptor(const char *json_str);
 
-typedef LabelDescriptor *LabelDescriptor_Ptr;
-
-typedef struct {
-    size_t count;
-    LabelDescriptor_Ptr *items;
-} LabelDescriptor_Ptr_List;
-
-typedef ThresholdDescriptor *ThresholdDescriptor_Ptr;
+typedef transit_LabelDescriptor *transit_LabelDescriptor_Ptr;
 
 typedef struct {
     size_t count;
-    ThresholdDescriptor_Ptr *items;
-} ThresholdDescriptor_Ptr_List;
+    transit_LabelDescriptor_Ptr *items;
+} transit_LabelDescriptor_Ptr_List;
+
+typedef transit_ThresholdDescriptor *transit_ThresholdDescriptor_Ptr;
 
 typedef struct {
+    size_t count;
+    transit_ThresholdDescriptor_Ptr *items;
+} transit_ThresholdDescriptor_Ptr_List;
+
+typedef struct _transit_MetricDescriptor_ {
     string CustomName;
     string Description;
     string DisplayName;
-    LabelDescriptor_Ptr_List Labels;  // go: []*LabelDescriptor
-    ThresholdDescriptor_Ptr_List Thresholds;  // go: []*ThresholdDescriptor
+    transit_LabelDescriptor_Ptr_List Labels;  // go: []*LabelDescriptor
+    transit_ThresholdDescriptor_Ptr_List Thresholds;  // go: []*ThresholdDescriptor
     string Type;
-    UnitType Unit;
-    ValueType ValueType;
-    ComputeType ComputeType;
-    MetricKind MetricKind;
-} MetricDescriptor;
+    transit_UnitType Unit;
+    transit_ValueType ValueType;
+    transit_ComputeType ComputeType;
+    transit_MetricKind MetricKind;
+} transit_MetricDescriptor;
 
-#define  make_empty_MetricDescriptor_array(n) (MetricDescriptor *) calloc((n), sizeof (MetricDescriptor))
-#define  make_empty_MetricDescriptor() make_empty_MetricDescriptor_array(1)
-extern bool destroy_MetricDescriptor_tree(MetricDescriptor *MetricDescriptor_ptr);
-extern char *encode_MetricDescriptor_as_json(const MetricDescriptor *MetricDescriptor_ptr, size_t flags);
-extern MetricDescriptor *decode_json_MetricDescriptor(const char *json_str);
-#define free_MetricDescriptor_tree destroy_MetricDescriptor_tree
+#define  make_empty_transit_MetricDescriptor_array(n) (transit_MetricDescriptor *) calloc((n), sizeof (transit_MetricDescriptor))
+#define  make_empty_transit_MetricDescriptor() make_empty_transit_MetricDescriptor_array(1)
+extern bool destroy_transit_MetricDescriptor_tree(transit_MetricDescriptor *transit_MetricDescriptor_ptr);
+extern char *encode_transit_MetricDescriptor_as_json(const transit_MetricDescriptor *transit_MetricDescriptor_ptr, size_t flags);
+extern transit_MetricDescriptor *decode_json_transit_MetricDescriptor(const char *json_str);
+#define free_transit_MetricDescriptor_tree destroy_transit_MetricDescriptor_tree
+extern json_t *transit_MetricDescriptor_as_JSON(const transit_MetricDescriptor *transit_MetricDescriptor);
+extern char *transit_MetricDescriptor_as_JSON_str(const transit_MetricDescriptor *transit_MetricDescriptor);
+extern transit_MetricDescriptor *JSON_as_transit_MetricDescriptor(json_t *json);
+extern transit_MetricDescriptor *JSON_str_as_transit_MetricDescriptor(const char *json_str);
 
 typedef struct {
     string key;
-    TypedValue value;
-} string_TypedValue_Pair;
+    transit_TypedValue value;
+} string_transit_TypedValue_Pair;
 
 typedef struct {
     size_t count;
-    string_TypedValue_Pair *items;
-} string_TypedValue_Pair_List;
+    string_transit_TypedValue_Pair *items;
+} string_transit_TypedValue_Pair_List;
 
-typedef struct {
+typedef struct _transit_InventoryResource_ {
     string Name;
     string Type;
     string Owner;
     string Category;
     string Description;
     string Device;
-    string_TypedValue_Pair_List Properties;  // go: map[string]TypedValue
-} InventoryResource;
+    string_transit_TypedValue_Pair_List Properties;  // go: map[string]TypedValue
+} transit_InventoryResource;
 
-#define  make_empty_InventoryResource_array(n) (InventoryResource *) calloc((n), sizeof (InventoryResource))
-#define  make_empty_InventoryResource() make_empty_InventoryResource_array(1)
-extern bool destroy_InventoryResource_tree(InventoryResource *InventoryResource_ptr);
-extern char *encode_InventoryResource_as_json(const InventoryResource *InventoryResource_ptr, size_t flags);
-extern InventoryResource *decode_json_InventoryResource(const char *json_str);
-#define free_InventoryResource_tree destroy_InventoryResource_tree
+#define  make_empty_transit_InventoryResource_array(n) (transit_InventoryResource *) calloc((n), sizeof (transit_InventoryResource))
+#define  make_empty_transit_InventoryResource() make_empty_transit_InventoryResource_array(1)
+extern bool destroy_transit_InventoryResource_tree(transit_InventoryResource *transit_InventoryResource_ptr);
+extern char *encode_transit_InventoryResource_as_json(const transit_InventoryResource *transit_InventoryResource_ptr, size_t flags);
+extern transit_InventoryResource *decode_json_transit_InventoryResource(const char *json_str);
+#define free_transit_InventoryResource_tree destroy_transit_InventoryResource_tree
+extern json_t *transit_InventoryResource_as_JSON(const transit_InventoryResource *transit_InventoryResource);
+extern char *transit_InventoryResource_as_JSON_str(const transit_InventoryResource *transit_InventoryResource);
+extern transit_InventoryResource *JSON_as_transit_InventoryResource(json_t *json);
+extern transit_InventoryResource *JSON_str_as_transit_InventoryResource(const char *json_str);
 
-typedef struct {
+typedef struct _transit_ResourceStatus_ {
     string Name;
     string Type;
     string Owner;
-    MonitorStatus Status;
-    FIX_MAJOR_dummy_typename LastCheckTime;  // go:  MillisecondTimestamp
-    FIX_MAJOR_dummy_typename NextCheckTime;  // go:  MillisecondTimestamp
+    transit_MonitorStatus Status;
+    milliseconds_MillisecondTimestamp LastCheckTime;  // go:  milliseconds.MillisecondTimestamp
+    milliseconds_MillisecondTimestamp NextCheckTime;  // go:  milliseconds.MillisecondTimestamp
     string LastPlugInOutput;
-    string_TypedValue_Pair_List Properties;  // go: map[string]TypedValue
-} ResourceStatus;
+    string_transit_TypedValue_Pair_List Properties;  // go: map[string]TypedValue
+} transit_ResourceStatus;
 
-#define  make_empty_ResourceStatus_array(n) (ResourceStatus *) calloc((n), sizeof (ResourceStatus))
-#define  make_empty_ResourceStatus() make_empty_ResourceStatus_array(1)
-extern bool destroy_ResourceStatus_tree(ResourceStatus *ResourceStatus_ptr);
-extern char *encode_ResourceStatus_as_json(const ResourceStatus *ResourceStatus_ptr, size_t flags);
-extern ResourceStatus *decode_json_ResourceStatus(const char *json_str);
-#define free_ResourceStatus_tree destroy_ResourceStatus_tree
+#define  make_empty_transit_ResourceStatus_array(n) (transit_ResourceStatus *) calloc((n), sizeof (transit_ResourceStatus))
+#define  make_empty_transit_ResourceStatus() make_empty_transit_ResourceStatus_array(1)
+extern bool destroy_transit_ResourceStatus_tree(transit_ResourceStatus *transit_ResourceStatus_ptr);
+extern char *encode_transit_ResourceStatus_as_json(const transit_ResourceStatus *transit_ResourceStatus_ptr, size_t flags);
+extern transit_ResourceStatus *decode_json_transit_ResourceStatus(const char *json_str);
+#define free_transit_ResourceStatus_tree destroy_transit_ResourceStatus_tree
+extern json_t *transit_ResourceStatus_as_JSON(const transit_ResourceStatus *transit_ResourceStatus);
+extern char *transit_ResourceStatus_as_JSON_str(const transit_ResourceStatus *transit_ResourceStatus);
+extern transit_ResourceStatus *JSON_as_transit_ResourceStatus(json_t *json);
+extern transit_ResourceStatus *JSON_str_as_transit_ResourceStatus(const char *json_str);
 
-typedef struct {
+typedef struct _transit_MonitoredResource_ {
     string Name;
-    MonitoredResourceType Type;
+    transit_MonitoredResourceType Type;
     string Owner;
-} MonitoredResource;
+} transit_MonitoredResource;
 
-#define  make_empty_MonitoredResource_array(n) (MonitoredResource *) calloc((n), sizeof (MonitoredResource))
-#define  make_empty_MonitoredResource() make_empty_MonitoredResource_array(1)
-extern bool destroy_MonitoredResource_tree(MonitoredResource *MonitoredResource_ptr);
-extern char *encode_MonitoredResource_as_json(const MonitoredResource *MonitoredResource_ptr, size_t flags);
-extern MonitoredResource *decode_json_MonitoredResource(const char *json_str);
-#define free_MonitoredResource_tree destroy_MonitoredResource_tree
+#define  make_empty_transit_MonitoredResource_array(n) (transit_MonitoredResource *) calloc((n), sizeof (transit_MonitoredResource))
+#define  make_empty_transit_MonitoredResource() make_empty_transit_MonitoredResource_array(1)
+extern bool destroy_transit_MonitoredResource_tree(transit_MonitoredResource *transit_MonitoredResource_ptr);
+extern char *encode_transit_MonitoredResource_as_json(const transit_MonitoredResource *transit_MonitoredResource_ptr, size_t flags);
+extern transit_MonitoredResource *decode_json_transit_MonitoredResource(const char *json_str);
+#define free_transit_MonitoredResource_tree destroy_transit_MonitoredResource_tree
+extern json_t *transit_MonitoredResource_as_JSON(const transit_MonitoredResource *transit_MonitoredResource);
+extern char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource);
+extern transit_MonitoredResource *JSON_as_transit_MonitoredResource(json_t *json);
+extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str);
 
-typedef struct {
+typedef struct _transit_TracerContext_ {
     string AppType;
     string AgentID;
     string TraceToken;
-    FIX_MAJOR_dummy_typename TimeStamp;  // go:  MillisecondTimestamp
-} TracerContext;
+    milliseconds_MillisecondTimestamp TimeStamp;  // go:  milliseconds.MillisecondTimestamp
+} transit_TracerContext;
 
-#define  make_empty_TracerContext_array(n) (TracerContext *) calloc((n), sizeof (TracerContext))
-#define  make_empty_TracerContext() make_empty_TracerContext_array(1)
-extern bool destroy_TracerContext_tree(TracerContext *TracerContext_ptr);
-extern char *encode_TracerContext_as_json(const TracerContext *TracerContext_ptr, size_t flags);
-extern TracerContext *decode_json_TracerContext(const char *json_str);
-#define free_TracerContext_tree destroy_TracerContext_tree
+#define  make_empty_transit_TracerContext_array(n) (transit_TracerContext *) calloc((n), sizeof (transit_TracerContext))
+#define  make_empty_transit_TracerContext() make_empty_transit_TracerContext_array(1)
+extern bool destroy_transit_TracerContext_tree(transit_TracerContext *transit_TracerContext_ptr);
+extern char *encode_transit_TracerContext_as_json(const transit_TracerContext *transit_TracerContext_ptr, size_t flags);
+extern transit_TracerContext *decode_json_transit_TracerContext(const char *json_str);
+#define free_transit_TracerContext_tree destroy_transit_TracerContext_tree
+extern json_t *transit_TracerContext_as_JSON(const transit_TracerContext *transit_TracerContext);
+extern char *transit_TracerContext_as_JSON_str(const transit_TracerContext *transit_TracerContext);
+extern transit_TracerContext *JSON_as_transit_TracerContext(json_t *json);
+extern transit_TracerContext *JSON_str_as_transit_TracerContext(const char *json_str);
 
 typedef struct {
     size_t count;
-    MonitoredResource *items;
-} MonitoredResource_List;
+    transit_MonitoredResource *items;
+} transit_MonitoredResource_List;
 
-typedef struct {
+typedef struct _transit_ResourceGroup_ {
     string GroupName;
-    MonitoredResource_List Resources;  // go: []MonitoredResource
-} ResourceGroup;
+    transit_MonitoredResource_List Resources;  // go: []MonitoredResource
+} transit_ResourceGroup;
 
-#define  make_empty_ResourceGroup_array(n) (ResourceGroup *) calloc((n), sizeof (ResourceGroup))
-#define  make_empty_ResourceGroup() make_empty_ResourceGroup_array(1)
-extern bool destroy_ResourceGroup_tree(ResourceGroup *ResourceGroup_ptr);
-extern char *encode_ResourceGroup_as_json(const ResourceGroup *ResourceGroup_ptr, size_t flags);
-extern ResourceGroup *decode_json_ResourceGroup(const char *json_str);
-#define free_ResourceGroup_tree destroy_ResourceGroup_tree
-
-typedef struct {
-    size_t count;
-    InventoryResource *items;
-} InventoryResource_List;
-
-typedef InventoryResource_List *InventoryResource_List_Ptr;
+#define  make_empty_transit_ResourceGroup_array(n) (transit_ResourceGroup *) calloc((n), sizeof (transit_ResourceGroup))
+#define  make_empty_transit_ResourceGroup() make_empty_transit_ResourceGroup_array(1)
+extern bool destroy_transit_ResourceGroup_tree(transit_ResourceGroup *transit_ResourceGroup_ptr);
+extern char *encode_transit_ResourceGroup_as_json(const transit_ResourceGroup *transit_ResourceGroup_ptr, size_t flags);
+extern transit_ResourceGroup *decode_json_transit_ResourceGroup(const char *json_str);
+#define free_transit_ResourceGroup_tree destroy_transit_ResourceGroup_tree
+extern json_t *transit_ResourceGroup_as_JSON(const transit_ResourceGroup *transit_ResourceGroup);
+extern char *transit_ResourceGroup_as_JSON_str(const transit_ResourceGroup *transit_ResourceGroup);
+extern transit_ResourceGroup *JSON_as_transit_ResourceGroup(json_t *json);
+extern transit_ResourceGroup *JSON_str_as_transit_ResourceGroup(const char *json_str);
 
 typedef struct {
     size_t count;
-    ResourceGroup *items;
-} ResourceGroup_List;
+    transit_InventoryResource *items;
+} transit_InventoryResource_List;
 
-typedef ResourceGroup_List *ResourceGroup_List_Ptr;
-
-typedef struct {
-    InventoryResource_List_Ptr Inventory;  // go: *[]InventoryResource
-    ResourceGroup_List_Ptr Groups;  // go: *[]ResourceGroup
-} SendInventoryRequest;
-
-#define  make_empty_SendInventoryRequest_array(n) (SendInventoryRequest *) calloc((n), sizeof (SendInventoryRequest))
-#define  make_empty_SendInventoryRequest() make_empty_SendInventoryRequest_array(1)
-extern bool destroy_SendInventoryRequest_tree(SendInventoryRequest *SendInventoryRequest_ptr);
-extern char *encode_SendInventoryRequest_as_json(const SendInventoryRequest *SendInventoryRequest_ptr, size_t flags);
-extern SendInventoryRequest *decode_json_SendInventoryRequest(const char *json_str);
-#define free_SendInventoryRequest_tree destroy_SendInventoryRequest_tree
+typedef transit_InventoryResource_List *transit_InventoryResource_List_Ptr;
 
 typedef struct {
+    size_t count;
+    transit_ResourceGroup *items;
+} transit_ResourceGroup_List;
+
+typedef transit_ResourceGroup_List *transit_ResourceGroup_List_Ptr;
+
+typedef struct _transit_SendInventoryRequest_ {
+    transit_InventoryResource_List_Ptr Inventory;  // go: *[]InventoryResource
+    transit_ResourceGroup_List_Ptr Groups;  // go: *[]ResourceGroup
+} transit_SendInventoryRequest;
+
+#define  make_empty_transit_SendInventoryRequest_array(n) (transit_SendInventoryRequest *) calloc((n), sizeof (transit_SendInventoryRequest))
+#define  make_empty_transit_SendInventoryRequest() make_empty_transit_SendInventoryRequest_array(1)
+extern bool destroy_transit_SendInventoryRequest_tree(transit_SendInventoryRequest *transit_SendInventoryRequest_ptr);
+extern char *encode_transit_SendInventoryRequest_as_json(const transit_SendInventoryRequest *transit_SendInventoryRequest_ptr, size_t flags);
+extern transit_SendInventoryRequest *decode_json_transit_SendInventoryRequest(const char *json_str);
+#define free_transit_SendInventoryRequest_tree destroy_transit_SendInventoryRequest_tree
+extern json_t *transit_SendInventoryRequest_as_JSON(const transit_SendInventoryRequest *transit_SendInventoryRequest);
+extern char *transit_SendInventoryRequest_as_JSON_str(const transit_SendInventoryRequest *transit_SendInventoryRequest);
+extern transit_SendInventoryRequest *JSON_as_transit_SendInventoryRequest(json_t *json);
+extern transit_SendInventoryRequest *JSON_str_as_transit_SendInventoryRequest(const char *json_str);
+
+typedef struct _transit_OperationResult_ {
     string Entity;
     string Status;
     string Message;
     string Location;
     int EntityID;
-} OperationResult;
+} transit_OperationResult;
 
-#define  make_empty_OperationResult_array(n) (OperationResult *) calloc((n), sizeof (OperationResult))
-#define  make_empty_OperationResult() make_empty_OperationResult_array(1)
-extern bool destroy_OperationResult_tree(OperationResult *OperationResult_ptr);
-extern char *encode_OperationResult_as_json(const OperationResult *OperationResult_ptr, size_t flags);
-extern OperationResult *decode_json_OperationResult(const char *json_str);
-#define free_OperationResult_tree destroy_OperationResult_tree
+#define  make_empty_transit_OperationResult_array(n) (transit_OperationResult *) calloc((n), sizeof (transit_OperationResult))
+#define  make_empty_transit_OperationResult() make_empty_transit_OperationResult_array(1)
+extern bool destroy_transit_OperationResult_tree(transit_OperationResult *transit_OperationResult_ptr);
+extern char *encode_transit_OperationResult_as_json(const transit_OperationResult *transit_OperationResult_ptr, size_t flags);
+extern transit_OperationResult *decode_json_transit_OperationResult(const char *json_str);
+#define free_transit_OperationResult_tree destroy_transit_OperationResult_tree
+extern json_t *transit_OperationResult_as_JSON(const transit_OperationResult *transit_OperationResult);
+extern char *transit_OperationResult_as_JSON_str(const transit_OperationResult *transit_OperationResult);
+extern transit_OperationResult *JSON_as_transit_OperationResult(json_t *json);
+extern transit_OperationResult *JSON_str_as_transit_OperationResult(const char *json_str);
 
 typedef struct {
     size_t count;
-    OperationResult *items;
-} OperationResult_List;
+    transit_OperationResult *items;
+} transit_OperationResult_List;
 
-typedef OperationResult_List *OperationResult_List_Ptr;
+typedef transit_OperationResult_List *transit_OperationResult_List_Ptr;
 
-typedef struct {
+typedef struct _transit_OperationResults_ {
     int ResourcesAdded;
     int ResourcesDeleted;
     string EntityType;
     string Operation;
     int Warning;
     int Count;
-    OperationResult_List_Ptr Results;  // go: *[]OperationResult
-} OperationResults;
+    transit_OperationResult_List_Ptr Results;  // go: *[]OperationResult
+} transit_OperationResults;
 
-#define  make_empty_OperationResults_array(n) (OperationResults *) calloc((n), sizeof (OperationResults))
-#define  make_empty_OperationResults() make_empty_OperationResults_array(1)
-extern bool destroy_OperationResults_tree(OperationResults *OperationResults_ptr);
-extern char *encode_OperationResults_as_json(const OperationResults *OperationResults_ptr, size_t flags);
-extern OperationResults *decode_json_OperationResults(const char *json_str);
-#define free_OperationResults_tree destroy_OperationResults_tree
-
-typedef struct {
-    size_t count;
-    TimeSeries *items;
-} TimeSeries_List;
-
-typedef struct {
-    ResourceStatus Resource;
-    TimeSeries_List Metrics;  // go: []TimeSeries
-} ResourceWithMetrics;
-
-#define  make_empty_ResourceWithMetrics_array(n) (ResourceWithMetrics *) calloc((n), sizeof (ResourceWithMetrics))
-#define  make_empty_ResourceWithMetrics() make_empty_ResourceWithMetrics_array(1)
-extern bool destroy_ResourceWithMetrics_tree(ResourceWithMetrics *ResourceWithMetrics_ptr);
-extern char *encode_ResourceWithMetrics_as_json(const ResourceWithMetrics *ResourceWithMetrics_ptr, size_t flags);
-extern ResourceWithMetrics *decode_json_ResourceWithMetrics(const char *json_str);
-#define free_ResourceWithMetrics_tree destroy_ResourceWithMetrics_tree
+#define  make_empty_transit_OperationResults_array(n) (transit_OperationResults *) calloc((n), sizeof (transit_OperationResults))
+#define  make_empty_transit_OperationResults() make_empty_transit_OperationResults_array(1)
+extern bool destroy_transit_OperationResults_tree(transit_OperationResults *transit_OperationResults_ptr);
+extern char *encode_transit_OperationResults_as_json(const transit_OperationResults *transit_OperationResults_ptr, size_t flags);
+extern transit_OperationResults *decode_json_transit_OperationResults(const char *json_str);
+#define free_transit_OperationResults_tree destroy_transit_OperationResults_tree
+extern json_t *transit_OperationResults_as_JSON(const transit_OperationResults *transit_OperationResults);
+extern char *transit_OperationResults_as_JSON_str(const transit_OperationResults *transit_OperationResults);
+extern transit_OperationResults *JSON_as_transit_OperationResults(json_t *json);
+extern transit_OperationResults *JSON_str_as_transit_OperationResults(const char *json_str);
 
 typedef struct {
     size_t count;
-    ResourceWithMetrics *items;
-} ResourceWithMetrics_List;
+    transit_TimeSeries *items;
+} transit_TimeSeries_List;
+
+typedef struct _transit_ResourceWithMetrics_ {
+    transit_ResourceStatus Resource;
+    transit_TimeSeries_List Metrics;  // go: []TimeSeries
+} transit_ResourceWithMetrics;
+
+#define  make_empty_transit_ResourceWithMetrics_array(n) (transit_ResourceWithMetrics *) calloc((n), sizeof (transit_ResourceWithMetrics))
+#define  make_empty_transit_ResourceWithMetrics() make_empty_transit_ResourceWithMetrics_array(1)
+extern bool destroy_transit_ResourceWithMetrics_tree(transit_ResourceWithMetrics *transit_ResourceWithMetrics_ptr);
+extern char *encode_transit_ResourceWithMetrics_as_json(const transit_ResourceWithMetrics *transit_ResourceWithMetrics_ptr, size_t flags);
+extern transit_ResourceWithMetrics *decode_json_transit_ResourceWithMetrics(const char *json_str);
+#define free_transit_ResourceWithMetrics_tree destroy_transit_ResourceWithMetrics_tree
+extern json_t *transit_ResourceWithMetrics_as_JSON(const transit_ResourceWithMetrics *transit_ResourceWithMetrics);
+extern char *transit_ResourceWithMetrics_as_JSON_str(const transit_ResourceWithMetrics *transit_ResourceWithMetrics);
+extern transit_ResourceWithMetrics *JSON_as_transit_ResourceWithMetrics(json_t *json);
+extern transit_ResourceWithMetrics *JSON_str_as_transit_ResourceWithMetrics(const char *json_str);
 
 typedef struct {
-    TracerContext Context;
-    ResourceWithMetrics_List Resources;  // go: []ResourceWithMetrics
-} ResourceWithMetricsRequest;
+    size_t count;
+    transit_ResourceWithMetrics *items;
+} transit_ResourceWithMetrics_List;
 
-#define  make_empty_ResourceWithMetricsRequest_array(n) (ResourceWithMetricsRequest *) calloc((n), sizeof (ResourceWithMetricsRequest))
-#define  make_empty_ResourceWithMetricsRequest() make_empty_ResourceWithMetricsRequest_array(1)
-extern bool destroy_ResourceWithMetricsRequest_tree(ResourceWithMetricsRequest *ResourceWithMetricsRequest_ptr);
-extern char *encode_ResourceWithMetricsRequest_as_json(const ResourceWithMetricsRequest *ResourceWithMetricsRequest_ptr, size_t flags);
-extern ResourceWithMetricsRequest *decode_json_ResourceWithMetricsRequest(const char *json_str);
-#define free_ResourceWithMetricsRequest_tree destroy_ResourceWithMetricsRequest_tree
+typedef struct _transit_ResourceWithMetricsRequest_ {
+    transit_TracerContext Context;
+    transit_ResourceWithMetrics_List Resources;  // go: []ResourceWithMetrics
+} transit_ResourceWithMetricsRequest;
 
-typedef config_Config *config_Config_Ptr; // ptr to base type
+#define  make_empty_transit_ResourceWithMetricsRequest_array(n) (transit_ResourceWithMetricsRequest *) calloc((n), sizeof (transit_ResourceWithMetricsRequest))
+#define  make_empty_transit_ResourceWithMetricsRequest() make_empty_transit_ResourceWithMetricsRequest_array(1)
+extern bool destroy_transit_ResourceWithMetricsRequest_tree(transit_ResourceWithMetricsRequest *transit_ResourceWithMetricsRequest_ptr);
+extern char *encode_transit_ResourceWithMetricsRequest_as_json(const transit_ResourceWithMetricsRequest *transit_ResourceWithMetricsRequest_ptr, size_t flags);
+extern transit_ResourceWithMetricsRequest *decode_json_transit_ResourceWithMetricsRequest(const char *json_str);
+#define free_transit_ResourceWithMetricsRequest_tree destroy_transit_ResourceWithMetricsRequest_tree
+extern json_t *transit_ResourceWithMetricsRequest_as_JSON(const transit_ResourceWithMetricsRequest *transit_ResourceWithMetricsRequest);
+extern char *transit_ResourceWithMetricsRequest_as_JSON_str(const transit_ResourceWithMetricsRequest *transit_ResourceWithMetricsRequest);
+extern transit_ResourceWithMetricsRequest *JSON_as_transit_ResourceWithMetricsRequest(json_t *json);
+extern transit_ResourceWithMetricsRequest *JSON_str_as_transit_ResourceWithMetricsRequest(const char *json_str);
 
-typedef struct {
+typedef config_Config *config_Config_Ptr;
+
+typedef struct _transit_Transit_ {
     config_Config_Ptr config_Config_ptr_;  // go: *config.Config
 } transit_Transit;
 
@@ -494,6 +564,10 @@ extern bool destroy_transit_Transit_tree(transit_Transit *transit_Transit_ptr);
 extern char *encode_transit_Transit_as_json(const transit_Transit *transit_Transit_ptr, size_t flags);
 extern transit_Transit *decode_json_transit_Transit(const char *json_str);
 #define free_transit_Transit_tree destroy_transit_Transit_tree
+extern json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit);
+extern char *transit_Transit_as_JSON_str(const transit_Transit *transit_Transit);
+extern transit_Transit *JSON_as_transit_Transit(json_t *json);
+extern transit_Transit *JSON_str_as_transit_Transit(const char *json_str);
 
 #ifdef  __cplusplus
 }
