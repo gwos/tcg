@@ -1,0 +1,39 @@
+Here are some ways in which we could usefully have someone other than
+myself speed up the development of the conversion tool.
+
+Being mindful of the widely-understood notion that adding people to a
+late project just makes it later, the idea here is to come up with tasks
+that can contribute usefully, but that don't involve having someone else
+get lost in complicated still-in-development code.
+
+Task #1:  Make the recommended Go-code changes.
+
+    See the sibling RECOMMENDED_CHANGES file.  There are a few changes
+    either strongly or possibly recommanded there.  Making such
+    adjustments may require a few corresponding adjustments elsewhere
+    in TNG code.
+
+Task #1:  Come up with full JSON strings for testing.
+
+    Currently, I have JSON strings embedded in the tjunit.c file, for just
+    a couple of the data structures being converted.  As I implement the
+    code for lists of objects, I will need some semi-large JSON strings
+    to test out those lists against.  The supplied strings don't need to
+    have the full C-code syntax as represented in the tjunit.c file; I can
+    easily handle modifying the punctuation to make the things compile.
+
+    What I need is actual representative content for such structures.
+    That content should be of some top-level object that includes some
+    other objects and lists of other objects.  I want an example of
+    each type of complexity represented in the Go code.  For instance,
+    if in some data structures we have a plain list and sometimes we
+    have a pointer to a list, those would be different use cases we
+    need to test separately.  Similarly, a list of pointers to objects
+    is different from a list of objects themselves.
+
+    At some point, we will also want to test each of the special values
+    we care about in the Go-code struct field tags, namely alternate
+    field names and the "omitempty" directive.  I am not concerned about
+    that in the first iteration.  Getting the data converted in both
+    directions is the first order of business, and adding support for
+    the field tags will be an immediate follow-on enhancement.

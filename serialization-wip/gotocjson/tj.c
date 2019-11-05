@@ -341,7 +341,8 @@ json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit) {
     // json = json_pack_ex(&error, flags, "{s:o?}"
     json = json_pack("{s:o?}"
 	// FIX MAJOR:  revisit the pointer stuff once that is settled out upstream
-        , "config_Config_ptr_", config_Config_as_JSON( transit_Transit->config_Config_ptr_ )
+	// FIX MAJOR:  we used to use "config_Config_ptr_" here
+        , "Config", config_Config_as_JSON( transit_Transit->config_Config_ptr_ )
     );
     if (json == NULL) {
 	// printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
@@ -400,6 +401,214 @@ char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *tra
 // FIX MAJOR:  for simplicity, publish this instead of the actual function just above
 #define transit_MonitoredResource_as_JSON_str(transit_MonitoredResource) JSON_as_string(transit_MonitoredResource_as_JSON(transit_MonitoredResource), 0)
 */
+
+// FIX MAJOR:  output these definitions in the boilerplate for the header file that defines the "struct_timespec" conversions
+#define	MILLISECONDS_PER_SECOND		1000
+#define	MICROSECONDS_PER_MILLISECOND	1000
+#define	NANOSECONDS_PER_MICROSECOND	1000
+#define NANOSECONDS_PER_MILLISECOND	(NANOSECONDS_PER_MICROSECOND * MICROSECONDS_PER_MILLISECOND)
+
+json_t *milliseconds_MillisecondTimestamp_as_JSON(const milliseconds_MillisecondTimestamp *milliseconds_MillisecondTimestamp) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    // FIX MAJOR:  when generating this code, special-case the field packing in this routine, based on the "struct_timespec" field type
+    // FIX MAJOR:  make sure the "i" conversion can handle a 64-bit number
+    json = json_pack_ex(&error, flags, "{s:i}"
+         // struct_timespec time_Time_;  // go:  time.Time
+	 , "Time", (json_int_t) (
+	     (milliseconds_MillisecondTimestamp->time_Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
+	     (milliseconds_MillisecondTimestamp->time_Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
+	 )
+    );
+    if (json == NULL) {
+	printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    error.text, error.source, error.line, error.column, error.position);
+    }
+    return json;
+}
+
+json_t *transit_TypedValue_as_JSON(const transit_TypedValue *transit_TypedValue) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    printf("before_pack() in transit_TypedValue_as_JSON\n");
+    // FIX MAJOR:  get all the element types correctly processed; transit_ValueType is at risk for 32bit/64bit issues
+    // json = json_pack("{s:i s:b s:f s:i s:s s:o}"
+    json = json_pack_ex(&error, flags, "{s:i s:b s:f s:i s:s s:o}"
+        , "ValueType",    transit_TypedValue->ValueType    // transit_ValueType
+        , "BoolValue",    transit_TypedValue->BoolValue    // bool
+        , "DoubleValue",  transit_TypedValue->DoubleValue  // float64
+        , "IntegerValue", transit_TypedValue->IntegerValue // int64
+        , "StringValue",  transit_TypedValue->StringValue  // string
+        , "TimeValue",    milliseconds_MillisecondTimestamp_as_JSON( &transit_TypedValue->TimeValue ) // milliseconds_MillisecondTimestamp
+    );
+    if (json == NULL) {
+	printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    error.text, error.source, error.line, error.column, error.position);
+    }
+    printf(" after json_pack() in transit_TypedValue_as_JSON; json = %p\n", json);
+    return json;
+}
+
+// Encoding routine.
+char *transit_TypedValue_as_JSON_str(const transit_TypedValue *transit_TypedValue) {
+    size_t flags = 0;
+    return JSON_as_string(transit_TypedValue_as_JSON(transit_TypedValue), flags);
+}
+/*
+// FIX MAJOR:  for simplicity, publish this instead of the actual function just above
+#define transit_TypedValue_as_JSON_str(transit_TypedValue) JSON_as_string(transit_TypedValue_as_JSON(transit_TypedValue), 0)
+*/
+
+// ----------------------------------------------------------------
+
+/*
+typedef struct {
+    string key;
+    transit_TypedValue value;
+} string_transit_TypedValue_Pair;
+*/
+json_t *string_transit_TypedValue_Pair_as_JSON(const string_transit_TypedValue_Pair *string_transit_TypedValue_Pair) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    printf("before_pack() in string_transit_TypedValue_Pair_as_JSON\n");
+    // json = json_pack("{s:i s:o}"
+    json = json_pack_ex(&error, flags, "{s:s s:o}"
+        , "key",   string_transit_TypedValue_Pair->key                                  // string
+        , "value", transit_TypedValue_as_JSON( &string_transit_TypedValue_Pair->value ) // transit_TypedValue
+    );
+    if (json == NULL) {
+	printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    error.text, error.source, error.line, error.column, error.position);
+    }
+    printf(" after json_pack() in string_transit_TypedValue_Pair_as_JSON; json = %p\n", json);
+    return json;
+}
+
+/*
+typedef struct {
+    size_t count;
+    string_transit_TypedValue_Pair *items; 
+} string_transit_TypedValue_Pair_List;
+*/
+json_t *string_transit_TypedValue_Pair_List_as_JSON(const string_transit_TypedValue_Pair_List *string_transit_TypedValue_Pair_List) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    printf("before_pack() in string_transit_TypedValue_Pair_List_as_JSON\n");
+
+// FIX QUICK:  this is currently bogus, and still in development
+    // json = json_pack("{s:i s:o}"
+    if (string_transit_TypedValue_Pair_List->count == 0) {
+	json = NULL;
+    }
+    else {
+	// In this case, we want to return a JSON array object.
+	// FIX MAJOR:  Revisit this calculation of size for the format string.  4 is for "s:o ".  10 is for some overall surrounding overhead.
+	// Also check for a NULL-pointer for the format.
+	char *array_format = (char *) malloc (string_transit_TypedValue_Pair_List->count * 4 + 10);
+	// In Perl terms:
+	// array_format = "[ " + ("s:o " x count) + "]"
+	// FIX QUICK:  manufacture that format
+	for (size_t i = 0; i < string_transit_TypedValue_Pair_List->count; ++i) {
+	}
+	/*
+	json = json_pack_ex(&error, flags, "{s:i s::}"
+	    , "count", string_transit_TypedValue_Pair_List->count      // size_t
+	    , "items", string_transit_TypedValue_Pair_List_as_JSON( &string_transit_TypedValue_Pair_List->items ) // string_transit_TypedValue_Pair_List*
+	);
+	*/
+
+	if (json == NULL) {
+	    printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+		error.text, error.source, error.line, error.column, error.position);
+	}
+    }
+    printf(" after json_pack() in string_transit_TypedValue_Pair_List_as_JSON; json = %p\n", json);
+    return json;
+}
+
+/*
+typedef struct _transit_InventoryResource_ {
+    string Name;
+    string Type;
+    string Owner;
+    string Category;
+    string Description;
+    string Device; 
+    // // Foundation Properties
+    // Properties map[string]TypedValue `json:"properties,omitempty"`
+    string_transit_TypedValue_Pair_List Properties;  // go: map[string]TypedValue
+} transit_InventoryResource;
+*/
+json_t *transit_InventoryResource_as_JSON(const transit_InventoryResource *transit_InventoryResource) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    printf("before_pack() in transit_InventoryResource_as_JSON\n");
+    // json = json_pack("{s:s s:s s:s s:s s:s s:s s:o}"
+    json = json_pack_ex(&error, flags, "{s:s s:s s:s s:s s:s s:s s:o}"
+        , "Name",        transit_InventoryResource->Name        // string
+        , "Type",        transit_InventoryResource->Type        // string
+        , "Owner",       transit_InventoryResource->Owner       // string
+        , "Category",    transit_InventoryResource->Category    // string
+        , "Description", transit_InventoryResource->Description // string
+        , "Device",      transit_InventoryResource->Device      // string
+        , "Properties",  string_transit_TypedValue_Pair_List_as_JSON( &transit_InventoryResource->Properties ) // string_transit_TypedValue_Pair_List
+    );
+    if (json == NULL) {
+	printf("ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    error.text, error.source, error.line, error.column, error.position);
+    }
+    printf(" after json_pack() in transit_InventoryResource_as_JSON; json = %p\n", json);
+    return json;
+}
+
+j/ Encoding routine.
+char *transit_InventoryResource_as_JSON_str(const transit_InventoryResource *transit_InventoryResource) {
+    size_t flags = 0;
+    return JSON_as_string(transit_InventoryResource_as_JSON(transit_InventoryResource), flags);
+}
+/*
+// FIX MAJOR:  for simplicity, publish this instead of the actual function just above
+#define transit_InventoryResource_as_JSON_str(transit_InventoryResource) JSON_as_string(transit_InventoryResource_as_JSON(transit_InventoryResource), 0)
+*/
+
+// ----------------------------------------------------------------
+
+#if !(JSON_INTEGER_IS_LONG_LONG)
+#error The Jansson JSON integer type may not hold 64 bits on this platform; 64 bits are needed for the milliseconds_MillisecondTimestamp type.
+#endif
+
+/*
+typedef struct _milliseconds_MillisecondTimestamp_ {
+    struct_timespec time_Time_;  // go:  time.Time
+} milliseconds_MillisecondTimestamp;
+*/
+milliseconds_MillisecondTimestamp *JSON_as_milliseconds_MillisecondTimestamp(json_t *json) {
+    milliseconds_MillisecondTimestamp *MillisecondTimestamp = (milliseconds_MillisecondTimestamp *)malloc(sizeof(milliseconds_MillisecondTimestamp));
+    if (!MillisecondTimestamp) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, "ERROR:  in JSON_as_milliseconds_MillisecondTimestamp, %s\n", "malloc failed");
+    } else {
+	// FIX MAJOR:  when generating this code, special-case the field unpacking in this routine, based on the "struct_timespec" field type
+	json_int_t pure_milliseconds;
+	if (json_unpack(json, "{s:i}"
+	    , "Time", &pure_milliseconds
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, "ERROR:  in JSON_as_milliseconds_MillisecondTimestamp, %s\n", "JSON unpacking failed");
+	    free(MillisecondTimestamp);
+	    MillisecondTimestamp = NULL;
+	} else {
+	    MillisecondTimestamp->time_Time_.tv_sec  = (time_t) (pure_milliseconds / MILLISECONDS_PER_SECOND);
+	    MillisecondTimestamp->time_Time_.tv_nsec = (long) (pure_milliseconds % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
+	}
+    }
+    return MillisecondTimestamp;
+}
 
 // ----------------------------------------------------------------
 
@@ -677,9 +886,9 @@ transit_Transit *JSON_str_as_transit_Transit(const char *json_str) {
         printf("json for transit_Transit is NULL\n");
 	return NULL;
     }
-    printf("--------------------------\n");
-    printf("transit_Transit dump:\n%s\n", json_dumps(json, JSON_INDENT(4)));
-    printf("--------------------------\n");
+    // printf("--------------------------\n");
+    // printf("transit_Transit dump:\n%s\n", json_dumps(json, JSON_INDENT(4)));
+    // printf("--------------------------\n");
     transit_Transit *Transit = JSON_as_transit_Transit(json);
     // FIX MAJOR:  put this back
     // json_decref(json);

@@ -1,0 +1,160 @@
+This subdirectory is here only on a temporary basis, to contain code which
+is still work-in-progress with regard to serialization and deserialization
+of C structures expressed as JSON in a manner which will be completely
+compatible with corresponding Go structures.
+
+Certain OS packages are needed.  In particular, you need the following
+before beginning (these are not the actual package names):
+
+    make
+    tar
+    autoconf
+    libtool
+    Go
+    GCC (a recent version that supports C99 or C11 by default; I forget which)
+    binutils (for things like "ar")
+
+From a standing start, as checked out from Git, follow the yellow brick road:
+
+    # Drop into the top-level WIP directory.
+    cd serialization-wip
+
+    # Make the Jansson library.  Header files and compiled library files for
+    # use with the WIP code will be installed under the local/ subdirectory.
+    # The Makefile for the C code we are generating knows to look there.
+    make
+
+    # Drop into the bottom-level WIP directory.  This is where the conversion
+    # program and test program are being developed.
+    cd gotocjson
+
+    # Compile the Go conversion program.
+    make
+
+    # Compile the unit-test program.
+    make tjunit
+
+    # Build everything necessary, and run the unit tests.
+    make test
+
+    # Cleanup targets.
+    make clean
+    make realclean
+
+The existing code contains a lot of extra output which has been useful
+during development to expose the innards of what is happening during
+Go-code parsing, C-code generation, and testing.  The parts of this
+that matter will be cleaned up and formalized at the end, once all Go
+constructs we must support are in fact supported.  In the meantime,
+having more clues available when things fail is helpful.
+
+There is currently much debris left around during the development and
+test process.  The most important files are:
+
+    serialization-wip/README
+	The file you are now reading.
+
+    serialization-wip/Makefile
+	A makefile used to compile the C-language Jansson library used
+	for generating and parsing JSON strings.
+
+    serialization-wip/jansson-2.12.tar.gz
+	The upstream Jansson library.  It doesn't really belong in our
+	checked-in code.  If this file is locally missing, the sibling
+	Makefile will download the original file and rename it to this
+	sensible name (the Jansson folks didn't follow the usual standard
+	conventions, which makes for confusion).
+
+    serialization-wip/gotocjson/Makefile
+	A makefile used to compile the conversion program and the
+	unit-test program.  As part of that build, the conversion program
+	is run on some of the .go files in this directory, to generate
+	corresponding C header and code files.
+
+    serialization-wip/gotocjson/config.go
+        a stable copy of the TNG config.go file, here to insulate
+	against random changes in the real copy until I've worked out
+	how to handle all features we need to support
+
+    serialization-wip/gotocjson/enum.go
+	used for testing the Go-language parsing, but not part of the
+	ultimate deliverable
+
+    serialization-wip/gotocjson/gotocjson.go
+	The Go-to-C conversion tool.  For development/test purposes,
+	this is built and invoked via the sibling Makefile.
+
+	The program works by running the standard Go compiler's own
+	parser, then walking the Abstract Syntax Tree that results to find
+	the parts we are interested in.  Those parts are picked through
+	to extract package imports, type definitions, const blocks, and
+	structure definitions eith their field name, field types, and
+	field tags.  That information is saved in other data structures
+	which are more convenient to use during C-code generation.
+
+	Because Go allows forward references to as-yet-undefined types
+	and objects, while C does not, the conversion program runs a
+	topological sort on the relationships between all the data types,
+	so they can be output in a form which closely mirrors that of
+	the original Go code but also satisfies the constraints of the
+	C compiler.
+
+	Output is split between a .h file, containing only declarations,
+	and a .c file, containing both enumeration values represented
+	as strings and the generated conversion functions.
+
+    serialization-wip/gotocjson/milliseconds.go
+        a stable copy of the TNG milliseconds.go file, here to insulate
+	against random changes in the real copy until I've worked out
+	how to handle all features we need to support
+
+    serialization-wip/gotocjson/tj.c
+	This is the manually-edited C code that I am using to work out all
+	the details of exactly how the final generated C code should look,
+	operate, and handle errors.  Essentially, this is a playpen where
+	I can experiment.  That is absolutely necessary, because it's
+	quite hard to see what code needs to be generated until you have
+	a chance to test it in practice.  In the final version, this file
+	will be replaced with the generated config.c, milliseconds.c, and
+	transit.c files that will have full coverage of all the packages,
+	enumerations, data structures, and encode/decode routines that
+	we need.
+
+    serialization-wip/gotocjson/tjunit.c
+	This is the basic unit-test program.  It contains a few large
+	JSON strings that we decode into C structures, then encode those
+	back into JSON and compare against the original JSON strings to
+	verify that we get back exactly what we started with.
+
+    serialization-wip/gotocjson/transit.go
+        a stable copy of the TNG transit.go file, here to insulate
+	against random changes in the real copy until I've worked out
+	how to handle all features we need to support
+
+Some of the other files represent older development code that I am
+presently still keeping around for reference as replacement code is
+written.
+
+Current limitations:
+
+    The current iteration of the conversion tool collects the struct field
+    tags as it walks the parse tree and saves them away for later use,
+    but the tags are not yet used to modify the generation or parsing
+    of JSON strings in the generated C code.  That will take a later
+    iteration of development.
+
+    One issue with the current playpen code is that when parsing JSON
+    into C structures, we encounter strings that end up being reference
+    by the C structures.  However, those strings will disappear when we
+    destroy the JSON (Jansson) objects that contain them after parsing
+    the incoming JSON string.  For that reason, at the moment we have
+    some json_decref(json); calls commented out.  We will either need
+    to strdup() such strings to sidestep such aliasing, or modify
+    the decoding API to also return the relevant JSON objects so their
+    lifetime can be controlled by the calling application rather than just
+    the conversion routines.  That is an improvement still in the wings.
+
+    I am still working on the playpen code to convert lists of items,
+    in either direction.  This is somewhat complicated by the use of
+    pointers in certain places in the Go structures.
+
