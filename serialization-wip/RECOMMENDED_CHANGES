@@ -108,3 +108,32 @@ diff -u ~/github/gwos/tng/transit/transit.go transit.go
  	Owner string `json:"owner,omitempty"`
  }
 
+Also, we have this difference of wording in the transit.go file, that ought to be
+made consistent as regards our spelling for Boolean values and our documentation for
+StringType, IntegerType, and BooleanType values:
+
+    ----------------------------------------------------------------
+    // Data type of the value of a metric
+    const (
+	    IntegerType     ValueType = "IntegerType"
+	    DoubleType                = "DoubleType"
+	    StringType                = "StringType"
+	    BooleanType               = "BooleanType"
+	    TimeType                  = "TimeType"
+	    UnspecifiedType           = "UnspecifiedType"
+    )
+    ----------------------------------------------------------------
+    (within "type TypedValue struct")
+    // BoolValue: A Boolean value: true or false.
+    BoolValue bool `json:"boolValue,omitempty"`
+    ----------------------------------------------------------------
+    (within "type LabelDescriptor struct")
+    // ValueType: The type of data that can be assigned to the label.
+    //
+    // Possible values:
+    //   "STRING" - A variable-length string. This is the default.
+    //   "BOOL" - Boolean; true or false.
+    //   "INT64" - A 64-bit signed integer.
+    ValueType ValueType `json:"valueType,omitempty"`
+    ----------------------------------------------------------------
+
