@@ -1124,6 +1124,31 @@ var C_code_boilerplate = `//
 {{.OtherHeaders}}
 #include "{{.HeaderFilename}}"
 
+#define stringify(x)                    #x
+#define expand_and_stringify(x)         stringify(x)
+
+// FILE_LINE is defined so you can just say:
+// log_message (APP_FATAL, FILE_LINE "Insufficient memory for %s; exiting!", foobar);
+// (Notice the lack of a comma after the FILE_LINE invocation.)
+
+#define FILE_LINE       __FILE__ "[" expand_and_stringify(__LINE__) "] "
+
+#define arraysize(array) (sizeof(array) / sizeof(array[0]))
+
+// If this routine fails to find any matching string within the array, it returns a negative result. 
+// It doesn't log anything in that situation, both because the caller is going to need to check the
+// result anyway for such an out-of-bound result, and because the calling code has a much better
+// idea of the full context of what ought to be included in a log message.
+int enumeration_value(const string const enum_string[], int enum_string_count, const char *enum_value_as_string) {
+    int enum_value;
+    for (enum_value = enum_string_count; --enum_value >= 0; ) {
+        if (!strcmp(enum_value_as_string, enum_string[enum_value])) {
+            break;
+        }
+    }
+    return enum_value;
+}
+
 // FIX MAJOR:  Also include in here some initialization of the conversion library,
 // so we can pass our logger to the package and have it use that for all error logging.
 
@@ -1454,7 +1479,7 @@ func print_type_declarations(
 					list_type := star_base_type + "_List"
 					if !have_list_struct[list_type] {
 					    have_list_struct[list_type] = true
-					    fmt.Fprintf(header_file, "typedef struct {\n");
+					    fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type);
 					    fmt.Fprintf(header_file, "    size_t count;\n");
 					    fmt.Fprintf(header_file, "    %s *items; // FIX MAJOR:  AAA\n", star_base_type);
 					    fmt.Fprintf(header_file, "} %s;\n", list_type);
@@ -1511,7 +1536,7 @@ func print_type_declarations(
 				    list_type := array_base_type + "_List"
 				    if !have_list_struct[list_type] {
 					have_list_struct[list_type] = true
-					fmt.Fprintf(header_file, "typedef struct {\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type);
 					fmt.Fprintf(header_file, "    size_t count;\n");
 					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type);
 					fmt.Fprintf(header_file, "} %s;\n", list_type);
@@ -1545,7 +1570,7 @@ func print_type_declarations(
 				    type_pair_list_type := type_pair_type + "_List"
 				    if !have_pair_structs[type_pair_type] {
 					have_pair_structs[type_pair_type] = true
-					fmt.Fprintf(header_file, "typedef struct {\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_type);
 					fmt.Fprintf(header_file, "    %s key;\n", key_type);
 					fmt.Fprintf(header_file, "    %s value;\n", value_type);
 					fmt.Fprintf(header_file, "} %s;\n", type_pair_type);
@@ -1555,7 +1580,7 @@ func print_type_declarations(
 					struct_field_C_types[type_pair_type] = map[string]string{}
 					struct_field_C_types[type_pair_type]["key"] = key_type
 					struct_field_C_types[type_pair_type]["value"] = value_type
-					fmt.Fprintf(header_file, "typedef struct {\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_list_type);
 					fmt.Fprintf(header_file, "    size_t count;\n");
 					fmt.Fprintf(header_file, "    %s *items;\n", type_pair_type);
 					fmt.Fprintf(header_file, "} %s;\n", type_pair_list_type);

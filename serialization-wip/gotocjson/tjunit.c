@@ -66,6 +66,54 @@ char *initial_transit_Transit_as_json_string = "{\n"
 "    }\n"
 "}";
 
+char *initial_transit_InventoryResource_as_json_string = "{\n"
+"    \"Name\": \"TestName\",\n"
+"    \"Type\": \"TestType\",\n"
+"    \"Owner\": \"TestOwner\",\n"
+"    \"Category\": \"TestCategory\",\n"
+"    \"Description\": \"TestDescription\",\n"
+"    \"Device\": \"TestDevice\",\n"
+"    \"Properties\": {\n"
+"        \"SampleTimeProperty\": {\n"
+"            \"ValueType\": \"TimeType\",\n"
+"            \"TimeValue\": 1572955806397\n"
+"        },\n"
+"        \"SampleBooleanProperty\": {\n"
+"            \"ValueType\": \"BooleanType\",\n"
+"            \"BoolValue\": true\n"
+"        },\n"
+"        \"SampleIntegerProperty\": {\n"
+"            \"ValueType\": \"IntegerType\",\n"
+"            \"IntegerValue\": 1234\n"
+"        },\n"
+"        \"SampleStringProperty\": {\n"
+"            \"ValueType\": \"StringType\",\n"
+"            \"StringValue\": \"arbitrary string\"\n"
+"        },\n"
+"        \"SampleDoubleProperty\": {\n"
+"            \"ValueType\": \"DoubleType\",\n"
+"            \"DoubleValue\": 2.7182818284590451\n"
+"        }\n"
+"    }\n"
+"}";
+
+void print_first_different_character(char *a, char *b) {
+    int i;
+    int line = 1;
+    int character = 1;
+    for (i = 0; *a && *b; ++i, ++character, ++a, ++b) {
+        if (*a != *b) {
+	    break;
+	} else if (*a == '\n') {
+	    ++line;
+	    character = 1;
+	}
+    }
+    if (*a != *b) {
+        printf("strings are different at position %d (line %d char %d)\n", i, line, character);
+    }
+}
+
 int main (int argc, char *argv[]) {
     if (1) {
 	transit_MonitoredResource *transit_MonitoredResource_ptr = JSON_str_as_transit_MonitoredResource(initial_transit_MonitoredResource_as_json_string);
@@ -116,6 +164,31 @@ int main (int argc, char *argv[]) {
 		if (!matches) {
 		    printf("original string:\n%s\n", initial_transit_Transit_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_Transit_as_json_string);
+		}
+	    }
+	}
+    }
+    printf("--------------------------\n");
+    if (1) {
+	printf("--- decoding JSON string ...\n");
+	transit_InventoryResource *transit_InventoryResource_ptr = JSON_str_as_transit_InventoryResource(initial_transit_InventoryResource_as_json_string);
+	if (transit_InventoryResource_ptr == NULL) {
+	    printf ("ERROR:  JSON string cannot be decoded into a transit_InventoryResource object\n");
+	}
+	else {
+	    printf ("--- encoding transit.InventoryResource object tree ...\n");
+	    char *final_transit_InventoryResource_as_json_string = transit_InventoryResource_as_JSON_str(transit_InventoryResource_ptr);
+	    printf ("--- encoding is complete, perhaps ...\n");
+	    if (final_transit_InventoryResource_as_json_string == NULL) {
+		printf ("ERROR:  transit_InventoryResource object cannot be encoded as a JSON string\n");
+	    }
+	    else {
+		int matches = ! strcmp(final_transit_InventoryResource_as_json_string, initial_transit_InventoryResource_as_json_string);
+		printf ("Final string for decode/encode of transit.InventoryResource %s the original string.\n", (matches ? "matches" : "DOES NOT MATCH"));
+		if (!matches) {
+		    printf("original string:\n%s\n", initial_transit_InventoryResource_as_json_string);
+		    printf("   final string:\n%s\n",   final_transit_InventoryResource_as_json_string);
+		    print_first_different_character(final_transit_InventoryResource_as_json_string, initial_transit_InventoryResource_as_json_string);
 		}
 	    }
 	}
