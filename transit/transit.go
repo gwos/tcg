@@ -1,14 +1,8 @@
 package transit
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
-	"net/http"
-	"net/url"
-	"strconv"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -355,6 +349,15 @@ type SendInventoryRequest struct {
 	Groups    *[]ResourceGroup     `json:"groups"`
 }
 
+// OperationResult defines API answer
+type OperationResult struct {
+	Entity   string `json:"entity"`
+	Status   string `json:"status"`
+	Message  string `json:"message"`
+	Location string `json:"location"`
+	EntityID int    `json:"entityID"`
+}
+
 // OperationResults defines API answer
 type OperationResults struct {
 	ResourcesAdded   int                `json:"successful"`
@@ -364,15 +367,6 @@ type OperationResults struct {
 	Warning          int                `json:"warning"`
 	Count            int                `json:"count"`
 	Results          *[]OperationResult `json:"results"`
-}
-
-// OperationResult defines API answer
-type OperationResult struct {
-	Entity   string `json:"entity"`
-	Status   string `json:"status"`
-	Message  string `json:"message"`
-	Location string `json:"location"`
-	EntityID int    `json:"entityID"`
 }
 
 // ResourceGroup defines group entity
@@ -391,255 +385,4 @@ type ResourceWithMetrics struct {
 type ResourceWithMetricsRequest struct {
 	Context   TracerContext         `json:"context"`
 	Resources []ResourceWithMetrics `json:"resources"`
-}
-
-// Operations defines Groundwork operations interface
-type Operations interface {
-	Connect() error
-	Disconnect() error
-	ValidateToken(appName, apiToken string) error
-	SendResourcesWithMetrics(request []byte) (*OperationResults, error)
-	SynchronizeInventory(request []byte) (*OperationResults, error)
-}
-
-// Transit implements Operations interface
-type Transit struct {
-	*config.Config
-}
-
-// Connect implements Operations.Connect.
-func (transit *Transit) Connect() error {
-	formValues := map[string]string{
-		"gwos-app-name": transit.GroundworkConfig.AppName,
-		"user":          transit.GroundworkConfig.Account,
-		"password":      transit.GroundworkConfig.Password,
-	}
-
-	headers := map[string]string{
-		"Accept":       "text/plain",
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.Connect.Entrypoint,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
-	if err != nil {
-		return err
-	}
-
-	if statusCode == 200 {
-		transit.GroundworkConfig.Token = string(byteResponse)
-		return nil
-	}
-
-	return errors.New(string(byteResponse))
-}
-
-// Disconnect implements Operations.Disconnect.
-func (transit Transit) Disconnect() error {
-	formValues := map[string]string{
-		"gwos-app-name":  transit.GroundworkConfig.AppName,
-		"gwos-api-token": transit.GroundworkConfig.Token,
-	}
-
-	headers := map[string]string{
-		"Accept":       "text/plain",
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.Disconnect.Entrypoint,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
-	if err != nil {
-		return err
-	}
-
-	if statusCode == 200 {
-		return nil
-	}
-	return errors.New(string(byteResponse))
-}
-
-// ValidateToken implements Operations.ValidateToken.
-func (transit Transit) ValidateToken(appName, apiToken string) error {
-	headers := map[string]string{
-		"Accept":       "text/plain",
-		"Content-Type": "application/x-www-form-urlencoded",
-	}
-
-	formValues := map[string]string{
-		"gwos-app-name":  appName,
-		"gwos-api-token": apiToken,
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.ValidateToken.Entrypoint,
-	}
-
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
-
-	if err == nil {
-		if statusCode == 200 {
-			b, _ := strconv.ParseBool(string(byteResponse))
-			if b {
-				return nil
-			} else {
-				return errors.New("invalid gwos-app-name or gwos-api-token")
-			}
-		} else {
-			return errors.New(string(byteResponse))
-		}
-	}
-
-	return err
-}
-
-// SynchronizeInventory implements Operations.SynchronizeInventory.
-func (transit *Transit) SynchronizeInventory(inventory []byte) (*OperationResults, error) {
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
-		"GWOS-APP-NAME":  transit.GroundworkConfig.AppName,
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.SynchronizeInventory.Entrypoint,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
-	if statusCode == 401 {
-		err = transit.Connect()
-		if err != nil {
-			return nil, err
-		}
-		headers["GWOS-API-TOKEN"] = transit.GroundworkConfig.Token
-		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
-	}
-
-	var operationResults OperationResults
-
-	err = json.Unmarshal(byteResponse, &operationResults)
-	if err != nil {
-		return nil, err
-	}
-
-	return &operationResults, nil
-}
-
-// SendResourcesWithMetrics implements Operations.SendResourcesWithMetrics.
-func (transit *Transit) SendResourcesWithMetrics(resources []byte) (*OperationResults, error) {
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": transit.GroundworkConfig.Token,
-		"GWOS-APP-NAME":  transit.GroundworkConfig.AppName,
-	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   transit.GroundworkConfig.Host,
-		Path:   transit.GroundworkActions.SendResourceWithMetrics.Entrypoint,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
-	if statusCode == 401 {
-		err = transit.Connect()
-		if err != nil {
-			return nil, err
-		}
-		headers["GWOS-API-TOKEN"] = transit.GroundworkConfig.Token
-		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
-	}
-
-	var operationResults OperationResults
-
-	err = json.Unmarshal(byteResponse, &operationResults)
-	if err != nil {
-		return nil, err
-	}
-
-	return &operationResults, nil
-}
-
-// ListMetrics TODO: implement
-func (transit Transit) ListMetrics() (*[]MetricDescriptor, error) {
-	// setup label descriptor samples
-	cores := LabelDescriptor{
-		Description: "Number of Cores",
-		Key:         "cores",
-		ValueType:   StringType,
-	}
-	sampleTime := LabelDescriptor{
-		Description: "Sample Time",
-		Key:         "sampleTime",
-		ValueType:   IntegerType,
-	}
-	load1 := MetricDescriptor{
-		Type:        "local_load_1",
-		Description: "Local Load for 1 minute",
-		DisplayName: "LocalLoad1",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  Gauge,
-		ComputeType: Query,
-		CustomName:  "load-one-minute",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			{Key: "critical", Value: 200},
-			{Key: "warning", Value: 100},
-		},
-	}
-	load5 := MetricDescriptor{
-		Type:        "local_load_5",
-		Description: "Local Load for 5 minute",
-		DisplayName: "LocalLoad5",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  Gauge,
-		ComputeType: Query,
-		CustomName:  "load-five-minutes",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			{Key: "critical", Value: 205},
-			{Key: "warning", Value: 105},
-		},
-	}
-	load15 := MetricDescriptor{
-		Type:        "local_load_15",
-		Description: "Local Load for 15 minute",
-		DisplayName: "LocalLoad15",
-		Labels:      []*LabelDescriptor{&cores, &sampleTime},
-		MetricKind:  Gauge,
-		ComputeType: Query,
-		CustomName:  "load-fifteen-minutes",
-		Unit:        UnitCounter,
-		ValueType:   DoubleType,
-		Thresholds: []*ThresholdDescriptor{
-			{Key: "critical", Value: 215},
-			{Key: "warning", Value: 115},
-		},
-	}
-	arr := []MetricDescriptor{load1, load5, load15}
-	return &arr, nil
 }
