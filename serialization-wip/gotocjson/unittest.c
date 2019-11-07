@@ -3,6 +3,9 @@
 #include <string.h>
 
 #include "jansson.h"
+
+#include "convert_go_to_c.h"
+
 #include "config.h"
 #include "milliseconds.h"
 #include "transit.h"
@@ -16,10 +19,10 @@
 
 // Routines for use by application code:
 // extern char   *transit_Transit_as_JSON_str(const transit_Transit *transit_Transit);
-// extern transit_Transit *JSON_str_as_transit_Transit(const char *json_str);
+// extern transit_Transit *JSON_str_as_transit_Transit(const char *json_str, json_t **json);
 
 // extern char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource);
-// extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str);
+// extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str, json_t **json);
 
 char *initial_transit_MonitoredResource_as_json_string = "{\n"
 "    \"Name\": \"dbserver\",\n"
@@ -115,10 +118,13 @@ void print_first_different_character(char *a, char *b) {
 }
 
 int main (int argc, char *argv[]) {
-    if (1) {
-	transit_MonitoredResource *transit_MonitoredResource_ptr = JSON_str_as_transit_MonitoredResource(initial_transit_MonitoredResource_as_json_string);
+    json_t *json;
+    printf("--------------------------\n");
+    if (true) {
+	transit_MonitoredResource *transit_MonitoredResource_ptr = JSON_str_as_transit_MonitoredResource(initial_transit_MonitoredResource_as_json_string, &json);
 	if (transit_MonitoredResource_ptr == NULL) {
 	    printf ("ERROR:  JSON string cannot be decoded into a transit_MonitoredResource object\n");
+	    return EXIT_FAILURE;
 	}
 	else {
 	    // Before we encode, let's first run some obvious checks to make sure the decoding worked as expected.
@@ -129,6 +135,7 @@ int main (int argc, char *argv[]) {
 	    char *final_transit_MonitoredResource_as_json_string = transit_MonitoredResource_as_JSON_str(transit_MonitoredResource_ptr);
 	    if (final_transit_MonitoredResource_as_json_string == NULL) {
 		printf ("ERROR:  transit_MonitoredResource object cannot be encoded as a JSON string\n");
+		return EXIT_FAILURE;
 	    }
 	    else {
 		int matches = !strcmp(final_transit_MonitoredResource_as_json_string, initial_transit_MonitoredResource_as_json_string);
@@ -136,16 +143,21 @@ int main (int argc, char *argv[]) {
 		if (!matches) {
 		    printf("original string:\n%s\n", initial_transit_MonitoredResource_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_MonitoredResource_as_json_string);
+		    return EXIT_FAILURE;
 		}
 	    }
 	}
+	// We want to use just the first call, but we're not yet linking in the object code for it.
+	// destroy_transit_MonitoredResource_tree(transit_MonitoredResource_ptr, json);
+	free_JSON(json);
     }
     printf("--------------------------\n");
-    if (1) {
+    if (true) {
 	printf("--- decoding JSON string ...\n");
-	transit_Transit *transit_Transit_ptr = JSON_str_as_transit_Transit(initial_transit_Transit_as_json_string);
+	transit_Transit *transit_Transit_ptr = JSON_str_as_transit_Transit(initial_transit_Transit_as_json_string, &json);
 	if (transit_Transit_ptr == NULL) {
 	    printf ("ERROR:  JSON string cannot be decoded into a transit_Transit object\n");
+	    return EXIT_FAILURE;
 	}
 	else {
 	    // Before we go encoding the object tree, let's first run some tests to see whether
@@ -157,6 +169,7 @@ int main (int argc, char *argv[]) {
 	    printf ("--- encoding is complete, perhaps ...\n");
 	    if (final_transit_Transit_as_json_string == NULL) {
 		printf ("ERROR:  transit_Transit object cannot be encoded as a JSON string\n");
+		return EXIT_FAILURE;
 	    }
 	    else {
 		int matches = ! strcmp(final_transit_Transit_as_json_string, initial_transit_Transit_as_json_string);
@@ -164,16 +177,21 @@ int main (int argc, char *argv[]) {
 		if (!matches) {
 		    printf("original string:\n%s\n", initial_transit_Transit_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_Transit_as_json_string);
+		    return EXIT_FAILURE;
 		}
 	    }
 	}
+	// We want to use just the first call, but we're not yet linking in the object code for it.
+	// destroy_transit_Transit_tree(transit_Transit_ptr, json);
+	free_JSON(json);
     }
     printf("--------------------------\n");
-    if (1) {
+    if (true) {
 	printf("--- decoding JSON string ...\n");
-	transit_InventoryResource *transit_InventoryResource_ptr = JSON_str_as_transit_InventoryResource(initial_transit_InventoryResource_as_json_string);
+	transit_InventoryResource *transit_InventoryResource_ptr = JSON_str_as_transit_InventoryResource(initial_transit_InventoryResource_as_json_string, &json);
 	if (transit_InventoryResource_ptr == NULL) {
 	    printf ("ERROR:  JSON string cannot be decoded into a transit_InventoryResource object\n");
+	    return EXIT_FAILURE;
 	}
 	else {
 	    printf ("--- encoding transit.InventoryResource object tree ...\n");
@@ -181,6 +199,7 @@ int main (int argc, char *argv[]) {
 	    printf ("--- encoding is complete, perhaps ...\n");
 	    if (final_transit_InventoryResource_as_json_string == NULL) {
 		printf ("ERROR:  transit_InventoryResource object cannot be encoded as a JSON string\n");
+		return EXIT_FAILURE;
 	    }
 	    else {
 		int matches = ! strcmp(final_transit_InventoryResource_as_json_string, initial_transit_InventoryResource_as_json_string);
@@ -189,9 +208,13 @@ int main (int argc, char *argv[]) {
 		    printf("original string:\n%s\n", initial_transit_InventoryResource_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_InventoryResource_as_json_string);
 		    print_first_different_character(final_transit_InventoryResource_as_json_string, initial_transit_InventoryResource_as_json_string);
+		    return EXIT_FAILURE;
 		}
 	    }
 	}
+	// We want to use just the first call, but we're not yet linking in the object code for it.
+	// destroy_transit_InventoryResource_tree(transit_InventoryResource_ptr, json);
+	free_JSON(json);
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

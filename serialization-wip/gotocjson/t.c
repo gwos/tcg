@@ -1,8 +1,4 @@
-#include <stdalign.h>  // Needed to supply alignof(), available starting with C10.
-#include <string.h>
-
 #include "convert_go_to_c.h"
-
 #include "config.h"
 #include "milliseconds.h"
 #include "transit.h"
@@ -20,255 +16,6 @@ const string const MonitoredResourceType_String[] = {
     "service",
     "host", 
 };
-
-transit_MonitoredResource *decode_transit_MonitoredResource(const char *json_str) {
-  transit_MonitoredResource *resource = NULL;
-  size_t size = 0;
-  json_error_t error;
-  json_t *json          = NULL;
-  json_t *jsonProp      = NULL;
-  json_t *jsonPropValue = NULL;
-
-  json = json_loads(json_str, 0, &error);
-  if (!json) {
-    fprintf(stderr, FILE_LINE "decode_transit_MonitoredResource error: %d: %s\n", error.line, error.text);
-  } else {
-    json_t *jsonName   = json_object_get(json, "name");
-    json_t *jsonType   = json_object_get(json, "type");
-    json_t *jsonOwner  = json_object_get(json, "owner");
-
-    size_t jsonName_len = json_string_length(jsonName);
-    size_t jsonType_len = json_string_length(jsonType);
-
-    size_t jsonOwner_len;
-    size_t string_transit_TypedValue_Pair_alignment = alignof(string_transit_TypedValue_Pair);
-    size_t string_transit_TypedValue_Pair_padding;
-
-    // incrementally compute a total size for allocation of the target struct,
-    // including all the strings and other objects it refers to
-    size = sizeof(transit_MonitoredResource);
-    size += jsonName_len + NUL_TERM_LEN;
-    size += jsonType_len + NUL_TERM_LEN;
-
-    if (jsonOwner) {
-      jsonOwner_len = json_string_length(jsonOwner);
-      size += jsonOwner_len + NUL_TERM_LEN;
-    }
-
-    /* allocate and fill the target struct by pointer */
-    resource = (transit_MonitoredResource *)malloc(size);
-    if (!resource) {
-      fprintf(stderr, FILE_LINE "ERROR:  in decode_transit_MonitoredResource, %s\n", "malloc failed");
-    } else {
-      char *ptr = (char *)resource;
-
-      ptr += sizeof(transit_MonitoredResource);
-      resource->Name = strcpy(ptr, json_string_value(jsonName));
-      ptr += jsonName_len + NUL_TERM_LEN;
-      if (1) {
-	  int enum_value;
-	  const string Type_string_value = json_string_value(jsonType);
-	  for (enum_value = arraysize(MonitoredResourceType_String); --enum_value >= 0; ) {
-	      if (!strcmp(Type_string_value, MonitoredResourceType_String[enum_value])) {
-		  break;
-	      }
-	  }
-	  if (enum_value < 0) {
-	      // FIX MAJOR:  raise a decoding exception here
-	  }
-	  resource->Type = enum_value;
-      }
-      ptr += jsonType_len + NUL_TERM_LEN;
-
-      if (jsonOwner) {
-        resource->Owner = strcpy(ptr, json_string_value(jsonOwner));
-        ptr += jsonOwner_len + NUL_TERM_LEN;
-      }
-    }
-
-    json_decref(json);
-  }
-
-  return resource;
-}
-
-// The return value must be disposed of by the caller, by calling free().
-char *encodeMonitoredResource(const transit_MonitoredResource *resource, size_t flags) {
-  char *result;
-  json_t *json     = json_object();
-  json_t *jsonProp = json_object();
-
-  json_object_set_new(json, "name", json_string(resource->Name));
-  json_object_set_new(json, "type", json_string(MonitoredResourceType_String[resource->Type]));
-  if (resource->Owner) {
-    json_object_set_new(json, "owner", json_string(resource->Owner));
-  }
-
-  if (!flags) {
-    // These flags may be helpful for development debugging, but should be adjusted for production.
-    // flags = JSON_SORT_KEYS | JSON_INDENT(4) | JSON_ENSURE_ASCII;
-    flags = JSON_INDENT(4) | JSON_ENSURE_ASCII;
-  }
-  result = json_dumps(json, flags);
-  json_decref(jsonProp);
-  json_decref(json);
-  return result;
-}
-
-// The return value must be disposed of by the caller, by calling free().
-char *encode_transit_Transit(const transit_Transit *transit_Transit, size_t flags) {
-  char *result;
-  json_t *json       = json_object();
-  json_t *jsonConfig = json_object();
-
-  json_object_set(json, "config", jsonConfig);
-  // json_object_set_new(jsonConfig, "account",  json_string(transit->config.account));
-  // json_object_set_new(jsonConfig, "hostName", json_string(transit->config.hostName));
-  // json_object_set_new(jsonConfig, "token",    json_string(transit->config.token));
-  // json_object_set_new(jsonConfig, "ssl",      json_boolean(transit->config.ssl));
-
-  if (!flags) {
-    // These flags may be helpful for development debugging, but should be adjusted for production.
-    // flags = JSON_SORT_KEYS | JSON_INDENT(4) | JSON_ENSURE_ASCII;
-    flags = JSON_INDENT(4) | JSON_ENSURE_ASCII;
-  }
-  result = json_dumps(json, flags);
-  json_decref(jsonConfig);
-  json_decref(json);
-  return result;
-}
-
-/*
-typedef struct {
-    string Entrypoint;
-} config_GroundworkAction;
-*/
-json_t *config_GroundworkAction_as_JSON(const config_GroundworkAction *config_GroundworkAction) {
-    printf(FILE_LINE "at start of config_GroundworkAction_as_JSON, config_GroundworkAction is %p\n", config_GroundworkAction);
-    printf(FILE_LINE "config_GroundworkAction->Entrypoint is %p\n", config_GroundworkAction->Entrypoint);
-    json_t *json;
-    json = json_pack("{s:s?}"
-        , "Entrypoint", config_GroundworkAction->Entrypoint
-    );
-    printf(FILE_LINE "at end   of config_GroundworkAction_as_JSON, json is %p\n", json);
-    return json;
-}
-
-/*
-typedef struct {
-    string ControllerAddr;
-    string ControllerCertFile;
-    string ControllerKeyFile;
-    string NATSFilestoreDir;
-    string NATSStoreType;
-    bool StartController;
-    bool StartNATS;
-    bool StartTransport;
-} config_AgentConfig;
-*/
-json_t *config_AgentConfig_as_JSON(const config_AgentConfig *config_AgentConfig) {
-    printf(FILE_LINE "at start of config_AgentConfig_as_JSON\n");
-    json_t *json;
-    json = json_pack("{s:s? s:s? s:s? s:s? s:s? s:b s:b s:b}"
-	, "ControllerAddr",     config_AgentConfig->ControllerAddr
-	, "ControllerCertFile", config_AgentConfig->ControllerCertFile
-	, "ControllerKeyFile",  config_AgentConfig->ControllerKeyFile
-	, "NATSFilestoreDir",   config_AgentConfig->NATSFilestoreDir
-	, "NATSStoreType",      config_AgentConfig->NATSStoreType
-	, "StartController",    config_AgentConfig->StartController
-	, "StartNATS",          config_AgentConfig->StartNATS
-	, "StartTransport",     config_AgentConfig->StartTransport
-    );
-    printf(FILE_LINE "at end   of config_AgentConfig_as_JSON\n");
-    return json;
-}
-
-/*
-typedef struct {
-    string Host;
-    string Account;
-    string Password;
-    string Token;
-    string AppName;
-} config_GroundworkConfig;
-*/
-json_t *config_GroundworkConfig_as_JSON(const config_GroundworkConfig *config_GroundworkConfig) {
-    printf(FILE_LINE "at start of config_GroundworkConfig_as_JSON\n");
-    json_t *json;
-    json = json_pack("{s:s? s:s? s:s? s:s? s:s?}"
-        , "Host",     config_GroundworkConfig->Host
-        , "Account",  config_GroundworkConfig->Account
-        , "Password", config_GroundworkConfig->Password
-        , "Token",    config_GroundworkConfig->Token
-        , "AppName",  config_GroundworkConfig->AppName
-    );
-    printf(FILE_LINE "at end   of config_GroundworkConfig_as_JSON\n");
-    return json;
-}
-
-/*
-typedef struct {
-    config_GroundworkAction Connect;
-    config_GroundworkAction Disconnect;
-    config_GroundworkAction SynchronizeInventory;
-    config_GroundworkAction SendResourceWithMetrics;
-    config_GroundworkAction ValidateToken;
-} config_GroundworkActions;
-*/
-json_t *config_GroundworkActions_as_JSON(const config_GroundworkActions *config_GroundworkActions) {
-    printf(FILE_LINE "at start of config_GroundworkActions_as_JSON\n");
-    printf(FILE_LINE "                Connect.Entrypoint = %p\n", config_GroundworkActions->Connect.Entrypoint);
-    printf(FILE_LINE "             Disconnect.Disconnect = %p\n", config_GroundworkActions->Disconnect.Entrypoint);
-    printf(FILE_LINE "   SynchronizeInventory.Entrypoint = %p\n", config_GroundworkActions->SynchronizeInventory.Entrypoint);
-    printf(FILE_LINE "SendResourceWithMetrics.Entrypoint = %p\n", config_GroundworkActions->SendResourceWithMetrics.Entrypoint);
-    printf(FILE_LINE "          ValidateToken.Entrypoint = %p\n", config_GroundworkActions->ValidateToken.Entrypoint);
-    json_t *json;
-    json = json_pack("{s:o? s:o? s:o? s:o? s:o?}"
-        , "Connect",                 config_GroundworkAction_as_JSON( &config_GroundworkActions->Connect                 )
-        , "Disconnect",              config_GroundworkAction_as_JSON( &config_GroundworkActions->Disconnect              )
-        , "SynchronizeInventory",    config_GroundworkAction_as_JSON( &config_GroundworkActions->SynchronizeInventory    )
-        , "SendResourceWithMetrics", config_GroundworkAction_as_JSON( &config_GroundworkActions->SendResourceWithMetrics )
-        , "ValidateToken",           config_GroundworkAction_as_JSON( &config_GroundworkActions->ValidateToken           )
-    );
-    printf(FILE_LINE "at end   of config_GroundworkActions_as_JSON\n");
-    return json;
-}
-
-/*
-typedef struct {
-    config_AgentConfig AgentConfig;
-    config_GroundworkConfig GroundworkConfig;
-    config_GroundworkActions GroundworkActions;
-} config_Config;
-*/
-json_t *config_Config_as_JSON(const config_Config *config_Config) {
-    json_t *json;
-    if (config_Config == NULL) {
-        printf(FILE_LINE "config_Config is NULL\n");
-    }
-    else {
-        printf(FILE_LINE "config_Config is not NULL\n");
-	/*
-	if (config_Config->AgentConfig == NULL) {
-	    printf(FILE_LINE "config_Config->AgentConfig is NULL\n");
-	}
-	if (config_Config->GroundworkConfig == NULL) {
-	    printf(FILE_LINE "config_Config->GroundworkConfig is NULL\n");
-	}
-	if (config_Config->GroundworkActions == NULL) {
-	    printf(FILE_LINE "config_Config->GroundworkActions is NULL\n");
-	}
-	*/
-    }
-    printf(FILE_LINE "before json_pack() in config_Config_as_JSON\n");
-    json = json_pack("{s:o? s:o? s:o?}"
-        , "AgentConfig",             config_AgentConfig_as_JSON( &config_Config->AgentConfig )
-        , "GroundworkConfig",   config_GroundworkConfig_as_JSON( &config_Config->GroundworkConfig )
-        , "GroundworkActions", config_GroundworkActions_as_JSON( &config_Config->GroundworkActions )
-    );
-    printf(FILE_LINE " after json_pack() in config_Config_as_JSON\n");
-    return json;
-}
 
 // ----------------------------------------------------------------
 
@@ -326,6 +73,8 @@ char *transit_Transit_as_JSON_str(const transit_Transit *transit_Transit) {
 #define transit_Transit_as_JSON_str(transit_Transit) JSON_as_string(transit_Transit_as_JSON(transit_Transit), 0)
 */
 
+// ----------------------------------------------------------------
+
 /*
 typedef struct {
     string Name;
@@ -363,31 +112,7 @@ char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *tra
 #define transit_MonitoredResource_as_JSON_str(transit_MonitoredResource) JSON_as_string(transit_MonitoredResource_as_JSON(transit_MonitoredResource), 0)
 */
 
-// FIX MAJOR:  output these definitions in the boilerplate for the header file that defines the "struct_timespec" conversions
-#define	MILLISECONDS_PER_SECOND		1000
-#define	MICROSECONDS_PER_MILLISECOND	1000
-#define	NANOSECONDS_PER_MICROSECOND	1000
-#define NANOSECONDS_PER_MILLISECOND	(NANOSECONDS_PER_MICROSECOND * MICROSECONDS_PER_MILLISECOND)
-
-json_t *milliseconds_MillisecondTimestamp_as_JSON(const milliseconds_MillisecondTimestamp *milliseconds_MillisecondTimestamp) {
-    json_error_t error;
-    size_t flags = 0;
-    json_t *json;
-    // FIX MAJOR:  when generating this code, we must special-case the field packing in this routine, based on the "struct_timespec" field type
-    // FIX MAJOR:  make sure the "I" conversion can handle a 64-bit number
-    json = json_pack_ex(&error, flags, "I"
-         // struct_timespec time_Time_;  // go:  time.Time
-	 , (json_int_t) (
-	     (milliseconds_MillisecondTimestamp->time_Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
-	     (milliseconds_MillisecondTimestamp->time_Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
-	 )
-    );
-    if (json == NULL) {
-	printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
-	    error.text, error.source, error.line, error.column, error.position);
-    }
-    return json;
-}
+// ----------------------------------------------------------------
 
 json_t *transit_TypedValue_as_JSON(const transit_TypedValue *transit_TypedValue) {
     json_error_t error;
@@ -578,41 +303,6 @@ char *transit_InventoryResource_as_JSON_str(const transit_InventoryResource *tra
 
 // ----------------------------------------------------------------
 
-#if !(JSON_INTEGER_IS_LONG_LONG)
-// In addition to millisecond timestamps, 64-bit integers are presumed in some of the other Go structures we convert.
-#error The Jansson JSON integer type may not hold 64 bits on this platform; 64 bits are needed for the milliseconds_MillisecondTimestamp type.
-#endif
-
-/*
-typedef struct _milliseconds_MillisecondTimestamp_ {
-    struct_timespec time_Time_;  // go:  time.Time
-} milliseconds_MillisecondTimestamp;
-*/
-milliseconds_MillisecondTimestamp *JSON_as_milliseconds_MillisecondTimestamp(json_t *json) {
-    milliseconds_MillisecondTimestamp *MillisecondTimestamp = (milliseconds_MillisecondTimestamp *)malloc(sizeof(milliseconds_MillisecondTimestamp));
-    if (!MillisecondTimestamp) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_milliseconds_MillisecondTimestamp, %s\n", "malloc failed");
-    } else {
-	// FIX MAJOR:  when generating this code, special-case the field unpacking in this routine, based on the "struct_timespec" field type
-	json_int_t pure_milliseconds;
-	if (json_unpack(json, "I"
-	    , &pure_milliseconds
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_milliseconds_MillisecondTimestamp, %s\n", "JSON unpacking failed");
-	    free(MillisecondTimestamp);
-	    MillisecondTimestamp = NULL;
-	} else {
-	    MillisecondTimestamp->time_Time_.tv_sec  = (time_t) (pure_milliseconds / MILLISECONDS_PER_SECOND);
-	    MillisecondTimestamp->time_Time_.tv_nsec = (long) (pure_milliseconds % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
-	}
-    }
-    return MillisecondTimestamp;
-}
-
-// ----------------------------------------------------------------
-
 /*
 typedef struct {
     string ControllerAddr;
@@ -794,6 +484,14 @@ transit_TypedValue *JSON_as_transit_TypedValue(json_t *json) {
 	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_transit_TypedValue, %s\n", "malloc failed");
     } else {
 	// FIX MAJOR:  correct this code
+	// We initialize all data elements of the data structure to what we consider to be their respective
+	// zero values, to prepare for correct operation using the "omitempty" struct field tag.
+	TypedValue->ValueType    = UnspecifiedType;
+	TypedValue->BoolValue    = false;
+	TypedValue->DoubleValue  = 0.0;
+	TypedValue->IntegerValue = 0;
+	TypedValue->StringValue  = NULL;  // FIX MAJOR:  Possibly, this should be some copy of the empty string instead.  But pay attention to issues of later deletion.
+	TypedValue->TimeValue    = (milliseconds_MillisecondTimestamp) { (struct_timespec) { 0, 0 } };  // FIX MAJOR:  define an "epoch_milliseconds_MillisecondTimestamp"
 	int failed = 0;
 	char *ValueType_as_string;
 	json_t *json_TimeValue;
@@ -1037,52 +735,6 @@ transit_MonitoredResource *JSON_as_transit_MonitoredResource(json_t *json) {
     return MonitoredResource;
 }
 
-// Decoding routine.
-transit_InventoryResource *JSON_str_as_transit_InventoryResource(const char *json_str) {
-    json_error_t error;
-    json_t *json = json_loads(json_str, 0, &error);
-    if (json == NULL) {
-        // FIX MAJOR:  produce a log message based on the content of the "error" object
-        printf(FILE_LINE "json for transit_InventoryResource is NULL\n");
-	return NULL;
-    }
-    transit_InventoryResource *InventoryResource = JSON_as_transit_InventoryResource(json);
-
-    if (InventoryResource != NULL) {
-	printf(FILE_LINE "in JSON_str_as_transit_InventoryResource, before decref, Name  = '%s'\n", InventoryResource->Name);
-	printf(FILE_LINE "in JSON_str_as_transit_InventoryResource, before decref, Owner = '%s'\n", InventoryResource->Owner);
-    }
-
-    // FIX QUICK:  this decref call is destroying the strings we obtained from json_unpack()
-    //json_decref(json);
-
-    if (InventoryResource != NULL) {
-	printf(FILE_LINE "in JSON_str_as_transit_InventoryResource,  after decref, Name  = '%s'\n", InventoryResource->Name);
-	printf(FILE_LINE "in JSON_str_as_transit_InventoryResource,  after decref, Owner = '%s'\n", InventoryResource->Owner);
-    }
-
-    return InventoryResource;
-}
-
-// Decoding routine.
-transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str) {
-    json_error_t error;
-    json_t *json = json_loads(json_str, 0, &error);
-    if (json == NULL) {
-        // FIX MAJOR:  produce a log message based on the content of the "error" object
-        printf(FILE_LINE "json for transit_MonitoredResource is NULL\n");
-	return NULL;
-    }
-    transit_MonitoredResource *MonitoredResource = JSON_as_transit_MonitoredResource(json);
-    printf(FILE_LINE "in JSON_str_as_transit_MonitoredResource, before decref, Name  = '%s'\n", MonitoredResource->Name);
-    printf(FILE_LINE "in JSON_str_as_transit_MonitoredResource, before decref, Owner = '%s'\n", MonitoredResource->Owner);
-    // FIX QUICK:  this decref call is destroying the strings we obtained from json_unpack()
-    //json_decref(json);
-    printf(FILE_LINE "in JSON_str_as_transit_MonitoredResource,  after decref, Name  = '%s'\n", MonitoredResource->Name);
-    printf(FILE_LINE "in JSON_str_as_transit_MonitoredResource,  after decref, Owner = '%s'\n", MonitoredResource->Owner);
-    return MonitoredResource;
-}
-
 transit_Transit *JSON_as_transit_Transit(json_t *json) {
     transit_Transit *Transit = (transit_Transit *)malloc(sizeof(transit_Transit));
     if (!Transit) {
@@ -1115,70 +767,71 @@ transit_Transit *JSON_as_transit_Transit(json_t *json) {
 }
 
 // Decoding routine.
-transit_Transit *JSON_str_as_transit_Transit(const char *json_str) {
+transit_InventoryResource *JSON_str_as_transit_InventoryResource(const char *json_str, json_t **json) {
     json_error_t error;
-    json_t *json = json_loads(json_str, 0, &error);
-    if (json == NULL) {
+    *json = json_loads(json_str, 0, &error);
+    if (*json == NULL) {
+        // FIX MAJOR:  produce a log message based on the content of the "error" object
+        printf(FILE_LINE "json for transit_InventoryResource is NULL\n");
+	return NULL;
+    }
+    transit_InventoryResource *InventoryResource = JSON_as_transit_InventoryResource(*json);
+
+    // Logically, we want to make this json_decref() call to release our hold on the JSON
+    // object we obtained, because we are now supposedly done with that JSON object.  But
+    // if we do so now, that will destroy all the strings we obtained from json_unpack()
+    // and stuffed into the returned C object tree.  So instead, we just allow that pointer
+    // to be returned to the caller, to be passed thereafter to free_JSON() once the caller
+    // is completely done with the returned C object tree.
+    //
+    // json_decref(*json);
+
+    return InventoryResource;
+}
+
+// Decoding routine.
+transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str, json_t **json) {
+    json_error_t error;
+    *json = json_loads(json_str, 0, &error);
+    if (*json == NULL) {
+        // FIX MAJOR:  produce a log message based on the content of the "error" object
+        printf(FILE_LINE "json for transit_MonitoredResource is NULL\n");
+	return NULL;
+    }
+    transit_MonitoredResource *MonitoredResource = JSON_as_transit_MonitoredResource(*json);
+
+    // Logically, we want to make this json_decref() call to release our hold on the JSON
+    // object we obtained, because we are now supposedly done with that JSON object.  But
+    // if we do so now, that will destroy all the strings we obtained from json_unpack()
+    // and stuffed into the returned C object tree.  So instead, we just allow that pointer
+    // to be returned to the caller, to be passed thereafter to free_JSON() once the caller
+    // is completely done with the returned C object tree.
+    //
+    // json_decref(*json);
+
+    return MonitoredResource;
+}
+
+// Decoding routine.
+transit_Transit *JSON_str_as_transit_Transit(const char *json_str, json_t **json) {
+    json_error_t error;
+    *json = json_loads(json_str, 0, &error);
+    if (*json == NULL) {
         // FIX MAJOR:  produce a log message based on the content of the "error" object
         printf(FILE_LINE "json for transit_Transit is NULL\n");
 	return NULL;
     }
-    // printf(FILE_LINE "--------------------------\n");
-    // printf(FILE_LINE "transit_Transit dump:\n%s\n", json_dumps(json, JSON_INDENT(4)));
-    // printf(FILE_LINE "--------------------------\n");
-    transit_Transit *Transit = JSON_as_transit_Transit(json);
-    // FIX MAJOR:  put this back
-    // json_decref(json);
+    transit_Transit *Transit = JSON_as_transit_Transit(*json);
+
+    // Logically, we want to make this json_decref() call to release our hold on the JSON
+    // object we obtained, because we are now supposedly done with that JSON object.  But
+    // if we do so now, that will destroy all the strings we obtained from json_unpack()
+    // and stuffed into the returned C object tree.  So instead, we just allow that pointer
+    // to be returned to the caller, to be passed thereafter to free_JSON() once the caller
+    // is completely done with the returned C object tree.
+    //
+    // json_decref(*json);
+
     return Transit;
-}
-
-// ----------------------------------------------------------------
-
-transit_Transit *decode_transit_Transit(const char *json_str) {
-  transit_Transit *Transit = NULL;
-  size_t size = 0;
-  json_error_t error;
-  json_t *json = NULL;
-
-  json = json_loads(json_str, 0, &error);
-  if (!json) {
-    fprintf(stderr, FILE_LINE "decode_transit_Transit error: %d: %s\n", error.line, error.text);
-  } else {
-    json_t *jsonCfg         = json_object_get(json, "config");
-    json_t *jsonCfgHostName = json_object_get(jsonCfg, "hostName");
-    json_t *jsonCfgAccount  = json_object_get(jsonCfg, "account");
-    json_t *jsonCfgToken    = json_object_get(jsonCfg, "token");
-    json_t *jsonCfgSSL      = json_object_get(jsonCfg, "ssl");
-
-    size_t jsonCfgHostName_len = json_string_length(jsonCfgHostName);
-    size_t jsonCfgAccount_len  = json_string_length(jsonCfgAccount);
-    size_t jsonCfgToken_len    = json_string_length(jsonCfgToken);
-
-    // incrementally compute a total size for allocation of the
-    // target struct, including all the strings it refers to
-    size = sizeof(transit_Transit);
-    size += jsonCfgHostName_len + NUL_TERM_LEN;
-    size += jsonCfgAccount_len  + NUL_TERM_LEN;
-    size += jsonCfgToken_len    + NUL_TERM_LEN;
-
-    /* allocate and fill the target struct by pointer */
-    Transit = (transit_Transit *)malloc(size);
-    if (!Transit) {
-      fprintf(stderr, FILE_LINE "ERROR:  in decode_transit_Transit, %s\n", "malloc failed");
-    } else {
-      char *ptr = (char *)Transit;
-      ptr += sizeof(transit_Transit);
-      // Transit->config.hostName = strcpy(ptr, json_string_value(jsonCfgHostName));
-      ptr += jsonCfgHostName_len + NUL_TERM_LEN;
-      // Transit->config.account = strcpy(ptr, json_string_value(jsonCfgAccount));
-      ptr += jsonCfgAccount_len + NUL_TERM_LEN;
-      // Transit->config.token = strcpy(ptr, json_string_value(jsonCfgToken));
-      // Transit->config.ssl = json_boolean_value(jsonCfgSSL);
-    }
-
-    json_decref(json);
-  }
-
-  return Transit;
 }
 

@@ -1065,14 +1065,14 @@ typedef struct timespec struct_timespec;
 // returns a pointer to a new object, or NULL on error.  The returned object must
 // ultimately be deallocated by the caller using a single call to this routine:
 //
-//     extern bool free_PackageName_StructTypeName_tree(PackageName_StructTypeName *StructTypeName_ptr);
+//     extern void free_PackageName_StructTypeName_tree(PackageName_StructTypeName *StructTypeName_ptr, json_t *json);
 //
 // That one call will at the same time free memory for all of the connected
 // subsidary objects.
 //
 // Note that a similar routine:
 //
-//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr);
+//     extern void destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr, json_t *json);
 //
 // is also available.  It has a very similar purpose, but it is intended for use
 // with a tree of data structures which are manually allocated in application code,
@@ -1114,7 +1114,9 @@ var C_code_boilerplate = `//
 //
 // FIX MAJOR:  This inclusion might be better moved to the header file,
 // if json_dumps() is expected to be used by application code.
-#include <jansson.h>
+#include "jansson.h"
+
+#include "convert_go_to_c.h"
 
 #include <stdlib.h>    // for the declaration of free(), at least
 // #include <stdalign.h>  // Needed to supply alignof(), available starting with C11.
@@ -1607,7 +1609,7 @@ func print_type_declarations(
 		    package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("#define  make_empty_%s_%s() make_empty_%[1]s_%[2]s_array(1)\n",
 		    package_name, decl_kind.type_name)
-		struct_definition += fmt.Sprintf("extern bool destroy_%s_%s_tree(%[1]s_%[2]s *%[1]s_%[2]s_ptr);\n", package_name, decl_kind.type_name)
+		struct_definition += fmt.Sprintf("extern void destroy_%s_%s_tree(%[1]s_%[2]s *%[1]s_%[2]s_ptr, json_t *json);\n", package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("extern char *encode_%s_%s_as_json(const %[1]s_%[2]s *%[1]s_%[2]s_ptr, size_t flags);\n",
 		    package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("extern %s_%s *decode_json_%[1]s_%[2]s(const char *json_str);\n", package_name, decl_kind.type_name)
@@ -1615,7 +1617,7 @@ func print_type_declarations(
 		struct_definition += fmt.Sprintf("extern json_t *%s_%s_as_JSON(const %[1]s_%[2]s *%[1]s_%[2]s);\n", package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("extern char *%s_%s_as_JSON_str(const %[1]s_%[2]s *%[1]s_%[2]s);\n", package_name, decl_kind.type_name)
 		struct_definition += fmt.Sprintf("extern %s_%s *JSON_as_%[1]s_%[2]s(json_t *json);\n", package_name, decl_kind.type_name)
-		struct_definition += fmt.Sprintf("extern %s_%s *JSON_str_as_%[1]s_%[2]s(const char *json_str);\n", package_name, decl_kind.type_name)
+		struct_definition += fmt.Sprintf("extern %s_%s *JSON_str_as_%[1]s_%[2]s(const char *json_str, json_t **json);\n", package_name, decl_kind.type_name)
 		fmt.Fprintln(header_file, struct_definition)
 	    default:
 		panic(fmt.Sprintf("found unknown type declaration kind '%s'", decl_kind.type_kind))
@@ -2067,9 +2069,10 @@ func generate_destroy_PackageName_StructTypeName_tree(
     trailing_Ptr  := regexp.MustCompile(`(.+)_Ptr$`)
     function_code = ""
 
-var destroy_routine_header_template = `bool destroy_{{.StructName}}_tree({{.StructName}} *{{.StructName}}_ptr) {
+var destroy_routine_header_template = `void destroy_{{.StructName}}_tree({{.StructName}} *{{.StructName}}_ptr, json_t *json) {
 `
-var destroy_routine_footer_template = `}
+var destroy_routine_footer_template = `    free_JSON(json);
+}
 
 `
 
@@ -2169,7 +2172,7 @@ var destroy_routine_footer_template = `}
 	    // We don't bother checking for a NULL pointer, because modern free() will tolerate that.
 	    // function_code += fmt.Sprintf("%s// string item_type=%s item_prefix=%s item_name=%s\n", line_prefix, item_type, item_prefix, item_name)
 	    function_code += fmt.Sprintf("%s// string field:  %s %s%s\n", line_prefix, item_type, item_prefix, item_name)
-	    function_code += fmt.Sprintf("%sfree(%s%s);\n", line_prefix, package_name + "_" + item_prefix, item_name)
+	    function_code += fmt.Sprintf("%sif (!json) free(%s%s);\n", line_prefix, package_name + "_" + item_prefix, item_name)
 
 	} else {
 	    // most likely, there is nothing to do for such a field, as it will just be a simple base type
@@ -2199,7 +2202,7 @@ var destroy_routine_footer_template = `}
 // has embedded within it in contiguous memory, the top-level data structure and all of its possibly
 // multi-generational offspring.  The recursive-destroy routines are what I am calling above:
 //
-//     extern bool destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr);
+//     extern void destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr, json_t *json);
 //
 func print_type_conversions(
 	other_headers         string,
