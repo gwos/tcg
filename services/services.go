@@ -38,7 +38,7 @@ type AgentStats struct {
 	ExecutionTimeMetrics   time.Duration
 	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
-	sync.RWMutex
+	sync.Mutex
 }
 
 // AgentStatus defines TNG Agent status
