@@ -236,7 +236,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine) {
 	apiV1Group.POST("/nats/transport/start", controller.startTransport)
 	apiV1Group.DELETE("/nats/transport/stop", controller.stopTransport)
 
-	pprofGroup := apiV1Group.Group("/pprof")
+	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
 	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
 	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
