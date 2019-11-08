@@ -67,7 +67,12 @@ type TransitServices interface {
 	SynchronizeInventory([]byte) error
 }
 
+// GetBytesHandlerType defines handler type
+type GetBytesHandlerType func() ([]byte, error)
+
 // Controllers defines TNG Agent controllers interface
 type Controllers interface {
 	ListMetrics() ([]byte, error)
+	RegisterListMetricsHandler(GetBytesHandlerType)
+	RemoveListMetricsHandler()
 }

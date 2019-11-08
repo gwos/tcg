@@ -8,6 +8,12 @@
 #include "libtransit.h" /* ERROR_LEN */
 #include "util.h"
 
+#ifndef NUL_TERM_LEN
+/* Size of a NUL-termination byte. Generally useful for documenting the meaning
+ * of +1 and -1 length adjustments having to do with such bytes. */
+#define NUL_TERM_LEN 1 /*  sizeof('\0') */
+#endif                 /* NUL_TERM_LEN */
+
 /*
 https://medium.com/@ben.mcclelland/an-adventure-into-cgo-calling-go-code-with-c-b20aa6637e75
 https://medium.com/learning-the-go-programming-language/calling-go-functions-from-other-languages-4c7d8bcc69bf
@@ -18,21 +24,50 @@ The libtransit supports environment variables:
 For more info see package `config`
 */
 
+char *listMetricsHandler() {
+  char *payload = "{\"key\":\"value\"}";
+
+  size_t bufLen = strlen(payload) + NUL_TERM_LEN;
+  char *buf = malloc(bufLen);
+  strcpy(buf, payload);
+
+  printf("\nlistMetricsHandler: %s : %ld", buf, bufLen);
+  return buf;
+}
+
+void test_dlRegisterListMetricsHandler() {
+  void *handle;
+  char *error;
+
+  handle = dlopen("libtransit/libtransit.so", RTLD_LAZY);
+  if (!handle) {
+    fail(dlerror());
+  }
+
+  void (*registerListMetricsHandler)(char *(*)()) =
+      dlsym(handle, "RegisterListMetricsHandler");
+  if ((error = dlerror()) != NULL) {
+    fail(error);
+  }
+
+  registerListMetricsHandler(listMetricsHandler);
+
+  dlclose(handle);
+}
+
 void test_dlSendResourcesWithMetrics() {
   void *handle;
   char *error;
 
   handle = dlopen("libtransit/libtransit.so", RTLD_LAZY);
   if (!handle) {
-    fprintf(stderr, "\nlibtransit error: %s\n", dlerror());
-    exit(1);
+    fail(dlerror());
   }
 
   bool (*sendResourcesWithMetrics)(char *, char *) =
       dlsym(handle, "SendResourcesWithMetrics");
   if ((error = dlerror()) != NULL) {
-    fprintf(stderr, "\nlibtransit error: %s\n", error);
-    exit(1);
+    fail(error);
   }
 
   /* TODO: should be serialized ResourceWithMetricsRequest */
@@ -47,6 +82,7 @@ void test_dlSendResourcesWithMetrics() {
 }
 
 int main(void) {
+  test_dlRegisterListMetricsHandler();
   test_dlSendResourcesWithMetrics();
 
   fprintf(stdout, "\nall tests passed");
