@@ -19,6 +19,7 @@ import (
 type Controller struct {
 	*AgentService
 	srv *http.Server
+	listMetricsHandler GetBytesHandlerType
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -29,7 +30,7 @@ var controller *Controller
 // GetController implements Singleton pattern
 func GetController() *Controller {
 	onceController.Do(func() {
-		controller = &Controller{GetAgentService(), nil}
+		controller = &Controller{GetAgentService(), nil, nil}
 	})
 	return controller
 }
@@ -58,6 +59,25 @@ func (controller *Controller) ListMetrics() ([]byte, error) {
 	}
 
 	return <-ch, nil
+}
+
+// ListMetricsEx implements Controllers.ListMetrics interface
+// TODO: use instead of ListMetrics
+func (controller *Controller) ListMetricsEx() ([]byte, error) {
+	if controller.listMetricsHandler != nil {
+		return controller.listMetricsHandler()
+	}
+	return nil, fmt.Errorf("listMetricsHandler unavailable")
+}
+
+// RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
+func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
+	controller.listMetricsHandler = fn
+}
+
+// RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
+func (controller *Controller) RemoveListMetricsHandler() {
+	controller.listMetricsHandler = nil
 }
 
 // StartController implements AgentServices.StartController interface
