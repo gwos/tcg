@@ -18,8 +18,8 @@ const (
 	QueueGroup                         = "tng-query-store-group"
 	TestSendResourceWithMetricsSubject = "send-resource-with-metrics-test"
 	TestMessagesCount                  = 3
-	GroundWorkMonitoringValidPath      = "/api/monitoring"
-	GroundWorkMonitoringInvalidPath    = "/api/invalidPath"
+	GroundWorkMonitoringValidHost      = "localhost:80"
+	GroundWorkMonitoringInvalidHost    = "localhost:23"
 )
 
 var deliveredCount = 0
@@ -34,7 +34,7 @@ func TestNATSQueue_1(t *testing.T) {
 		return
 	}
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringInvalidPath
+	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringInvalidHost
 
 	connection, subscription, err := connectAndSubscribe()
 	if err != nil {
@@ -57,7 +57,7 @@ func TestNATSQueue_1(t *testing.T) {
 		return
 	}
 
-	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringValidPath
+	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringValidHost
 	log.Println("Invalid path was changed to valid one")
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
@@ -78,7 +78,7 @@ func TestNATSQueue_2(t *testing.T) {
 	}
 
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringInvalidPath
+	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringInvalidHost
 
 	connection, subscription, err := connectAndSubscribe()
 	if err != nil {
@@ -108,7 +108,7 @@ func TestNATSQueue_2(t *testing.T) {
 	}
 	log.Println("NATS Server was stopped successfully")
 
-	services.GetTransitService().Config.GroundworkActions.SendResourceWithMetrics.Entrypoint = GroundWorkMonitoringValidPath
+	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringValidHost
 	log.Println("Invalid path was changed to valid one")
 
 	log.Println("Starting NATS server ...")
@@ -136,7 +136,7 @@ func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
 		TestSendResourceWithMetricsSubject,
 		QueueGroup,
 		func(msg *stan.Msg) {
-			_, err := services.GetTransitService().Transit.SendResourcesWithMetrics(msg.Data)
+			_, err := services.GetTransitService().SendResourcesWithMetrics(msg.Data)
 			if err == nil {
 				_ = msg.Ack()
 				deliveredCount++
