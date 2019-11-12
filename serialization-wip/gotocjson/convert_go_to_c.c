@@ -37,7 +37,11 @@ char *typeof_json_item(const json_t *json) {
     return buf;
 }
 
-char *JSON_as_string(json_t *json, size_t flags) {
+// As a convenience for the caller, JSON_as_string() eats what is probably the last reference to the
+// "json" object that is passed in.  That circumstance needs to be understood if you want to produce
+// a JSON string in some context where you want the JSON object to stick around afterward.  In that
+// case, you must call json_incref(json) before calling the JSON_as_str() routine.
+char *JSON_as_str(json_t *json, size_t flags) {
     char *result;
     if (!flags) {
         // FIX MAJOR:  These settings are for initial development use.
@@ -47,7 +51,7 @@ char *JSON_as_string(json_t *json, size_t flags) {
     }
     if (json == NULL) {
         // FIX MAJOR:  this message is just for development use, to track down the true source of failure
-        printf(FILE_LINE "in JSON_as_string, received a NULL pointer\n");
+        printf(FILE_LINE "in JSON_as_str, received a NULL pointer\n");
         result = NULL;
     }
     else {

@@ -25,9 +25,9 @@
 // extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str, json_t **json);
 
 char *initial_transit_MonitoredResource_as_json_string = "{\n"
-"    \"Name\": \"dbserver\",\n"
-"    \"Type\": \"host\",\n"
-"    \"Owner\": \"charley\"\n"
+"    \"name\": \"dbserver\",\n"
+"    \"type\": \"host\",\n"
+"    \"owner\": \"charley\"\n"
 "}";
 
 char *initial_transit_Transit_as_json_string = "{\n"
@@ -70,32 +70,32 @@ char *initial_transit_Transit_as_json_string = "{\n"
 "}";
 
 char *initial_transit_InventoryResource_as_json_string = "{\n"
-"    \"Name\": \"TestName\",\n"
-"    \"Type\": \"TestType\",\n"
-"    \"Owner\": \"TestOwner\",\n"
-"    \"Category\": \"TestCategory\",\n"
-"    \"Description\": \"TestDescription\",\n"
-"    \"Device\": \"TestDevice\",\n"
-"    \"Properties\": {\n"
+"    \"name\": \"TestName\",\n"
+"    \"type\": \"TestType\",\n"
+"    \"owner\": \"TestOwner\",\n"
+"    \"category\": \"TestCategory\",\n"
+"    \"description\": \"TestDescription\",\n"
+"    \"device\": \"TestDevice\",\n"
+"    \"properties\": {\n"
 "        \"SampleTimeProperty\": {\n"
-"            \"ValueType\": \"TimeType\",\n"
-"            \"TimeValue\": 1572955806397\n"
+"            \"valueType\": \"TimeType\",\n"
+"            \"timeValue\": 1572955806397\n"
 "        },\n"
 "        \"SampleBooleanProperty\": {\n"
-"            \"ValueType\": \"BooleanType\",\n"
-"            \"BoolValue\": true\n"
+"            \"valueType\": \"BooleanType\",\n"
+"            \"boolValue\": true\n"
 "        },\n"
 "        \"SampleIntegerProperty\": {\n"
-"            \"ValueType\": \"IntegerType\",\n"
-"            \"IntegerValue\": 1234\n"
+"            \"valueType\": \"IntegerType\",\n"
+"            \"integerValue\": 1234\n"
 "        },\n"
 "        \"SampleStringProperty\": {\n"
-"            \"ValueType\": \"StringType\",\n"
-"            \"StringValue\": \"arbitrary string\"\n"
+"            \"valueType\": \"StringType\",\n"
+"            \"stringValue\": \"arbitrary string\"\n"
 "        },\n"
 "        \"SampleDoubleProperty\": {\n"
-"            \"ValueType\": \"DoubleType\",\n"
-"            \"DoubleValue\": 2.7182818284590451\n"
+"            \"valueType\": \"DoubleType\",\n"
+"            \"doubleValue\": 2.7182818284590451\n"
 "        }\n"
 "    }\n"
 "}";
@@ -143,6 +143,7 @@ int main (int argc, char *argv[]) {
 		if (!matches) {
 		    printf("original string:\n%s\n", initial_transit_MonitoredResource_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_MonitoredResource_as_json_string);
+		    print_first_different_character(final_transit_MonitoredResource_as_json_string, initial_transit_MonitoredResource_as_json_string);
 		    return EXIT_FAILURE;
 		}
 	    }
@@ -162,8 +163,10 @@ int main (int argc, char *argv[]) {
 	else {
 	    // Before we go encoding the object tree, let's first run some tests to see whether
 	    // the JSON string got decoded into the object-tree values that we expect.
+	    /*
 	    printf ("value of transit_Transit_ptr->config_Config_ptr_.AgentConfig.ControllerAddr = %s\n",
 		transit_Transit_ptr->config_Config_ptr_->AgentConfig.ControllerAddr);
+	    */
 	    printf ("--- encoding transit.Transit object tree ...\n");
 	    char *final_transit_Transit_as_json_string = transit_Transit_as_JSON_str(transit_Transit_ptr);
 	    printf ("--- encoding is complete, perhaps ...\n");
@@ -177,6 +180,7 @@ int main (int argc, char *argv[]) {
 		if (!matches) {
 		    printf("original string:\n%s\n", initial_transit_Transit_as_json_string);
 		    printf("   final string:\n%s\n",   final_transit_Transit_as_json_string);
+		    print_first_different_character(final_transit_Transit_as_json_string, initial_transit_Transit_as_json_string);
 		    return EXIT_FAILURE;
 		}
 	    }
