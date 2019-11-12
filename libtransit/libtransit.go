@@ -1,6 +1,17 @@
 package main
 
+//#include <stdlib.h>
 //#define ERROR_LEN 250 /* buffer for error message */
+//
+///* getTextHandlerType defines a function type that returns an allocated string.
+// * It should be safe to call `C.free` on it. */
+//typedef char *(*getTextHandlerType) ();
+//
+///* invokeGetTextHandler provides a function call by reference.
+// * https://golang.org/cmd/cgo/#hdr-Go_references_to_C */
+//static char *invokeGetTextHandler(getTextHandlerType fn) {
+//	return fn();
+//}
 import "C"
 import (
 	"github.com/gwos/tng/services"
@@ -8,6 +19,7 @@ import (
 	"unsafe"
 )
 
+var controller = services.GetController()
 var transitService = services.GetTransitService()
 
 func init() {
@@ -124,4 +136,20 @@ func IsNATSRunning() bool {
 //export IsTransportRunning
 func IsTransportRunning() bool {
 	return transitService.Status().Transport == services.Running
+}
+
+//export RegisterListMetricsHandler
+func RegisterListMetricsHandler(fn C.getTextHandlerType) {
+	/* See notes on getTextHandlerType and invokeGetTextHandler */
+	controller.RegisterListMetricsHandler(func() ([]byte, error) {
+		textPtr := C.invokeGetTextHandler(fn)
+		bytes := []byte(C.GoString(textPtr))
+		C.free(unsafe.Pointer(textPtr))
+		return bytes, nil
+	})
+}
+
+//export RemoveListMetricsHandler
+func RemoveListMetricsHandler() {
+	controller.RemoveListMetricsHandler()
 }

@@ -1,17 +1,16 @@
 package services
 
 import (
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
-	"github.com/gwos/tng/transit"
 	"sync"
 	"time"
 )
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	transit.Transit
+	*clients.GWClient
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
 }
@@ -23,7 +22,7 @@ var agentService *AgentService
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
 		agentService = &AgentService{
-			transit.Transit{Config: config.GetConfig()},
+			clients.GetGWClient(),
 			&AgentStats{},
 			&AgentStatus{
 				Controller: Pending,
@@ -78,7 +77,7 @@ func (service *AgentService) StopNATS() error {
 func (service *AgentService) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
 		SubjSendResourceWithMetrics: func(b []byte) error {
-			_, err := service.Transit.SendResourcesWithMetrics(b)
+			_, err := service.GWClient.SendResourcesWithMetrics(b)
 			service.agentStats.Lock()
 			if err == nil {
 				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
@@ -91,7 +90,7 @@ func (service *AgentService) StartTransport() error {
 			return err
 		},
 		SubjSynchronizeInventory: func(b []byte) error {
-			_, err := service.Transit.SynchronizeInventory(b)
+			_, err := service.GWClient.SynchronizeInventory(b)
 			service.agentStats.Lock()
 			if err == nil {
 				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}

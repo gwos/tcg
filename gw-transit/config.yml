@@ -10,14 +10,3 @@ groundworkConfig:
   account: "RESTAPIACCESS"
   password: "***REMOVED***"
   appName: "gw8"
-groundworkActions:
-  connect:
-    entrypoint: "/api/auth/login"
-  disconnect:
-    entrypoint: "/api/auth/logout"
-  synchronizeInventory:
-    entrypoint: "/api/synchronizer"
-  sendResourceWithMetrics:
-    entrypoint: "/api/monitoring"
-  validateToken:
-    entrypoint: "/api/auth/validatetoken"

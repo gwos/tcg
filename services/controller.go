@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/nats"
-	stan "github.com/nats-io/go-nats-streaming"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -18,7 +16,8 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*AgentService
-	srv *http.Server
+	srv                *http.Server
+	listMetricsHandler GetBytesHandlerType
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -29,35 +28,27 @@ var controller *Controller
 // GetController implements Singleton pattern
 func GetController() *Controller {
 	onceController.Do(func() {
-		controller = &Controller{GetAgentService(), nil}
+		controller = &Controller{GetAgentService(), nil, nil}
 	})
 	return controller
 }
 
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
-	ch := make(chan []byte)
-	defer close(ch)
-
-	go func(c chan []byte) {
-		done := make(chan bool)
-		defer close(done)
-		natsConn, _ := nats.Connect("tng-controller")
-		natsSub, _ := natsConn.Subscribe(SubjListMetricsResponse, func(msg *stan.Msg) {
-			c <- msg.Data
-			done <- true
-		})
-		<-done
-		natsSub.Close()
-		natsConn.Close()
-	}(ch)
-
-	err := nats.Publish(SubjListMetricsRequest, []byte("REQUEST"))
-	if err != nil {
-		return nil, err
+	if controller.listMetricsHandler != nil {
+		return controller.listMetricsHandler()
 	}
+	return nil, fmt.Errorf("listMetricsHandler unavailable")
+}
 
-	return <-ch, nil
+// RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
+func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
+	controller.listMetricsHandler = fn
+}
+
+// RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
+func (controller *Controller) RemoveListMetricsHandler() {
+	controller.listMetricsHandler = nil
 }
 
 // StartController implements AgentServices.StartController interface
@@ -208,7 +199,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.Transit.ValidateToken(credentials.GwosAppName, credentials.GwosApiToken)
+		err := controller.GWClient.ValidateToken(credentials.GwosAppName, credentials.GwosApiToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
@@ -236,7 +227,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine) {
 	apiV1Group.POST("/nats/transport/start", controller.startTransport)
 	apiV1Group.DELETE("/nats/transport/stop", controller.stopTransport)
 
-	pprofGroup := apiV1Group.Group("/pprof")
+	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
 	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
 	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
