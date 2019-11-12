@@ -6,8 +6,6 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/nats"
-	stan "github.com/nats-io/go-nats-streaming"
 	"log"
 	"net/http"
 	"net/http/pprof"
@@ -18,7 +16,7 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*AgentService
-	srv *http.Server
+	srv                *http.Server
 	listMetricsHandler GetBytesHandlerType
 }
 
@@ -37,33 +35,6 @@ func GetController() *Controller {
 
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
-	ch := make(chan []byte)
-	defer close(ch)
-
-	go func(c chan []byte) {
-		done := make(chan bool)
-		defer close(done)
-		natsConn, _ := nats.Connect("tng-controller")
-		natsSub, _ := natsConn.Subscribe(SubjListMetricsResponse, func(msg *stan.Msg) {
-			c <- msg.Data
-			done <- true
-		})
-		<-done
-		natsSub.Close()
-		natsConn.Close()
-	}(ch)
-
-	err := nats.Publish(SubjListMetricsRequest, []byte("REQUEST"))
-	if err != nil {
-		return nil, err
-	}
-
-	return <-ch, nil
-}
-
-// ListMetricsEx implements Controllers.ListMetrics interface
-// TODO: use instead of ListMetrics
-func (controller *Controller) ListMetricsEx() ([]byte, error) {
 	if controller.listMetricsHandler != nil {
 		return controller.listMetricsHandler()
 	}

@@ -11,7 +11,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Unit test for simple App.
@@ -33,7 +32,7 @@ public class AppTest {
      * 4. Run test.
      */
     @Test
-    public void shouldSendResourceAndMetrics() throws IOException, ParseException, TimeoutException, InterruptedException {
+    public void shouldSendResourceAndMetrics() throws ParseException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -93,7 +92,7 @@ public class AppTest {
      * 4. Run test.
      */
     @Test
-    public void shouldSynchronizeInventory() throws IOException, TimeoutException, InterruptedException {
+    public void shouldSynchronizeInventory() {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -141,7 +140,7 @@ public class AppTest {
      * 5. Run test.
      */
     @Test
-    public void testSynchronizeInventoryPerformance() throws IOException, TimeoutException, InterruptedException {
+    public void testSynchronizeInventoryPerformance() throws IOException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -189,7 +188,7 @@ public class AppTest {
      * 5. Run test.
      */
     @Test
-    public void testSendResourceWithMetricsPerformance() throws ParseException, IOException, TimeoutException, InterruptedException {
+    public void testSendResourceWithMetricsPerformance() throws ParseException, IOException {
         TransitServices transit = new TransitServicesImpl();
 
         DtoTracerContext context = DtoTracerContext.builder()
@@ -252,11 +251,13 @@ public class AppTest {
         String name = reader.readLine();
     }
 
-    @Test
-    public void testListMetrics() throws IOException, InterruptedException, TimeoutException {
-        TransitServices transit = new TransitServicesImpl();
+    /*Example of callback func*/
+    static ListMetricsCallback func = new ListMetricsCallback() {
+        @Override
+        public String GetTextHandlerType() {
+            //Metric list generation ...
 
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
-    }
+            return "List metric list";
+        }
+    };
 }
