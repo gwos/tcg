@@ -132,3 +132,169 @@ json_t *config_Config_as_JSON(const config_Config *config_Config) {
     printf(FILE_LINE " after json_pack() in config_Config_as_JSON\n");
     return json;
 }
+
+// ----------------------------------------------------------------
+
+/*
+typedef struct {
+    string ControllerAddr;
+    string ControllerCertFile;
+    string ControllerKeyFile;
+    string NATSFilestoreDir;
+    string NATSStoreType;
+    bool StartController;
+    bool StartNATS;
+    bool StartTransport;
+} config_AgentConfig;
+*/
+config_AgentConfig *JSON_as_config_AgentConfig(json_t *json) {
+    config_AgentConfig *AgentConfig = (config_AgentConfig *)malloc(sizeof(config_AgentConfig));
+    if (!AgentConfig) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_AgentConfig, %s\n", "malloc failed");
+    } else {
+	if (json_unpack(json, "{s:s s:s s:s s:s s:s s:b s:b s:b}"
+	    , "ControllerAddr",     &AgentConfig->ControllerAddr
+	    , "ControllerCertFile", &AgentConfig->ControllerCertFile
+	    , "ControllerKeyFile",  &AgentConfig->ControllerKeyFile
+	    , "NATSFilestoreDir",   &AgentConfig->NATSFilestoreDir
+	    , "NATSStoreType",      &AgentConfig->NATSStoreType
+	    , "StartController",    &AgentConfig->StartController
+	    , "StartNATS",          &AgentConfig->StartNATS
+	    , "StartTransport",     &AgentConfig->StartTransport
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_AgentConfig, %s\n", "JSON unpacking failed");
+	    free(AgentConfig);
+	    AgentConfig = NULL;
+	}
+    }
+    return AgentConfig;
+}
+
+/*
+typedef struct {
+    string Host;
+    string Account;
+    string Password;
+    string Token;
+    string AppName;
+} config_GroundworkConfig;
+*/
+config_GroundworkConfig *JSON_as_config_GroundworkConfig(json_t *json) {
+    config_GroundworkConfig *GroundworkConfig = (config_GroundworkConfig *)malloc(sizeof(config_GroundworkConfig));
+    if (!GroundworkConfig) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkConfig, %s\n", "malloc failed");
+    } else {
+	if (json_unpack(json, "{s:s s:s s:s s:s s:s}"
+	    , "Host",     &GroundworkConfig->Host
+	    , "Account",  &GroundworkConfig->Account
+	    , "Password", &GroundworkConfig->Password
+	    , "Token",    &GroundworkConfig->Token
+	    , "AppName",  &GroundworkConfig->AppName
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkConfig, %s\n", "JSON unpacking failed");
+	    free(GroundworkConfig);
+	    GroundworkConfig = NULL;
+	}
+    }
+    return GroundworkConfig;
+}
+
+/*
+typedef struct {
+    string Entrypoint;
+} config_GroundworkAction;
+*/
+config_GroundworkAction *JSON_as_config_GroundworkAction(json_t *json) {
+    config_GroundworkAction *GroundworkAction = (config_GroundworkAction *)malloc(sizeof(config_GroundworkAction));
+    if (!GroundworkAction) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkAction, %s\n", "malloc failed");
+    } else {
+	if (json_unpack(json, "{s:s}"
+	    , "Entrypoint", &GroundworkAction->Entrypoint
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkAction, %s\n", "JSON unpacking failed");
+	    free(GroundworkAction);
+	    GroundworkAction = NULL;
+	}
+    }
+    return GroundworkAction;
+}
+
+/*
+typedef struct {
+    config_GroundworkAction Connect;
+    config_GroundworkAction Disconnect;
+    config_GroundworkAction SynchronizeInventory;
+    config_GroundworkAction SendResourceWithMetrics;
+    config_GroundworkAction ValidateToken;
+} config_GroundworkActions;
+*/
+config_GroundworkActions *JSON_as_config_GroundworkActions(json_t *json) {
+    config_GroundworkActions *GroundworkActions = (config_GroundworkActions *)malloc(sizeof(config_GroundworkActions));
+    if (!GroundworkActions) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkActions, %s\n", "malloc failed");
+    } else {
+	// FIX MAJOR:  correct this code; perhaps I need to allocate the json objects beforehand,
+	// and delete them afterward?
+	json_t *json_Connect;
+	json_t *json_Disconnect;
+	json_t *json_SynchronizeInventory;
+	json_t *json_SendResourceWithMetrics;
+	json_t *json_ValidateToken;
+	if (json_unpack(json, "{s:o s:o s:o s:o s:o}"
+	    , "Connect",                 &json_Connect
+	    , "Disconnect",              &json_Disconnect
+	    , "SynchronizeInventory",    &json_SynchronizeInventory
+	    , "SendResourceWithMetrics", &json_SendResourceWithMetrics
+	    , "ValidateToken",           &json_ValidateToken
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkActions, %s\n", "JSON unpacking failed");
+	    free(GroundworkActions);
+	    GroundworkActions = NULL;
+	} else {
+	    GroundworkActions->Connect                 = *JSON_as_config_GroundworkAction(json_Connect);
+	    GroundworkActions->Disconnect              = *JSON_as_config_GroundworkAction(json_Disconnect);
+	    GroundworkActions->SynchronizeInventory    = *JSON_as_config_GroundworkAction(json_SynchronizeInventory);
+	    GroundworkActions->SendResourceWithMetrics = *JSON_as_config_GroundworkAction(json_SendResourceWithMetrics);
+	    GroundworkActions->ValidateToken           = *JSON_as_config_GroundworkAction(json_ValidateToken);
+	}
+    }
+    return GroundworkActions;
+}
+
+config_Config *JSON_as_config_Config(json_t *json) {
+    config_Config *Config = (config_Config *)malloc(sizeof(config_Config));
+    if (!Config) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_Config, %s\n", "malloc failed");
+    } else {
+	// FIX MAJOR:  correct this code; perhaps I need to allocate the json objects beforehand,
+	// and delete them afterward?
+	json_t *json_AgentConfig;
+	json_t *json_GroundworkConfig;
+	json_t *json_GroundworkActions;
+	if (json_unpack(json, "{s:o s:o s:o}"
+	    , "AgentConfig",       &json_AgentConfig
+	    , "GroundworkConfig",  &json_GroundworkConfig
+	    , "GroundworkActions", &json_GroundworkActions
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_Config, %s\n", "JSON unpacking failed");
+	    free(Config);
+	    Config = NULL;
+	} else {
+	    Config->AgentConfig       = *JSON_as_config_AgentConfig      (json_AgentConfig);
+	    Config->GroundworkConfig  = *JSON_as_config_GroundworkConfig (json_GroundworkConfig);
+	    Config->GroundworkActions = *JSON_as_config_GroundworkActions(json_GroundworkActions);
+	}
+    }
+    return Config;
+}

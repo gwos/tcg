@@ -27,8 +27,6 @@ typedef struct {
 } transit_Transit;
 */
 json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit) {
-    json_t *json;
-
     if (transit_Transit->config_Config_ptr_ == NULL) {
         printf(FILE_LINE "transit_Transit->config_Config_ptr_ is NULL\n");
     }
@@ -48,8 +46,9 @@ json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit) {
     // FIX MAJOR:  change this to show error detail
     json_error_t error;
     size_t flags = 0;
-    // json = json_pack_ex(&error, flags, "{s:o?}"
-    json = json_pack("{s:o?}"
+    json_t *json;
+    // json = json_pack("{s:o?}"
+    json = json_pack_ex(&error, flags, "{s:o?}"
 	// FIX MAJOR:  revisit the pointer stuff once that is settled out upstream
 	// FIX MAJOR:  we used to use "config_Config_ptr_" here
         , "Config", config_Config_as_JSON( transit_Transit->config_Config_ptr_ )
@@ -202,6 +201,53 @@ json_t *string_transit_TypedValue_Pair_as_JSON(const string_transit_TypedValue_P
 }
 
 /*
+typedef struct _transit_MonitoredResource_List_ {
+    size_t count;
+    transit_MonitoredResource *items; 
+} transit_MonitoredResource_List;
+*/
+json_t *transit_MonitoredResource_List_as_JSON(const transit_MonitoredResource_List *transit_MonitoredResource_List) {
+    json_t *json;
+    if (transit_MonitoredResource_List == NULL) {
+	json = NULL;
+    } else if (transit_MonitoredResource_List->count == 0) {
+	json = NULL;
+    } else {
+	json = json_array();
+	if (json == NULL) {
+	    printf(FILE_LINE "ERROR:  cannot create a JSON %s object\n", "transit_MonitoredResource_List");
+	} else {
+	    for (size_t i = 0; i < transit_MonitoredResource_List->count; ++i) {
+		if (json_array_append_new(json,
+		    transit_MonitoredResource_as_JSON( &transit_MonitoredResource_List->items[i] ) // transit_MonitoredResource*
+		) != 0) {
+                    //
+                    // Report and handle the error condition.  Unfortunately, there is no json_error_t value to
+                    // look at, to determine the exact cause.  Also, be aware that we might now have a memory leak.
+                    // Since we don't know exactly what happened, we would rather suffer that leak than attempt to
+                    // decrement the reference count on the subsidiary object that we just tried to add to the array
+                    // (if in fact it was non-NULL).
+                    //
+                    // Since adding one element to the array didn't work, we abort the process of trying to add any 
+                    // additional elements to the array.  Instead, we just clear out the entire array, and we return
+                    // a NULL value to indicate the error.
+                    //
+                    // A future version might print at least the failing key, if not also the failing value (which
+                    // could be of some complicated type).
+                    //
+                    printf(FILE_LINE "ERROR:  cannot append an element to a JSON %s array\n", "transit_MonitoredResource_List");
+                    json_array_clear(json);
+                    json_decref(json);
+                    json = NULL; 
+                    break;
+		}
+	    }
+	}
+    }
+    return json;
+}
+
+/*
 typedef struct {
     size_t count;
     string_transit_TypedValue_Pair *items; 
@@ -237,15 +283,15 @@ json_t *string_transit_TypedValue_Pair_List_as_JSON(const string_transit_TypedVa
 	    ) != 0) {
 		// FIX MAJOR:
 		// Report and handle the error condition.  Unfortunately, there is no json_error_t value to
-		// look at, to determine the exact cause.  wlso, be aware that we might now have a memory leak.
-		// since we don't know exactly what happened, we would rather suffer that leak than attempt to
+		// look at, to determine the exact cause.  Also, be aware that we might now have a memory leak.
+		// Since we don't know exactly what happened, we would rather suffer that leak than attempt to
 		// decrement the reference count on the subsidiary object that we just tried to add to the array
 		// (if in fact it was non-NULL).
 		//
-		// Since adding one element to the array didn't work, we abort the process of trying to add any
-		// additional elements to the array.  Instead, we just clear out the entire array, and we return
-		// a NULL value to indicate the error.
-		json_array_clear(json);
+		// Since adding one key/value pair to the object didn't work, we abort the process of trying to
+		// add any additional key/value pairs to the object.  Instead, we just clear out the entire object,
+		// and we return a NULL value to indicate the error.
+		json_object_clear(json);
 		json_decref(json);
 		json = NULL;
 		break;
@@ -302,170 +348,6 @@ char *transit_InventoryResource_as_JSON_str(const transit_InventoryResource *tra
 */
 
 // ----------------------------------------------------------------
-
-/*
-typedef struct {
-    string ControllerAddr;
-    string ControllerCertFile;
-    string ControllerKeyFile;
-    string NATSFilestoreDir;
-    string NATSStoreType;
-    bool StartController;
-    bool StartNATS;
-    bool StartTransport;
-} config_AgentConfig;
-*/
-config_AgentConfig *JSON_as_config_AgentConfig(json_t *json) {
-    config_AgentConfig *AgentConfig = (config_AgentConfig *)malloc(sizeof(config_AgentConfig));
-    if (!AgentConfig) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_AgentConfig, %s\n", "malloc failed");
-    } else {
-	if (json_unpack(json, "{s:s s:s s:s s:s s:s s:b s:b s:b}"
-	    , "ControllerAddr",     &AgentConfig->ControllerAddr
-	    , "ControllerCertFile", &AgentConfig->ControllerCertFile
-	    , "ControllerKeyFile",  &AgentConfig->ControllerKeyFile
-	    , "NATSFilestoreDir",   &AgentConfig->NATSFilestoreDir
-	    , "NATSStoreType",      &AgentConfig->NATSStoreType
-	    , "StartController",    &AgentConfig->StartController
-	    , "StartNATS",          &AgentConfig->StartNATS
-	    , "StartTransport",     &AgentConfig->StartTransport
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_AgentConfig, %s\n", "JSON unpacking failed");
-	    free(AgentConfig);
-	    AgentConfig = NULL;
-	}
-    }
-    return AgentConfig;
-}
-
-/*
-typedef struct {
-    string Host;
-    string Account;
-    string Password;
-    string Token;
-    string AppName;
-} config_GroundworkConfig;
-*/
-config_GroundworkConfig *JSON_as_config_GroundworkConfig(json_t *json) {
-    config_GroundworkConfig *GroundworkConfig = (config_GroundworkConfig *)malloc(sizeof(config_GroundworkConfig));
-    if (!GroundworkConfig) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkConfig, %s\n", "malloc failed");
-    } else {
-	if (json_unpack(json, "{s:s s:s s:s s:s s:s}"
-	    , "Host",     &GroundworkConfig->Host
-	    , "Account",  &GroundworkConfig->Account
-	    , "Password", &GroundworkConfig->Password
-	    , "Token",    &GroundworkConfig->Token
-	    , "AppName",  &GroundworkConfig->AppName
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkConfig, %s\n", "JSON unpacking failed");
-	    free(GroundworkConfig);
-	    GroundworkConfig = NULL;
-	}
-    }
-    return GroundworkConfig;
-}
-
-/*
-typedef struct {
-    string Entrypoint;
-} config_GroundworkAction;
-*/
-config_GroundworkAction *JSON_as_config_GroundworkAction(json_t *json) {
-    config_GroundworkAction *GroundworkAction = (config_GroundworkAction *)malloc(sizeof(config_GroundworkAction));
-    if (!GroundworkAction) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkAction, %s\n", "malloc failed");
-    } else {
-	if (json_unpack(json, "{s:s}"
-	    , "Entrypoint", &GroundworkAction->Entrypoint
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkAction, %s\n", "JSON unpacking failed");
-	    free(GroundworkAction);
-	    GroundworkAction = NULL;
-	}
-    }
-    return GroundworkAction;
-}
-
-/*
-typedef struct {
-    config_GroundworkAction Connect;
-    config_GroundworkAction Disconnect;
-    config_GroundworkAction SynchronizeInventory;
-    config_GroundworkAction SendResourceWithMetrics;
-    config_GroundworkAction ValidateToken;
-} config_GroundworkActions;
-*/
-config_GroundworkActions *JSON_as_config_GroundworkActions(json_t *json) {
-    config_GroundworkActions *GroundworkActions = (config_GroundworkActions *)malloc(sizeof(config_GroundworkActions));
-    if (!GroundworkActions) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkActions, %s\n", "malloc failed");
-    } else {
-	// FIX MAJOR:  correct this code; perhaps I need to allocate the json objects beforehand,
-	// and delete them afterward?
-	json_t *json_Connect;
-	json_t *json_Disconnect;
-	json_t *json_SynchronizeInventory;
-	json_t *json_SendResourceWithMetrics;
-	json_t *json_ValidateToken;
-	if (json_unpack(json, "{s:o s:o s:o s:o s:o}"
-	    , "Connect",                 &json_Connect
-	    , "Disconnect",              &json_Disconnect
-	    , "SynchronizeInventory",    &json_SynchronizeInventory
-	    , "SendResourceWithMetrics", &json_SendResourceWithMetrics
-	    , "ValidateToken",           &json_ValidateToken
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_GroundworkActions, %s\n", "JSON unpacking failed");
-	    free(GroundworkActions);
-	    GroundworkActions = NULL;
-	} else {
-	    GroundworkActions->Connect                 = *JSON_as_config_GroundworkAction(json_Connect);
-	    GroundworkActions->Disconnect              = *JSON_as_config_GroundworkAction(json_Disconnect);
-	    GroundworkActions->SynchronizeInventory    = *JSON_as_config_GroundworkAction(json_SynchronizeInventory);
-	    GroundworkActions->SendResourceWithMetrics = *JSON_as_config_GroundworkAction(json_SendResourceWithMetrics);
-	    GroundworkActions->ValidateToken           = *JSON_as_config_GroundworkAction(json_ValidateToken);
-	}
-    }
-    return GroundworkActions;
-}
-
-config_Config *JSON_as_config_Config(json_t *json) {
-    config_Config *Config = (config_Config *)malloc(sizeof(config_Config));
-    if (!Config) {
-	// FIX MAJOR:  invoke proper logging for error conditions
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_Config, %s\n", "malloc failed");
-    } else {
-	// FIX MAJOR:  correct this code; perhaps I need to allocate the json objects beforehand,
-	// and delete them afterward?
-	json_t *json_AgentConfig;
-	json_t *json_GroundworkConfig;
-	json_t *json_GroundworkActions;
-	if (json_unpack(json, "{s:o s:o s:o}"
-	    , "AgentConfig",       &json_AgentConfig
-	    , "GroundworkConfig",  &json_GroundworkConfig
-	    , "GroundworkActions", &json_GroundworkActions
-	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_config_Config, %s\n", "JSON unpacking failed");
-	    free(Config);
-	    Config = NULL;
-	} else {
-	    Config->AgentConfig       = *JSON_as_config_AgentConfig      (json_AgentConfig);
-	    Config->GroundworkConfig  = *JSON_as_config_GroundworkConfig (json_GroundworkConfig);
-	    Config->GroundworkActions = *JSON_as_config_GroundworkActions(json_GroundworkActions);
-	}
-    }
-    return Config;
-}
 
 /*
 typedef struct _transit_TypedValue_ {

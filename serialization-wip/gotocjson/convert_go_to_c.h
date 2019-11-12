@@ -62,7 +62,13 @@ extern int enumeration_value(const string const enum_string[], int enum_string_c
 
 extern char *typeof_json_item(const json_t *json);
 
-extern char *JSON_as_string(json_t *json, size_t flags);
+// This routine decrements the reference count on the "json" object.  In many calling
+// contexts, that will be the last reference to that object, so it will be destroyed.
+// If you do want to keep the object around, call json_incref(json) before calling
+// the JSON_as_string() routine.
+extern char *JSON_as_str(json_t *json, size_t flags);
+
+#define JSON_as_string(json) JSON_as_str(json, 0)
 
 // A routine that an application must eventually call to dispose of whatever JSON object
 // got returned by conversion from a JSON string to Go-as-C data structures.  This call
