@@ -8,8 +8,6 @@ import (
 
 // Define NATS subjects
 const (
-	SubjListMetricsRequest      = "list-metrics-request"
-	SubjListMetricsResponse     = "list-metrics-response"
 	SubjSendResourceWithMetrics = "send-resource-with-metrics"
 	SubjSynchronizeInventory    = "synchronize-inventory"
 )

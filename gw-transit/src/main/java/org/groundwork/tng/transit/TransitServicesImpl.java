@@ -21,28 +21,11 @@ public class TransitServicesImpl implements TransitServices {
     private TngTransitLibrary tngTransitLibrary;
     private StringByReference errorMsg;
 
-    public TransitServicesImpl() throws IOException, InterruptedException, TimeoutException {
+    public TransitServicesImpl() {
         this.objectMapper = new ConfiguredObjectMapper();
-        this.tngTransitLibrary = Native.load("/home/vsenkevich/Projects/effectivesoft/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
+        this.tngTransitLibrary = Native.load("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
         // TODO: load this from Maven this.tngTransitLibrary = Native.load("/Users/dtaylor/gw8/tng/libtransit/libtransit.so", TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
-
-        Thread.sleep(WAIT_FOR_NATS_SERVER);
-
-        StreamingConnectionFactory cf = new StreamingConnectionFactory(new Options.Builder()
-                .natsUrl(TNG_NATS_URL)
-                .clusterId(CLUSTER_ID)
-                .clientId(CLIENT_ID)
-                .build());
-
-        StreamingConnection sc = cf.createConnection();
-        sc.subscribe("list-metrics-request", m -> {
-            try {
-                sc.publish("list-metrics-response", this.ListMetrics());
-            } catch (IOException | InterruptedException | TimeoutException e) {
-                e.printStackTrace();
-            }
-        });
     }
 
     @Override
@@ -62,10 +45,6 @@ public class TransitServicesImpl implements TransitServices {
         }
     }
 
-    @Override
-    public byte[] ListMetrics() throws TransitException {
-        return "RESPONSE".getBytes();
-    }
 
     @Override
     public void SynchronizeInventory(DtoInventory inventory) throws TransitException {
@@ -108,5 +87,30 @@ public class TransitServicesImpl implements TransitServices {
         if (!tngTransitLibrary.StopTransport(errorMsg)) {
             throw new TransitException(errorMsg.getValue());
         }
+    }
+
+    @Override
+    public boolean IsControllerRunning() throws TransitException {
+        return tngTransitLibrary.IsControllerRunning();
+    }
+
+    @Override
+    public boolean IsNATSRunning() throws TransitException {
+        return tngTransitLibrary.IsNATSRunning();
+    }
+
+    @Override
+    public boolean IsTransportRunning() throws TransitException {
+        return tngTransitLibrary.IsTransportRunning();
+    }
+
+    @Override
+    public void RegisterListMetricsHandler(ListMetricsCallback func) throws TransitException {
+        tngTransitLibrary.RegisterListMetricsHandler(func);
+    }
+
+    @Override
+    public void RemoveListMetricsHandler() throws TransitException {
+        tngTransitLibrary.RemoveListMetricsHandler();
     }
 }

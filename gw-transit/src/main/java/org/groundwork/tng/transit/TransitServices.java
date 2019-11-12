@@ -8,8 +8,6 @@ public interface TransitServices {
 
     void SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException;
 
-    byte[] ListMetrics() throws TransitException;
-
     void SynchronizeInventory(DtoInventory inventory) throws TransitException;
 
     void StartNATS() throws TransitException;
@@ -19,4 +17,14 @@ public interface TransitServices {
     void StartTransport() throws TransitException;
 
     void StopTransport() throws TransitException;
+
+    boolean IsControllerRunning() throws TransitException;
+
+    boolean IsNATSRunning() throws TransitException;
+
+    boolean IsTransportRunning() throws TransitException;
+
+    void RegisterListMetricsHandler(ListMetricsCallback callback) throws TransitException;
+
+    void RemoveListMetricsHandler() throws TransitException;
 }
