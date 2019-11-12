@@ -8,8 +8,6 @@ import (
 
 // Define NATS subjects
 const (
-	SubjListMetricsRequest      = "list-metrics-request"
-	SubjListMetricsResponse     = "list-metrics-response"
 	SubjSendResourceWithMetrics = "send-resource-with-metrics"
 	SubjSynchronizeInventory    = "synchronize-inventory"
 )
@@ -38,7 +36,7 @@ type AgentStats struct {
 	ExecutionTimeMetrics   time.Duration
 	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
-	sync.RWMutex
+	sync.Mutex
 }
 
 // AgentStatus defines TNG Agent status
@@ -67,7 +65,12 @@ type TransitServices interface {
 	SynchronizeInventory([]byte) error
 }
 
+// GetBytesHandlerType defines handler type
+type GetBytesHandlerType func() ([]byte, error)
+
 // Controllers defines TNG Agent controllers interface
 type Controllers interface {
 	ListMetrics() ([]byte, error)
+	RegisterListMetricsHandler(GetBytesHandlerType)
+	RemoveListMetricsHandler()
 }

@@ -8,9 +8,15 @@ RUN apt-get update -qq \
         software-properties-common \
         build-essential \
         libjansson-dev \
-    && add-apt-repository ppa:longsleep/golang-backports \
-    && apt-get install -qqy \
+        maven \
+        openjdk-8-jdk
+
+RUN add-apt-repository ppa:longsleep/golang-backports \
+    && apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
         golang-go
+
+# https://github.com/carlossg/docker-maven/tree/master/jdk-8
 
 WORKDIR /src/
 
