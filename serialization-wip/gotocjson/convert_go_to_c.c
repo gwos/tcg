@@ -61,6 +61,48 @@ char *JSON_as_str(json_t *json, size_t flags) {
     return result;
 }
 
+json_t *struct_timespec_as_JSON(const struct_timespec *struct_timespec) {
+    json_error_t error;
+    size_t flags = 0;
+    json_t *json;
+    // FIX MAJOR:  when generating this code, we must special-case the field packing in this routine, based on the "struct_timespec" field type
+    // FIX MAJOR:  make sure the "I" conversion can handle a 64-bit number
+    json = json_pack_ex(&error, flags, "I"
+	 , (json_int_t) (
+	     (struct_timespec->tv_sec  * MILLISECONDS_PER_SECOND) +
+	     (struct_timespec->tv_nsec / NANOSECONDS_PER_MILLISECOND)
+	 )
+    );
+    if (json == NULL) {
+	printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    error.text, error.source, error.line, error.column, error.position);
+    }
+    return json;
+}
+
+struct_timespec *JSON_as_struct_timespec(json_t *json) {
+    struct_timespec *timespec = (struct_timespec *)malloc(sizeof(struct_timespec));
+    if (!timespec) {
+	// FIX MAJOR:  invoke proper logging for error conditions
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "malloc failed");
+    } else {
+	// FIX MAJOR:  when generating this code, special-case the field unpacking in this routine, based on the "struct_timespec" field type
+	json_int_t pure_milliseconds;
+	if (json_unpack(json, "I"
+	    , &pure_milliseconds
+	) != 0) {
+	    // FIX MAJOR:  invoke proper logging for error conditions
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "JSON unpacking failed");
+	    free(timespec);
+	    timespec = NULL;
+	} else {
+	    timespec->tv_sec  = (time_t) (pure_milliseconds / MILLISECONDS_PER_SECOND);
+	    timespec->tv_nsec = (long) (pure_milliseconds % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
+	}
+    }
+    return timespec;
+}
+
 void free_JSON(json_t *json) {
     if (json != NULL) {
         json_decref(json);
