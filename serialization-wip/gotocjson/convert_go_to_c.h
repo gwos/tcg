@@ -30,6 +30,7 @@ typedef int64_t int64;
 typedef double  float64;
 typedef int32_t int32;
 typedef struct timespec struct_timespec;
+typedef struct_timespec time_Time;
 
 #ifndef string
 // Make a simple global substitution using the C preprocessor, so we don't
@@ -69,6 +70,11 @@ extern char *typeof_json_item(const json_t *json);
 extern char *JSON_as_str(json_t *json, size_t flags);
 
 #define JSON_as_string(json) JSON_as_str(json, 0)
+
+extern json_t *struct_timespec_as_JSON(const struct_timespec *milliseconds_MillisecondTimestamp);
+extern struct_timespec *JSON_as_struct_timespec(json_t *json);
+#define time_Time_as_JSON struct_timespec_as_JSON
+#define JSON_as_time_Time JSON_as_struct_timespec
 
 // A routine that an application must eventually call to dispose of whatever JSON object
 // got returned by conversion from a JSON string to Go-as-C data structures.  This call
