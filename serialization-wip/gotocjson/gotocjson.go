@@ -82,7 +82,8 @@ func main() {
     if err != nil {
 	os.Exit(1)
     }
-    pointer_base_types, list_base_types, key_value_pair_types, struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags, generated_C_code,
+    pointer_base_types, pointer_list_base_types, list_base_types, key_value_pair_types,
+	struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags, generated_C_code,
 	err := print_type_declarations(
 	package_name,
 	final_type_order,
@@ -96,7 +97,7 @@ func main() {
 	other_headers,
 	generated_C_code,
 	package_name,
-	final_type_order, pointer_base_types, list_base_types, key_value_pair_types,
+	final_type_order, pointer_base_types, pointer_list_base_types, list_base_types, key_value_pair_types,
 	simple_typedefs, enum_typedefs, const_groups, struct_typedefs, struct_field_typedefs,
 	simple_typedef_nodes, enum_typedef_nodes, const_group_nodes, struct_typedef_nodes,
 	struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags,
@@ -1180,14 +1181,15 @@ func print_type_declarations(
 	const_group_nodes     map[string]*ast.GenDecl,
 	struct_typedef_nodes  map[string]*ast.GenDecl,
     ) (
-	pointer_base_types    map[string]string,
-	list_base_types       []string,
-	key_value_pair_types  map[string][]string,
-	struct_fields         map[string][]string,
-	struct_field_Go_types map[string]map[string]string,
-	struct_field_C_types  map[string]map[string]string,
-	struct_field_tags     map[string]map[string]string,
-	generated_C_code      string,
+	pointer_base_types      map[string]string,
+	pointer_list_base_types []string,
+	list_base_types         []string,
+	key_value_pair_types    map[string][]string,
+	struct_fields           map[string][]string,
+	struct_field_Go_types   map[string]map[string]string,
+	struct_field_C_types    map[string]map[string]string,
+	struct_field_tags       map[string]map[string]string,
+	generated_C_code        string,
 	err error,
     ) {
     package_defined_type := map[string]bool{};
@@ -1218,8 +1220,9 @@ func print_type_declarations(
     map_key_value_types := regexp.MustCompile(`map\[([^]]+)\](.+)`)
 
     pointer_base_types    = map[string]string{}
-    // FIX QUICK:  Do we need to initialize this slice of strings?
-    // list_base_types       = []string{}
+    // FIX QUICK:  Do we need to initialize these slices of strings?
+    // pointer_list_base_types = []string{}
+    // list_base_types         = []string{}
     key_value_pair_types  = map[string][]string{}
     struct_fields         = map[string][]string{}
     struct_field_Go_types = map[string]map[string]string{}
@@ -1561,6 +1564,7 @@ func print_type_declarations(
 					    have_ptr_type[array_base_type] = true
 					    fmt.Fprintf(header_file, "typedef %s *%[1]s_Ptr;\n", array_base_type);
 					    fmt.Fprintf(header_file, "\n");
+					    pointer_list_base_types = append(pointer_list_base_types, array_base_type)
 					    pointer_base_types[array_base_type_ptr] = array_base_type
 					}
 					array_base_type = array_base_type_ptr
@@ -1659,7 +1663,7 @@ func print_type_declarations(
 		// FIX MAJOR:  clean this up
 		// struct_definition += fmt.Sprintf("extern char *%s_%s_as_JSON_str(const %[1]s_%[2]s *%[1]s_%[2]s);\n",
 		//     package_name, decl_kind.type_name)
-		struct_definition += fmt.Sprintf("#define %s_%s_as_JSON_str(%[1]s_%[2]s) JSON_as_string(%[1]s_%[2]s_as_JSON(%[1]s_%[2]s))\n",
+		struct_definition += fmt.Sprintf("#define %s_%s_as_JSON_str(%[1]s_%[2]s) JSON_as_str(%[1]s_%[2]s_as_JSON(%[1]s_%[2]s), 0)\n",
 		    package_name, decl_kind.type_name)
 
 		struct_definition += fmt.Sprintf("extern %s_%s *JSON_as_%[1]s_%[2]s(json_t *json);\n",
@@ -1675,8 +1679,8 @@ func print_type_declarations(
     if err = footer_boilerplate.Execute(header_file, boilerplate_variables); err != nil {
         panic("C header-file footer processing failed");
     }
-    return pointer_base_types, list_base_types, key_value_pair_types, struct_fields,
-	struct_field_Go_types, struct_field_C_types, struct_field_tags, generated_C_code, nil
+    return pointer_base_types, pointer_list_base_types, list_base_types, key_value_pair_types,
+	struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags, generated_C_code, nil
 }
 
 type json_field_tag struct {
@@ -1764,7 +1768,7 @@ func generate_all_encode_tree_routines(
 	package_name string,
 	final_type_order []declaration_kind,
 
-	// map[base_typ_ptr]base_type
+	// map[base_type_ptr]base_type
 	pointer_base_types map[string]string,
 
 	// []base_type
@@ -1794,7 +1798,9 @@ func generate_all_encode_tree_routines(
     all_encode_function_code = ""
 
     // This is a shortcut, so we don't have to special-case some code later on.
-    all_encode_function_code += "#define string_as_JSON(string_ptr) json_string(*(string_ptr))\n"
+    // It's now included in convert_go_to_c.h instead, to centralize the declaration
+    // because it is not specific to the conversion of any one Go package.
+    // all_encode_function_code += "#define string_as_JSON(string_ptr) json_string(*(string_ptr))\n"
 
     // This is also a shortcut, so we don't have to nearly-replicate some other code we will generate later on.
     for base_type_ptr, base_type := range pointer_base_types {
@@ -1834,12 +1840,71 @@ func generate_all_encode_tree_routines(
     return all_encode_function_code, err
 }
 
+func generate_decode_pointer_list_tree(
+	base_type string,
+    ) (
+	function_code string,
+	err error,
+    ) {
+/*
+// Scaffolding.
+
+typedef struct _transit_MetricSample_Ptr_List_ {
+    size_t count;
+    transit_MetricSample_Ptr *items;
+} transit_MetricSample_Ptr_List;
+
+### adding transit_MetricSample to the list of pointer list base types
+### adding transit_LabelDescriptor to the list of pointer list base types
+### adding transit_ThresholdDescriptor to the list of pointer list base types
+*/
+
+    function_code += fmt.Sprintf(`
+%[1]s_Ptr_List *JSON_as_%[1]s_Ptr_List(json_t *json) {
+    %[1]s_Ptr_List *%[1]s_Ptr_List_Ptr = (%[1]s_Ptr_List *) calloc(1, sizeof(%[1]s_Ptr_List));
+    if (!%[1]s_Ptr_List_Ptr) {
+	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List, %%s\n", "malloc failed");
+    } else {
+        int failed = 0;
+	%[1]s_Ptr_List_Ptr->count = json_array_size(json);
+        %[1]s_Ptr_List_Ptr->items = (%[1]s_Ptr *) malloc(%[1]s_Ptr_List_Ptr->count * sizeof(%[1]s_Ptr));
+        size_t index;
+        json_t *value;
+        json_array_foreach(json, index, value) {
+            %[1]s *%[1]s_ptr = JSON_as_%[1]s(value);
+            if (%[1]s_ptr == NULL) {
+                fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List, %%s\n", "transit_TypedValue_ptr is NULL");
+                failed = 1;
+		break;
+            } else {
+                %[1]s_Ptr_List_Ptr->items[index] = %[1]s_ptr;
+            }
+            fprintf(stderr, "processed index %%d\n", index);
+        }
+	if (failed) {
+	    // FIX QUICK:  verify that this error handling is correct at all levels,
+	    // including possible removal of any objects already copied into the array
+	    // (which might not be the full array size)
+	    free(%[1]s_Ptr_List_Ptr);
+	    %[1]s_Ptr_List_Ptr = NULL;
+	}
+    }
+    return %[1]s_Ptr_List_Ptr;
+}
+`, base_type)
+
+    return function_code, err
+}
+
 func generate_all_decode_tree_routines(
 	package_name string,
 	final_type_order []declaration_kind,
 
-	// map[base_typ_ptr]base_type
+	// map[base_type_ptr]base_type
 	pointer_base_types map[string]string,
+
+	// []list_base_type
+	pointer_list_base_types []string,
 
 	// map[key_type][]value_type
 	key_value_pair_types map[string][]string,
@@ -1880,6 +1945,14 @@ fmt.Fprintf(os.Stderr, "=== key/value types = '%s/%s'\n", key_type, value_type);
 	    }
 	    all_decode_function_code += function_code
 	}
+    }
+
+    for _, base_type := range pointer_list_base_types {
+	function_code, err := generate_decode_pointer_list_tree(base_type)
+	if err != nil {
+	    panic(err)
+	}
+	all_decode_function_code += function_code
     }
 
     for _, final_type := range final_type_order {
@@ -2185,14 +2258,14 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
 // that will call it.
 /*
 string_transit_TypedValue_Pair_List *JSON_as_string_transit_TypedValue_Pair_List(json_t *json) {
-    string_transit_TypedValue_Pair_List *Pair_List = (string_transit_TypedValue_Pair_List *)malloc(sizeof(string_transit_TypedValue_Pair_List));
+    string_transit_TypedValue_Pair_List *Pair_List = (string_transit_TypedValue_Pair_List *) malloc(sizeof(string_transit_TypedValue_Pair_List));
     if (!Pair_List) {
         // FIX MAJOR:  Invoke proper logging for error conditions.
         fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List, %s\n", "malloc failed");
     } else {
         int failed = 0;
         Pair_List->count = json_object_size(json);
-        Pair_List->items = (string_transit_TypedValue_Pair *)malloc(Pair_List->count * sizeof(string_transit_TypedValue_Pair));
+        Pair_List->items = (string_transit_TypedValue_Pair *) malloc(Pair_List->count * sizeof(string_transit_TypedValue_Pair));
         const char *key;
         json_t *value;
         size_t i = 0;
@@ -2204,13 +2277,18 @@ string_transit_TypedValue_Pair_List *JSON_as_string_transit_TypedValue_Pair_List
             if (TypedValue_ptr == NULL) {
                 fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List, %s\n", "TypedValue_ptr is NULL");
                 failed = 1;
+		break;
             } else {
                 Pair_List->items[i].value = *TypedValue_ptr;
+		free(TypedValue_ptr);
             }
             fprintf(stderr, "processed key %s\n", key);
             ++i;
         }
         if (failed) {
+	    // FIX QUICK:  verify that this error handling is correct at all levels,
+	    // including possible removal of any objects already copied into the array
+	    // (which might not be the full array size)
             free(Pair_List);
             Pair_List = NULL;
         }
@@ -2225,14 +2303,14 @@ string_transit_TypedValue_Pair_List *JSON_as_string_transit_TypedValue_Pair_List
     // {{.PairListType}}   // string_transit_TypedValue_Pair_List
     var decode_routine_complete_template = `
 {{.PairListType}} *JSON_as_{{.PairListType}}(json_t *json) {
-    {{.PairListType}} *Pair_List = ({{.PairListType}} *)malloc(sizeof({{.PairListType}}));
+    {{.PairListType}} *Pair_List = ({{.PairListType}} *) malloc(sizeof({{.PairListType}}));
     if (!Pair_List) {
         // FIX MAJOR:  Invoke proper logging for error conditions.
         fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}, %s\n", "malloc failed");
     } else {
         int failed = 0;
         Pair_List->count = json_object_size(json);
-        Pair_List->items = ({{.PairKeyType}}_{{.PairValueType}}_Pair *)malloc(Pair_List->count * sizeof({{.PairKeyType}}_{{.PairValueType}}_Pair));
+        Pair_List->items = ({{.PairKeyType}}_{{.PairValueType}}_Pair *) malloc(Pair_List->count * sizeof({{.PairKeyType}}_{{.PairValueType}}_Pair));
         const char *key;
         json_t *value;
         size_t i = 0;
@@ -2244,13 +2322,18 @@ string_transit_TypedValue_Pair_List *JSON_as_string_transit_TypedValue_Pair_List
             if ({{.PairValueType}}_ptr == NULL) {
                 fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}, %s\n", "{{.PairValueType}}_ptr is NULL");
                 failed = 1;
+		break;
             } else {
                 Pair_List->items[i].value = *{{.PairValueType}}_ptr;
+		free({{.PairValueType}}_ptr);
             }
             fprintf(stderr, "processed key %s\n", key);
             ++i;
         }
         if (failed) {
+	    // FIX QUICK:  verify that this error handling is correct at all levels,
+	    // including possible removal of any objects already copied into the array
+	    // (which might not be the full array size)
             free(Pair_List);
             Pair_List = NULL;
         }
@@ -2288,7 +2371,7 @@ func generate_encode_PackageName_StructTypeName_tree(
 	package_name string,
 	struct_name string,
 
-	// map[base_typ_ptr]base_type
+	// map[base_type_ptr]base_type
 	pointer_base_types map[string]string,
 
 	// map[key_type][]value_type
@@ -2645,7 +2728,7 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
 			    have_encode_routine_normal_body_format = true
 			}
 			// FIX QUICK:  fill in this branch
-			function_code += fmt.Sprintf("\n        // as-yet-undone\n")
+			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _Pair_List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
 			function_code += fmt.Sprintf("        //   field_name = %s\n", field_name)
@@ -2695,13 +2778,44 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
 			    have_encode_routine_normal_body_format = true
 			}
 			// FIX QUICK:  fill in this branch
-			function_code += fmt.Sprintf("\n        // as-yet-undone\n")
+			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _Ptr_List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
 			function_code += fmt.Sprintf("        //   field_name = %s\n", field_name)
 			function_code += fmt.Sprintf("        // field_C_type = %s\n", field_C_type)
 			function_code += fmt.Sprintf("        // FIX QUICK:  encoding placeholder for package %s struct %s field %s, of type %s\n",
 			    package_name, struct_name, field_name, field_C_type)
+
+// FIX QUICK:  generalize this to include support for omitempty
+// =====================================================================================================================
+/*
+        // package_name = transit
+        //  struct_name = TimeSeries
+        //   field_name = MetricSamples
+        // field_C_type = transit_MetricSample_Ptr_List
+
+        json_t *transit_TimeSeries_MetricSamples = transit_MetricSample_Ptr_List_as_JSON(&transit_TimeSeries->MetricSamples);
+        if (transit_TimeSeries->MetricSamples.count != 0) {
+            if (json_object_set_new(json, "metricSamples", transit_TimeSeries_MetricSamples) != 0) {
+                failure = "cannot set transit_MetricSample_Ptr_List subobject value into object";
+                break;
+            }
+        }
+
+*/
+
+			function_code += fmt.Sprintf(`
+        json_t *%[2]s_%s_%s = %[5]s_as_JSON(&%[2]s_%s->%s);
+        if (%[2]s_%s->%s.count != 0) {
+            if (json_object_set_new(json, "%[1]s", %[2]s_%s_%s) != 0) {
+                failure = "cannot set %[5]s subobject value into object";
+                break;
+            }
+        }`,
+			    json_field_name, package_name, struct_name, field_name, field_C_type,
+			)
+// =====================================================================================================================
+
 		    } else if strings.HasSuffix(field_C_type, "_List") {
 	// FIX QUICK:  this case covers the following:
         // FIX QUICK:  encoding placeholder for package transit struct ResourceGroup field Resources, of type transit_MonitoredResource_List
@@ -2712,7 +2826,7 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
 			    have_encode_routine_normal_body_format = true
 			}
 			// FIX QUICK:  fill in this branch
-			function_code += fmt.Sprintf("\n        // as-yet-undone\n")
+			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
 			function_code += fmt.Sprintf("        //   field_name = %s\n", field_name)
@@ -2729,7 +2843,7 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
 			    have_encode_routine_normal_body_format = true
 			}
 			// FIX QUICK:  fill in this branch
-			function_code += fmt.Sprintf("\n        // as-yet-undone\n")
+			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _List_Ptr)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
 			function_code += fmt.Sprintf("        //   field_name = %s\n", field_name)
@@ -2816,7 +2930,7 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
 				have_encode_routine_normal_body_format = true
 			    }
 			    // FIX QUICK:  check the json_field_name, to make sure it is handled correctly.
-			    function_code += fmt.Sprintf("\n        // as-yet-undone\n")
+			    function_code += fmt.Sprintf("\n        // as-yet-undone (encoding default)\n")
 			    function_code += fmt.Sprintf("        //    package_name = %s\n", package_name)
 			    function_code += fmt.Sprintf("        //     struct_name = %s\n", struct_name)
 			    function_code += fmt.Sprintf("        //      field_name = %s\n", field_name)
@@ -2998,7 +3112,7 @@ json_t *{{.StructName}}_as_JSON(const {{.StructName}} *{{.StructName}}) {
     size += jsonCfgToken_len    + NUL_TERM_LEN;
 
     // allocate and fill the target struct by pointer
-    {{.StructName}}_ptr = ({{.StructName}} *)malloc(size);
+    {{.StructName}}_ptr = ({{.StructName}} *) malloc(size);
     if ({{.StructName}}_ptr == NULL) {
       fprintf(stderr, "decode{{.StructName}} error: %s\n", "malloc failed");
     } else {
@@ -3023,7 +3137,7 @@ func generate_decode_PackageName_StructTypeName_tree(
 	package_name string,
 	struct_name string,
 
-	// map[base_typ_ptr]base_type
+	// map[base_type_ptr]base_type
 	pointer_base_types map[string]string,
 
 	// map[key_type][]value_type
@@ -3232,6 +3346,7 @@ func generate_decode_PackageName_StructTypeName_tree(
 			    field_tag.json_field_name, max_json_field_name_len - field_name_len + 1, " ", field_name)
 
 			// FIX QUICK:  create the missing JSON_as_XXX_YYY_Pair_List() routines that will make the rest of this work as intended
+			// FIX QUICK:  alter the order of arguments in this format to be more standard
 			field_values += fmt.Sprintf(
 `	    %s *%[1]s_ptr = JSON_as_%[1]s(json_%[4]s);
 	    if (%[1]s_ptr == NULL) {
@@ -3239,23 +3354,93 @@ func generate_decode_PackageName_StructTypeName_tree(
 		failed = 1;
 	    } else {
 		%[3]s->%s = *%[1]s_ptr;
+		// FIX QUICK:  Do we also need to free() the pointer whose pointed-to value we just copied?
 	    }
 `, field_C_type, package_name, struct_name, field_name)
 
 		    } else if strings.HasSuffix(field_C_type, "_Ptr_List") {
 			// FIX QUICK:  Does this handle field_tag.json_omitempty correctly for all relevant types?
 			// FIX QUICK:  fill in this branch
-			field_values += fmt.Sprintf("\n            // as-yet-undone\n")
+			var omitempty_condition string
+			if field_tag.json_omitempty {
+			    omitempty_condition = "1"
+			} else {
+			    omitempty_condition = "0"
+			}
+			field_values += fmt.Sprintf("\n            // as-yet-undone (decoding _Ptr_List)\n")
 			field_values += fmt.Sprintf("            // package_name = %s\n", package_name)
 			field_values += fmt.Sprintf("            //  struct_name = %s\n", struct_name)
 			field_values += fmt.Sprintf("            //   field_name = %s\n", field_name)
 			field_values += fmt.Sprintf("            // field_C_type = %s\n", field_C_type)
 			field_values += fmt.Sprintf("            // FIX QUICK:  decoding placeholder for package %s struct %s field %s, of type %s\n",
 			    package_name, struct_name, field_name, field_C_type)
+
+// ================================================================================================================================
+			// This part seems to be okay.
+			field_objects += fmt.Sprintf("        json_t *json_%s = NULL;\n", field_name)
+			field_unpacks += fmt.Sprintf("            , \"%s\",%*s&json_%s\n",
+			    field_tag.json_field_name, max_json_field_name_len - field_name_len + 1, " ", field_name)
+
+			// This part is under development.
+			/*
+            // package_name = transit
+            //  struct_name = TimeSeries
+            //   field_name = MetricSamples
+            // field_C_type = transit_MetricSample_Ptr_List
+
+            if (json_MetricSamples == NULL) {
+		// FIX QUICK:  When processing the failed flag below, be sure that we also
+		// take care to recursively free up any memory that we have allocated to this
+		// or any other sub-object data structure before freeing the top-level pointer.
+                TimeSeries->MetricSamples.count = 0;
+                TimeSeries->MetricSamples.items = NULL;
+		if (!omitempty) {  // This is only a reportable error if the field is not declared as "omitempty".
+		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries, %s\n", "json_MetricSamples is NULL");
+		    failed = 1;
+		}
+            } else {
+                transit_MetricSample_Ptr_List *transit_MetricSample_Ptr_List_ptr = JSON_as_transit_MetricSample_Ptr_List(json_MetricSamples);
+                if (transit_MetricSample_Ptr_List_ptr == NULL) {
+                    TimeSeries->MetricSamples.count = 0;
+                    TimeSeries->MetricSamples.items = NULL;
+		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries, %s\n", "transit_MetricSample_Ptr_List_ptr is NULL");
+		    failed = 1;
+                } else {
+                    TimeSeries->MetricSamples = *transit_MetricSample_Ptr_List_ptr;
+		    free(transit_MetricSample_Ptr_List_ptr);
+                }
+            }
+			*/
+			field_values += fmt.Sprintf(
+`            if (json_%[3]s == NULL) {
+		// FIX QUICK:  When processing the failed flag below, be sure that we also
+		// take care to recursively free up any memory that we have allocated to this
+		// or any other sub-object data structure before freeing the top-level pointer.
+                %[2]s->%s.count = 0;
+                %[2]s->%s.items = NULL;
+		if (!%[5]s) {  // This is only a reportable error if the field is not declared as "omitempty".
+		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s, %%s\n", "json_%[3]s is NULL");
+		    failed = 1;
+		}
+            } else {
+                %[4]s *%[4]s_ptr = JSON_as_%[4]s(json_%[3]s);
+                if (%[4]s_ptr == NULL) {
+                    %[2]s->%s.count = 0;
+                    %[2]s->%s.items = NULL;
+		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s, %%s\n", "%[4]s_ptr is NULL");
+		    failed = 1;
+                } else {
+                    %[2]s->%s = *%[4]s_ptr;
+		    free(%[4]s_ptr);
+                }
+            }
+`, package_name, struct_name, field_name, field_C_type, omitempty_condition)
+// ================================================================================================================================
+
 		    } else if strings.HasSuffix(field_C_type, "_List") {
 			// FIX QUICK:  Does this handle field_tag.json_omitempty correctly for all relevant types?
 			// FIX QUICK:  fill in this branch
-			field_values += fmt.Sprintf("\n            // as-yet-undone\n")
+			field_values += fmt.Sprintf("\n            // as-yet-undone (decoding _List)\n")
 			field_values += fmt.Sprintf("            // package_name = %s\n", package_name)
 			field_values += fmt.Sprintf("            //  struct_name = %s\n", struct_name)
 			field_values += fmt.Sprintf("            //   field_name = %s\n", field_name)
@@ -3265,7 +3450,7 @@ func generate_decode_PackageName_StructTypeName_tree(
 		    } else if strings.HasSuffix(field_C_type, "_List_Ptr") {
 			// FIX QUICK:  Does this handle field_tag.json_omitempty correctly for all relevant types?
 			// FIX QUICK:  fill in this branch
-			field_values += fmt.Sprintf("\n            // as-yet-undone\n")
+			field_values += fmt.Sprintf("\n            // as-yet-undone (decoding _List_Ptr)\n")
 			field_values += fmt.Sprintf("            // package_name = %s\n", package_name)
 			field_values += fmt.Sprintf("            //  struct_name = %s\n", struct_name)
 			field_values += fmt.Sprintf("            //   field_name = %s\n", field_name)
@@ -3351,7 +3536,7 @@ func generate_decode_PackageName_StructTypeName_tree(
 				field_tag.json_field_name, max_json_field_name_len - field_name_len + 1, " ", field_name)
 			}
 			// FIX QUICK:  this seems to be working; clean up the extra development output here
-			field_values += fmt.Sprintf("\n            // decoding as-yet-undone\n")
+			field_values += fmt.Sprintf("\n            // decoding as-yet-undone (decoding default) \n")
 			field_values  += fmt.Sprintf("            // package_name = %s\n", package_name)
 			field_values  += fmt.Sprintf("            //  struct_name = %s\n", struct_name)
 			field_values  += fmt.Sprintf("            //   field_name = %s\n", field_name)
@@ -3538,7 +3723,7 @@ func generate_decode_PackageName_StructTypeName_tree(
     // When adding code like this, we need to double the % characters in any fprintf() format specifications
     // that we don't want Go itself to attempt to interpret.
     function_code += fmt.Sprintf(`    // allocate and fill the target struct by pointer
-    %[1]s_ptr = (%[1]s *)malloc(size);
+    %[1]s_ptr = (%[1]s *) malloc(size);
     if (%[1]s_ptr == NULL) {
       fprintf(stderr, "decode_json_%[1]s error: %%s\n", "malloc failed");
     } else {
@@ -3834,26 +4019,27 @@ var destroy_routine_footer_template = `    free_JSON(json);
 //     extern void destroy_PackageName_StructTypeName_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr, json_t *json);
 //
 func print_type_conversions(
-	other_headers         string,
-	generated_C_code      string,
-	package_name          string,
-	final_type_order      []declaration_kind,
-	pointer_base_types    map[string]string,
-	list_base_types       []string,
-	key_value_pair_types  map[string][]string,
-	simple_typedefs       map[string]string,
-	enum_typedefs         map[string]string,
-	const_groups          map[string]string,
-	struct_typedefs       map[string][]string,
-	struct_field_typedefs map[string]map[string]string,
-	simple_typedef_nodes  map[string]*ast.GenDecl,
-	enum_typedef_nodes    map[string]*ast.GenDecl,
-	const_group_nodes     map[string]*ast.GenDecl,
-	struct_typedef_nodes  map[string]*ast.GenDecl,
-	struct_fields         map[string][]string,
-	struct_field_Go_types map[string]map[string]string,
-	struct_field_C_types  map[string]map[string]string,
-	struct_field_tags     map[string]map[string]string,
+	other_headers           string,
+	generated_C_code        string,
+	package_name            string,
+	final_type_order        []declaration_kind,
+	pointer_base_types      map[string]string,
+	pointer_list_base_types []string,
+	list_base_types         []string,
+	key_value_pair_types    map[string][]string,
+	simple_typedefs         map[string]string,
+	enum_typedefs           map[string]string,
+	const_groups            map[string]string,
+	struct_typedefs         map[string][]string,
+	struct_field_typedefs   map[string]map[string]string,
+	simple_typedef_nodes    map[string]*ast.GenDecl,
+	enum_typedef_nodes      map[string]*ast.GenDecl,
+	const_group_nodes       map[string]*ast.GenDecl,
+	struct_typedef_nodes    map[string]*ast.GenDecl,
+	struct_fields           map[string][]string,
+	struct_field_Go_types   map[string]map[string]string,
+	struct_field_C_types    map[string]map[string]string,
+	struct_field_tags       map[string]map[string]string,
     ) error {
 
     header_boilerplate := template.Must(template.New("code_file_header").Parse(C_code_boilerplate))
@@ -3902,7 +4088,8 @@ func print_type_conversions(
 
     all_decode_function_code, err := generate_all_decode_tree_routines(
 	package_name, final_type_order,
-	pointer_base_types, key_value_pair_types, enum_typedefs, struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags,
+	pointer_base_types, pointer_list_base_types, key_value_pair_types,
+	enum_typedefs, struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags,
     )
     if err != nil {
         panic(err)

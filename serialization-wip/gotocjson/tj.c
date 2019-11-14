@@ -319,11 +319,11 @@ json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit) {
 char *transit_Transit_as_JSON_str(const transit_Transit *transit_Transit) {
     printf(FILE_LINE "FIX QUICK:  got into transit_Transit_as_JSON_str()\n");
     size_t flags = 0;
-    return JSON_as_string(transit_Transit_as_JSON(transit_Transit), flags);
+    return JSON_as_str(transit_Transit_as_JSON(transit_Transit), flags);
 }
 /*
 // FIX MAJOR:  for simplicity, publish this instead of the actual function just above
-#define transit_Transit_as_JSON_str(transit_Transit) JSON_as_string(transit_Transit_as_JSON(transit_Transit), 0)
+#define transit_Transit_as_JSON_str(transit_Transit) JSON_as_str(transit_Transit_as_JSON(transit_Transit), 0)
 */
 
 /*
@@ -356,11 +356,11 @@ json_t *transit_MonitoredResource_as_JSON(const transit_MonitoredResource *trans
 // Encoding routine.
 char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource) {
     size_t flags = 0;
-    return JSON_as_string(transit_MonitoredResource_as_JSON(transit_MonitoredResource), flags);
+    return JSON_as_str(transit_MonitoredResource_as_JSON(transit_MonitoredResource), flags);
 }
 /*
 // FIX MAJOR:  for simplicity, publish this instead of the actual function just above
-#define transit_MonitoredResource_as_JSON_str(transit_MonitoredResource) JSON_as_string(transit_MonitoredResource_as_JSON(transit_MonitoredResource), 0)
+#define transit_MonitoredResource_as_JSON_str(transit_MonitoredResource) JSON_as_str(transit_MonitoredResource_as_JSON(transit_MonitoredResource), 0)
 */
 
 // FIX MAJOR:  output these definitions in the boilerplate for the header file that defines the "struct_timespec" conversions
@@ -443,11 +443,11 @@ json_t *transit_TypedValue_as_JSON(const transit_TypedValue *transit_TypedValue)
 // Encoding routine.
 char *transit_TypedValue_as_JSON_str(const transit_TypedValue *transit_TypedValue) {
     size_t flags = 0;
-    return JSON_as_string(transit_TypedValue_as_JSON(transit_TypedValue), flags);
+    return JSON_as_str(transit_TypedValue_as_JSON(transit_TypedValue), flags);
 }
 /*
 // FIX MAJOR:  for simplicity, publish this instead of the actual function just above
-#define transit_TypedValue_as_JSON_str(transit_TypedValue) JSON_as_string(transit_TypedValue_as_JSON(transit_TypedValue), 0)
+#define transit_TypedValue_as_JSON_str(transit_TypedValue) JSON_as_str(transit_TypedValue_as_JSON(transit_TypedValue), 0)
 */
 
 // ----------------------------------------------------------------
@@ -569,11 +569,11 @@ json_t *transit_InventoryResource_as_JSON(const transit_InventoryResource *trans
 // Encoding routine.
 char *transit_InventoryResource_as_JSON_str(const transit_InventoryResource *transit_InventoryResource) {
     size_t flags = 0;
-    return JSON_as_string(transit_InventoryResource_as_JSON(transit_InventoryResource), flags);
+    return JSON_as_str(transit_InventoryResource_as_JSON(transit_InventoryResource), flags);
 }
 /*
 // FIX MAJOR:  for simplicity, publish this instead of the actual function just above
-#define transit_InventoryResource_as_JSON_str(transit_InventoryResource) JSON_as_string(transit_InventoryResource_as_JSON(transit_InventoryResource), 0)
+#define transit_InventoryResource_as_JSON_str(transit_InventoryResource) JSON_as_str(transit_InventoryResource_as_JSON(transit_InventoryResource), 0)
 */
 
 // ----------------------------------------------------------------

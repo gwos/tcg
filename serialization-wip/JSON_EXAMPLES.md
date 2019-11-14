@@ -6,7 +6,7 @@
 
     {"valueType":"IntegerType","integerValue":1,"timeValue":1572955806397}
 
->SampleType:  
+>MetricSample:  
 
     {"sampleType":"Warning","interval":{"endTime":1572955806397,"startTime":1572955806397},"value":{"valueType":"IntegerType","integerValue":1,"timeValue":1572955806397}}
 

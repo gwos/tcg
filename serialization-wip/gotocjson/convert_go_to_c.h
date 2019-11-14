@@ -67,9 +67,14 @@ extern char *typeof_json_item(const json_t *json);
 // contexts, that will be the last reference to that object, so it will be destroyed.
 // If you do want to keep the object around, call json_incref(json) before calling
 // the JSON_as_string() routine.
-extern char *JSON_as_str(json_t *json, size_t flags);
+extern string JSON_as_str(json_t *json, size_t flags);
 
-#define JSON_as_string(json) JSON_as_str(json, 0)
+#define string_as_JSON(string_ptr) json_string(*(string_ptr))
+
+// This definition is tentative, and it's causing us some build problems.
+// It is likely to be either revised or replaced with an actual separate routine.
+// #define JSON_as_string(json) JSON_as_str(json, 0)
+extern string *JSON_as_string(json_t *json);
 
 extern json_t *struct_timespec_as_JSON(const struct_timespec *milliseconds_MillisecondTimestamp);
 extern struct_timespec *JSON_as_struct_timespec(json_t *json);
