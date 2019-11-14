@@ -1,7 +1,7 @@
 package org.groundwork.tng.transit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.jna.Native;
+import org.codehaus.jackson.map.ObjectMapper;
 
 import java.io.IOException;
 
