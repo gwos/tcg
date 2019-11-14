@@ -34,6 +34,7 @@ var headers map[string]string
 func TestIntegration(t *testing.T) {
 	var err error
 	headers, err = config()
+	defer clean(headers)
 	if err != nil {
 		t.Error(err)
 	}
@@ -41,23 +42,34 @@ func TestIntegration(t *testing.T) {
 	err = existenceCheck(false, "irrelevant")
 	if err != nil {
 		t.Error(err)
+		return
+	}
+
+	err = installDependencies()
+	if err != nil {
+		t.Error(err)
+		return
 	}
 
 	err = runJavaSynchronizeInventoryTest()
 	if err != nil {
 		t.Error(err)
+		return
 	}
-
-	defer clean(headers)
 
 	err = existenceCheck(true, HostStatusPending)
 
 	err = runJavaSendResourceWithMetricsTest()
 	if err != nil {
 		t.Error(err)
+		return
 	}
 
 	err = existenceCheck(true, HostStatusUp)
+	if err != nil {
+		t.Error(err)
+		return
+	}
 }
 
 func config() (map[string]string, error) {
@@ -91,8 +103,8 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	if !mustExist && statusCode == 404 {
 		return nil
 	}
-	if !(!mustExist && statusCode != 404) {
-		return fmt.Errorf("Status code = %d(Details: %s), want = %d", statusCode, string(byteResponse), 404)
+	if !(mustExist && statusCode == 200) {
+		return fmt.Errorf("Status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 404)
 	}
 
 	var response Response
@@ -110,15 +122,31 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	return nil
 }
 
+func installDependencies() error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("mvn", "install:install-file", "-Dfile=lib/collagerest-common-8.0.0-SNAPSHOT.jar", "-DgroupId=org.groundwork", "-DartifactId=collagerest-common", "-Dversion=8.0.0-SNAPSHOT")
+	cmd.Dir = path.Join(workDir, "../gw-transit")
+	_, err = cmd.Output()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func runJavaSynchronizeInventoryTest() error {
 	workDir, err := os.Getwd()
 	if err != nil {
 		return err
 	}
 
-	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSynchronizeInventory", "test")
-	cmd.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd.Output()
+	cmd1 := exec.Command("mvn", "-Dtest=AppTest#shouldSynchronizeInventory", "test")
+	cmd1.Dir = path.Join(workDir, "../gw-transit")
+	_, err = cmd1.Output()
 	if err != nil {
 		return err
 	}
@@ -132,9 +160,10 @@ func runJavaSendResourceWithMetricsTest() error {
 		return err
 	}
 
-	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSendResourceAndMetrics", "test")
-	cmd.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd.Output()
+	cmd1 := exec.Command("mvn", "-Dtest=AppTest#shouldSendResourceAndMetrics", "test")
+	cmd1.Dir = path.Join(workDir, "../gw-transit")
+	out, err := cmd1.Output()
+	log.Println(string(out))
 	if err != nil {
 		return err
 	}
