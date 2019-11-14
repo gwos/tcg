@@ -11,7 +11,6 @@ import (
 // Define NATS IDs
 const (
 	ClusterID            = "tng-cluster"
-	DispatcherAckWait    = 15 * time.Second
 	DispatcherClientID   = "tng-dispatcher"
 	DispatcherDurableID  = "tng-store-dispatcher"
 	DispatcherQueueGroup = "tng-queue-dispatcher"
@@ -19,9 +18,18 @@ const (
 )
 
 var (
+	cfg            Config
 	dispatcherConn stan.Conn
 	stanServer     *stand.StanServer
 )
+
+// Config defines NATS configurable options
+type Config struct {
+	DispatcherAckWait time.Duration
+	FilestoreDir      string
+	StoreType         string
+	NatsURL           string
+}
 
 // DispatcherFn defines message processor
 type DispatcherFn func([]byte) error
@@ -34,16 +42,18 @@ func Connect(clientID string) (stan.Conn, error) {
 	return stan.Connect(
 		ClusterID,
 		clientID,
-		stan.NatsURL(stan.DefaultNatsURL),
+		stan.NatsURL(cfg.NatsURL),
 	)
 }
 
 // StartServer runs NATS
-func StartServer(storeType, filestoreDir string) error {
+func StartServer(config Config) error {
+	cfg = config
 	opts := stand.GetDefaultOptions()
 	opts.ID = ClusterID
-	opts.FilestoreDir = filestoreDir
-	switch storeType {
+	opts.NATSServerURL = cfg.NatsURL
+	opts.FilestoreDir = cfg.FilestoreDir
+	switch cfg.StoreType {
 	case "MEMORY":
 		opts.StoreType = stores.TypeMemory
 	case "FILE":
@@ -71,7 +81,7 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 		dispatcherConn, err = stan.Connect(
 			ClusterID,
 			DispatcherClientID,
-			stan.NatsURL(stan.DefaultNatsURL),
+			stan.NatsURL(cfg.NatsURL),
 		)
 	}
 	if err != nil {
@@ -92,7 +102,7 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 				}
 			},
 			stan.SetManualAckMode(),
-			stan.AckWait(DispatcherAckWait),
+			stan.AckWait(cfg.DispatcherAckWait),
 			stan.DurableName(DispatcherDurableID),
 			stan.StartWithLastReceived(),
 		)
@@ -115,7 +125,7 @@ func Publish(subject string, msg []byte) error {
 	connection, err := stan.Connect(
 		ClusterID,
 		PublisherID,
-		stan.NatsURL(stan.DefaultNatsURL),
+		stan.NatsURL(cfg.NatsURL),
 	)
 	if err != nil {
 		return err
