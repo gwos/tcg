@@ -70,3 +70,17 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 >With logs: 
     
     $ go test -v ./<package_name>/
+    
+***Testing in Docker container:***
+
+    $ ./docker_tests.sh <package_name>
+    
+*Available packages:* <b>integration, config, milliseconds
+
+***Examples:***
+
+    $ go test ./integration/
+    
+    $ go test -v ./config
+    
+    $ ./docker_tests.sh milliseconds
