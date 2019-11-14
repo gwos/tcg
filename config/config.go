@@ -19,8 +19,8 @@ const (
 	EnvConfigPrefix = "TNG"
 )
 
-// GroundworkConfig defines Groundwork Connection configuration
-type GroundworkConfig struct {
+// GWConfig defines Groundwork Connection configuration
+type GWConfig struct {
 	Host     string
 	Account  string
 	Password string
@@ -29,23 +29,29 @@ type GroundworkConfig struct {
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	// ControllerAddr accepts value for `http.Server{Addr}`: TCP address to listen on, ":http" if empty
+	// ControllerAddr accepts value for `http.Server{Addr}`
+	// TCP address to listen on, ":http" if empty
 	ControllerAddr     string `yaml:"controllerAddr"`
 	ControllerCertFile string `yaml:"controllerCertFile"`
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
-	NATSFilestoreDir   string `yaml:"natsFilestoreDir"`
-	// NATSStoreType accepts "FILE"|"MEMORY"
-	NATSStoreType   string `yaml:"natsStoreType"`
+	// NatsAckWait accepts number of seconds
+	// should be greater then the GWClient request duration
+	NatsAckWait      int64  `yaml:"natsAckWait"`
+	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
+	// NatsStoreType accepts "FILE"|"MEMORY"
+	NatsStoreType string `yaml:"natsStoreType"`
+	// NatsURL accepts value in form "nats://localhost:4222"
+	NatsURL         string `yaml:"natsURL"`
 	StartController bool   `yaml:"startController"`
-	StartNATS       bool   `yaml:"startNATS"`
+	StartNats       bool   `yaml:"startNats"`
 	// StartTransport defines that NATS starts with Transport
 	StartTransport bool `yaml:"startTransport"`
 }
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig       AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  GroundworkConfig  `yaml:"groundworkConfig"`
+	AgentConfig AgentConfig `yaml:"agentConfig"`
+	GWConfig    GWConfig    `yaml:"gwConfig"`
 }
 
 // GetConfig implements Singleton pattern

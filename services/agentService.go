@@ -26,7 +26,7 @@ func GetAgentService() *AgentService {
 			&AgentStats{},
 			&AgentStatus{
 				Controller: Pending,
-				NATS:       Pending,
+				Nats:       Pending,
 				Transport:  Pending,
 			},
 		}
@@ -46,12 +46,17 @@ func (service *AgentService) StopController() error {
 	return GetController().StopController()
 }
 
-// StartNATS implements AgentServices.StartNATS interface
-func (service *AgentService) StartNATS() error {
-	err := nats.StartServer(service.AgentConfig.NATSStoreType, service.AgentConfig.NATSFilestoreDir)
+// StartNats implements AgentServices.StartNats interface
+func (service *AgentService) StartNats() error {
+	err := nats.StartServer(nats.Config{
+		DispatcherAckWait: time.Second * time.Duration(service.AgentConfig.NatsAckWait),
+		FilestoreDir:      service.AgentConfig.NatsFilestoreDir,
+		StoreType:         service.AgentConfig.NatsStoreType,
+		NatsURL:           service.AgentConfig.NatsURL,
+	})
 	if err == nil {
 		service.agentStatus.Lock()
-		service.agentStatus.NATS = Running
+		service.agentStatus.Nats = Running
 		service.agentStatus.Unlock()
 		// StartTransport as dependency
 		if service.AgentConfig.StartTransport {
@@ -61,14 +66,14 @@ func (service *AgentService) StartNATS() error {
 	return err
 }
 
-// StopNATS implements AgentServices.StopNATS interface
-func (service *AgentService) StopNATS() error {
+// StopNats implements AgentServices.StopNats interface
+func (service *AgentService) StopNats() error {
 	// StopTransport as dependency
 	err := service.StopTransport()
 	// skip StopTransport error checking
 	nats.StopServer()
 	service.agentStatus.Lock()
-	service.agentStatus.NATS = Stopped
+	service.agentStatus.Nats = Stopped
 	service.agentStatus.Unlock()
 	return err
 }

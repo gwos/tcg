@@ -18,8 +18,8 @@ const (
 	QueueGroup                         = "tng-query-store-group"
 	TestSendResourceWithMetricsSubject = "send-resource-with-metrics-test"
 	TestMessagesCount                  = 3
-	GroundWorkMonitoringValidHost      = "localhost:80"
-	GroundWorkMonitoringInvalidHost    = "localhost:23"
+	GWValidHost                        = "localhost:80"
+	GWInvalidHost                      = "localhost:23"
 )
 
 var deliveredCount = 0
@@ -27,20 +27,20 @@ var droppedCount = 0
 
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
-func TestNATSQueue_1(t *testing.T) {
-	err := configNATS()
+func TestNatsQueue_1(t *testing.T) {
+	err := configNats()
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringInvalidHost
+	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
 	connection, subscription, err := connectAndSubscribe()
 	if err != nil {
 		t.Error(err)
 	}
-	defer cleanNATS(connection, subscription, t)
+	defer cleanNats(connection, subscription, t)
 
 	for i := 0; i < TestMessagesCount; i++ {
 		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
@@ -57,7 +57,7 @@ func TestNATSQueue_1(t *testing.T) {
 		return
 	}
 
-	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringValidHost
+	services.GetTransitService().Config.GWConfig.Host = GWValidHost
 	log.Println("Invalid path was changed to valid one")
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
@@ -70,21 +70,21 @@ func TestNATSQueue_1(t *testing.T) {
 
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
-func TestNATSQueue_2(t *testing.T) {
-	err := configNATS()
+func TestNatsQueue_2(t *testing.T) {
+	err := configNats()
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringInvalidHost
+	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
 	connection, subscription, err := connectAndSubscribe()
 	if err != nil {
 		t.Error(err)
 	}
-	defer cleanNATS(connection, subscription, t)
+	defer cleanNats(connection, subscription, t)
 
 	for i := 0; i < TestMessagesCount; i++ {
 		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
@@ -101,18 +101,18 @@ func TestNATSQueue_2(t *testing.T) {
 	}
 
 	log.Println("Stopping NATS server ...")
-	err = services.GetTransitService().StopNATS()
+	err = services.GetTransitService().StopNats()
 	if err != nil {
 		t.Error(err)
 		return
 	}
 	log.Println("NATS Server was stopped successfully")
 
-	services.GetTransitService().Config.GroundworkConfig.Host = GroundWorkMonitoringValidHost
+	services.GetTransitService().Config.GWConfig.Host = GWValidHost
 	log.Println("Invalid path was changed to valid one")
 
 	log.Println("Starting NATS server ...")
-	err = services.GetTransitService().StartNATS()
+	err = services.GetTransitService().StartNats()
 	if err != nil {
 		t.Error(err)
 		return
@@ -158,7 +158,7 @@ func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
 	return connection, subscription, nil
 }
 
-func configNATS() error {
+func configNats() error {
 	err := os.Setenv(ConfigEnv, path.Join("..", ConfigName))
 	if err != nil {
 		return err
@@ -166,7 +166,7 @@ func configNATS() error {
 
 	service := services.GetTransitService()
 
-	err = service.StartNATS()
+	err = service.StartNats()
 	if err != nil {
 		return err
 	}
@@ -184,7 +184,7 @@ func configNATS() error {
 	return nil
 }
 
-func cleanNATS(connection stan.Conn, subscription stan.Subscription, t *testing.T) {
+func cleanNats(connection stan.Conn, subscription stan.Subscription, t *testing.T) {
 	err := subscription.Unsubscribe()
 	if err != nil {
 		t.Error(err)
@@ -195,7 +195,7 @@ func cleanNATS(connection stan.Conn, subscription stan.Subscription, t *testing.
 		t.Error(err)
 	}
 
-	err = services.GetTransitService().StopNATS()
+	err = services.GetTransitService().StopNats()
 	if err != nil {
 		t.Error(err)
 	}

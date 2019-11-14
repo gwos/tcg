@@ -42,7 +42,7 @@ type AgentStats struct {
 // AgentStatus defines TNG Agent status
 type AgentStatus struct {
 	Controller StatusEnum
-	NATS       StatusEnum
+	Nats       StatusEnum
 	Transport  StatusEnum
 	sync.Mutex
 }
@@ -51,8 +51,8 @@ type AgentStatus struct {
 type AgentServices interface {
 	StartController() error
 	StopController() error
-	StartNATS() error
-	StopNATS() error
+	StartNats() error
+	StopNats() error
 	StartTransport() error
 	StopTransport() error
 	Stats() *AgentStats

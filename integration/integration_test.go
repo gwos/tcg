@@ -88,7 +88,7 @@ func config() (map[string]string, error) {
 	token := reflect.ValueOf(service).Elem().FieldByName("token").String()
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  service.GroundworkConfig.AppName,
+		"GWOS-APP-NAME":  service.GWConfig.AppName,
 		"GWOS-API-TOKEN": token,
 	}
 

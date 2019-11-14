@@ -28,13 +28,13 @@ func init() {
 			log.Println(err)
 		}
 	}
-	if transitService.AgentConfig.StartNATS {
-		if err := transitService.StartNATS(); err != nil {
+	if transitService.AgentConfig.StartNats {
+		if err := transitService.StartNats(); err != nil {
 			log.Println(err)
 		}
 	}
 	// NOTE: the transitService.AgentConfig.StartTransport
-	// processed by transitService.StartNATS itself
+	// processed by transitService.StartNats itself
 	log.Println("libtransit:", transitService.Status())
 }
 
@@ -91,18 +91,18 @@ func StopController(errorBuf *C.char) bool {
 	return true
 }
 
-//export StartNATS
-func StartNATS(errorBuf *C.char) bool {
-	if err := transitService.StartNATS(); err != nil {
+//export StartNats
+func StartNats(errorBuf *C.char) bool {
+	if err := transitService.StartNats(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-//export StopNATS
-func StopNATS() {
-	transitService.StopNATS()
+//export StopNats
+func StopNats() {
+	transitService.StopNats()
 }
 
 //export StartTransport
@@ -128,9 +128,9 @@ func IsControllerRunning() bool {
 	return transitService.Status().Controller == services.Running
 }
 
-//export IsNATSRunning
-func IsNATSRunning() bool {
-	return transitService.Status().NATS == services.Running
+//export IsNatsRunning
+func IsNatsRunning() bool {
+	return transitService.Status().Nats == services.Running
 }
 
 //export IsTransportRunning
