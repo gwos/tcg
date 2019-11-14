@@ -23,8 +23,11 @@ test	: unittest
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
 
-unittest	: c.o milliseconds.o transit.o unittest.o convert_go_to_c.o
-	${CC} -o unittest c.o milliseconds.o transit.o unittest.o convert_go_to_c.o -Wl,-L${JANSSON_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_LIB_DIRECTORY}
+unittest	: config.o milliseconds.o transit.o unittest.o convert_go_to_c.o
+	${CC} -o unittest config.o milliseconds.o transit.o unittest.o convert_go_to_c.o -Wl,-L${JANSSON_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_LIB_DIRECTORY}
+
+#unittest	: c.o milliseconds.o transit.o unittest.o convert_go_to_c.o
+#	${CC} -o unittest c.o milliseconds.o transit.o unittest.o convert_go_to_c.o -Wl,-L${JANSSON_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_LIB_DIRECTORY}
 
 #unittest	: c.o m.o transit.o unittest.o convert_go_to_c.o
 #	${CC} -o unittest c.o m.o transit.o unittest.o convert_go_to_c.o -Wl,-L${JANSSON_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_LIB_DIRECTORY}
