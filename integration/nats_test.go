@@ -4,6 +4,7 @@ import (
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	stan "github.com/nats-io/go-nats-streaming"
+	"gotest.tools/assert"
 	"log"
 	"os"
 	"os/exec"
@@ -28,7 +29,7 @@ var droppedCount = 0
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
 func TestNatsQueue_1(t *testing.T) {
-	err := configNats()
+	err := configNats(t)
 	if err != nil {
 		t.Error(err)
 		return
@@ -71,7 +72,7 @@ func TestNatsQueue_1(t *testing.T) {
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
 func TestNatsQueue_2(t *testing.T) {
-	err := configNats()
+	err := configNats(t)
 	if err != nil {
 		t.Error(err)
 		return
@@ -158,28 +159,14 @@ func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
 	return connection, subscription, nil
 }
 
-func configNats() error {
-	err := os.Setenv(ConfigEnv, path.Join("..", ConfigName))
-	if err != nil {
-		return err
-	}
+func configNats(t *testing.T) error {
+	assert.NilError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 
 	service := services.GetTransitService()
 
-	err = service.StartNats()
-	if err != nil {
-		return err
-	}
-
-	err = service.StartTransport()
-	if err != nil {
-		return err
-	}
-
-	err = service.Connect()
-	if err != nil {
-		return err
-	}
+	assert.NilError(t, service.StartNats())
+	assert.NilError(t, service.StartTransport())
+	assert.NilError(t, service.Connect())
 
 	return nil
 }
