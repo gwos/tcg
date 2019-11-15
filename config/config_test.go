@@ -9,7 +9,7 @@ import (
 
 func TestGetConfig(t *testing.T) {
 	expected := Config{
-		AgentConfig: AgentConfig{":8081", "", "", 15, "src/main/resources/datastore", "MEMORY", "nats://localhost:4222", true, true, true},
+		AgentConfig: AgentConfig{":8081", "", "", 15, "src/main/resources/datastore", "MEMORY", ":4222", true, true, true},
 		GWConfig:    GWConfig{"localhost:80", "RESTAPIACCESS", "SECRET", "gw8"},
 	}
 

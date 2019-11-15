@@ -21,6 +21,8 @@ const (
 
 // GWConfig defines Groundwork Connection configuration
 type GWConfig struct {
+	// Host accepts value for combined "host:port"
+	// used as `url.URL{Host}`
 	Host     string
 	Account  string
 	Password string
@@ -29,8 +31,8 @@ type GWConfig struct {
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	// ControllerAddr accepts value for `http.Server{Addr}`
-	// TCP address to listen on, ":http" if empty
+	// ControllerAddr accepts value for combined "host:port"
+	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
 	ControllerCertFile string `yaml:"controllerCertFile"`
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
@@ -40,8 +42,9 @@ type AgentConfig struct {
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
-	// NatsURL accepts value in form "nats://localhost:4222"
-	NatsURL         string `yaml:"natsURL"`
+	// NatsHost accepts value for combined "host:port"
+	// used as `strings.Split(natsHost, ":")`
+	NatsHost        string `yaml:"natsHost"`
 	StartController bool   `yaml:"startController"`
 	StartNats       bool   `yaml:"startNats"`
 	// StartTransport defines that NATS starts with Transport
