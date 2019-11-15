@@ -3,7 +3,7 @@ agentConfig:
   natsAckWait: 15
   natsFilestoreDir: "src/main/resources/datastore"
   natsStoreType: "FILE"
-  natsURL: "nats://localhost:4222"
+  natsHost: ":4222"
   startNats: True
   startTransport: True
   startController: True

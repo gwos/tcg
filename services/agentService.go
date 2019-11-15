@@ -52,7 +52,7 @@ func (service *AgentService) StartNats() error {
 		DispatcherAckWait: time.Second * time.Duration(service.AgentConfig.NatsAckWait),
 		FilestoreDir:      service.AgentConfig.NatsFilestoreDir,
 		StoreType:         service.AgentConfig.NatsStoreType,
-		NatsURL:           service.AgentConfig.NatsURL,
+		NatsHost:          service.AgentConfig.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Lock()
