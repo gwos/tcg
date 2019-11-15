@@ -22,6 +22,7 @@ WORKDIR /src/
 
 COPY . /src/
 
+RUN go get -t ./...
 RUN go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 
 CMD ./docker_cmd.sh
