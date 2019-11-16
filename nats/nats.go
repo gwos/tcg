@@ -131,9 +131,12 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	err := dispatcherConn.Close()
-	dispatcherConn = nil
-	return err
+	if dispatcherConn != nil {
+		err := dispatcherConn.Close()
+		dispatcherConn = nil
+		return err
+	}
+	return nil
 }
 
 // Publish adds message in queue
