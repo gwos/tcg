@@ -58,12 +58,27 @@ $ cd tng
 $ go run .
 ```
 
+Docker
+--------
+***Build image:***
+
+    $ docker build -t groundworkdevelopment/tng .
+
 Testing
 -------
 The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
-***Testing package:***
->Without logs
+***Run all tests:***
+>Without logs:
+
+    $ go test ./...
+
+>With logs:
+
+    $ go test -v ./...
+
+***Run package tests:***
+>Without logs:
 
     $ go test ./<package_name>/
     
@@ -71,8 +86,13 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     
     $ go test -v ./<package_name>/
     
-***Testing in Docker container:***
+***Run tests in Docker container:***
+>All packages:
 
+    $ ./docker_tests.sh
+    
+>One package:
+    
     $ ./docker_tests.sh <package_name>
     
 *Available packages:* <b>integration, config, milliseconds

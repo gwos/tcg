@@ -4,7 +4,7 @@ import (
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	stan "github.com/nats-io/go-nats-streaming"
-	"gotest.tools/assert"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
 	"os/exec"
@@ -160,13 +160,13 @@ func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
 }
 
 func configNats(t *testing.T) error {
-	assert.NilError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
+	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 
 	service := services.GetTransitService()
 
-	assert.NilError(t, service.StartNats())
-	assert.NilError(t, service.StartTransport())
-	assert.NilError(t, service.Connect())
+	assert.NoError(t, service.StartNats())
+	assert.NoError(t, service.StartTransport())
+	assert.NoError(t, service.Connect())
 
 	return nil
 }

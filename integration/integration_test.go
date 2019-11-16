@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/services"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"os"
@@ -35,41 +36,25 @@ func TestIntegration(t *testing.T) {
 	var err error
 	headers, err = config()
 	defer clean(headers)
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	err = existenceCheck(false, "irrelevant")
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = installDependencies()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = runJavaSynchronizeInventoryTest()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = existenceCheck(true, HostStatusPending)
+	assert.NoError(t, err)
 
 	err = runJavaSendResourceWithMetricsTest()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	err = existenceCheck(true, HostStatusUp)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 }
 
 func config() (map[string]string, error) {
@@ -144,9 +129,9 @@ func runJavaSynchronizeInventoryTest() error {
 		return err
 	}
 
-	cmd1 := exec.Command("mvn", "-Dtest=AppTest#shouldSynchronizeInventory", "test")
-	cmd1.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd1.Output()
+	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSynchronizeInventory", "test")
+	cmd.Dir = path.Join(workDir, "../gw-transit")
+	_, err = cmd.Output()
 	if err != nil {
 		return err
 	}
@@ -160,10 +145,9 @@ func runJavaSendResourceWithMetricsTest() error {
 		return err
 	}
 
-	cmd1 := exec.Command("mvn", "-Dtest=AppTest#shouldSendResourceAndMetrics", "test")
-	cmd1.Dir = path.Join(workDir, "../gw-transit")
-	out, err := cmd1.Output()
-	log.Println(string(out))
+	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSendResourceAndMetrics", "test")
+	cmd.Dir = path.Join(workDir, "../gw-transit")
+	_, err = cmd.Output()
 	if err != nil {
 		return err
 	}
