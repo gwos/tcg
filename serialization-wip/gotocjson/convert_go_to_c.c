@@ -43,6 +43,9 @@ char *typeof_json_item(const json_t *json) {
 // "json" object that is passed in.  That circumstance needs to be understood if you want to produce
 // a JSON string in some context where you want the JSON object to stick around afterward.  In that
 // case, you must call json_incref(json) before calling the JSON_as_str() routine.
+//
+// That said, the string returned by this routine is dynamically allocated, so it eventually needs
+// to be free()d by the calling application to avoid a memory leak.
 string JSON_as_str(json_t *json, size_t flags) {
     char *result;
     if (!flags) {

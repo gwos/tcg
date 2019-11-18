@@ -23,6 +23,12 @@ test	: unittest
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
 
+fullcheck	: unittest
+	valgrind --leak-check=full unittest
+
+check	: unittest
+	valgrind unittest
+
 unittest	: config.o milliseconds.o transit.o unittest.o convert_go_to_c.o
 	${CC} -o unittest config.o milliseconds.o transit.o unittest.o convert_go_to_c.o -Wl,-L${JANSSON_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_LIB_DIRECTORY}
 
@@ -48,13 +54,13 @@ convert_go_to_c.o	: convert_go_to_c.h convert_go_to_c.c
 	${CC} -c convert_go_to_c.c -I../local/include
 
 config.h config.c	: gotocjson config.go
-	gotocjson config.go > ,c
+	./gotocjson config.go > ,c
 
 milliseconds.h milliseconds.c	: gotocjson milliseconds.go
-	gotocjson milliseconds.go > ,m
+	./gotocjson milliseconds.go > ,m
 
 transit.h transit.c	: gotocjson transit.go
-	gotocjson transit.go > ,t
+	./gotocjson transit.go > ,t
 
 config.o	: config.h config.c
 	${CC} -c config.c -I../local/include
