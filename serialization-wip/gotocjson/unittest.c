@@ -29,7 +29,8 @@
 // extern json_t *transit_MonitoredResource_as_JSON(const transit_MonitoredResource *transit_MonitoredResource);
 // extern transit_MonitoredResource *JSON_as_transit_MonitoredResource(json_t *json);
 
-char separation_line[] = "--------------------------------------------------------------------------------\n";
+// We make this a const string to attempt to bypass some overly aggressive compiler security warnings.
+const char separation_line[] = "--------------------------------------------------------------------------------\n";
 
 char *initial_transit_TimeInterval_as_json_string = "{\n"
 "    \"endTime\": 1572955806397,\n"
