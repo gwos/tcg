@@ -3,7 +3,6 @@ package integration
 import (
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
-	stan "github.com/nats-io/go-nats-streaming"
 	"github.com/stretchr/testify/assert"
 	"log"
 	"os"
@@ -14,22 +13,18 @@ import (
 )
 
 const (
-	TestNatsClientID                   = "test-nats-client"
-	DurableID                          = "tng-store-durable-test"
-	QueueGroup                         = "tng-query-store-group"
-	TestSendResourceWithMetricsSubject = "send-resource-with-metrics-test"
 	TestMessagesCount                  = 3
+	TestNatsAckWait                    = 5
 	GWValidHost                        = "localhost:80"
 	GWInvalidHost                      = "localhost:23"
+	TestTngAgentConfigNatsFileStoreDir = "test_datastore"
 )
-
-var deliveredCount = 0
-var droppedCount = 0
 
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
 func TestNatsQueue_1(t *testing.T) {
 	err := configNats(t)
+	defer cleanNats(t)
 	if err != nil {
 		t.Error(err)
 		return
@@ -37,14 +32,8 @@ func TestNatsQueue_1(t *testing.T) {
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
-	connection, subscription, err := connectAndSubscribe()
-	if err != nil {
-		t.Error(err)
-	}
-	defer cleanNats(connection, subscription, t)
-
 	for i := 0; i < TestMessagesCount; i++ {
-		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
+		err := nats.Publish(services.SubjSendResourceWithMetrics, []byte(testMessage))
 		if err != nil {
 			t.Error(err)
 			return
@@ -52,9 +41,9 @@ func TestNatsQueue_1(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}
 
-	if deliveredCount != 0 {
+	if services.GetTransitService().Stats().MessagesSent != 0 {
 		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
-			deliveredCount, 0)
+			services.GetTransitService().Stats().MessagesSent, 0)
 		return
 	}
 
@@ -63,9 +52,9 @@ func TestNatsQueue_1(t *testing.T) {
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
 
-	if deliveredCount == 0 {
+	if services.GetTransitService().Stats().MessagesSent == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
-			deliveredCount, "'>0'")
+			services.GetTransitService().Stats().MessagesSent, "'>0'")
 	}
 }
 
@@ -81,23 +70,19 @@ func TestNatsQueue_2(t *testing.T) {
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
-	connection, subscription, err := connectAndSubscribe()
-	if err != nil {
-		t.Error(err)
-	}
-	defer cleanNats(connection, subscription, t)
+	defer cleanNats(t)
 
 	for i := 0; i < TestMessagesCount; i++ {
-		err := nats.Publish(TestSendResourceWithMetricsSubject, []byte(testMessage))
+		err := nats.Publish(services.SubjSendResourceWithMetrics, []byte(testMessage))
 		if err != nil {
 			t.Error(err)
 		}
 		time.Sleep(1 * time.Second)
 	}
 
-	if deliveredCount != 0 {
+	if services.GetTransitService().Stats().MessagesSent != 0 {
 		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
-			deliveredCount, 0)
+			services.GetTransitService().Stats().MessagesSent, 0)
 		return
 	}
 
@@ -122,47 +107,19 @@ func TestNatsQueue_2(t *testing.T) {
 	log.Println("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 2 * time.Second)
 
-	if deliveredCount == 0 {
+	if services.GetTransitService().Stats().MessagesSent == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
-			deliveredCount, "'>0'")
+			services.GetTransitService().Stats().MessagesSent, "'>0'")
 	}
-}
-
-func connectAndSubscribe() (stan.Conn, stan.Subscription, error) {
-	connection, err := nats.Connect(TestNatsClientID)
-	if err != nil {
-		return nil, nil, err
-	}
-	subscription, err := connection.QueueSubscribe(
-		TestSendResourceWithMetricsSubject,
-		QueueGroup,
-		func(msg *stan.Msg) {
-			_, err := services.GetTransitService().SendResourcesWithMetrics(msg.Data)
-			if err == nil {
-				_ = msg.Ack()
-				deliveredCount++
-				log.Println("Delivered")
-			} else {
-				droppedCount++
-				log.Println("Not delivered")
-			}
-		},
-		stan.SetManualAckMode(),
-		stan.AckWait(2*TestMessagesCount*time.Second),
-		stan.DurableName(DurableID),
-		stan.StartWithLastReceived(),
-	)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return connection, subscription, nil
 }
 
 func configNats(t *testing.T) error {
 	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 
 	service := services.GetTransitService()
+
+	service.AgentConfig.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
+	service.AgentConfig.NatsAckWait = TestNatsAckWait
 
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
@@ -171,29 +128,17 @@ func configNats(t *testing.T) error {
 	return nil
 }
 
-func cleanNats(connection stan.Conn, subscription stan.Subscription, t *testing.T) {
-	err := subscription.Unsubscribe()
+func cleanNats(t *testing.T) {
+	err := services.GetTransitService().StopNats()
 	if err != nil {
 		t.Error(err)
 	}
 
-	err = connection.Close()
-	if err != nil {
-		t.Error(err)
-	}
-
-	err = services.GetTransitService().StopNats()
-	if err != nil {
-		t.Error(err)
-	}
-
-	cmd := exec.Command("rm", "-rf", "src")
+	cmd := exec.Command("rm", "-rf", "test_datastore")
 	_, err = cmd.Output()
 	if err != nil {
 		t.Error(err)
 	}
-	deliveredCount = 0
-	droppedCount = 0
 }
 
 var testMessage = `{"context": {"appType":"VEMA","agentId":"3939333393342","traceToken":"token-99e93",

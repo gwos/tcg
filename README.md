@@ -95,7 +95,7 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     
     $ ./docker_tests.sh <package_name>
     
-*Available packages:* <b>integration, config, milliseconds
+*Available packages:* <b>integration, config, milliseconds, customTime
 
 ***Examples:***
 
