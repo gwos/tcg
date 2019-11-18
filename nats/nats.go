@@ -111,10 +111,10 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			DispatcherQueueGroup,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+					log.Println("Not delivered") //\nError: ", err.Error(), "\nMessage: ", msg)
 				} else {
 					_ = msg.Ack()
-					log.Println("Delivered\nMessage:", msg)
+					log.Println("Delivered") //\nMessage:", msg)
 				}
 			},
 			stan.SetManualAckMode(),
