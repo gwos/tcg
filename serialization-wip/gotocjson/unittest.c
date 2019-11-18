@@ -429,7 +429,7 @@ int test_##OBJECT##_json_string(bool enable) {											\
     printf(separation_line);													\
     if (enable) {														\
 	json_t *json;														\
-	printf("Decoding "OBJSTR" JSON string ...\n");									\
+	printf("Decoding "OBJSTR" JSON string ...\n");										\
 	OBJECT *OBJECT##_ptr = JSON_str_as_##OBJECT(initial_##OBJECT##_as_json_string, &json);					\
 	if (OBJECT##_ptr == NULL) {												\
 	    printf (FILE_LINE "ERROR:  JSON string cannot be decoded into a "OBJSTR" object\n");				\
@@ -454,13 +454,15 @@ int test_##OBJECT##_json_string(bool enable) {											\
 		    print_first_different_character(initial_##OBJECT##_as_json_string, final_##OBJECT##_as_json_string);	\
 		    return FAILURE;												\
 		}														\
+		free(final_##OBJECT##_as_json_string);										\
 	    }															\
+	    free_##OBJECT##_tree(OBJECT##_ptr, json);										\
 	}															\
 	/*															\
-	// We want to use just the first call, but we're not yet linking in the object code for it.				\
-	// destroy_##OBJECT##_tree(OBJECT##_ptr, json);										\
-	*/															\
+	// We use just the first of these two calls (done just above, for now), because it's our official cleanup routine.	\
+	destroy_##OBJECT##_tree(OBJECT##_ptr, json);										\
 	free_JSON(json);													\
+	*/															\
     }																\
     else {															\
 	printf("--- skipping "OBJSTR" JSON string ...\n");									\
@@ -502,6 +504,8 @@ int main (int argc, char *argv[]) {
 	&& run_object_test(true, transit_LabelDescriptor)
 	&& run_object_test(true, transit_ThresholdDescriptor)
 	&& run_object_test(true, transit_SendInventoryRequest)
+// ; return EXIT_SUCCESS;
+// return 1
 	&& run_object_test(true, transit_OperationResult)
 	&& run_object_test(true, transit_ResourceGroup)
 	&& run_object_test(true, transit_ResourceWithMetricsRequest)

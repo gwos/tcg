@@ -172,7 +172,7 @@ func parse_file(filepath string) (*token.FileSet, *ast.File, error) {
 //     "[][]foo"
 //     "*[]*foo"
 //
-// We only track file-level (i.e., package-level) typedefs, an consts.  We don't track signatures
+// We only track file-level (i.e., package-level) typedefs, and consts.  We don't track signatures
 // for generated functions because we expect that any topological sorting that would benefit from
 // such tracking will be obviated by instead just putting all the necessary function declarations
 // in a header file, where all the declarations will come ahead of the code that needs them.
