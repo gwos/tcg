@@ -11,7 +11,9 @@
 // idea of the full context of what ought to be included in a log message.
 int enumeration_value(const string const enum_string[], int enum_string_count, const char *enum_value_as_string) {
     int enum_value;
-    for (enum_value = enum_string_count; --enum_value >= 0; ) {
+    // We don't bother to test against the value at index 0 because we treat that slot as a
+    // universally-matching wildcard.  That provides a mechanism for designating an unknown value.
+    for (enum_value = enum_string_count; --enum_value > 0; ) {
         if (!strcmp(enum_value_as_string, enum_string[enum_value])) {
             break;
         }
@@ -109,6 +111,50 @@ string *JSON_as_string(json_t *json) {
     return string_ptr;
 }
 
+bool is_bool_zero_value(const bool *bool_ptr) {
+    return (
+        bool_ptr == NULL || *bool_ptr == false
+    );
+}
+
+bool is_int_zero_value(const int *int_ptr) {
+    return (
+        int_ptr == NULL || *int_ptr == 0
+    );
+}
+
+bool is_int32_zero_value(const int32 *int32_ptr) {
+    return (
+        int32_ptr == NULL || *int32_ptr == 0
+    );
+}
+
+bool is_int64_zero_value(const int64 *int64_ptr) {
+    return (
+        int64_ptr == NULL || *int64_ptr == 0
+    );
+}
+
+bool is_float64_zero_value(const float64 *float64_ptr) {
+    return (
+        float64_ptr == NULL || *float64_ptr == 0.0
+    );
+}
+
+bool is_string_zero_value(string const *string_ptr) {
+    return (
+        string_ptr == NULL || *string_ptr == NULL || **string_ptr == '\0'
+    );
+}
+
+bool is_struct_timespec_zero_value(const struct_timespec *struct_timespec_ptr) {
+    return (
+	struct_timespec_ptr == NULL || (
+	    struct_timespec_ptr->tv_sec  == 0 &&
+	    struct_timespec_ptr->tv_nsec == 0
+	)
+    );
+}
 
 json_t *struct_timespec_as_JSON(const struct_timespec *struct_timespec) {
     json_error_t error;

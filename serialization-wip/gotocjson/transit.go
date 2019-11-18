@@ -294,7 +294,7 @@ type InventoryResource struct {
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
-	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
+	// FIX MAJOR:  Should this be "Type MonitoredResourceType" instead?  Yes, probably.
 	Type string `json:"type,required"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
@@ -314,7 +314,7 @@ type ResourceStatus struct {
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
-	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
+	// FIX MAJOR:  Should this be "Type MonitoredResourceType" instead?  yes, probably.
 	Type string `json:"type,required"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`

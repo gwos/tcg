@@ -10,7 +10,7 @@
 
 JANSSON_LIB_DIRECTORY = ../local/lib
 
-CFLAGS = -std=c11
+CFLAGS = -std=c11 -g
 CC = cc $(CFLAGS)
 
 default	: all

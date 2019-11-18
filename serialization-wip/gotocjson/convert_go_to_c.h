@@ -76,6 +76,14 @@ extern string JSON_as_str(json_t *json, size_t flags);
 // #define JSON_as_string(json) JSON_as_str(json, 0)
 extern string *JSON_as_string(json_t *json);
 
+extern bool is_bool_zero_value(const bool *bool_ptr);
+extern bool is_int_zero_value(const int *int_ptr);
+extern bool is_int32_zero_value(const int32 *int32_ptr);
+extern bool is_int64_zero_value(const int64 *int64_ptr);
+extern bool is_float64_zero_value(const float64 *float64_ptr);
+extern bool is_string_zero_value(string const *string_ptr);
+extern bool is_struct_timespec_zero_value(const struct_timespec *struct_timespec_ptr);
+
 extern json_t *struct_timespec_as_JSON(const struct_timespec *milliseconds_MillisecondTimestamp);
 extern struct_timespec *JSON_as_struct_timespec(json_t *json);
 #define time_Time_as_JSON struct_timespec_as_JSON
