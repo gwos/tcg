@@ -36,13 +36,9 @@ char *initial_transit_TimeInterval_as_json_string = "{\n"
 "    \"startTime\": 1572955806397\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_TypedValue_as_json_string = "{\n"
 "    \"valueType\": \"IntegerType\",\n"
-// "    \"integerValue\": 1,\n"
 "    \"integerValue\": 1\n"
-// "    \"timeValue\": 1572955806397\n"
 "}";
 
 char *initial_transit_LabelDescriptor_as_json_string = "{\n"
@@ -56,8 +52,6 @@ char *initial_transit_ThresholdDescriptor_as_json_string = "{\n"
 "    \"value\": 2\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_SendInventoryRequest_as_json_string = "{\n"
 "    \"resources\": [\n"
 "        {\n"
@@ -70,9 +64,7 @@ char *initial_transit_SendInventoryRequest_as_json_string = "{\n"
 "            \"properties\": {\n"
 "                \"property\": {\n"
 "                    \"valueType\": \"IntegerType\",\n"
-// "                    \"integerValue\": 1,\n"
 "                    \"integerValue\": 1\n"
-// "                    \"timeValue\": 1572955806397\n"
 "                }\n"
 "            }\n"
 "        }\n"
@@ -110,8 +102,6 @@ char *initial_transit_ResourceGroup_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_ResourceWithMetricsRequest_as_json_string = "{\n"
 "    \"context\": {\n"
 "        \"appType\": \"TestAppType\",\n"
@@ -132,9 +122,7 @@ char *initial_transit_ResourceWithMetricsRequest_as_json_string = "{\n"
 "                \"properties\": {\n"
 "                    \"property\": {\n"
 "                        \"valueType\": \"IntegerType\",\n"
-// "                        \"integerValue\": 1,\n"
 "                        \"integerValue\": 1\n"
-// "                        \"timeValue\": 1572955806397\n"
 "                    }\n"
 "                }\n"
 "            },\n"
@@ -150,9 +138,7 @@ char *initial_transit_ResourceWithMetricsRequest_as_json_string = "{\n"
 "                            },\n"
 "                            \"value\": {\n"
 "                                \"valueType\": \"IntegerType\",\n"
-// "                                \"integerValue\": 1,\n"
 "                                \"integerValue\": 1\n"
-// "                                \"timeValue\": 1572955806397\n"
 "                            }\n"
 "                        }\n"
 "                    ],\n"
@@ -212,8 +198,6 @@ char *initial_transit_Transit_as_json_string = "{\n"
 "    }\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_MetricSample_as_json_string = "{\n"
 "    \"sampleType\": \"Warning\",\n"
 "    \"interval\": {\n"
@@ -222,9 +206,7 @@ char *initial_transit_MetricSample_as_json_string = "{\n"
 "    },\n"
 "    \"value\": {\n"
 "        \"valueType\": \"IntegerType\",\n"
-// "        \"integerValue\": 1,\n"
 "        \"integerValue\": 1\n"
-// "        \"timeValue\": 1572955806397\n"
 "    }\n"
 "}";
 
@@ -235,8 +217,6 @@ char *initial_transit_TracerContext_as_json_string = "{\n"
 "    \"timeStamp\": 1572955806398\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_TimeSeries_as_json_string = "{\n"
 "    \"metricName\": \"TestMetric\",\n"
 "    \"metricSamples\": [\n"
@@ -248,9 +228,7 @@ char *initial_transit_TimeSeries_as_json_string = "{\n"
 "            },\n"
 "            \"value\": {\n"
 "                \"valueType\": \"IntegerType\",\n"
-// "                \"integerValue\": 1,\n"
 "                \"integerValue\": 1\n"
-// "                \"timeValue\": 1572955806397\n"
 "            }\n"
 "        }\n"
 "    ],\n"
@@ -261,8 +239,6 @@ char *initial_transit_TimeSeries_as_json_string = "{\n"
 "    \"unit\": \"1\"\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_ResourceWithMetrics_as_json_string = "{\n"
 "    \"resource\": {\n"
 "        \"name\": \"TestName\",\n"
@@ -275,9 +251,7 @@ char *initial_transit_ResourceWithMetrics_as_json_string = "{\n"
 "        \"properties\": {\n"
 "            \"property\": {\n"
 "                \"valueType\": \"IntegerType\",\n"
-// "                \"integerValue\": 1,\n"
 "                \"integerValue\": 1\n"
-// "                \"timeValue\": 1572955806397\n"
 "            }\n"
 "        }\n"
 "    },\n"
@@ -293,9 +267,7 @@ char *initial_transit_ResourceWithMetrics_as_json_string = "{\n"
 "                    },\n"
 "                    \"value\": {\n"
 "                        \"valueType\": \"IntegerType\",\n"
-// "                        \"integerValue\": 1,\n"
 "                        \"integerValue\": 1\n"
-// "                        \"timeValue\": 1572955806397\n"
 "                    }\n"
 "                }\n"
 "            ],\n"
@@ -364,8 +336,6 @@ char *initial_transit_MetricDescriptor_as_json_string = "{\n"
 "    \"metricKind\": \"GAUGE\"\n"
 "}";
 
-// FIX MAJOR:  We should remove the timeValue from this test data,
-// since in fact the valueType is IntegerType, not TimeType.
 char *initial_transit_ResourceStatus_as_json_string = "{\n"
 "    \"name\": \"TestName\",\n"
 "    \"type\": \"TestType\",\n"
@@ -377,9 +347,7 @@ char *initial_transit_ResourceStatus_as_json_string = "{\n"
 "    \"properties\": {\n"
 "        \"property\": {\n"
 "            \"valueType\": \"IntegerType\",\n"
-// "            \"integerValue\": 1,\n"
 "            \"integerValue\": 1\n"
-// "            \"timeValue\": 1572955806397\n"
 "        }\n"
 "    }\n"
 "}";
