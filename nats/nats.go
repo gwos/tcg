@@ -6,6 +6,7 @@ import (
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +19,8 @@ const (
 	DispatcherDurableID  = "tng-store-dispatcher"
 	DispatcherQueueGroup = "tng-queue-dispatcher"
 	PublisherID          = "tng-publisher"
+	TestLoggingLevel     = "LEVEL_TEST"
+	LoggingLevel         = "LEVEL"
 )
 
 var (
@@ -111,10 +114,18 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			DispatcherQueueGroup,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-					log.Println("Not delivered") //\nError: ", err.Error(), "\nMessage: ", msg)
+					if os.Getenv(LoggingLevel) == TestLoggingLevel {
+						log.Println("Not delivered")
+					} else {
+						log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+					}
 				} else {
 					_ = msg.Ack()
-					log.Println("Delivered") //\nMessage:", msg)
+					if os.Getenv(LoggingLevel) == TestLoggingLevel {
+						log.Println("Delivered")
+					} else {
+						log.Println("Delivered\nMessage:", msg)
+					}
 				}
 			},
 			stan.SetManualAckMode(),
