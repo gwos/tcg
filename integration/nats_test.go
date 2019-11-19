@@ -4,6 +4,7 @@ import (
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -32,8 +33,11 @@ func TestNatsQueue_1(t *testing.T) {
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
+	testMessage, err := parseJson()
+	assert.NoError(t, err)
+
 	for i := 0; i < TestMessagesCount; i++ {
-		err := nats.Publish(services.SubjSendResourceWithMetrics, []byte(testMessage))
+		err := nats.Publish(services.SubjSendResourceWithMetrics, testMessage)
 		if err != nil {
 			t.Error(err)
 			return
@@ -62,18 +66,18 @@ func TestNatsQueue_1(t *testing.T) {
 // after NATS streaming server restarting
 func TestNatsQueue_2(t *testing.T) {
 	err := configNats(t)
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
 	defer cleanNats(t)
 
+	testMessage, err := parseJson()
+	assert.NoError(t, err)
+
 	for i := 0; i < TestMessagesCount; i++ {
-		err := nats.Publish(services.SubjSendResourceWithMetrics, []byte(testMessage))
+		err := nats.Publish(services.SubjSendResourceWithMetrics, testMessage)
 		if err != nil {
 			t.Error(err)
 		}
@@ -88,10 +92,7 @@ func TestNatsQueue_2(t *testing.T) {
 
 	log.Println("Stopping NATS server ...")
 	err = services.GetTransitService().StopNats()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 	log.Println("NATS Server was stopped successfully")
 
 	services.GetTransitService().Config.GWConfig.Host = GWValidHost
@@ -99,10 +100,7 @@ func TestNatsQueue_2(t *testing.T) {
 
 	log.Println("Starting NATS server ...")
 	err = services.GetTransitService().StartNats()
-	if err != nil {
-		t.Error(err)
-		return
-	}
+	assert.NoError(t, err)
 
 	log.Println("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 2 * time.Second)
@@ -129,6 +127,8 @@ func configNats(t *testing.T) error {
 }
 
 func cleanNats(t *testing.T) {
+	services.GetTransitService().Stats().MessagesSent = 0
+
 	err := services.GetTransitService().StopNats()
 	if err != nil {
 		t.Error(err)
@@ -141,12 +141,17 @@ func cleanNats(t *testing.T) {
 	}
 }
 
-var testMessage = `{"context": {"appType":"VEMA","agentId":"3939333393342","traceToken":"token-99e93",
-	"timeStamp":"2019-10-21T21:00:00.000+0000"},"resources":[{"resource":{"properties":{},
-	"name":"GW8_TNG_TEST_HOST_1","type":"HOST","status":"HOST_UP",
-	"lastCheckTime":"2019-10-21T21:00:00.000+0000"}},{"resource":{"properties":{},
-	"name":"GW8_TNG_TEST_SERVICE_0","type":"SERVICE","owner":"GW8_TNG_TEST_HOST_1",
-	"status":"SERVICE_OK","lastCheckTime":"2019-10-21T21:00:00.000+0000"},
-	"metrics":[{"tags":{},"metricName":"GW8_TNG_TEST_SERVICE","sampleType":"Warning",
-	"interval":{"startTime":"2019-10-20T21:00:00.000+0000","endTime":"2019-10-22T21:00:00.000+0000"},
-	"value":{"valueType":"IntegerType","integerValue":1}}]}]}`
+func parseJson() ([]byte, error) {
+	jsonFile, err := os.Open("fixtures/sendResourceWithMetrics.json")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = jsonFile.Close() }()
+
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return byteValue, nil
+}
