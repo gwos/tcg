@@ -39,10 +39,10 @@ char *typeof_json_item(const json_t *json) {
     return buf;
 }
 
-// As a convenience for the caller, JSON_as_string() eats what is probably the last reference to the
-// "json" object that is passed in.  That circumstance needs to be understood if you want to produce
-// a JSON string in some context where you want the JSON object to stick around afterward.  In that
-// case, you must call json_incref(json) before calling the JSON_as_str() routine.
+// As a convenience for the caller, JSON_as_string_ptr() eats what is probably the last reference
+// to the "json" object that is passed in.  That circumstance needs to be understood if you want to
+// produce a JSON string in some context where you want the JSON object to stick around afterward.
+// In that case, you must call json_incref(json) before calling the JSON_as_str() routine.
 //
 // That said, the string returned by this routine is dynamically allocated, so it eventually needs
 // to be free()d by the calling application to avoid a memory leak.
@@ -99,7 +99,7 @@ string JSON_as_str(json_t *json, size_t flags) {
 // a pointer to memory controlled by the JSON object, that we never have to worry about free()ing
 // separately ourselves?  Or do we need to keep track of it, and eventually run our own free() call?
 //
-string *JSON_as_string(json_t *json) {
+string *JSON_as_string_ptr(json_t *json) {
     // string str_ptr = JSON_as_str(json, 0);
     const string str_ptr = json_string_value(json);
     string * string_ptr;
@@ -108,49 +108,50 @@ string *JSON_as_string(json_t *json) {
     } else {
 	string_ptr = (string *) malloc(sizeof(string));
 	if (string_ptr != NULL) {
+	    // FIX MAJOR:  why do we need this cast?  does it cause any downstream constraints?
 	    *(const string *)string_ptr = str_ptr;
 	}
     }
     return string_ptr;
 }
 
-bool is_bool_zero_value(const bool *bool_ptr) {
+bool is_bool_ptr_zero_value(const bool *bool_ptr) {
     return (
         bool_ptr == NULL || *bool_ptr == false
     );
 }
 
-bool is_int_zero_value(const int *int_ptr) {
+bool is_int_ptr_zero_value(const int *int_ptr) {
     return (
         int_ptr == NULL || *int_ptr == 0
     );
 }
 
-bool is_int32_zero_value(const int32 *int32_ptr) {
+bool is_int32_ptr_zero_value(const int32 *int32_ptr) {
     return (
         int32_ptr == NULL || *int32_ptr == 0
     );
 }
 
-bool is_int64_zero_value(const int64 *int64_ptr) {
+bool is_int64_ptr_zero_value(const int64 *int64_ptr) {
     return (
         int64_ptr == NULL || *int64_ptr == 0
     );
 }
 
-bool is_float64_zero_value(const float64 *float64_ptr) {
+bool is_float64_ptr_zero_value(const float64 *float64_ptr) {
     return (
         float64_ptr == NULL || *float64_ptr == 0.0
     );
 }
 
-bool is_string_zero_value(string const *string_ptr) {
+bool is_string_ptr_zero_value(string const *string_ptr) {
     return (
         string_ptr == NULL || *string_ptr == NULL || **string_ptr == '\0'
     );
 }
 
-bool is_struct_timespec_zero_value(const struct_timespec *struct_timespec_ptr) {
+bool is_struct_timespec_ptr_zero_value(const struct_timespec *struct_timespec_ptr) {
     return (
 	struct_timespec_ptr == NULL || (
 	    struct_timespec_ptr->tv_sec  == 0 &&
@@ -159,7 +160,7 @@ bool is_struct_timespec_zero_value(const struct_timespec *struct_timespec_ptr) {
     );
 }
 
-json_t *struct_timespec_as_JSON(const struct_timespec *struct_timespec) {
+json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *struct_timespec) {
     json_error_t error;
     size_t flags = 0;
     json_t *json;

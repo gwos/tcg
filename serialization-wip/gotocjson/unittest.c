@@ -15,18 +15,18 @@
 
 // Sample routines for use by application code:
 
-// extern char   *transit_Transit_as_JSON_str(const transit_Transit *transit_Transit);
-// extern transit_Transit *JSON_str_as_transit_Transit(const char *json_str, json_t **json);
+// extern char   *transit_Transit_ptr_as_JSON_str(const transit_Transit *transit_Transit);
+// extern transit_Transit *JSON_str_as_transit_Transit_ptr(const char *json_str, json_t **json);
 
-// extern char *transit_MonitoredResource_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource);
-// extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource(const char *json_str, json_t **json);
+// extern char *transit_MonitoredResource_ptr_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource);
+// extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource_ptr(const char *json_str, json_t **json);
 
 // Sample internal conversion routines, generally not of interest to applications:
 
-// extern json_t *transit_Transit_as_JSON(const transit_Transit *transit_Transit);
+// extern json_t *transit_Transit_ptr_as_JSON_ptr(const transit_Transit *transit_Transit);
 // extern transit_Transit *JSON_as_transit_Transit(json_t *json); 
 
-// extern json_t *transit_MonitoredResource_as_JSON(const transit_MonitoredResource *transit_MonitoredResource);
+// extern json_t *transit_MonitoredResource_ptr_as_JSON_ptr(const transit_MonitoredResource *transit_MonitoredResource);
 // extern transit_MonitoredResource *JSON_as_transit_MonitoredResource(json_t *json);
 
 // We make this a const string to attempt to bypass some overly aggressive compiler security warnings.
@@ -431,14 +431,14 @@ int test_##OBJECT##_json_string(bool enable) {											\
     if (enable) {														\
 	json_t *json;														\
 	printf("Decoding "OBJSTR" JSON string ...\n");										\
-	OBJECT *OBJECT##_ptr = JSON_str_as_##OBJECT(initial_##OBJECT##_as_json_string, &json);					\
+	OBJECT *OBJECT##_ptr = JSON_str_as_##OBJECT##_ptr(initial_##OBJECT##_as_json_string, &json);				\
 	if (OBJECT##_ptr == NULL) {												\
 	    printf (FILE_LINE "ERROR:  JSON string cannot be decoded into a "OBJSTR" object\n");				\
 	    return FAILURE;													\
 	}															\
 	else {															\
 	    printf ("Encoding "OBJSTR" object tree ...\n");									\
-	    char *final_##OBJECT##_as_json_string = OBJECT##_as_JSON_str(OBJECT##_ptr);						\
+	    char *final_##OBJECT##_as_json_string = OBJECT##_ptr_as_JSON_str(OBJECT##_ptr);					\
 	    if (final_##OBJECT##_as_json_string == NULL) {									\
 		printf (FILE_LINE "ERROR:  "OBJSTR" object cannot be encoded as a JSON string\n");				\
 		return FAILURE;													\
@@ -457,7 +457,7 @@ int test_##OBJECT##_json_string(bool enable) {											\
 		}														\
 		free(final_##OBJECT##_as_json_string);										\
 	    }															\
-	    free_##OBJECT##_tree(OBJECT##_ptr, json);										\
+	    free_##OBJECT##_ptr_tree(OBJECT##_ptr, json);									\
 	}															\
 	/*															\
 	// We use just the first of these two calls (done just above, for now), because it's our official cleanup routine.	\
@@ -505,8 +505,6 @@ int main (int argc, char *argv[]) {
 	&& run_object_test(true, transit_LabelDescriptor)
 	&& run_object_test(true, transit_ThresholdDescriptor)
 	&& run_object_test(true, transit_SendInventoryRequest)
-// ; return EXIT_SUCCESS;
-// return 1
 	&& run_object_test(true, transit_OperationResult)
 	&& run_object_test(true, transit_ResourceGroup)
 	&& run_object_test(true, transit_ResourceWithMetricsRequest)
@@ -514,6 +512,7 @@ int main (int argc, char *argv[]) {
 	&& run_object_test(true, transit_Transit)
 	&& run_object_test(true, transit_MetricSample)
 	&& run_object_test(true, transit_TracerContext)
+	// || 0
 	&& run_object_test(true, transit_TimeSeries)
 	&& run_object_test(true, transit_ResourceWithMetrics)
 	&& run_object_test(true, transit_OperationResults)

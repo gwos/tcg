@@ -66,27 +66,27 @@ extern char *typeof_json_item(const json_t *json);
 // This routine decrements the reference count on the "json" object.  In many calling
 // contexts, that will be the last reference to that object, so it will be destroyed.
 // If you do want to keep the object around, call json_incref(json) before calling
-// the JSON_as_string() routine.
+// the JSON_as_string_ptr() routine.
 extern string JSON_as_str(json_t *json, size_t flags);
 
-#define string_as_JSON(string_ptr) json_string(*(string_ptr))
+#define string_ptr_as_JSON_ptr(string_ptr) json_string(*(string_ptr))
 
-// This definition is tentative, and it's causing us some build problems.
+// FIX MAJOR:  This #define definition is tentative, and it's causing us some build problems.
 // It is likely to be either revised or replaced with an actual separate routine.
-// #define JSON_as_string(json) JSON_as_str(json, 0)
-extern string *JSON_as_string(json_t *json);
+// #define JSON_as_string_ptr(json) JSON_as_str(json, 0)
+extern string *JSON_as_string_ptr(json_t *json);
 
-extern bool is_bool_zero_value(const bool *bool_ptr);
-extern bool is_int_zero_value(const int *int_ptr);
-extern bool is_int32_zero_value(const int32 *int32_ptr);
-extern bool is_int64_zero_value(const int64 *int64_ptr);
-extern bool is_float64_zero_value(const float64 *float64_ptr);
-extern bool is_string_zero_value(string const *string_ptr);
-extern bool is_struct_timespec_zero_value(const struct_timespec *struct_timespec_ptr);
+extern bool is_bool_ptr_zero_value(const bool *bool_ptr);
+extern bool is_int_ptr_zero_value(const int *int_ptr);
+extern bool is_int32_ptr_zero_value(const int32 *int32_ptr);
+extern bool is_int64_ptr_zero_value(const int64 *int64_ptr);
+extern bool is_float64_ptr_zero_value(const float64 *float64_ptr);
+extern bool is_string_ptr_zero_value(string const *string_ptr);
+extern bool is_struct_timespec_ptr_zero_value(const struct_timespec *struct_timespec_ptr);
 
-extern json_t *struct_timespec_as_JSON(const struct_timespec *milliseconds_MillisecondTimestamp);
+extern json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *milliseconds_MillisecondTimestamp);
 extern struct_timespec *JSON_as_struct_timespec(json_t *json);
-#define time_Time_as_JSON struct_timespec_as_JSON
+#define time_Time_ptr_as_JSON_ptr struct_timespec_ptr_as_JSON_ptr
 #define JSON_as_time_Time JSON_as_struct_timespec
 
 // A routine that an application must eventually call to dispose of whatever JSON object
