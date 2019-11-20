@@ -19,8 +19,6 @@ const (
 	GWValidHost                        = "localhost:80"
 	GWInvalidHost                      = "localhost:23"
 	TestTngAgentConfigNatsFileStoreDir = "test_datastore"
-	TestLoggingLevel                   = "LEVEL_TEST"
-	LoggingLevel                       = "LEVEL"
 )
 
 // Test for ensuring that all data is stored in NATS and later resent
@@ -115,7 +113,6 @@ func TestNatsQueue_2(t *testing.T) {
 
 func configNats(t *testing.T) error {
 	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
-	assert.NoError(t, os.Setenv(LoggingLevel, TestLoggingLevel))
 
 	service := services.GetTransitService()
 
