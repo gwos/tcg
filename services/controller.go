@@ -139,8 +139,8 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, string(metrics))
 }
 
-func (controller *Controller) startNATS(c *gin.Context) {
-	err := controller.StartNATS()
+func (controller *Controller) startNats(c *gin.Context) {
+	err := controller.StartNats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -148,8 +148,8 @@ func (controller *Controller) startNATS(c *gin.Context) {
 	c.JSON(http.StatusOK, controller)
 }
 
-func (controller *Controller) stopNATS(c *gin.Context) {
-	err := controller.StopNATS()
+func (controller *Controller) stopNats(c *gin.Context) {
+	err := controller.StopNats()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
@@ -222,8 +222,8 @@ func (controller *Controller) registerAPI1(router *gin.Engine) {
 	apiV1Group.GET("/listMetrics", controller.listMetrics)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
-	apiV1Group.POST("/nats/start", controller.startNATS)
-	apiV1Group.DELETE("/nats/stop", controller.stopNATS)
+	apiV1Group.POST("/nats/start", controller.startNats)
+	apiV1Group.DELETE("/nats/stop", controller.stopNats)
 	apiV1Group.POST("/nats/transport/start", controller.startTransport)
 	apiV1Group.DELETE("/nats/transport/stop", controller.stopTransport)
 

@@ -5,20 +5,17 @@ import (
 	"path"
 	"reflect"
 	"testing"
-
-	. "github.com/gwos/tng/config"
 )
 
-var cfg = Config{
-	AgentConfig:      AgentConfig{":8081", "", "", "src/main/resources/datastore", "FILE", true, true, true},
-	GroundworkConfig: GroundworkConfig{"localhost:80", "RESTAPIACCESS", "", "gw8"},
-}
-
 func TestGetConfig(t *testing.T) {
+	expected := Config{
+		AgentConfig: AgentConfig{":8081", "", "", 15, "src/main/resources/datastore", "MEMORY", ":4222", true, true, true, 3},
+		GWConfig:    GWConfig{"localhost:80", "RESTAPIACCESS", "SECRET", "gw8"},
+	}
+
 	os.Setenv(ConfigEnv, path.Join("..", ConfigName))
 	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
-	expected := cfg
-	expected.AgentConfig.NATSStoreType = "MEMORY"
+	os.Setenv("TNG_GWCONFIG_PASSWORD", "SECRET")
 
 	tests := []struct {
 		name string

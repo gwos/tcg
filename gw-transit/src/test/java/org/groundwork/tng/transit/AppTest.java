@@ -95,6 +95,8 @@ public class AppTest {
     public void shouldSynchronizeInventory() {
         TransitServices transit = new TransitServicesImpl();
 
+        System.out.println("LOADED 1");
+
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
                 .setAppType("VEMA")
@@ -112,6 +114,8 @@ public class AppTest {
                 .setOwner(TEST_HOST_NAME)
                 .build();
 
+        System.out.println("LOADED 2");
+
         DtoGroup group = new DtoGroup();
         List<DtoMonitoredResource> resources = new ArrayList<>();
         group.setGroupName("GW8");
@@ -122,6 +126,8 @@ public class AppTest {
         dtoInventory.add(host);
         dtoInventory.add(service);
         dtoInventory.add(group);
+
+        System.out.println("LOADED 3");
 
         transit.SynchronizeInventory(dtoInventory);
     }

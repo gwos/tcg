@@ -29,3 +29,5 @@ nbdist/
 src/main/webapp/app/
 src/main/resources/static/
 src/main/resources/public/app/
+
+lib/

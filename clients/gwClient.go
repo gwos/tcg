@@ -59,9 +59,9 @@ func (client *GWClient) Connect() error {
 	}
 
 	formValues := map[string]string{
-		"gwos-app-name": client.GroundworkConfig.AppName,
-		"user":          client.GroundworkConfig.Account,
-		"password":      client.GroundworkConfig.Password,
+		"gwos-app-name": client.GWConfig.AppName,
+		"user":          client.GWConfig.Account,
+		"password":      client.GWConfig.Password,
 	}
 
 	headers := map[string]string{
@@ -71,7 +71,7 @@ func (client *GWClient) Connect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GroundworkConfig.Host,
+		Host:   client.GWConfig.Host,
 		Path:   GWEntrypointConnect,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
@@ -90,7 +90,7 @@ func (client *GWClient) Connect() error {
 // Disconnect implements GWOperations.Disconnect.
 func (client *GWClient) Disconnect() error {
 	formValues := map[string]string{
-		"gwos-app-name":  client.GroundworkConfig.AppName,
+		"gwos-app-name":  client.GWConfig.AppName,
 		"gwos-api-token": client.token,
 	}
 
@@ -101,7 +101,7 @@ func (client *GWClient) Disconnect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GroundworkConfig.Host,
+		Host:   client.GWConfig.Host,
 		Path:   GWEntrypointDisconnect,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
@@ -129,7 +129,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GroundworkConfig.Host,
+		Host:   client.GWConfig.Host,
 		Path:   GWEntrypointValidateToken,
 	}
 
@@ -155,12 +155,12 @@ func (client *GWClient) SynchronizeInventory(inventory []byte) (*transit.Operati
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": client.token,
-		"GWOS-APP-NAME":  client.GroundworkConfig.AppName,
+		"GWOS-APP-NAME":  client.GWConfig.AppName,
 	}
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GroundworkConfig.Host,
+		Host:   client.GWConfig.Host,
 		Path:   GWEntrypointSynchronizeInventory,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
@@ -195,12 +195,12 @@ func (client *GWClient) SendResourcesWithMetrics(resources []byte) (*transit.Ope
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": client.token,
-		"GWOS-APP-NAME":  client.GroundworkConfig.AppName,
+		"GWOS-APP-NAME":  client.GWConfig.AppName,
 	}
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GroundworkConfig.Host,
+		Host:   client.GWConfig.Host,
 		Path:   GWEntrypointSendResourceWithMetrics,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
