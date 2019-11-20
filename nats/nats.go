@@ -1,17 +1,20 @@
 package nats
 
 import (
+	"fmt"
+	"github.com/gwos/tng/config"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 )
 
 // Define NATS IDs
 const (
 	ClusterID            = "tng-cluster"
-	DispatcherAckWait    = 15 * time.Second
 	DispatcherClientID   = "tng-dispatcher"
 	DispatcherDurableID  = "tng-store-dispatcher"
 	DispatcherQueueGroup = "tng-queue-dispatcher"
@@ -19,9 +22,19 @@ const (
 )
 
 var (
+	cfg            Config
 	dispatcherConn stan.Conn
 	stanServer     *stand.StanServer
+	natsURL        string
 )
+
+// Config defines NATS configurable options
+type Config struct {
+	DispatcherAckWait time.Duration
+	FilestoreDir      string
+	StoreType         string
+	NatsHost          string
+}
 
 // DispatcherFn defines message processor
 type DispatcherFn func([]byte) error
@@ -34,27 +47,41 @@ func Connect(clientID string) (stan.Conn, error) {
 	return stan.Connect(
 		ClusterID,
 		clientID,
-		stan.NatsURL(stan.DefaultNatsURL),
+		stan.NatsURL(natsURL),
 	)
 }
 
 // StartServer runs NATS
-func StartServer(storeType, filestoreDir string) error {
-	opts := stand.GetDefaultOptions()
-	opts.ID = ClusterID
-	opts.FilestoreDir = filestoreDir
-	switch storeType {
+func StartServer(config Config) error {
+	var err error
+	cfg = config
+	natsOpts := stand.DefaultNatsServerOptions
+
+	addrParts := strings.Split(cfg.NatsHost, ":")
+	if len(addrParts) == 2 {
+		if addrParts[0] != "" {
+			natsOpts.Host = addrParts[0]
+		}
+		if port, err := strconv.Atoi(addrParts[1]); err == nil {
+			natsOpts.Port = port
+		}
+	}
+	natsURL = fmt.Sprintf("nats://%s:%d", natsOpts.Host, natsOpts.Port)
+
+	stanOpts := stand.GetDefaultOptions()
+	stanOpts.ID = ClusterID
+	stanOpts.FilestoreDir = cfg.FilestoreDir
+	switch cfg.StoreType {
 	case "MEMORY":
-		opts.StoreType = stores.TypeMemory
+		stanOpts.StoreType = stores.TypeMemory
 	case "FILE":
-		opts.StoreType = stores.TypeFile
+		stanOpts.StoreType = stores.TypeFile
 	default:
-		opts.StoreType = stores.TypeFile
+		stanOpts.StoreType = stores.TypeFile
 	}
 
-	var err error
 	if stanServer == nil || stanServer.State() == stand.Shutdown {
-		stanServer, err = stand.RunServerWithOpts(opts, nil)
+		stanServer, err = stand.RunServerWithOpts(stanOpts, &natsOpts)
 	}
 	return err
 }
@@ -65,13 +92,13 @@ func StopServer() {
 }
 
 // StartDispatcher subscribes processors by subject
-func StartDispatcher(dispatcherMap *DispatcherMap) error {
+func StartDispatcher(dispatcherMap *DispatcherMap, loggingLevel config.LoggingLevel) error {
 	var err error
 	if dispatcherConn == nil {
 		dispatcherConn, err = stan.Connect(
 			ClusterID,
 			DispatcherClientID,
-			stan.NatsURL(stan.DefaultNatsURL),
+			stan.NatsURL(natsURL),
 		)
 	}
 	if err != nil {
@@ -85,14 +112,22 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 			DispatcherQueueGroup,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-					log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+					if loggingLevel == 0 {
+						log.Println("Not delivered")
+					} else {
+						log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
+					}
 				} else {
 					_ = msg.Ack()
-					log.Println("Delivered\nMessage:", msg)
+					if loggingLevel == 0 {
+						log.Println("Delivered")
+					} else {
+						log.Println("Delivered\nMessage:", msg)
+					}
 				}
 			},
 			stan.SetManualAckMode(),
-			stan.AckWait(DispatcherAckWait),
+			stan.AckWait(cfg.DispatcherAckWait),
 			stan.DurableName(DispatcherDurableID),
 			stan.StartWithLastReceived(),
 		)
@@ -105,9 +140,12 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	err := dispatcherConn.Close()
-	dispatcherConn = nil
-	return err
+	if dispatcherConn != nil {
+		err := dispatcherConn.Close()
+		dispatcherConn = nil
+		return err
+	}
+	return nil
 }
 
 // Publish adds message in queue
@@ -115,7 +153,7 @@ func Publish(subject string, msg []byte) error {
 	connection, err := stan.Connect(
 		ClusterID,
 		PublisherID,
-		stan.NatsURL(stan.DefaultNatsURL),
+		stan.NatsURL(natsURL),
 	)
 	if err != nil {
 		return err

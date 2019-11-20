@@ -1,11 +1,14 @@
 agentConfig:
   controllerAddr: ":8081"
+  natsAckWait: 15
   natsFilestoreDir: "src/main/resources/datastore"
   natsStoreType: "FILE"
-  startNATS: True
+  natsHost: ":4222"
+  startNats: True
   startTransport: True
   startController: True
-groundworkConfig:
+  loggingLevel: 1
+gwConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
   password: "***REMOVED***"

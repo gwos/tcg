@@ -19,8 +19,22 @@ const (
 	EnvConfigPrefix = "TNG"
 )
 
-// GroundworkConfig defines Groundwork Connection configuration
-type GroundworkConfig struct {
+type LoggingLevel int
+
+const (
+	Info LoggingLevel = iota
+	Warn
+	Debug
+)
+
+func (l LoggingLevel) String() string {
+	return [...]string{"Info", "Warn", "Debug"}[l]
+}
+
+// GWConfig defines Groundwork Connection configuration
+type GWConfig struct {
+	// Host accepts value for combined "host:port"
+	// used as `url.URL{Host}`
 	Host     string
 	Account  string
 	Password string
@@ -29,23 +43,31 @@ type GroundworkConfig struct {
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	// ControllerAddr accepts value for `http.Server{Addr}`: TCP address to listen on, ":http" if empty
+	// ControllerAddr accepts value for combined "host:port"
+	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
 	ControllerCertFile string `yaml:"controllerCertFile"`
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
-	NATSFilestoreDir   string `yaml:"natsFilestoreDir"`
-	// NATSStoreType accepts "FILE"|"MEMORY"
-	NATSStoreType   string `yaml:"natsStoreType"`
+	// NatsAckWait accepts number of seconds
+	// should be greater then the GWClient request duration
+	NatsAckWait      int64  `yaml:"natsAckWait"`
+	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
+	// NatsStoreType accepts "FILE"|"MEMORY"
+	NatsStoreType string `yaml:"natsStoreType"`
+	// NatsHost accepts value for combined "host:port"
+	// used as `strings.Split(natsHost, ":")`
+	NatsHost        string `yaml:"natsHost"`
 	StartController bool   `yaml:"startController"`
-	StartNATS       bool   `yaml:"startNATS"`
+	StartNats       bool   `yaml:"startNats"`
 	// StartTransport defines that NATS starts with Transport
-	StartTransport bool `yaml:"startTransport"`
+	StartTransport bool         `yaml:"startTransport"`
+	LogLevel       LoggingLevel `yaml:"loggingLevel"`
 }
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig       AgentConfig       `yaml:"agentConfig"`
-	GroundworkConfig  GroundworkConfig  `yaml:"groundworkConfig"`
+	AgentConfig AgentConfig `yaml:"agentConfig"`
+	GWConfig    GWConfig    `yaml:"gwConfig"`
 }
 
 // GetConfig implements Singleton pattern

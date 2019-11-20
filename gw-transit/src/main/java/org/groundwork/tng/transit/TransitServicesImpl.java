@@ -1,21 +1,14 @@
 package org.groundwork.tng.transit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sun.jna.Native;
-import io.nats.streaming.Options;
-import io.nats.streaming.StreamingConnection;
-import io.nats.streaming.StreamingConnectionFactory;
+import org.codehaus.jackson.JsonProcessingException;
 import org.groundwork.rs.common.ConfiguredObjectMapper;
 import org.groundwork.rs.transit.*;
 
 import java.io.IOException;
-import java.util.concurrent.TimeoutException;
 
 public class TransitServicesImpl implements TransitServices {
-    private static final String TNG_NATS_URL = "nats://localhost:4222";
-    private static final String CLIENT_ID = "gw-transit";
-    private static final String CLUSTER_ID = "tng-cluster";
-    private static final Integer WAIT_FOR_NATS_SERVER = 1000;
+    private static final String LIBTRANSIT_LIBRARY_PATH_ENV = "LIBTRANSIT";
 
     private ConfiguredObjectMapper objectMapper;
     private TngTransitLibrary tngTransitLibrary;
@@ -23,8 +16,11 @@ public class TransitServicesImpl implements TransitServices {
 
     public TransitServicesImpl() {
         this.objectMapper = new ConfiguredObjectMapper();
-        this.tngTransitLibrary = Native.load("/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so", TngTransitLibrary.class);
-        // TODO: load this from Maven this.tngTransitLibrary = Native.load("/Users/dtaylor/gw8/tng/libtransit/libtransit.so", TngTransitLibrary.class);
+        String path = System.getenv(LIBTRANSIT_LIBRARY_PATH_ENV);
+        if (path.isEmpty()) {
+            path = "/home/vsenkevich/Projects/effectivesoft/groundwork/_rep/tng/libtransit/libtransit.so";
+        }
+        this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
     }
 

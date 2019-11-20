@@ -2,21 +2,22 @@ package integration
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"testing"
 )
 
 const (
-	HostGetApi        = "http://localhost/api/hosts/"
-	HostDeleteApi     = "http://localhost/api/hosts/"
+	HostGetAPI        = "http://localhost/api/hosts/"
+	HostDeleteAPI     = "http://localhost/api/hosts/"
 	HostStatusPending = "PENDING"
 	HostStatusUp      = "UP"
 	TestHostName      = "GW8_TNG_TEST_HOST"
@@ -34,30 +35,26 @@ var headers map[string]string
 func TestIntegration(t *testing.T) {
 	var err error
 	headers, err = config()
-	if err != nil {
-		t.Error(err)
-	}
+	defer clean(headers)
+	assert.NoError(t, err)
 
 	err = existenceCheck(false, "irrelevant")
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
+
+	err = installDependencies()
+	assert.NoError(t, err)
 
 	err = runJavaSynchronizeInventoryTest()
-	if err != nil {
-		t.Error(err)
-	}
-
-	defer clean(headers)
+	assert.NoError(t, err)
 
 	err = existenceCheck(true, HostStatusPending)
+	assert.NoError(t, err)
 
 	err = runJavaSendResourceWithMetricsTest()
-	if err != nil {
-		t.Error(err)
-	}
+	assert.NoError(t, err)
 
 	err = existenceCheck(true, HostStatusUp)
+	assert.NoError(t, err)
 }
 
 func config() (map[string]string, error) {
@@ -73,25 +70,26 @@ func config() (map[string]string, error) {
 		return nil, err
 	}
 
+	token := reflect.ValueOf(service).Elem().FieldByName("token").String()
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  service.GroundworkConfig.AppName,
-		"GWOS-API-TOKEN": service.GroundworkConfig.Token,
+		"GWOS-APP-NAME":  service.GWConfig.AppName,
+		"GWOS-API-TOKEN": token,
 	}
 
 	return headers, nil
 }
 
 func existenceCheck(mustExist bool, mustHasStatus string) error {
-	statusCode, byteResponse, err := transit.SendRequest(http.MethodGet, HostGetApi+TestHostName, headers, nil, nil)
+	statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, HostGetAPI+TestHostName, headers, nil, nil)
 	if err != nil {
 		return err
 	}
 	if !mustExist && statusCode == 404 {
 		return nil
 	}
-	if !(!mustExist && statusCode != 404) {
-		return errors.New(fmt.Sprintf("Status code = %d(Details: %s), want = %d", statusCode, string(byteResponse), 404))
+	if !(mustExist && statusCode == 200) {
+		return fmt.Errorf("Status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 404)
 	}
 
 	var response Response
@@ -102,8 +100,24 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	}
 
 	if mustExist && (response.HostName != TestHostName || response.MonitorStatus != mustHasStatus) {
-		return errors.New(fmt.Sprintf("Host from database = (Name: %s, Status: %s), want = (Name: %s, Status: %s)",
-			response.HostName, response.MonitorStatus, TestHostName, mustHasStatus))
+		return fmt.Errorf("Host from database = (Name: %s, Status: %s), want = (Name: %s, Status: %s)",
+			response.HostName, response.MonitorStatus, TestHostName, mustHasStatus)
+	}
+
+	return nil
+}
+
+func installDependencies() error {
+	workDir, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("mvn", "install:install-file", "-Dfile=lib/collagerest-common-8.0.0-SNAPSHOT.jar", "-DgroupId=org.groundwork", "-DartifactId=collagerest-common", "-Dversion=8.0.0-SNAPSHOT")
+	cmd.Dir = path.Join(workDir, "../gw-transit")
+	_, err = cmd.Output()
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -142,7 +156,7 @@ func runJavaSendResourceWithMetricsTest() error {
 }
 
 func clean(headers map[string]string) {
-	_, _, err := transit.SendRequest(http.MethodDelete, HostDeleteApi+TestHostName, headers, nil, nil)
+	_, _, err := clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
 	if err != nil {
 		log.Println(err)
 	}
