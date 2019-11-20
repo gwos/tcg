@@ -7,7 +7,15 @@
 // and accurate.
 package main
 
-// FIX MAJOR:
+// FIX LATER:
+//
+// (*) Consider implementing a layer of routines that effectively provide what C++
+//     calls "placement new" semantics, meaning the caller would be responsible for
+//     allocating the principal C-structure memory block and the called routine
+//     would then take a pointer to that block and fill it in.  Figure out whether
+//     such an approach might eliminate some amount of allocation and deallocation
+//     at the top and bottom of the hierarchy, enough to make a switch worthwhile.
+//
 // (*) Consider optionally using the Custom Memory Allocation routines of Jansson
 //     to implement some sort of invocation-count and execution-time processing,
 //     so we can measure the amount of effort involved at that level of the
@@ -64,7 +72,7 @@ func main() {
 	}
     }
 
-    // FIX MINOR:  add support for -V and --version options
+    // FIX MINOR:  add support for -V and --version options; automate updating the version string if that is somehow possible
 
     fset, f, err := parse_file(os.Args[1])
     if err != nil {
@@ -139,10 +147,11 @@ func parse_file(filepath string) (*token.FileSet, *ast.File, error) {
     return fset, f, nil
 }
 
-// FIX MAJOR:  We could probably use a certain amount of refactoring, both to factor out similar
+// FIX LATER:  We could probably use a certain amount of refactoring, both to factor out similar
 // code blocks and to allow for a certain degree of potential recursion in type declarations.
 //
-// FIX MAJOR:  make sure we test the following types separately:
+// FIX MAJOR:  Make sure we test the following types separately:
+//
 //     "foo"
 //     "*foo"
 //     "[]foo"
@@ -197,7 +206,7 @@ func process_parse_nodes(
 	other_headers         string,
 	err error,
     ) {
-    // FIX MINOR
+    // FIX MINOR:
     // Having this function in play turns out to be somewhat less than completely desirable,
     // because the simple error message does not include all the failure-coordinate data that
     // would have been printed by allowing the panic to proceed without interception.
@@ -252,7 +261,7 @@ func process_parse_nodes(
     // Print the file's documentation.
     // It only prints the leading package doc, not function comments.
     // For that, one needs to dig deeper (see below).
-    // FIX MAJOR:  this is not stripping the leading "//" from comment lines
+    // FIX MAJOR:  This is not stripping the leading "//" from comment lines.
     fmt.Println("=== Package Documentation:")
     if f.Doc != nil {
 	for _, doc := range f.Doc.List {
@@ -271,7 +280,7 @@ node_loop:
 	    fmt.Printf("--- function name:  %v\n", func_decl.Name.Name)
 	    if func_decl.Doc != nil {
 		fmt.Println("--- function documentation:")
-		// FIX MAJOR:  this is not stripping the leading "//" from comment lines
+		// FIX MAJOR:  This is not stripping the leading "//" from comment lines.
 		for _, doc := range func_decl.Doc.List {
 		    fmt.Println(doc.Text)
 		}
@@ -306,7 +315,7 @@ node_loop:
 			    break node_loop
 			}
 			for _, field := range type_struct.Fields.List {
-			    // FIX MAJOR:  add support for the .Doc and .Comment attributes as well
+			    // FIX MAJOR:  Add support for the .Doc and .Comment attributes as well.
 			    // fmt.Printf("    --- field:  %#v\n", field)
 			    // Field elements to process:
 			    // .Doc   *ast.CommentGroup    // may be nil
@@ -496,7 +505,7 @@ node_loop:
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
-					// FIX MINOR:  this may need work to fully and correctly reflect the complete selector
+					// FIX MINOR:  This may need work to fully and correctly reflect the complete selector.
 					field_type_name = "*" + x_type_ident.Name + "." + type_selectorexpr.Sel.Name
 					fmt.Printf("    --- struct field name and type:  %#v *%v.%v\n", name.Name, x_type_ident.Name, field_type_name)
 				    } else {
@@ -524,7 +533,7 @@ node_loop:
 					    fmt.Printf("    --- struct field name and interior StarExpr type:  %#v %#v\n", name.Name, field_type_name)
 					} else if type_array, ok := type_starexpr.X.(*ast.ArrayType); ok {
 					    fmt.Printf("    --- UNEXPECTED interior field.Type.X Type *ast.ArrayType %#v\n", type_array)
-					    // FIX MAJOR:  handle this case
+					    // FIX MAJOR:  Handle this case.
 					} else {
 					    fmt.Printf("ERROR:  at %s, found unexpected interior field.Type.X type:  %T\n", file_line(), type_starexpr.X)
 					    fmt.Printf("ERROR:  struct field interior Type.X field is not of a recognized type\n")
@@ -557,7 +566,7 @@ node_loop:
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
-				    // FIX QUICK:  this needs work to fully reflect the map structure; perhaps the new statements now do so
+				    // FIX QUICK:  This needs work to fully reflect the map structure; perhaps the new statements now do so.
 				    // field_type_name = value_type_ident.Name
 				    // fmt.Printf("    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
 				    field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
@@ -578,7 +587,7 @@ node_loop:
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
-				    // FIX QUICK:  this may need work to fully and correctly reflect the complete selector
+				    // FIX QUICK:  This may need work to fully and correctly reflect the complete selector.
 				    field_type_name = x_type_ident.Name + "." + type_selectorexpr.Sel.Name
 				    fmt.Printf("    --- struct field name and type:  %#v %v.%v\n", name.Name, x_type_ident.Name, field_type_name)
 				} else {
@@ -598,7 +607,7 @@ node_loop:
 			    // .Comment *ast.CommentGroup  // likely nil
 			}
 		    } else if type_interface, ok := spec.(*ast.TypeSpec).Type.(*ast.InterfaceType); ok {
-			fmt.Printf("FIX MAJOR:  handle this next case (where the type is *ast.InterfaceType)\n")
+			fmt.Printf("FIX MAJOR:  Handle this next case (where the type is *ast.InterfaceType)\n")
 			// This is an interface definition, which perhaps mostly declares methods, not simple types,
 			// enumerations, constants, or structs.  Verify that assumption, and perhaps extend this case
 			// to process whatever it might need to.  We might, for instance, at least need to emit function
@@ -613,7 +622,7 @@ node_loop:
 		}
 	    }
 	    if gen_decl.Tok == token.CONST {
-		// FIX MAJOR:  this needs some testing to see when iota_value and value_is_from_iota need to be set or reset
+		// FIX MAJOR:  This needs some testing to see when iota_value and value_is_from_iota need to be set or reset.
 		var spec_type string
 		var iota_value int = -1
 		var value_is_from_iota bool = false
@@ -676,7 +685,7 @@ node_loop:
 				    }
 				case *ast.BinaryExpr:
 				    fmt.Printf("ERROR:  at %s, value expression is %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.BinaryExpr))
-				    // FIX MAJOR:  this setting of spec_type is nowhere near a thorough analysis
+				    // FIX MAJOR:  This setting of spec_type is nowhere near a thorough analysis.
 				    if spec_type == "" {
 					spec_type = "int"
 				    }
@@ -696,7 +705,7 @@ node_loop:
 			    iota_value++
 			    const_value = fmt.Sprintf("%d", iota_value)
 			}
-			// FIX MAJOR:  this is not yet showing the "int" spec_type for a "1 << iota" expression
+			// FIX MAJOR:  This is not yet showing the "int" spec_type for a "1 << iota" expression.
 			fmt.Printf("--- const element name, type, and value:  %v %v %v\n", name.Name, spec_type, const_value)
 			// It's not required by Go syntax that every assignment in a single const block has exactly
 			// the same type, but we insist on that here to simplify our work.  If we encounter code that
@@ -785,12 +794,12 @@ node_loop:
 	nil
 }
 
-// FIX MAJOR:  add support for iota to the evaluation
-// FIX MAJOR:  this is not yet coordinated with the ast.Ident processing above
+// FIX MAJOR:  Add support for iota to the evaluation.
+// FIX MAJOR:  This is not yet coordinated with the ast.Ident processing above.
 func eval_int_expr(tree ast.Expr, iota *int) (int, error) {
     switch n := tree.(type) {
 	case *ast.Ident:
-	    // FIX MAJOR:  do the right thing here to prove we should really be accessing iota
+	    // FIX MAJOR:  Do the right thing here to prove we should really be accessing iota.
 	    *iota++
 	    return *iota, nil
 	case *ast.BasicLit:
@@ -1126,7 +1135,7 @@ var C_code_boilerplate = `//
 //     https://github.com/akheron/jansson
 //     https://jansson.readthedocs.io/
 //
-// FIX MAJOR:  This inclusion might be better moved to the header file,
+// FIX MINOR:  This inclusion might be better moved to the header file,
 // if json_dumps() is expected to be used by application code.
 #include "jansson.h"
 
@@ -1759,7 +1768,7 @@ func interpret_json_field_tag(field_name string, struct_field_tag string) json_f
     return field_tag
 }
 
-// FIX MAJOR:  when generating these routines, apply the "json"-related content of struct field tags
+// FIX MAJOR:  When generating these routines, apply the "json"-related content of struct field tags.
 
 func generate_all_encode_tree_routines(
 	package_name string,
@@ -1795,13 +1804,7 @@ func generate_all_encode_tree_routines(
     all_encode_function_code = ""
     pointer_type_zero_value_code := ""
 
-    // FIX QUICK:  clean this up
-    // This is a shortcut, so we don't have to special-case some code later on.
-    // It's now included in convert_go_to_c.h instead, to centralize the declaration
-    // because it is not specific to the conversion of any one Go package.
-    // all_encode_function_code += "#define string_ptr_as_JSON_ptr(string_ptr) json_string(*(string_ptr))\n"
-
-    // This is also a shortcut, so we don't have to nearly-replicate some other code we will generate later on.
+    // This is a shortcut, so we don't have to nearly-replicate some other code we will generate later on.
     for base_type_ptr, base_type := range pointer_base_types {
 	pointer_type_zero_value_code += fmt.Sprintf(`
 bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr) {
@@ -1814,7 +1817,7 @@ bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr) {
 	// FIX QUICK:  This ought to be moved to the header file.
 	all_encode_function_code += fmt.Sprintf("#define %s_ptr_as_JSON_ptr(ptr) %s_ptr_as_JSON_ptr(*(ptr))\n", base_type_ptr, base_type)
     }
-    // FIX QUICK:  There ought to be declarations for these routines in the header file.
+    // FIX QUICK:  There ought to be declarations for these routines in the header file, if there aren't already.
     all_encode_function_code += pointer_type_zero_value_code
 
     // FIX QUICK:  Perhaps this support for zero_value routines for _List types should be moved into the generate_encode_list_tree() routine.
@@ -2493,11 +2496,6 @@ func generate_encode_PackageName_StructTypeName_ptr_tree(
     // Here's the template for the standard encoding function we need to generate.
     // There are also a few extra flavors, which we will get to in due course.
 
-/*
-    var encode_routine_fields_template = `
-	    , "{{.FieldName}}", {{.StructName}}->{{.FieldName}} // {{.FieldType}}`
-*/
-
     var encode_routine_header_template = `
 json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_ptr) {
     char *failure = NULL;
@@ -2537,8 +2535,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
     */
 
     var encode_routine_struct_timespec_body_format = `
-	// FIX QUICK:  deal with the error scope issue (a text pointer from the error object may be
-	// assigned to the failure pointer and then used after the error object has gone out of scope)
+	// FIX QUICK:  Deal with the error scope issue (a text pointer from the error object may be
+	// assigned to the failure pointer and then used after the error object has gone out of scope).
 	json_error_t error;
 	size_t flags = 0;
 	// We special-case the field packing in this routine, based on the "struct_timespec" field type.
@@ -2571,9 +2569,6 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 `
 
     header_template := template.Must(template.New("encode_routine_header").Parse(encode_routine_header_template))
-    /*
-    fields_template := template.Must(template.New("encode_routine_fields").Parse(encode_routine_fields_template))
-    */
     footer_template := template.Must(template.New("encode_routine_footer").Parse(encode_routine_footer_template))
 
     type encode_routine_boilerplate_fields struct {
@@ -2595,8 +2590,6 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 
     fields := struct_fields[struct_name] // []string
     max_field_name_len := 0
-    // pack_separator := "{"
-    // pack_format := ""
     for _, field_name := range fields {
 	field_tag := interpret_json_field_tag(field_name, struct_field_tags[struct_name][field_name])
 	if !field_tag.json_omitalways {
@@ -2604,47 +2597,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	    if  max_field_name_len < field_name_len {
 		max_field_name_len = field_name_len
 	    }
-	    /*
-	    // We specify "s?:X" instead of "s:X" as the unpack format for an optional field
-	    // (i.e., when "omitempty" is present in the struct field tag).
-	    var optional string
-	    if field_tag.json_omitempty {
-		optional = "*"
-	    } else {
-		optional = ""
-	    }
-	    var json_field_format string
-	    // FIX MAJOR:  There are certain field types that devolve to a string or to a 32-bit integer,
-	    // that we should be handling differently here.
-	    field_C_type := struct_field_C_types[struct_name][field_name]
-	    switch field_C_type {
-		// FIX QUICK:  optional == "*" is not supported for "b", "I", or "f" conversions;
-		// we need to work out some alternate means to support the omitempty directive for
-		// these datatypes
-		case "bool":    json_field_format = "b"; // optional = ""
-		case "int64":   json_field_format = "I"; // optional = ""
-		case "float64": json_field_format = "f"; // optional = ""
-		case "string":  json_field_format = "s"
-		default:
-		    if enum_C_type, ok := enum_typedefs[field_C_type]; ok {
-			if enum_C_type == "string" {
-			    json_field_format = "s"
-			} else {
-			    json_field_format = "o"
-			}
-		    } else {
-			json_field_format = "o"
-		    }
-	    }
-	    // pack_format += pack_separator + "s" + ":" + json_field_format + optional
-	    // pack_separator = " "
-	    */
 	}
     }
-    // pack_format += "}"
-
-    // FIX MAJOR:  take out this and related code above, as we no longer use the pack_format
-    // pack_format = pack_format
 
     boilerplate_variables := encode_routine_boilerplate_fields{StructName: package_name + "_" + struct_name}
 
@@ -2672,17 +2626,6 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
     have_encode_routine_normal_body_format := false
     for _, field_name := range fields {
 	field_C_type := struct_field_C_types[struct_name][field_name]
-	/*
-	struct_field_variables := encode_routine_struct_fields{
-	    StructName: package_name + "_" + struct_name,
-	    FieldName: field_name,
-	    FieldType: field_C_type,
-	}
-	var field_code bytes.Buffer
-	if err := fields_template.Execute(&field_code, struct_field_variables); err != nil {
-	    panic("encode routine field processing failed");
-	}
-	*/
 
 	// FIX QUICK:  clean this up
 	// field_tag := interpret_json_field_tag(field_name, struct_field_tags[struct_name][field_name])
@@ -2705,8 +2648,8 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 
 	var include_condition string
 	if !field_tag.json_omitalways {
-	    // FIX MAJOR:  this might need work to correctly handle all of int32, int64, and int;
-	    // check the JSON_INTEGER_IS_LONG_LONG macro, and handle stuff appropriately
+	    // FIX MAJOR:  This might need work to correctly handle all of int32, int64, and int;
+	    // check the JSON_INTEGER_IS_LONG_LONG macro, and handle stuff appropriately.
 
 	    switch field_C_type {
 		case "bool":
@@ -2819,14 +2762,11 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else if strings.HasSuffix(field_C_type, "_Pair_List") {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct TimeSeries field Tags, of type string_string_Pair_List
-	// FIX QUICK:  encoding placeholder for package transit struct InventoryResource field Properties, of type string_transit_TypedValue_Pair_List
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceStatus field Properties, of type string_transit_TypedValue_Pair_List
 			if !have_encode_routine_normal_body_format {
 			    function_code += encode_routine_normal_body_format
 			    have_encode_routine_normal_body_format = true
 			}
+			// FIX QUICK:  clean this up
 			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _Pair_List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
@@ -2839,6 +2779,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			} else {
 			    include_condition = "1"
 			}
+			// FIX QUICK:  Verify that this block of code has been moved up intact, then delete it here.
 			/*
 			go_type := struct_field_Go_types[struct_name][field_name]
 			field_tag := strict_json_field_tag(field_name, struct_field_tags[struct_name][field_name])
@@ -2869,14 +2810,11 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else if strings.HasSuffix(field_C_type, "_Ptr_List") {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct TimeSeries field MetricSamples, of type transit_MetricSample_Ptr_List
-	// FIX QUICK:  encoding placeholder for package transit struct MetricDescriptor field Labels, of type transit_LabelDescriptor_Ptr_List
-	// FIX QUICK:  encoding placeholder for package transit struct MetricDescriptor field Thresholds, of type transit_ThresholdDescriptor_Ptr_List
 			if !have_encode_routine_normal_body_format {
 			    function_code += encode_routine_normal_body_format
 			    have_encode_routine_normal_body_format = true
 			}
+			// FIX QUICK:  clean this up
 			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _Ptr_List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
@@ -2914,14 +2852,11 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else if strings.HasSuffix(field_C_type, "_List") {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceGroup field Resources, of type transit_MonitoredResource_List
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceWithMetrics field Metrics, of type transit_TimeSeries_List
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceWithMetricsRequest field Resources, of type transit_ResourceWithMetrics_List
 			if !have_encode_routine_normal_body_format {
 			    function_code += encode_routine_normal_body_format
 			    have_encode_routine_normal_body_format = true
 			}
+			// FIX QUICK:  clean this up
 			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _List)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
@@ -2959,14 +2894,11 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else if strings.HasSuffix(field_C_type, "_List_Ptr") {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct SendInventoryRequest field Inventory, of type transit_InventoryResource_List_Ptr
-	// FIX QUICK:  encoding placeholder for package transit struct SendInventoryRequest field Groups, of type transit_ResourceGroup_List_Ptr
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResults field Results, of type transit_OperationResult_List_Ptr
 			if !have_encode_routine_normal_body_format {
 			    function_code += encode_routine_normal_body_format
 			    have_encode_routine_normal_body_format = true
 			}
+			// FIX QUICK:  clean this up
 			function_code += fmt.Sprintf("\n        // as-yet-undone (encoding _List_Ptr)\n")
 			function_code += fmt.Sprintf("        // package_name = %s\n", package_name)
 			function_code += fmt.Sprintf("        //  struct_name = %s\n", struct_name)
@@ -3010,15 +2942,12 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else if strings.HasSuffix(field_C_type, "_Ptr") {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct MetricSample field Interval, of type transit_TimeInterval_Ptr
-	// FIX QUICK:  encoding placeholder for package transit struct MetricSample field Value, of type transit_TypedValue_Ptr
-	// FIX QUICK:  encoding placeholder for package transit struct Transit field Config_ptr_, of type config_Config_Ptr
 			if field_tag.json_omitempty {
 			    include_condition = fmt.Sprintf("%s_%s_%s != NULL", package_name, struct_name, field_name)
 			} else {
 			    include_condition = "1"
 			}
+			// FIX QUICK:  Verify that this block of code has been moved up intact, then delete it here.
 			/*
 			go_type := struct_field_Go_types[struct_name][field_name]
 			field_tag := strict_json_field_tag(field_name, struct_field_tags[struct_name][field_name])
@@ -3053,21 +2982,6 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			)
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else {
-	// FIX QUICK:  this case covers the following:
-	// FIX QUICK:  encoding placeholder for package transit struct TimeInterval field EndTime, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct TimeInterval field StartTime, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct TypedValue field TimeValue, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct ThresholdDescriptor field Value, of type int32
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceStatus field LastCheckTime, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceStatus field NextCheckTime, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct TracerContext field TimeStamp, of type milliseconds_MillisecondTimestamp
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResult field EntityID, of type int
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResults field ResourcesAdded, of type int
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResults field ResourcesDeleted, of type int
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResults field Warning, of type int
-	// FIX QUICK:  encoding placeholder for package transit struct OperationResults field Count, of type int
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceWithMetrics field Resource, of type ResourceStatus
-	// FIX QUICK:  encoding placeholder for package transit struct ResourceWithMetricsRequest field Context, of type TracerContext
 
 /*
 // Generate routines similar to this, stepping through all of the individual fields of a structure
@@ -3087,7 +3001,7 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 			// of the affected structure, and really just constitutes basic error checking that
 			// should be unconditional instead of reflecting the omitempty option
 			if field_tag.json_omitempty {
-			    // FIX QUICK:  add an extra include condition for a milliseconds_MillisecondTimestamp value not being zero (or equivalent)
+			    // FIX QUICK:  Add an extra include condition for a milliseconds_MillisecondTimestamp value not being zero (or equivalent).
 			    // include_condition = "1"
 			    include_condition = fmt.Sprintf("!is_%[4]s_ptr_zero_value(&%[1]s_%s_ptr->%s)", package_name, struct_name, field_name, field_C_type)
 			} else {
@@ -3100,7 +3014,8 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 				function_code += encode_routine_normal_body_format
 				have_encode_routine_normal_body_format = true
 			    }
-			    // FIX QUICK:  check the json_field_name, to make sure it is handled correctly.
+			    // FIX QUICK:  Check the json_field_name, to make sure it is handled correctly.
+			    // FIX QUICK:  clean this up
 			    function_code += fmt.Sprintf("\n        // as-yet-undone (encoding default)\n")
 			    function_code += fmt.Sprintf("        //    package_name = %s\n", package_name)
 			    function_code += fmt.Sprintf("        //     struct_name = %s\n", struct_name)
@@ -3125,11 +3040,11 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 	    }
 	}
 */
-			    // FIX MINOR:  perhaps improve the failure messages to specify the particular structure/field in question,
-			    // to better pinpoint the specific problem that is occurring should it happen in a deployed system
+			    // FIX MINOR:  Perhaps improve the failure messages to specify the particular structure/field in question,
+			    // to better pinpoint the specific problem that is occurring should it happen in a deployed system.
 			    function_code += fmt.Sprintf(`
-	// FIX QUICK:  deal properly with the omitempty handling here,
-	// in particular for a milliseconds_MillisecondTimestamp object
+	// FIX QUICK:  Deal properly with the omitempty handling here,
+	// in particular for a milliseconds_MillisecondTimestamp object.
 	if (%s) {
 	    json_t *json_%[5]s = %[6]s_ptr_as_JSON_ptr(&%[3]s_%s_ptr->%s);
 	    if (json_%[5]s != NULL) {
@@ -3154,6 +3069,7 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 // --------------------------------------------------------------------------------------------------------------------------------
 	    }
 
+// FIX QUICK:  clean this up
 // package_name = milliseconds
 //  struct_name = MillisecondTimestamp
 //   field_name = Time_
@@ -3448,7 +3364,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 			field_unpacks += fmt.Sprintf("            , \"%s\",%*s&json_%s\n",
 			    json_field_name, max_json_field_name_len - json_field_name_len + 1, " ", field_name)
 
-			// FIX QUICK:  create the missing JSON_as_XXX_YYY_Pair_List_ptr() routines that will make the rest of this work as intended
+			// FIX QUICK:  Create the missing JSON_as_XXX_YYY_Pair_List_ptr() routines that will make the rest of this work as intended.
 			field_values += fmt.Sprintf(
 `	    %[4]s *%[4]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 	    if (%[4]s_ptr == NULL) {
@@ -3566,7 +3482,7 @@ package_name, struct_name, field_name, field_C_type)
 	    }
 */
 			field_values += fmt.Sprintf(`
-	    // FIX MAJOR:  deal correctly with the omitempty_condition
+	    // FIX MAJOR:  Deal correctly with the omitempty_condition.
 	    if (1) {
 		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 		if (%[3]s_ptr == NULL) {
@@ -3610,7 +3526,7 @@ package_name, struct_name, field_name, field_C_type)
 	    }
 */
 			field_values += fmt.Sprintf(`
-	    // FIX MAJOR:  deal correctly with the omitempty_condition (json_%[3]s != NULL)
+	    // FIX MAJOR:  Deal correctly with the omitempty_condition (json_%[3]s != NULL).
 	    if (1) {
 		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 		if (%[3]s_ptr == NULL) {
@@ -3630,10 +3546,11 @@ package_name, struct_name, field_name, field_C_type)
 			field_values  += fmt.Sprintf("            //   field_name = %s\n", field_name)
 			field_values  += fmt.Sprintf("            // field_C_type = %s\n", field_C_type)
 			field_objects += fmt.Sprintf("        json_t *json_%s;\n", field_name)
-			// FIX MAJOR:  possibly change the JSON field name in this next item, based on
+			// FIX MAJOR:  Possibly change the JSON field name in this next item, based on
 			// an analysis of the Go type (for "*config.Config", reduce to just "Config")
-			// and then on a possible override from the struct field tag
+			// and then on a possible override from the struct field tag.
 			field_tags := struct_field_tags[struct_name][field_name]
+			// FIX QUICK:  Verify that this block of code has been moved up intact, then delete it here.
 			/*
 			go_type := struct_field_Go_types[struct_name][field_name]
 			field_tag := strict_json_field_tag(field_name, struct_field_tags[struct_name][field_name])
@@ -3664,22 +3581,14 @@ package_name, struct_name, field_name, field_C_type)
 			    package_name, struct_name, field_name, pointer_base_types[field_C_type])
 // --------------------------------------------------------------------------------------------------------------------------------
 		    } else {
-			// FIX QUICK:  There are lots of subtle distinctions and adjustments
-			// that need to be made in this branch, that we are not yet making.
+			// FIX QUICK:  There are lots of subtle distinctions and adjustments that need to
+			// be made in this branch, that we were (at the time of this writing) not yet making.
 			// Also handle a field_C_type of:
 			//     "milliseconds_MillisecondTimestamp"
 			//     "ResourceStatus"  (should that be "transit_ResourceStatus" instead?)
 			//     "TracerContext"   (should that be "transit_TracerContext"  instead?)
-			// FIX QUICK:  That is all close to being done; check the json_field_name, though,
-			// to make sure it is handled correctly.
-			/*
-			var json_field_name string
-			if true {
-			    json_field_name = field_name
-			} else {
-			    json_field_name = field_name
-			}
-			*/
+			// FIX QUICK:  That is all close to being done, if it's not already done; check the json_field_name,
+			// though, to make sure it is handled correctly.
 			var decode_condition string
 			if field_tag.json_omitempty {
 			    if field_C_type == "struct_timespec" {
@@ -3806,7 +3715,8 @@ package_name, struct_name, field_name, field_C_type)
     json_error_t error;
     *json = json_loads(json_str, 0, &error);
     if (*json == NULL) {
-	// FIX MAJOR:  produce a log message based on the content of the "error" object
+	// FIX MAJOR:  Once we have our official support for logging in place,
+	// produce a log message based on the content of the "error" object.
 	printf(FILE_LINE "json for {{.StructName}} is NULL\n");
 	return NULL;
     }
@@ -3825,39 +3735,7 @@ package_name, struct_name, field_name, field_C_type)
 }
 `
 
-    // FIX MAJOR:  this is obsolete code
-    /*
-    var obsolete_decode_routine_header_template = `
-{{.StructName}} *decode_json_{{.StructName}}(const char *json_str) {
-  {{.StructName}} *{{.StructName}}_ptr = NULL;
-  size_t size = 0;
-  json_error_t error;
-  json_t *json = NULL;
-
-  json = json_loads(json_str, 0, &error);
-  if (json) {
-    fprintf(stderr, "decode_json_{{.StructName}} error on line %d: %s\n", error.line, error.text);
-  } else {
-`
-    */
-
-    // FIX MAJOR:  this is obsolete code
-    /*
-    var decode_routine_footer_template = `
-    json_decref(json);
-  }
-
-  return {{.StructName}}_ptr;
-}
-
-`
-    */
-
     header_template := template.Must(template.New("decode_routine_header").Parse(decode_routine_header_template))
-    // FIX MAJOR:  this is obsolete code
-    /*
-    footer_template := template.Must(template.New("decode_routine_footer").Parse(decode_routine_footer_template))
-    */
 
     type decode_routine_boilerplate_fields struct {
 	StructName string
@@ -3870,124 +3748,6 @@ package_name, struct_name, field_name, field_C_type)
 	panic("decode routine header processing failed");
     }
     function_code += header_code.String()
-
-// FIX MAJOR:  this is obsolete code
-/*
-    // When adding code like this, we need to double the % characters in any fprintf() format specifications
-    // that we don't want Go itself to attempt to interpret.
-    function_code += fmt.Sprintf(`    // allocate and fill the target struct by pointer
-    %[1]s_ptr = (%[1]s *) malloc(size);
-    if (%[1]s_ptr == NULL) {
-      fprintf(stderr, "decode_json_%[1]s error: %%s\n", "malloc failed");
-    } else {
-`, package_name + "_" + struct_name)
-
-    // Recursively decode all other structures pointed to by the given pointer.
-    // To do so, we use our conventions of naming structures to identify which of them are lists
-    // and pointers.  Possibilities for field types that need special handling are the following:
-    //
-    //     string     is a "char *", which needs to be directly free()d
-    //
-    //     xxx_List   (special structure) check for a NULL pointer in the items subfield; otherwise,
-    //                use the count subfield and walk through the array of items, each of which will be an
-    //                "xxx *" element, handling each one in turn, recursively, before deleting the array itself
-    //
-    //     xxx        (any other structure) walk through the fields of the "xxx" structure, and deal with
-    //                them individually, as otherwise described here for the types of those subfields
-    //
-    //     xxx_Ptr    is a pointer to a single object of type "xxx" (though that type might be "yyy_List");
-    //                check for a NULL pointer, then delete all necessary subsidiary-object elements first
-    //                before deleting the pointed-to object itself
-
-    // FIX MINOR:  Clean up the generated comments used during development, to leave only short forms of
-    // comments that reflect strutures and fields being skipped because they need no subsidiary deallocation.
-
-    indent := "  "
-    var process_item func(line_prefix string, parent_struct_type string, item_type string, item_prefix string, item_name string)
-    process_item = func(line_prefix string, parent_struct_type string, item_type string, item_prefix string, item_name string) {
-	// A xxx_List structure is just like any other structure we have manufactured, in that the details of its
-	// fields have been recorded for our later use.  However, the .items field in this structure is special, in
-	// that it refers not just to a single instance of the referred-to object, but to potentially many more.
-	// So we must test for this structure before testing for other types of structures, so we guarantee that
-	// the necessary special handling is applied.
-	if matches := trailing_List.FindStringSubmatch(item_type); matches != nil {
-	    // we have List of items; we just need to process the list, recursively decoding its individual elements
-	    // we have an embedded xxx_List structure; we can presume its own internal construction,
-	    // and use that to decode the complete set of individual elements in the list
-	    field_tag := interpret_json_field_tag(item_name, struct_field_tags[parent_struct_type][item_name])
-	    if !field_tag.json_omitalways {
-		// if !field_tag.json_omitempty || !is_empty_value("FIX MAJOR") {
-		    // function_code += fmt.Sprintf(`%sjson_t *json%s = json_object_get(json, "status");`, line_prefix, item_name, field_tag.json_field_name)
-		// }
-		base_type := matches[1]
-		var member_op string
-		if item_name == "" {  // A "->" pointer dereference yields an unnamed object which needs no additional structure member operator.
-		    member_op = ""
-		} else {
-		    member_op = "."
-		}
-		count_field := package_name + "_" + item_prefix + item_name + member_op + "count"
-		items_field := package_name + "_" + item_prefix + item_name + member_op + "items"
-		function_code += fmt.Sprintf("%s// list structure:  %s %s%s\n", line_prefix, item_type, item_prefix, item_name)
-		function_code += fmt.Sprintf("%sif (%s != NULL) {\n", line_prefix + indent, items_field)
-		function_code += fmt.Sprintf("%sfor (int index = %s; --index >= 0; ) {\n", line_prefix + indent + indent, count_field)
-		function_code += fmt.Sprintf("%s// decode one %s item's fields\n", line_prefix + indent + indent + indent, base_type)
-		process_item(line_prefix + indent + indent + indent, base_type, base_type, item_prefix + item_name + member_op, "items[index]")
-		function_code += fmt.Sprintf("%s}\n", line_prefix + indent + indent)
-		function_code += fmt.Sprintf("%sfree(%s);\n", line_prefix + indent + indent, items_field)
-		function_code += fmt.Sprintf("%s}\n", line_prefix + indent)
-		// process_item(line_prefix + indent, base_type, base_type, item_prefix + item_name, item_name)
-	    }
-	} else if field_list, ok := struct_fields[item_type]; ok {
-	    // we have a known structure; we just need to recursively decode its individual fields
-	    function_code += fmt.Sprintf("%s// embedded structure:  %s %s%s\n", line_prefix, item_type, item_prefix, item_name)
-	    for _, field_name := range field_list {
-		field_type := struct_field_C_types[item_type][field_name]
-		// process the field as an item (just make a recursive call here)
-		var member_op string
-		if item_name == "" {  // A "->" pointer dereference yields an unnamed object which needs no additional structure member operator.
-		    member_op = ""
-		} else {
-		    member_op = "."
-		}
-		process_item(line_prefix + indent, parent_struct_type, field_type, item_prefix + item_name + member_op, field_name)
-	    }
-	} else if matches := trailing_Ptr.FindStringSubmatch(item_type); matches != nil {
-	    base_type := matches[1]
-	    function_code += fmt.Sprintf("%s// pointer field:  %s %s%s\n", line_prefix, item_type, item_prefix, item_name)
-	    process_item(line_prefix + indent, parent_struct_type, base_type, item_prefix + item_name + "->", "")
-	} else if item_type == "string" {
-	    // We don't bother checking for a NULL pointer, because modern free() will tolerate that.
-	    function_code += fmt.Sprintf("%s// string field: parent_struct_type=%s item_name=%s\n", line_prefix, parent_struct_type, item_name)
-	    function_code += fmt.Sprintf("%s// string field:  %s %s%s %s\n", line_prefix, item_type, item_prefix, item_name,
-		struct_field_tags[parent_struct_type][item_name])
-	    function_code += fmt.Sprintf("%sfree(%s%s);\n", line_prefix, package_name + "_" + item_prefix, item_name)
-
-	} else {
-	    // FIX QUICK:  Compare this whole process_item() function to our code that generates destroy...() routines.
-	    // Have we covered all necessary cases?
-	    // Perhap this will just be a simple base type whose storage is allocated directly in the existing structure.
-	    // But perhap not.
-	    function_code += fmt.Sprintf("%s//  other field:  parent_struct_type=%s item_name=%s\n", line_prefix, parent_struct_type, item_name)
-	    function_code += fmt.Sprintf("%s//  other field:  %s %s%s %s\n", line_prefix, item_type, item_prefix, item_name,
-		struct_field_tags[parent_struct_type][item_name])
-	}
-    }
-    process_item("    " + indent, struct_name, struct_name, struct_name + "_ptr->", "")
-    function_code += fmt.Sprintf("    free(%s_ptr);\n", package_name + "_" + struct_name)
-
-    function_code += `    }
-`
-*/
-
-    // FIX MAJOR:  this is obsolete code
-    /*
-    var footer_code bytes.Buffer
-    if err := footer_template.Execute(&footer_code, boilerplate_variables); err != nil {
-	panic("decode routine footer processing failed");
-    }
-    function_code += footer_code.String()
-    */
 
     return function_code, err
 }
@@ -4063,7 +3823,7 @@ var destroy_routine_footer_template = `        free_JSON(json);
     var process_item func(line_prefix string, item_type string, item_prefix string, member_op string, item_name string)
     process_item = func(line_prefix string, item_type string, item_prefix string, member_op string, item_name string) {
 
-	// FIX LATER:  This output is to help figure out why we're not free()ing deep enough, when that happens.
+	// FIX LATER:  This output is here to help figure out why we're not free()ing deep enough, when that happens.
 	// function_code += fmt.Sprintf("// process_item(line_prefix, \"%s\", \"%s\", \"%s\", \"%s\")\n",
 	    // item_type, item_prefix, member_op, item_name)
 
