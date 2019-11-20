@@ -19,6 +19,18 @@ const (
 	EnvConfigPrefix = "TNG"
 )
 
+type LoggingLevel int
+
+const (
+	Info LoggingLevel = iota
+	Warn
+	Debug
+)
+
+func (l LoggingLevel) String() string {
+	return [...]string{"Info", "Warn", "Debug"}[l]
+}
+
 // GWConfig defines Groundwork Connection configuration
 type GWConfig struct {
 	// Host accepts value for combined "host:port"
@@ -48,7 +60,8 @@ type AgentConfig struct {
 	StartController bool   `yaml:"startController"`
 	StartNats       bool   `yaml:"startNats"`
 	// StartTransport defines that NATS starts with Transport
-	StartTransport bool `yaml:"startTransport"`
+	StartTransport bool         `yaml:"startTransport"`
+	LogLevel       LoggingLevel `yaml:"loggingLevel"`
 }
 
 // Config defines TNG Agent configuration

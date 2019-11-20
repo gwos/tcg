@@ -109,7 +109,7 @@ func (service *AgentService) StartTransport() error {
 		},
 	}
 
-	err := nats.StartDispatcher(&dispatcherMap)
+	err := nats.StartDispatcher(&dispatcherMap, service.AgentConfig.LogLevel)
 	if err == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running
