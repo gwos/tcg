@@ -101,8 +101,12 @@ func StartNats(errorBuf *C.char) bool {
 }
 
 //export StopNats
-func StopNats() {
-	transitService.StopNats()
+func StopNats(errorBuf *C.char) bool {
+	if err := transitService.StopNats(); err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
 }
 
 //export StartTransport
