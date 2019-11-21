@@ -18,7 +18,10 @@
 https://medium.com/@ben.mcclelland/an-adventure-into-cgo-calling-go-code-with-c-b20aa6637e75
 https://medium.com/learning-the-go-programming-language/calling-go-functions-from-other-languages-4c7d8bcc69bf
 
-The libtransit supports environment variables:
+The test supports environment variables:
+    LIBTRANSIT=/path/to/libtransit.so
+    TEST_ENDLESS - cycle run test_dlSendResourcesWithMetrics
+And all environment variables supported by libtransit itself:
     TNG_CONFIG=/path/to/config.yml
     TNG_AGENTCONFIG_NATSSTORETYPE=MEMORY
 For more info see package `config`
@@ -39,7 +42,12 @@ void test_dlRegisterListMetricsHandler() {
   void *handle;
   char *error;
 
-  handle = dlopen("libtransit/libtransit.so", RTLD_LAZY);
+  char *libtransit = getenv("LIBTRANSIT");
+  if (!libtransit) {
+    libtransit = "libtransit.so";
+  }
+
+  handle = dlopen(libtransit, RTLD_LAZY);
   if (!handle) {
     fail(dlerror());
   }
@@ -59,7 +67,12 @@ void test_dlSendResourcesWithMetrics() {
   void *handle;
   char *error;
 
-  handle = dlopen("libtransit/libtransit.so", RTLD_LAZY);
+  char *libtransit = getenv("LIBTRANSIT");
+  if (!libtransit) {
+    libtransit = "libtransit.so";
+  }
+
+  handle = dlopen(libtransit, RTLD_LAZY);
   if (!handle) {
     fail(dlerror());
   }
