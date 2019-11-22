@@ -33,10 +33,12 @@ func Config(level int) {
 
 	switch level {
 	case 0:
-		logger.SetLevel(logrus.InfoLevel)
+		logger.SetLevel(logrus.ErrorLevel)
 	case 1:
 		logger.SetLevel(logrus.WarnLevel)
 	case 2:
+		logger.SetLevel(logrus.InfoLevel)
+	case 3:
 		logger.SetLevel(logrus.DebugLevel)
 	}
 }
