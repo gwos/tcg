@@ -136,7 +136,7 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, string(metrics))
+	c.Data(http.StatusOK, gin.MIMEJSON, metrics)
 }
 
 func (controller *Controller) startNats(c *gin.Context) {
@@ -145,7 +145,7 @@ func (controller *Controller) startNats(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, controller)
+	c.JSON(http.StatusOK, controller.Status())
 }
 
 func (controller *Controller) stopNats(c *gin.Context) {
@@ -154,7 +154,7 @@ func (controller *Controller) stopNats(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, controller)
+	c.JSON(http.StatusOK, controller.Status())
 }
 
 func (controller *Controller) startTransport(c *gin.Context) {
@@ -163,7 +163,7 @@ func (controller *Controller) startTransport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, controller)
+	c.JSON(http.StatusOK, controller.Status())
 }
 
 func (controller *Controller) stopTransport(c *gin.Context) {
@@ -172,7 +172,7 @@ func (controller *Controller) stopTransport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
 
-	c.JSON(http.StatusOK, controller)
+	c.JSON(http.StatusOK, controller.Status())
 }
 
 func (controller *Controller) stats(c *gin.Context) {
@@ -222,10 +222,10 @@ func (controller *Controller) registerAPI1(router *gin.Engine) {
 	apiV1Group.GET("/listMetrics", controller.listMetrics)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
-	apiV1Group.POST("/nats/start", controller.startNats)
-	apiV1Group.DELETE("/nats/stop", controller.stopNats)
-	apiV1Group.POST("/nats/transport/start", controller.startTransport)
-	apiV1Group.DELETE("/nats/transport/stop", controller.stopTransport)
+	apiV1Group.POST("/nats", controller.startNats)
+	apiV1Group.DELETE("/nats", controller.stopNats)
+	apiV1Group.POST("/nats/transport", controller.startTransport)
+	apiV1Group.DELETE("/nats/transport", controller.stopTransport)
 
 	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
