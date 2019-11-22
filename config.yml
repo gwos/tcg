@@ -7,7 +7,7 @@ agentConfig:
   startNats: True
   startTransport: True
   startController: True
-  loggingLevel: 1
+  loggingLevel: 0
 gwConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"

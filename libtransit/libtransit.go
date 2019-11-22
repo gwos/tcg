@@ -14,8 +14,8 @@ package main
 //}
 import "C"
 import (
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
-	"log"
 	"unsafe"
 )
 
@@ -25,17 +25,17 @@ var transitService = services.GetTransitService()
 func init() {
 	if transitService.AgentConfig.StartController {
 		if err := transitService.StartController(); err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 		}
 	}
 	if transitService.AgentConfig.StartNats {
 		if err := transitService.StartNats(); err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 		}
 	}
 	// NOTE: the transitService.AgentConfig.StartTransport
 	// processed by transitService.StartNats itself
-	log.Println("libtransit:", transitService.Status())
+	log.Info("libtransit:", transitService.Status())
 }
 
 func main() {
