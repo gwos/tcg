@@ -455,3 +455,16 @@ type ResourceWithServicesRequest struct {
 	Context   TracerContext          `json:"context"`
 	Resources []MonitoredService `json:"resources"`
 }
+
+// Alerts received from cloud services
+type IncidentAlert struct {
+	IncidentId string 	`json:"incidentId"`
+	ResourceName string `json:"resourceName,required"`
+	Status string 		`json:"status"`
+	StartedAt milliseconds.MillisecondTimestamp `json:"startedAt"`
+	EndedAt milliseconds.MillisecondTimestamp `json:"startedAt,omitempty"`
+	ConditionName string `json:"conditionName"`
+	URL string `json:"url,omitempty"`
+	Summary string `json:"summary,omitempty"`
+}
+
