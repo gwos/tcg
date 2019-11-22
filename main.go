@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
+	"log"
 	"math/rand"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,6 +26,14 @@ func valueOf(x int64) *int64 {
 func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
+
+	// metrics live!
+	gatherMetrics()
+	// works only in Linux, not mac
+	//contents, _ := ioutil.ReadFile("/proc/stat")
+	// fmt.Println(contents)
+	// @see: https://github.com/c9s/goprocinfo
+
 	// TODO: start TNG
 	sendInventoryResources()
 	sendMonitoredResources()
@@ -180,3 +193,45 @@ func makeMetricSamples() []*transit.MetricSample {
 	return metricSamples;
 }
 
+// Use this if we can't find something better
+
+type Process struct {
+	pid int
+	cpu float64
+}
+func gatherMetrics() {
+	cmd := exec.Command("ps", "aux")
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	err := cmd.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	processes := make([]*Process, 0)
+	for {
+		line, err := out.ReadString('\n')
+		if err!=nil {
+			break;
+		}
+		tokens := strings.Split(line, " ")
+		ft := make([]string, 0)
+		for _, t := range(tokens) {
+			if t!="" && t!="\t" {
+				ft = append(ft, t)
+			}
+		}
+		log.Println(len(ft), ft)
+		pid, err := strconv.Atoi(ft[1])
+		if err!=nil {
+			continue
+		}
+		cpu, err := strconv.ParseFloat(ft[2], 64)
+		if err!=nil {
+			log.Fatal(err)
+		}
+		processes = append(processes, &Process{pid, cpu})
+	}
+	for _, p := range(processes) {
+		log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
+	}
+}
