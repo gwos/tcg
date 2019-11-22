@@ -21,39 +21,38 @@ func valueOf(x int64) *int64 {
 func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
-	// Example Usage with a host
-	geneva := transit.ResourceStatus{
-		Name:             "geneva",
-		Type:             transit.HostResource,
-		Status:           transit.HostUp,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Properties: map[string]transit.TypedValue{
-			"stateType":       transit.TypedValue{StringValue: "SOFT"},
-			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
-			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
-			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
-			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
-		},
-	}
-	localLoadService := transit.ResourceStatus{
+	// TODO: start TNG
+	sendInventoryResources()
+	sendMonitoredResources()
+	// TODO: stop TNG:
+}
+func sendInventoryResources() {
+	// Example Service
+	localLoadService := transit.InventoryService{
 		Name:             "local_load",
-		Type:             transit.ServiceResource,
-		Status:           transit.ServiceOk,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-		LastPlugInOutput: "foo | bar",
-		Properties: map[string]transit.TypedValue{
-			"stateType":       transit.TypedValue{StringValue: "SOFT"},
-			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
-			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
-			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
-			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
-		},
 	}
+
+	// Example Monitored Resource of type Host
+	geneva := transit.InventoryResource{
+		Name:             "geneva",
+		Type:             transit.Host,
+		Services: []transit.InventoryService{localLoadService},
+	}
+	// Build Inventory
+	inventory := []transit.InventoryResource{geneva}
+
+	// TODO: call into API
+
+	bytes, error := json.Marshal(inventory)
+	if error == nil {
+		s := string(bytes)
+		println(s);
+	}
+
+}
+
+func sendMonitoredResources() {
+	// Create a Metrics Sample
 	metricSample := makeMetricSample()
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
@@ -107,26 +106,54 @@ func main() {
 		Unit: "%{cpu}",
 	}
 
-	// Build Payload
-	resources := []transit.ResourceWithMetrics{
-		{Resource: geneva, Metrics: make([]transit.TimeSeries, 0)},
-		{Resource: localLoadService, Metrics: []transit.TimeSeries{sampleValue, sampleCritical, sampleWarning}},
+	// Example Service
+	localLoadService := transit.MonitoredService{
+		Name:             "local_load",
+		Type:             transit.Service,
+		Status:           transit.ServiceOk,
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastPlugInOutput: "foo | bar",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+		},
+		Metrics: []transit.TimeSeries{sampleValue, sampleWarning, sampleCritical},
 	}
-	println("Resources: ", resources[0].Resource.Name)
+
+	// Example Monitored Resource of type Host
+	geneva := transit.MonitoredResource{
+		Name:             "geneva",
+		Type:             transit.Host,
+		Status:           transit.HostUp,
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastPlugInOutput: "44/55/888 QA00005-BC",
+		Properties: map[string]transit.TypedValue{
+			"stateType":       transit.TypedValue{StringValue: "SOFT"},
+			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
+			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
+			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
+			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
+			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+		},
+		Services: []transit.MonitoredService{localLoadService},
+	}
+
+	// Build Monitored Resources
+	resources := []transit.MonitoredResource{geneva}
+
+	// TODO: call into API
+
 	bytes, error := json.Marshal(resources)
 	if error == nil {
 		s := string(bytes)
 		println(s);
 	}
-	//var transitServices,_ = transit.Connect(transit.Credentials{
-	//	User:     "test",
-	//	Password: "test",
-	//})
-	//
-	//transitServices.SendResourcesWithMetrics(resources)
-
-	// Retrieve Metrics List with Transit
-	//transit.Disconnect(transitServices)
 }
 
 func makeMetricSample() *transit.MetricSample {
@@ -152,3 +179,4 @@ func makeMetricSamples() []*transit.MetricSample {
 	}
 	return metricSamples;
 }
+
