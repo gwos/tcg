@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"log"
+	"github.com/gwos/tng/log"
 	"net/http"
 	"net/http/pprof"
 	"sync"
@@ -81,14 +81,14 @@ func (controller *Controller) StartController() error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Println("controller: start listen TLS", addr)
+			log.Info("controller: start listen TLS", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Println("controller: start error:", err)
+				log.Error("controller: start error:", err)
 			}
 		} else {
-			log.Println("controller: start listen", addr)
+			log.Info("controller: start listen", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Println("controller: start error:", err)
+				log.Error("controller: start error:", err)
 			}
 		}
 
@@ -114,18 +114,18 @@ func (controller *Controller) StartController() error {
 // gracefully shutdowns the http server
 func (controller *Controller) StopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartServer itself
-	log.Println("controller: shutdown ...")
+	log.Info("Controller: shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Println("controller: shutdown error:", err)
+		log.Error("Controller: shutdown error:", err)
 	}
 	// catching ctx.Done() timeout
 	select {
 	case <-ctx.Done():
-		log.Println("controller: shutdown: timeout")
+		log.Warn("controller: shutdown: timeout")
 	}
-	log.Println("controller: exiting")
+	log.Warn("controller: exiting")
 	controller.srv = nil
 	return nil
 }

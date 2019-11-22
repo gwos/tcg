@@ -1,9 +1,9 @@
 package config
 
 import (
+	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
-	"log"
 	"os"
 	"path"
 	"sync"
@@ -79,7 +79,7 @@ func GetConfig() *Config {
 		if configPath == "" {
 			wd, err := os.Getwd()
 			if err != nil {
-				log.Println(err)
+				log.Warn(err)
 			}
 			configPath = path.Join(wd, ConfigName)
 		}
@@ -88,14 +88,16 @@ func GetConfig() *Config {
 		if err == nil {
 			err = yaml.NewDecoder(configFile).Decode(cfg)
 			if err != nil {
-				log.Println(err)
+				log.Warn(err)
 			}
 		}
 
 		err = envconfig.Process(EnvConfigPrefix, cfg)
 		if err != nil {
-			log.Println(err)
+			log.Warn(err)
 		}
+
+		log.Config(int(cfg.AgentConfig.LogLevel))
 	})
 	return cfg
 }
