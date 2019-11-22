@@ -74,14 +74,31 @@ const (
 	HostUnreachable                          = "HOST_UNREACHABLE"
 )
 
-// ResourceType defines the resource
+// ResourceType defines the resource type
 type ResourceType string
 
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	ServiceResource ResourceType = "service"
-	HostResource                 = "host"
+	Host 		ResourceType  = "host"
+	Hypervisor				  = "hypervisor"
+	Instance				  = "instance"
+	VirtualMachine			  = "virtual-machine"
+	CloudApp   				  = "cloud-app"
+	CloudFunction			  = "cloud-function"
+	LoadBalancer              = "load-balancer"
+	Container  				  = "container"
+	Storage					  = "storage"
+	Network					  = "network"
+	NetworkSwitch			  = "network-switch"
+	NetworkDevice             = "network-device"
+)
+
+// Service Type defines the service type
+type ServiceType string
+
+const (
+	Service 	ServiceType = "service"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -277,22 +294,25 @@ type ThresholdDescriptor struct {
 	Value int32  `json:"value"`
 }
 
-// InventoryResource is an object representing a live resource instance that
-// can be included in a monitoring inventory. Examples include for example:
-// 	* virtual machine instances
-// 	* databases
-// 	* storage devices such as disks
-// 	* webapps, serverless functions(lambdas)
-// 	* real hosts and services on those hosts
+// InventoryResource represents a resource that is included in a inventory scan.
+// Examples include:
+//  * nagios host
+//  * virtual machine instance
+//  * RDS database
+//  * storage devices such as disks
+//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//
+// An InventoryResource is the representation of a specific monitored resource during an nventory scan.
+// Each InventoryResource contains list of services (InventoryService) (no metrics are sent).
 type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// Type: Required. The resource type of the resource
+	// General Nagios Types are hosts, where as CloudHub can be more rich
 	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like host->service
+	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources, translate to Foundation Metric Type
+	// CloudHub Categorization of resources
 	Category string `json:"category,omitempty"`
 	// Optional description of this resource, such as Nagios notes
 	Description string `json:"description,omitempty"`
@@ -300,16 +320,48 @@ type InventoryResource struct {
 	Device string `json:"device,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
+	// Inventory Service collection
+	Services []InventoryService
 }
 
-// ResourceStatus defines the current status of a monitored resource
-type ResourceStatus struct {
+// InventoryService represents a Groundwork Service that is included in a inventory scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series. During inventory scans, TNG does not gather metric samples.
+//
+// InventoryService collections are attached to an InventoryResource during inventory scans.
+type InventoryService struct {
+	// The unique name of the service
+	Name string `json:"name,required"`
+	// Type: Required. The service type
+	Type ServiceType `json:"type"`
+	// Owner relationship for associations like host->service
+	Owner string `json:"owner,omitempty"`
+	// CloudHub Categorization of services
+	Category string `json:"category,omitempty"`
+	// Optional description of this service
+	Description string `json:"description,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+// A MonitoredResource defines the current status and services of a resource during a metrics scan.
+// Examples include:
+//  * nagios host
+//  * virtual machine instance
+//  * RDS database
+//  * storage devices such as disks
+//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//
+// A MonitoredResource is the representation of a specific monitored resource during a metric scan.
+// Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
+// only services.
+type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// Type: Required. The resource type
+	// General Nagios Types are hosts, where as CloudHub can be more rich
 	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like host->service
+	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
@@ -321,15 +373,45 @@ type ResourceStatus struct {
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
+	// Services state collection
+	Services []MonitoredService
 }
 
-// MonitoredResource defines the resource entity
-type MonitoredResource struct {
+// A MonitoredService represents a Groundwork Service creating during a metrics scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series.
+//
+// A MonitoredService contains a collection of TimeSeries Metrics.
+// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
+type MonitoredService struct {
+	// The unique name of the service
+	Name string `json:"name,required"`
+	// Type: Required. The service type uniquely defining the service type
+	// General Nagios Types are host and service, where as CloudHub can be more rich
+	Type ServiceType `json:"type,required"`
+	// Owner relationship for associations like hypervisor->virtual machine
+	Owner string `json:"owner,omitempty"`
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+	// metrics
+	Metrics  []TimeSeries   `json:"metrics"`
+}
+
+// A reference to a MonitoredResource in a group collection
+type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, where as CloudHub can be more rich
-	Type string `json:"type,required"`
+	Type string `json:"type,resquired"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 }
@@ -340,13 +422,6 @@ type TracerContext struct {
 	AgentID    string                            `json:"agentID"`
 	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
-}
-
-// SendInventoryRequest defines SendInventory payload
-type SendInventoryRequest struct {
-	// Context   *TracerContext       `json:"context"`
-	Inventory *[]InventoryResource `json:"resources"`
-	Groups    *[]ResourceGroup     `json:"groups"`
 }
 
 // OperationResult defines API answer
@@ -371,18 +446,12 @@ type OperationResults struct {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName string              `json:"groupName"`
-	Resources []MonitoredResource `json:"resources"`
-}
-
-// ResourceWithMetrics combines resource data
-type ResourceWithMetrics struct {
-	Resource ResourceStatus `json:"resource"`
-	Metrics  []TimeSeries   `json:"metrics"`
+	GroupName string                 `json:"groupName"`
+	Resources []MonitoredResourceRef `json:"resources"`
 }
 
 // ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
-type ResourceWithMetricsRequest struct {
-	Context   TracerContext         `json:"context"`
-	Resources []ResourceWithMetrics `json:"resources"`
+type ResourceWithServicesRequest struct {
+	Context   TracerContext          `json:"context"`
+	Resources []MonitoredService `json:"resources"`
 }
