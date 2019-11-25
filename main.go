@@ -27,8 +27,13 @@ func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 
+	processes := gatherMetrics()
+
+	for _, p := range processes {
+		log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
+	}
+
 	// metrics live!
-	gatherMetrics()
 	// works only in Linux, not mac
 	//contents, _ := ioutil.ReadFile("/proc/stat")
 	// fmt.Println(contents)
@@ -39,16 +44,17 @@ func main() {
 	sendMonitoredResources()
 	// TODO: stop TNG:
 }
+
 func sendInventoryResources() {
 	// Example Service
 	localLoadService := transit.InventoryService{
-		Name:             "local_load",
+		Name: "local_load",
 	}
 
 	// Example Monitored Resource of type Host
 	geneva := transit.InventoryResource{
-		Name:             "geneva",
-		Type:             transit.Host,
+		Name:     "geneva",
+		Type:     transit.Host,
 		Services: []transit.InventoryService{localLoadService},
 	}
 	// Build Inventory
@@ -56,10 +62,10 @@ func sendInventoryResources() {
 
 	// TODO: call into API
 
-	bytes, error := json.Marshal(inventory)
-	if error == nil {
-		s := string(bytes)
-		println(s);
+	b, err := json.Marshal(inventory)
+	if err == nil {
+		s := string(b)
+		println(s)
 	}
 
 }
@@ -71,7 +77,7 @@ func sendMonitoredResources() {
 		MetricName: "local_load_5",
 		// Labels:      []*LabelDescriptor{&cores, &sampleTime},
 		MetricSamples: []*transit.MetricSample{
-			&transit.MetricSample{
+			{
 				SampleType: transit.Value,
 				Interval:   metricSample.Interval,
 				Value:      metricSample.Value,
@@ -88,7 +94,7 @@ func sendMonitoredResources() {
 	sampleCritical := transit.TimeSeries{
 		MetricName: "local_load_5_cr",
 		MetricSamples: []*transit.MetricSample{
-			&transit.MetricSample{
+			{
 				SampleType: transit.Critical,
 				Interval:   metricSample.Interval,
 				Value:      metricSample.Value,
@@ -105,7 +111,7 @@ func sendMonitoredResources() {
 	sampleWarning := transit.TimeSeries{
 		MetricName: "local_load_5_wn",
 		MetricSamples: []*transit.MetricSample{
-			&transit.MetricSample{
+			{
 				SampleType: transit.Warning,
 				Interval:   metricSample.Interval,
 				Value:      metricSample.Value,
@@ -120,7 +126,7 @@ func sendMonitoredResources() {
 	}
 
 	// Example Service
-	localLoadService := transit.MonitoredService{
+	var localLoadService = transit.MonitoredService{
 		Name:             "local_load",
 		Type:             transit.Service,
 		Status:           transit.ServiceOk,
@@ -128,17 +134,15 @@ func sendMonitoredResources() {
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Properties: map[string]transit.TypedValue{
-			"stateType":       transit.TypedValue{StringValue: "SOFT"},
-			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
-			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
-			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
-			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+			"stateType":       {StringValue: "SOFT"},
+			"checkType":       {StringValue: "ACTIVE"},
+			"PerformanceData": {StringValue: "007-321 RAD"},
+			"ExecutionTime":   {DoubleValue: 3.0},
+			"CurrentAttempt":  {IntegerValue: 2},
+			"InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 		Metrics: []transit.TimeSeries{sampleValue, sampleWarning, sampleCritical},
-	}
-
-	// Example Monitored Resource of type Host
+	} // Example Monitored Resource of type Host
 	geneva := transit.MonitoredResource{
 		Name:             "geneva",
 		Type:             transit.Host,
@@ -147,12 +151,12 @@ func sendMonitoredResources() {
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Properties: map[string]transit.TypedValue{
-			"stateType":       transit.TypedValue{StringValue: "SOFT"},
-			"checkType":       transit.TypedValue{StringValue: "ACTIVE"},
-			"PerformanceData": transit.TypedValue{StringValue: "007-321 RAD"},
-			"ExecutionTime":   transit.TypedValue{DoubleValue: 3.0},
-			"CurrentAttempt":  transit.TypedValue{IntegerValue: 2},
-			"InceptionTime":   transit.TypedValue{TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+			"stateType":       {StringValue: "SOFT"},
+			"checkType":       {StringValue: "ACTIVE"},
+			"PerformanceData": {StringValue: "007-321 RAD"},
+			"ExecutionTime":   {DoubleValue: 3.0},
+			"CurrentAttempt":  {IntegerValue: 2},
+			"InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 		Services: []transit.MonitoredService{localLoadService},
 	}
@@ -162,10 +166,10 @@ func sendMonitoredResources() {
 
 	// TODO: call into API
 
-	bytes, error := json.Marshal(resources)
-	if error == nil {
-		s := string(bytes)
-		println(s);
+	b, err := json.Marshal(resources)
+	if err == nil {
+		s := string(b)
+		println(s)
 	}
 }
 
@@ -190,7 +194,7 @@ func makeMetricSamples() []*transit.MetricSample {
 			Value:      &transit.TypedValue{DoubleValue: random},
 		}
 	}
-	return metricSamples;
+	return metricSamples
 }
 
 // Use this if we can't find something better
@@ -199,7 +203,8 @@ type Process struct {
 	pid int
 	cpu float64
 }
-func gatherMetrics() {
+
+func gatherMetrics() []*Process{
 	cmd := exec.Command("ps", "aux")
 	var out bytes.Buffer
 	cmd.Stdout = &out
@@ -210,28 +215,26 @@ func gatherMetrics() {
 	processes := make([]*Process, 0)
 	for {
 		line, err := out.ReadString('\n')
-		if err!=nil {
-			break;
+		if err != nil {
+			break
 		}
 		tokens := strings.Split(line, " ")
 		ft := make([]string, 0)
-		for _, t := range(tokens) {
-			if t!="" && t!="\t" {
+		for _, t := range tokens {
+			if t != "" && t != "\t" {
 				ft = append(ft, t)
 			}
 		}
-		log.Println(len(ft), ft)
 		pid, err := strconv.Atoi(ft[1])
-		if err!=nil {
+		if err != nil {
 			continue
 		}
 		cpu, err := strconv.ParseFloat(ft[2], 64)
-		if err!=nil {
+		if err != nil {
 			log.Fatal(err)
 		}
 		processes = append(processes, &Process{pid, cpu})
 	}
-	for _, p := range(processes) {
-		log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
-	}
+
+	return processes
 }

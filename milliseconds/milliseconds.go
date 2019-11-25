@@ -90,5 +90,5 @@ func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 
 // MarshalJSON implements json.Marshaler.
 func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
+	return []byte("\"" + fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond)) + "\""), nil
 }
