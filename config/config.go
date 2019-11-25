@@ -69,8 +69,8 @@ type AgentConfig struct {
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig AgentConfig `yaml:"agentConfig"`
-	GWConfig    GWConfig    `yaml:"gwConfig"`
+	AgentConfig *AgentConfig `yaml:"agentConfig"`
+	GWConfig    *GWConfig    `yaml:"gwConfig"`
 }
 
 // GetConfig implements Singleton pattern
