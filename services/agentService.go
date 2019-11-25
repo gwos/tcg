@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
@@ -11,6 +12,7 @@ import (
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*clients.GWClient
+	*config.AgentConfig
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
 }
@@ -23,6 +25,7 @@ func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
 		agentService = &AgentService{
 			clients.GetGWClient(),
+			config.GetConfig().AgentConfig,
 			&AgentStats{},
 			&AgentStatus{
 				Controller: Pending,
