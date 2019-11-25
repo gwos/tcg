@@ -3,6 +3,7 @@ module github.com/gwos/tng
 go 1.13
 
 require (
+	github.com/antonfisher/nested-logrus-formatter v1.0.2
 	github.com/boj/redistore v0.0.0-20160128113310-fc113767cd6b // indirect
 	github.com/garyburd/redigo v1.6.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
@@ -30,6 +31,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/procfs v0.0.5 // indirect
+	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.3.0
 	github.com/ugorji/go v1.1.7 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
@@ -38,5 +40,4 @@ require (
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.2.4 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20191010095647-fc94e3f71652
-	gotest.tools v2.2.0+incompatible
 )
