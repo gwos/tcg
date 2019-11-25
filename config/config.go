@@ -1,12 +1,12 @@
 package config
 
 import (
-	"github.com/kelseyhightower/envconfig"
-	"gopkg.in/yaml.v3"
-	"log"
-	"os"
-	"path"
-	"sync"
+    "github.com/gwos/tng/log"
+    "github.com/kelseyhightower/envconfig"
+    "gopkg.in/yaml.v3"
+    "os"
+    "path"
+    "sync"
 )
 
 var once sync.Once
@@ -14,88 +14,93 @@ var cfg *Config
 
 // ConfigEnv defines environment variable for config file path
 const (
-	ConfigEnv       = "TNG_CONFIG"
-	ConfigName      = "config.yml"
-	EnvConfigPrefix = "TNG"
+    ConfigEnv       = "TNG_CONFIG"
+    ConfigName      = "config.yml"
+    EnvConfigPrefix = "TNG"
 )
 
-type LoggingLevel int
+// LogLevel defines levels for logrus
+type LogLevel int
 
+// Enum levels
 const (
-	Info LoggingLevel = iota
-	Warn
-	Debug
+    Error LogLevel = iota
+    Warn
+    Info
+    Debug
 )
 
-func (l LoggingLevel) String() string {
-	return [...]string{"Info", "Warn", "Debug"}[l]
+func (l LogLevel) String() string {
+    return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
 // GWConfig defines Groundwork Connection configuration
 type GWConfig struct {
-	// Host accepts value for combined "host:port"
-	// used as `url.URL{Host}`
-	Host     string
-	Account  string
-	Password string
-	AppName  string `yaml:"appName"`
+    // Host accepts value for combined "host:port"
+    // used as `url.URL{Host}`
+    Host     string
+    Account  string
+    Password string
+    AppName  string `yaml:"appName"`
 }
 
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
-	// ControllerAddr accepts value for combined "host:port"
-	// used as `http.Server{Addr}`
-	ControllerAddr     string `yaml:"controllerAddr"`
-	ControllerCertFile string `yaml:"controllerCertFile"`
-	ControllerKeyFile  string `yaml:"controllerKeyFile"`
-	// NatsAckWait accepts number of seconds
-	// should be greater then the GWClient request duration
-	NatsAckWait      int64  `yaml:"natsAckWait"`
-	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
-	// NatsStoreType accepts "FILE"|"MEMORY"
-	NatsStoreType string `yaml:"natsStoreType"`
-	// NatsHost accepts value for combined "host:port"
-	// used as `strings.Split(natsHost, ":")`
-	NatsHost        string `yaml:"natsHost"`
-	StartController bool   `yaml:"startController"`
-	StartNats       bool   `yaml:"startNats"`
-	// StartTransport defines that NATS starts with Transport
-	StartTransport bool         `yaml:"startTransport"`
-	LogLevel       LoggingLevel `yaml:"loggingLevel"`
+    // ControllerAddr accepts value for combined "host:port"
+    // used as `http.Server{Addr}`
+    ControllerAddr     string `yaml:"controllerAddr"`
+    ControllerCertFile string `yaml:"controllerCertFile"`
+    ControllerKeyFile  string `yaml:"controllerKeyFile"`
+    // NatsAckWait accepts number of seconds
+    // should be greater then the GWClient request duration
+    NatsAckWait      int64  `yaml:"natsAckWait"`
+    NatsFilestoreDir string `yaml:"natsFilestoreDir"`
+    // NatsStoreType accepts "FILE"|"MEMORY"
+    NatsStoreType string `yaml:"natsStoreType"`
+    // NatsHost accepts value for combined "host:port"
+    // used as `strings.Split(natsHost, ":")`
+    NatsHost        string `yaml:"natsHost"`
+    StartController bool   `yaml:"startController"`
+    StartNats       bool   `yaml:"startNats"`
+    // StartTransport defines that NATS starts with Transport
+    StartTransport bool     `yaml:"startTransport"`
+    LogLevel       LogLevel `yaml:"logLevel"`
 }
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig AgentConfig `yaml:"agentConfig"`
-	GWConfig    GWConfig    `yaml:"gwConfig"`
+    AgentConfig AgentConfig `yaml:"agentConfig"`
+    GWConfig    GWConfig    `yaml:"gwConfig"`
 }
 
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
-	once.Do(func() {
-		cfg = &Config{}
+    once.Do(func() {
+        cfg = &Config{}
 
-		configPath := os.Getenv(ConfigEnv)
-		if configPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				log.Println(err)
-			}
-			configPath = path.Join(wd, ConfigName)
-		}
+        configPath := os.Getenv(ConfigEnv)
+        if configPath == "" {
+            wd, err := os.Getwd()
+            if err != nil {
+                log.Warn(err)
+            }
+            configPath = path.Join(wd, ConfigName)
+        }
 
-		configFile, err := os.Open(configPath)
-		if err == nil {
-			err = yaml.NewDecoder(configFile).Decode(cfg)
-			if err != nil {
-				log.Println(err)
-			}
-		}
+        configFile, err := os.Open(configPath)
+        if err == nil {
+            err = yaml.NewDecoder(configFile).Decode(cfg)
+            if err != nil {
+                log.Warn(err)
+            }
+        }
 
-		err = envconfig.Process(EnvConfigPrefix, cfg)
-		if err != nil {
-			log.Println(err)
-		}
-	})
-	return cfg
+        err = envconfig.Process(EnvConfigPrefix, cfg)
+        if err != nil {
+            log.Warn(err)
+        }
+
+        log.Config(int(cfg.AgentConfig.LogLevel))
+    })
+    return cfg
 }
