@@ -159,7 +159,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	//TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	//TimeValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
@@ -373,11 +373,11 @@ type MonitoredResource struct {
 	// The next status check time on this resource
 	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 	// Services state collection
-	Services []MonitoredService
+	Services []MonitoredService `json:"services"`
 }
 
 // A MonitoredService represents a Groundwork Service creating during a metrics scan.
@@ -401,7 +401,7 @@ type MonitoredService struct {
 	// The next status check time on this resource
 	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 	// metrics
@@ -454,9 +454,9 @@ type ResourceGroup struct {
 }
 
 // ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
-type ResourceWithServicesRequest struct {
+type ResourcesWithServicesRequest struct {
 	Context   TracerContext          `json:"context"`
-	Resources []MonitoredService `json:"resources"`
+	Resources []MonitoredResource `json:"resources"`
 }
 
 type InventoryRequest struct {

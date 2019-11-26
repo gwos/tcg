@@ -165,7 +165,7 @@ func sendMonitoredResources() error {
         Status:        transit.ServiceOk,
         LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
         NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-        //LastPlugInOutput: "foo | bar",
+        LastPlugInOutput: "foo | bar",
         Properties: map[string]transit.TypedValue{
             "stateType": {
                 ValueType:   "StringType",
@@ -191,32 +191,32 @@ func sendMonitoredResources() error {
         Metrics: []transit.TimeSeries{sampleValue, sampleWarning, sampleCritical},
     } // Example Monitored Resource of type Host
 
-    //geneva := transit.MonitoredResource{
-    //    Name:             "geneva",
-    //    Type:             transit.Host,
-    //    Status:           transit.HostUp,
-    //    LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-    //    NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-    //    LastPlugInOutput: "44/55/888 QA00005-BC",
-    //    Properties: map[string]transit.TypedValue{
-    //        "stateType":       {StringValue: "SOFT"},
-    //        "checkType":       {StringValue: "ACTIVE"},
-    //        "PerformanceData": {StringValue: "007-321 RAD"},
-    //        "ExecutionTime":   {DoubleValue: 3.0},
-    //        "CurrentAttempt":  {IntegerValue: 2},
-    //        "InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
-    //    },
-    //    Services: []transit.MonitoredService{localLoadService},
-    //}
+    geneva := transit.MonitoredResource{
+       Name:             "geneva",
+       Type:             transit.Host,
+       Status:           transit.HostUp,
+       LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+       NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+       LastPlugInOutput: "44/55/888 QA00005-BC",
+       Properties: map[string]transit.TypedValue{
+           "stateType":       {ValueType: "StringType", StringValue: "SOFT"},
+           "checkType":       {ValueType: "StringType", StringValue: "ACTIVE"},
+           "PerformanceData": {ValueType: "StringType", StringValue: "007-321 RAD"},
+           "ExecutionTime":   {ValueType: "DoubleType", DoubleValue: 3.0},
+           "CurrentAttempt":  {ValueType: "IntegerType", IntegerValue: 2},
+           //"InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+       },
+       Services: []transit.MonitoredService{localLoadService},
+    }
 
-    request := transit.ResourceWithServicesRequest{
+    request := transit.ResourcesWithServicesRequest{
         Context: transit.TracerContext{
             AppType:    "VEMA",
             AgentID:    "3939333393342",
             TraceToken: "token-99e93",
             TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
         },
-        Resources: []transit.MonitoredService{localLoadService},
+        Resources: []transit.MonitoredResource{geneva},
     }
 
     b, err := json.Marshal(request)
