@@ -1323,7 +1323,7 @@ extern "C" {
 
 #include <stdbool.h>    // as of C99, provides the "bool" datatype, along with "true" and "false" macros
 #include <stdint.h>     // as or C99, provides "int32_t" and "int64_t" datatypes
-#include <time.h>	// to supply "struct timespec", with time_t tv_sec (seconds) and long tv_nsec (nanoseconds) members
+#include <time.h>       // to supply "struct timespec", with time_t tv_sec (seconds) and long tv_nsec (nanoseconds) members
 
 #ifndef NUL_TERM_LEN
 // Size of a NUL-termination byte.  Generally useful for documenting the
