@@ -32,6 +32,7 @@ func CollectMetrics() transit.MonitoredResource {
     // cpu - get CPU number of cores and speed
     cpuStat, err := cpu.Info()
     dealwithErr(err)
+
     percentage, err := cpu.Percent(0, true)
     dealwithErr(err)
 
@@ -45,81 +46,77 @@ func CollectMetrics() transit.MonitoredResource {
 
     // TODO: VLAD: remove below between ====== when done, its just examples
     // ====================================================================
-    html := "<html>OS : " + runtimeOS + "<br>"
-    html = html + "Total memory: " + strconv.FormatUint(vmStat.Total, 10) + " bytes <br>"
-    html = html + "Free memory: " + strconv.FormatUint(vmStat.Free, 10) + " bytes<br>"
-    html = html + "Percentage used memory: " + strconv.FormatFloat(vmStat.UsedPercent, 'f', 2, 64) + "%<br>"
+    html := "<html>OS : " + runtimeOS + "<br>\n"
+    html = html + "Total memory: " + strconv.FormatUint(vmStat.Total, 10) + " bytes <br>\n"
+    html = html + "Free memory: " + strconv.FormatUint(vmStat.Free, 10) + " bytes<br>\n"
+    html = html + "Percentage used memory: " + strconv.FormatFloat(vmStat.UsedPercent, 'f', 2, 64) + "%<br>\n"
 
     // get disk serial number.... strange... not available from disk package at compile time
     // undefined: disk.GetDiskSerialNumber
     //serial := disk.GetDiskSerialNumber("/dev/sda")
 
-    //html = html + "Disk serial number: " + serial + "<br>"
+    //html = html + "Disk serial number: " + serial + "<br>\n"
 
-    html = html + "Total disk space: " + strconv.FormatUint(diskStat.Total, 10) + " bytes <br>"
-    html = html + "Used disk space: " + strconv.FormatUint(diskStat.Used, 10) + " bytes<br>"
-    html = html + "Free disk space: " + strconv.FormatUint(diskStat.Free, 10) + " bytes<br>"
-    html = html + "Percentage disk space usage: " + strconv.FormatFloat(diskStat.UsedPercent, 'f', 2, 64) + "%<br>"
+    html = html + "Total disk space: " + strconv.FormatUint(diskStat.Total, 10) + " bytes <br>\n"
+    html = html + "Used disk space: " + strconv.FormatUint(diskStat.Used, 10) + " bytes<br>\n"
+    html = html + "Free disk space: " + strconv.FormatUint(diskStat.Free, 10) + " bytes<br>\n"
+    html = html + "Percentage disk space usage: " + strconv.FormatFloat(diskStat.UsedPercent, 'f', 2, 64) + "%<br>\n"
 
     // since my machine has one CPU, I'll use the 0 index
     // if your machine has more than 1 CPU, use the correct index
     // to get the proper data
-    html = html + "CPU index number: " + strconv.FormatInt(int64(cpuStat[0].CPU), 10) + "<br>"
-    html = html + "VendorID: " + cpuStat[0].VendorID + "<br>"
-    html = html + "Family: " + cpuStat[0].Family + "<br>"
-    html = html + "Number of cores: " + strconv.FormatInt(int64(cpuStat[0].Cores), 10) + "<br>"
-    html = html + "Model Name: " + cpuStat[0].ModelName + "<br>"
-    html = html + "Speed: " + strconv.FormatFloat(cpuStat[0].Mhz, 'f', 2, 64) + " MHz <br>"
+    html = html + "CPU index number: " + strconv.FormatInt(int64(cpuStat[0].CPU), 10) + "<br>\n"
+    html = html + "VendorID: " + cpuStat[0].VendorID + "<br>\n"
+    html = html + "Family: " + cpuStat[0].Family + "<br>\n"
+    html = html + "Number of cores: " + strconv.FormatInt(int64(cpuStat[0].Cores), 10) + "<br>\n"
+    html = html + "Model Name: " + cpuStat[0].ModelName + "<br>\n"
+    html = html + "Speed: " + strconv.FormatFloat(cpuStat[0].Mhz, 'f', 2, 64) + " MHz <br>\n"
 
     for idx, cpupercent := range percentage {
-        html = html + "Current CPU utilization: [" + strconv.Itoa(idx) + "] " + strconv.FormatFloat(cpupercent, 'f', 2, 64) + "%<br>"
+        html = html + "Current CPU utilization: [" + strconv.Itoa(idx) + "] " + strconv.FormatFloat(cpupercent, 'f', 2, 64) + "%<br>\n"
     }
 
-    html = html + "Hostname: " + hostStat.Hostname + "<br>"
-    html = html + "Uptime: " + strconv.FormatUint(hostStat.Uptime, 10) + "<br>"
-    html = html + "Number of processes running: " + strconv.FormatUint(hostStat.Procs, 10) + "<br>"
+    html = html + "Hostname: " + hostStat.Hostname + "<br>\n"
+    html = html + "Uptime: " + strconv.FormatUint(hostStat.Uptime, 10) + "<br>\n"
+    html = html + "Number of processes running: " + strconv.FormatUint(hostStat.Procs, 10) + "<br>\n"
 
     // another way to get the operating system name
     // both darwin for Mac OSX, For Linux, can be ubuntu as platform
     // and linux for OS
 
-    html = html + "OS: " + hostStat.OS + "<br>"
-    html = html + "Platform: " + hostStat.Platform + "<br>"
+    html = html + "OS: " + hostStat.OS + "<br>\n"
+    html = html + "Platform: " + hostStat.Platform + "<br>\n"
 
     // the unique hardware id for this machine
-    html = html + "Host ID(uuid): " + hostStat.HostID + "<br>"
+    html = html + "Host ID(uuid): " + hostStat.HostID + "<br>\n"
 
     for _, interf := range interfStat {
-        html = html + "------------------------------------------------------<br>"
-        html = html + "Interface Name: " + interf.Name + "<br>"
+        html = html + "------------------------------------------------------<br>\n"
+        html = html + "Interface Name: " + interf.Name + "<br>\n"
 
         if interf.HardwareAddr != "" {
-            html = html + "Hardware(MAC) Address: " + interf.HardwareAddr + "<br>"
+            html = html + "Hardware(MAC) Address: " + interf.HardwareAddr + "<br>\n"
         }
 
         for _, flag := range interf.Flags {
-            html = html + "Interface behavior or flags: " + flag + "<br>"
+            html = html + "Interface behavior or flags: " + flag + "<br>\n"
         }
 
         for _, addr := range interf.Addrs {
-            html = html + "IPv6 or IPv4 addresses: " + addr.String() + "<br>"
-
+            html = html + "IPv6 or IPv4 addresses: " + addr.String() + "<br>\n"
         }
-
     }
+
+    fmt.Println(html)
     // ======================================================================
 
     now := milliseconds.MillisecondTimestamp{Time: time.Now()}
 
     diskFree := transit.TimeSeries{
         MetricName: "diskFree",
-        MetricSamples: []*transit.MetricSample{
-            {
-                SampleType: transit.Value,
-                Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
-                Value:      &transit.TypedValue{ValueType: transit.IntegerType, IntegerValue: int64(diskStat.Free)},
-            },
-        },
+        SampleType: transit.Value,
+        Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
+        Value:      &transit.TypedValue{ValueType: transit.IntegerType, IntegerValue: int64(diskStat.Free)},
     }
     // TODO: we may want to convert from int64 to uint64
     // TODO: GET TOTAL DISK USAGE -- see above
@@ -132,18 +129,18 @@ func CollectMetrics() transit.MonitoredResource {
     // TODO: hostStat.Procs -- number of processes running
 
     diskFreeService := transit.MonitoredService{
-        Name:             "diskFree",
-        Status:           transit.ServiceOk,
-        LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-        Metrics: []transit.TimeSeries{diskFree},
+        Name:          "diskFree",
+        Status:        transit.ServiceOk,
+        LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+        Metrics:       []transit.TimeSeries{diskFree},
     }
 
     return transit.MonitoredResource{
-        Name:             hostStat.Hostname,
-        Type:             transit.Host,
-        Status:           transit.HostUp,
-        LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-        Services: []transit.MonitoredService{diskFreeService},
+        Name:          hostStat.Hostname,
+        Type:          transit.Host,
+        Status:        transit.HostUp,
+        LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+        Services:      []transit.MonitoredService{diskFreeService},
     }
 }
 
