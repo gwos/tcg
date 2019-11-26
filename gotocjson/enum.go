@@ -1,5 +1,7 @@
-// enumpkg is just for testing our parsing
-package enumpkg
+// "enum" is just for testing our parsing, including in particular
+// our handling of iota in enumeration values
+
+package enum
 
 // MetricKind: The metric kind of the time series.
 //   "METRIC_KIND_UNSPECIFIED" - Do not use this default value.

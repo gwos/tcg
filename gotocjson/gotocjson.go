@@ -7,6 +7,10 @@
 // and accurate.
 package main
 
+// All operations in this program assume that the source code under
+// inspection fits easily into memory all at once; there is no need
+// for any type of streaming in the handling of the source code.
+
 // FIX LATER:
 //
 // (*) Consider implementing a layer of routines that effectively provide what C++
@@ -29,6 +33,7 @@ import (
     "go/parser"
     "go/token"
     "os"
+    "path/filepath"
     "reflect"
     "regexp"
     "runtime"
@@ -40,41 +45,163 @@ import (
     "unicode"
 )
 
-var debug = true
+// Argument parsing in Go seems to be something of a mess.  The distributed Go language provides
+// an {import "flag"} package (https://golang.org/pkg/flag/), but for no good reason it ignores
+// longstanding conventions for how to construct long argument option names.  Alternatives for
+// getopt-like behavior include:
+//
+//     import "github.com/pborman/getopt"     // version 1
+//     import "github.com/pborman/getopt/v2"  // version 2, preferred over version 1
+//     import "github.com/pborman/options"    // improvement over "github.com/pborman/getopt/v2"
+//     import "github.com/mkideal/cli"
+//     import "github.com/galdor/go-cmdline"
+//     import "gopkg.in/alecthomas/kingpin.v2"
+//     import "github.com/docopt/docopt-go"
+//     import "github.com/jessevdk/go-flags" 
+//
+// See:
+//
+//     https://godoc.org/github.com/pborman/getopt
+//     https://godoc.org/github.com/pborman/getopt/v2
+//     https://godoc.org/github.com/pborman/options
+//     https://groups.google.com/forum/#!topic/golang-nuts/i8Qw9go6CnQ
+//     https://github.com/mkideal/cli
+//     https://github.com/galdor/go-cmdline
+//     http://snowsyn.net/2016/08/11/parsing-command-line-options-in-go/
+//     https://github.com/alecthomas/kingpin
+//     http://docopt.org/
+//     https://github.com/docopt/docopt.go
+//     https://godoc.org/github.com/jessevdk/go-flags
+//
+// Not wanting to get into that complexity at the moment, I have recorded those resources above for
+// future reference, but for now I am resricting this program to use only short-option command-line
+// arguments, and very simple parsing.
 
-func file_line() string {
-    var s string
-    if _, file_path, line_number, ok := runtime.Caller(1); ok {
-	// We get back the full absolute path for the file_path.
-	// That's much more than we need, so we extract the file
-	// basename and use that instead.
-	path_components := strings.Split(file_path, "/")
-	base_name := path_components[len(path_components) - 1]
-	s = fmt.Sprintf("%s:%d", base_name, line_number)
-    } else {
-	s = ""
-    }
-    return s
+// Globals.
+
+var PROGRAM = "gotocjson"
+var VERSION = "0.1.0"
+
+var bad_args = false
+var exit_early = false
+var print_help = false
+var print_version = false
+var print_diagnostics = false
+var print_errors = true
+var input_filepath = ""
+var output_directory = ""
+var diag_file = os.Stdout
+
+func show_help() {
+    fmt.Fprintf(os.Stdout,
+`usage:  %[1]s [-d] [-o outdir] filename.go
+	%[1]s -h
+	%[1]s --help
+	%[1]s --version
+where:  -d           produces diagnostic output on the stdout stream
+	-o outdir    specifies the directory where the generated .h and .c files
+		     will be placed; default is the same directory in which the
+		     filename.go file lives
+	filename.go  path to the source-code file you wish to transform into C code
+	-h           prints this usage message
+	--help       prints this usage message
+	--version    prints the version of this program
+`, PROGRAM)
 }
 
-// All operations in this program assume that the source code under
-// inspection fits easily into memory all at once; there is no need
-// for any type of streaming in the handling of the source code.
+func show_version() {
+    fmt.Fprintf(os.Stdout, "%s version %s\n", PROGRAM, VERSION)
+}
+
+// Because of the mess that is Go's handling of command-line arguments, we centralize the parsing of
+// those options so just this one routine will need replacement if/when we switch the implementation
+// to some other package.
+//
+func parse_args() {
+    // Grab the full set of command-line arguments, so we can more readily manipulate them.
+    cmd_args := os.Args
+    // Skip the program name.
+    cmd_args = cmd_args[1:]
+    for {
+	if len(cmd_args) == 0 || cmd_args[0] == "-h" || cmd_args[0] == "--help" {
+	    print_help = true
+	    exit_early = true
+	    break
+	}
+	if cmd_args[0] == "--version" {
+	    print_version = true
+	    exit_early = true
+	    break
+	}
+	if cmd_args[0] == "-d" {
+	    print_diagnostics = true
+	    cmd_args = cmd_args[1:]
+	    continue
+	}
+	if cmd_args[0] == "-o" {
+	    if len(cmd_args) > 1 {
+		output_directory = cmd_args[1]
+		if len(output_directory) == 0 {
+		    fmt.Fprintf(os.Stderr, "ERROR:  Output directory is specified as an empty string.\n")
+		    bad_args = true
+		    print_help = true
+		    exit_early = true
+		    break
+		}
+		cmd_args = cmd_args[2:]
+		continue
+	    } else {
+		bad_args = true
+		print_help = true
+		exit_early = true
+		break
+	    }
+	}
+	if len(cmd_args) == 1 {
+	    input_filepath = cmd_args[0]
+	    if len(input_filepath) == 0 {
+		fmt.Fprintf(os.Stderr, "ERROR:  Input filepath is specified as an empty string.\n")
+		bad_args = true
+		print_help = true
+		exit_early = true
+		break
+	    }
+	    if len(output_directory) == 0 {
+		output_directory = filepath.Dir(input_filepath)
+	    }
+	    break
+	} else {
+	    bad_args = true
+	    print_help = true
+	    exit_early = true
+	    break
+	}
+    }
+    if print_diagnostics && diag_file == os.Stdout {
+	print_errors = false
+    }
+}
 
 func main() {
-    if len(os.Args) != 2 || os.Args[1] == "-h" || os.Args[1] == "--help" {
-	print_help()
+    parse_args()
+    if print_help {
+	show_help()
+    }
+    if print_version {
+	show_version()
+    }
+    if exit_early {
 	// Go ought to have a ternary operator, but doesn't.  Sigh.
-	if len(os.Args) <= 1 || os.Args[1] == "-h" || os.Args[1] == "--help" {
-	    os.Exit(0)
-	} else {
+        if bad_args {
 	    os.Exit(1)
+	} else {
+	    os.Exit(0)
 	}
     }
 
     // FIX MINOR:  add support for -V and --version options; automate updating the version string if that is somehow possible
 
-    fset, f, err := parse_file(os.Args[1])
+    fset, f, err := parse_file(input_filepath)
     if err != nil {
 	os.Exit(1)
     }
@@ -120,15 +247,21 @@ func main() {
     os.Exit(0)
 }
 
-func print_help() {
-    fmt.Fprintf(os.Stderr,
-`usage:  gotocjson filename.go
-	gotocjson -h
-	gotocjson --help
-where:  filename.go  is the source-code file you wish to transform into C code
-	-h           prints this usage message
-	--help       prints this usage message
-`)
+// A routine whose output is to be used in debug messages, to precisely
+// identify the source-code origin of the debug message.
+func file_line() string {
+    var s string
+    if _, file_path, line_number, ok := runtime.Caller(1); ok {
+	// We get back the full absolute path for the file_path.
+	// That's much more than we need, so we extract the file
+	// basename and use that instead.
+	path_components := strings.Split(file_path, "/")
+	base_name := path_components[len(path_components) - 1]
+	s = fmt.Sprintf("%s:%d", base_name, line_number)
+    } else {
+	s = ""
+    }
+    return s
 }
 
 // Routine to parse the file.
@@ -140,7 +273,7 @@ func parse_file(filepath string) (*token.FileSet, *ast.File, error) {
     // Parse the specified file.
     f, err := parser.ParseFile(fset, filepath, nil, mode)
     if err != nil {
-	fmt.Printf("found Go-syntax parsing error in file %s: %s\n", filepath, err)
+	fmt.Fprintf(diag_file, "found Go-syntax parsing error in file %s: %s\n", filepath, err)
 	return nil, nil, err
     }
 
@@ -214,7 +347,12 @@ func process_parse_nodes(
 	if false {
 	    if exception := recover(); exception != nil {
 		err = fmt.Errorf("internal error: %v", exception)
-		fmt.Println(err)
+		if print_diagnostics {
+		    fmt.Fprintln(diag_file, err)
+		}
+		if print_errors {
+		    fmt.Println(err)
+		}
 	    }
 	}
     }()
@@ -241,15 +379,21 @@ func process_parse_nodes(
 
     // Print the package name.
     package_name = f.Name.Name  // from the "package" declaration inside the file
-    fmt.Println("=== Package:")
-    fmt.Println(package_name)
+    if print_diagnostics {
+	fmt.Fprintln(diag_file, "=== Package:")
+	fmt.Fprintln(diag_file, package_name)
+    }
 
     // Print the file's imports.
-    fmt.Println("=== Imports:")
+    if print_diagnostics {
+	fmt.Fprintln(diag_file, "=== Imports:")
+    }
     special_package_prefix := regexp.MustCompile(`^github.com/gwos/tng/([^/]+)$`)
     include_headers := []string{}
     for _, s := range f.Imports {
-	fmt.Println(s.Path.Value)
+	if print_diagnostics {
+	    fmt.Fprintln(diag_file, s.Path.Value)
+	}
 	pkg := strings.ReplaceAll(s.Path.Value, "\"", "")
 	special_package := special_package_prefix.FindStringSubmatch(pkg)
 	if special_package != nil {
@@ -262,27 +406,35 @@ func process_parse_nodes(
     // It only prints the leading package doc, not function comments.
     // For that, one needs to dig deeper (see below).
     // FIX MAJOR:  This is not stripping the leading "//" from comment lines.
-    fmt.Println("=== Package Documentation:")
-    if f.Doc != nil {
-	for _, doc := range f.Doc.List {
-	    fmt.Println(doc.Text)
+    if print_diagnostics {
+	fmt.Fprintln(diag_file, "=== Package Documentation:")
+	if f.Doc != nil {
+	    for _, doc := range f.Doc.List {
+		fmt.Fprintln(diag_file, doc.Text)
+	    }
 	}
     }
 
-    fmt.Println("=== Declarations:")
+    if print_diagnostics {
+	fmt.Fprintln(diag_file, "=== Declarations:")
+    }
     // Print the file-level declarations.  This conveniently ignores declarations within functions,
     // which we don't care about for our purposes.
     panic_message := ""
 node_loop:
     for _, file_decl := range f.Decls {
-	// fmt.Println(d)  // "&{<nil> <nil> parse_file 0xc000093660 0xc00007abd0}" and other forms
+	if print_diagnostics {
+	    // fmt.Fprintln(diag_file, d)  // "&{<nil> <nil> parse_file 0xc000093660 0xc00007abd0}" and other forms
+	}
 	if func_decl, ok := file_decl.(*ast.FuncDecl); ok {
-	    fmt.Printf("--- function name:  %v\n", func_decl.Name.Name)
-	    if func_decl.Doc != nil {
-		fmt.Println("--- function documentation:")
-		// FIX MAJOR:  This is not stripping the leading "//" from comment lines.
-		for _, doc := range func_decl.Doc.List {
-		    fmt.Println(doc.Text)
+	    if print_diagnostics {
+		fmt.Fprintf(diag_file, "--- function name:  %v\n", func_decl.Name.Name)
+		if func_decl.Doc != nil {
+		    fmt.Fprintln(diag_file, "--- function documentation:")
+		    // FIX MAJOR:  This is not stripping the leading "//" from comment lines.
+		    for _, doc := range func_decl.Doc.List {
+			fmt.Fprintln(diag_file, doc.Text)
+		    }
 		}
 	    }
 	}
@@ -292,12 +444,16 @@ node_loop:
 		    // I'm just assuming that spec.(*ast.TypeSpec).Type is of type *ast.Ident here in all cases.
 		    // If that turns out not to be true, we'll have to fill in other cases.
 		    if type_ident, ok := spec.(*ast.TypeSpec).Type.(*ast.Ident); ok {
-			fmt.Printf("--- simple type declaration name and type:  %v %v\n", spec.(*ast.TypeSpec).Name.Name, type_ident.Name)
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "--- simple type declaration name and type:  %v %v\n", spec.(*ast.TypeSpec).Name.Name, type_ident.Name)
+			}
 			simple_typedefs[spec.(*ast.TypeSpec).Name.Name] = type_ident.Name
 			simple_typedef_nodes[spec.(*ast.TypeSpec).Name.Name] = gen_decl
 		    } else if type_struct, ok := spec.(*ast.TypeSpec).Type.(*ast.StructType); ok {
-			// fmt.Printf("--- struct type:  %#v\n", type_struct)
-			fmt.Printf("--- struct type declaration name:  %v\n", spec.(*ast.TypeSpec).Name.Name)
+			if print_diagnostics {
+			    // fmt.Fprintf(diag_file, "--- struct type:  %#v\n", type_struct)
+			    fmt.Fprintf(diag_file, "--- struct type declaration name:  %v\n", spec.(*ast.TypeSpec).Name.Name)
+			}
 			struct_typedefs[spec.(*ast.TypeSpec).Name.Name] = nil
 
 			// FIX MINOR:  I'm not yet sure if this is correct (though it seems to be working).
@@ -310,13 +466,17 @@ node_loop:
 			if type_struct.Incomplete {
 			    // I'm not sure when this condition might be true, so let's alarm on it if we encounter it
 			    // just to make sure we're not overlooking anything.
-			    fmt.Printf("    --- The list of fields is incomplete.\n")
+			    if print_diagnostics {
+				fmt.Fprintf(diag_file, "    --- The list of fields is incomplete.\n")
+			    }
 			    panic_message = "aborting due to previous errors"
 			    break node_loop
 			}
 			for _, field := range type_struct.Fields.List {
 			    // FIX MAJOR:  Add support for the .Doc and .Comment attributes as well.
-			    // fmt.Printf("    --- field:  %#v\n", field)
+			    if print_diagnostics {
+				// fmt.Fprintf(diag_file, "    --- field:  %#v\n", field)
+			    }
 			    // Field elements to process:
 			    // .Doc   *ast.CommentGroup    // may be nil
 			    // .Names []*ast.Ident
@@ -327,7 +487,9 @@ node_loop:
 				// there will be no confusion in C between the field name and the type name.
 				if type_ident, ok := field.Type.(*ast.Ident); ok {
 				    // Old construction:  just accept that we have a missing field name.
-				    // fmt.Printf("    --- struct field name and type:  %#v %#v\n", "(none)", type_ident.Name)
+				    if print_diagnostics {
+					// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", "(none)", type_ident.Name)
+				    }
 				    // New construction:  autovivify a sensible field name.
 				    name_ident := new(ast.Ident)
 				    // Testing shows I was wrong; modern C can handle having a variable or struct field named
@@ -336,9 +498,13 @@ node_loop:
 				    name_ident.Name = type_ident.Name
 				    field.Names = append(field.Names, name_ident)
 				} else if type_starexpr, ok := field.Type.(*ast.StarExpr); ok {
-				    // fmt.Printf("    --- struct field name and type:  %#v %#v\n", "(none)", type_starexpr)
+				    if print_diagnostics {
+					// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", "(none)", type_starexpr)
+				    }
 				    if type_ident, ok := type_starexpr.X.(*ast.Ident); ok {
-					// fmt.Printf("    --- struct field name and StarExpr type:  %#v %#v\n", name.Name, type_ident.Name)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- struct field name and StarExpr type:  %#v %#v\n", name.Name, type_ident.Name)
+					}
 					name_ident := new(ast.Ident)
 					name_ident.Name = type_ident.Name + "_ptr_"
 					field.Names = append(field.Names, name_ident)
@@ -347,18 +513,20 @@ node_loop:
 					var x_type_ident *ast.Ident
 					var ok bool
 					if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
-					    // fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
-					    // fmt.Printf("    --- struct field SelectorExpr X:  %#v\n", x_type_ident.Name)
+					    if print_diagnostics {
+						// fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+						// fmt.Fprintf(diag_file, "    --- struct field SelectorExpr X:  %#v\n", x_type_ident.Name)
+					    }
 					} else {
-					    fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
 						file_line, type_selectorexpr.X)
-					    fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 					*/
 					if type_selectorexpr.Sel == nil {
-					    fmt.Printf("ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
@@ -382,7 +550,9 @@ node_loop:
 					// name_ident.Name = x_type_ident.Name + "_" + type_selectorexpr.Sel.Name + "_ptr_"
 					//
 					name_ident.Name = type_selectorexpr.Sel.Name + "_ptr_"
-					// fmt.Printf("    ==> manufactured field name:  %s\n", name_ident.Name)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    ==> manufactured field name:  %s\n", name_ident.Name)
+					}
 					field.Names = append(field.Names, name_ident)
 				    } else {
 					//
@@ -407,9 +577,11 @@ node_loop:
 					// The type of type_starexpr.X is a *ast.SelectorExpr, and that occurs within a field of type *ast.StarExpr .
 					// So once we figure out the field name we will manufacture for type_starexpr.X, we will append "_ptr_" to that name.
 					//
-					fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
-					    file_line(), type_starexpr.X)
-					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+						file_line(), type_starexpr.X)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
@@ -418,17 +590,23 @@ node_loop:
 				    var x_type_ident *ast.Ident
 				    var ok bool
 				    if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
-					// fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					}
 				    } else {
-					fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
-					    file_line, type_selectorexpr.X)
-					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+						file_line, type_selectorexpr.X)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    */
 				    if type_selectorexpr.Sel == nil {
-					fmt.Printf("ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
@@ -454,95 +632,137 @@ node_loop:
 				    name_ident.Name = type_selectorexpr.Sel.Name + "_"
 				    field.Names = append(field.Names, name_ident)
 				} else {
-				    fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type type:  %T\n", file_line(), field.Type)
-				    fmt.Printf("ERROR:  struct field Type field is not of a recognized type\n")
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type type:  %T\n", file_line(), field.Type)
+					fmt.Fprintf(diag_file, "ERROR:  struct field Type field is not of a recognized type\n")
+				    }
 				    panic_message = "aborting due to previous errors"
 				    break node_loop
 				}
 			    }
 			    for _, name := range field.Names {
-				// fmt.Printf("    --- field name:  %#v\n", name)
+				if print_diagnostics {
+				    // fmt.Fprintf(diag_file, "    --- field name:  %#v\n", name)
+				}
 				var field_type_name string
 				if type_ident, ok := field.Type.(*ast.Ident); ok {
 				    field_type_name = type_ident.Name
-				    fmt.Printf("    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+				    }
 				} else if type_starexpr, ok := field.Type.(*ast.StarExpr); ok {
 				    if type_ident, ok := type_starexpr.X.(*ast.Ident); ok {
 					field_type_name = "*" + type_ident.Name
-					fmt.Printf("    --- struct field name and StarExpr type:  %#v %#v\n", name.Name, field_type_name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "    --- struct field name and StarExpr type:  %#v %#v\n", name.Name, field_type_name)
+					}
 				    } else if type_array, ok := type_starexpr.X.(*ast.ArrayType); ok {
 					var array_type_ident *ast.Ident
 					// A nil type_array.Len means it's a slice type.
 					if type_array.Len != nil {
-					    fmt.Printf("ERROR:  at %s, a non-nil value for a StarExpr array-type Len is not yet handled (%#v)\n",
-						file_line(), type_array.Len)
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "ERROR:  at %s, a non-nil value for a StarExpr array-type Len is not yet handled (%#v)\n",
+						    file_line(), type_array.Len)
+					    }
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 					if array_type_ident, ok = type_array.Elt.(*ast.Ident); ok {
-					    // fmt.Printf("    --- struct field Type X Elt array element ident %#v\n", array_type_ident)
+					    if print_diagnostics {
+						// fmt.Fprintf(diag_file, "    --- struct field Type X Elt array element ident %#v\n", array_type_ident)
+					    }
 					} else {
-					    fmt.Printf("ERROR:  at %s, found unexpected field.Type.X.Elt type:  %T\n", file_line(), type_array.Elt)
-					    fmt.Printf("ERROR:  struct field Type X Elt field is not of a recognized type\n")
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.X.Elt type:  %T\n", file_line(), type_array.Elt)
+						fmt.Fprintf(diag_file, "ERROR:  struct field Type X Elt field is not of a recognized type\n")
+					    }
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 					field_type_name = "*[]" + array_type_ident.Name
-					fmt.Printf("    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+					}
 				    } else if type_selectorexpr, ok := type_starexpr.X.(*ast.SelectorExpr); ok {
 					var x_type_ident *ast.Ident
 					var ok bool
 					if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
-					    // fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					    if print_diagnostics {
+						// fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					    }
 					} else {
-					    fmt.Printf("ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_selectorexpr.X)
-					    fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_selectorexpr.X)
+						fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					    }
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 					if type_selectorexpr.Sel == nil {
-					    fmt.Printf("ERROR:  at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "ERROR:  at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					    }
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 					// FIX MINOR:  This may need work to fully and correctly reflect the complete selector.
 					field_type_name = "*" + x_type_ident.Name + "." + type_selectorexpr.Sel.Name
-					fmt.Printf("    --- struct field name and type:  %#v *%v.%v\n", name.Name, x_type_ident.Name, field_type_name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v *%v.%v\n", name.Name, x_type_ident.Name, field_type_name)
+					}
 				    } else {
-					fmt.Printf("ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_starexpr.X)
-					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_starexpr.X)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				} else if type_array, ok := field.Type.(*ast.ArrayType); ok {
 				    // A nil type_array.Len means it's a slice type.
 				    if type_array.Len != nil {
-					fmt.Printf("ERROR:  at %s, a non-nil value for an array-type Len is not yet handled (%#v)\n",
-					    file_line(), type_array.Len)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, a non-nil value for an array-type Len is not yet handled (%#v)\n",
+						file_line(), type_array.Len)
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    if type_ident, ok := type_array.Elt.(*ast.Ident); ok {
-					// fmt.Printf("    --- array element ident %#v\n", type_ident)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- array element ident %#v\n", type_ident)
+					}
 					field_type_name = "[]" + type_ident.Name
-					fmt.Printf("    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+					}
 				    } else if type_starexpr, ok := type_array.Elt.(*ast.StarExpr); ok {
-					// fmt.Printf("    --- array element starexpr %#v\n", type_starexpr)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- array element starexpr %#v\n", type_starexpr)
+					}
 					if type_ident, ok := type_starexpr.X.(*ast.Ident); ok {
 					    field_type_name = "[]*" + type_ident.Name
-					    fmt.Printf("    --- struct field name and interior StarExpr type:  %#v %#v\n", name.Name, field_type_name)
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "    --- struct field name and interior StarExpr type:  %#v %#v\n", name.Name, field_type_name)
+					    }
 					} else if type_array, ok := type_starexpr.X.(*ast.ArrayType); ok {
-					    fmt.Printf("    --- UNEXPECTED interior field.Type.X Type *ast.ArrayType %#v\n", type_array)
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "    --- UNEXPECTED interior field.Type.X Type *ast.ArrayType %#v\n", type_array)
+					    }
 					    // FIX MAJOR:  Handle this case.
 					} else {
-					    fmt.Printf("ERROR:  at %s, found unexpected interior field.Type.X type:  %T\n", file_line(), type_starexpr.X)
-					    fmt.Printf("ERROR:  struct field interior Type.X field is not of a recognized type\n")
+					    if print_diagnostics {
+						fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected interior field.Type.X type:  %T\n", file_line(), type_starexpr.X)
+						fmt.Fprintf(diag_file, "ERROR:  struct field interior Type.X field is not of a recognized type\n")
+					    }
 					    panic_message = "aborting due to previous errors"
 					    break node_loop
 					}
 				    } else {
-					fmt.Printf("ERROR:  at %s, found unexpected field.Type.Elt type:  %T\n", file_line(), type_array.Elt)
-					fmt.Printf("ERROR:  struct field Type Elt field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Elt type:  %T\n", file_line(), type_array.Elt)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type Elt field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
@@ -551,55 +771,79 @@ node_loop:
 				    var value_type_ident *ast.Ident
 				    var ok bool
 				    if key_type_ident, ok = type_map.Key.(*ast.Ident); ok {
-					// fmt.Printf("    --- map Key Ident %#v\n", key_type_ident)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- map Key Ident %#v\n", key_type_ident)
+					}
 				    } else {
-					fmt.Printf("ERROR:  at %s, found unexpected field.Type.Key type:  %T\n", file_line(), type_map.Key)
-					fmt.Printf("ERROR:  struct field Type Key field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Key type:  %T\n", file_line(), type_map.Key)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type Key field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    if value_type_ident, ok = type_map.Value.(*ast.Ident); ok {
-					// fmt.Printf("    --- map Value Ident %#v\n", value_type_ident)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- map Value Ident %#v\n", value_type_ident)
+					}
 				    } else {
-					fmt.Printf("ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
-					fmt.Printf("ERROR:  struct field Type Value field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type Value field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    // FIX QUICK:  This needs work to fully reflect the map structure; perhaps the new statements now do so.
 				    // field_type_name = value_type_ident.Name
-				    // fmt.Printf("    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
+				    if print_diagnostics {
+					// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
+				    }
 				    field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
-				    fmt.Printf("    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+				    }
 				} else if type_selectorexpr, ok := field.Type.(*ast.SelectorExpr); ok {
 				    var x_type_ident *ast.Ident
 				    var ok bool
 				    if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
-					// fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					}
 				    } else {
-					fmt.Printf("ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_selectorexpr.X)
-					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.X type:  %T\n", file_line(), type_selectorexpr.X)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    if type_selectorexpr.Sel == nil {
-					fmt.Printf("ERROR:  at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					}
 					panic_message = "aborting due to previous errors"
 					break node_loop
 				    }
 				    // FIX QUICK:  This may need work to fully and correctly reflect the complete selector.
 				    field_type_name = x_type_ident.Name + "." + type_selectorexpr.Sel.Name
-				    fmt.Printf("    --- struct field name and type:  %#v %v.%v\n", name.Name, x_type_ident.Name, field_type_name)
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %v.%v\n", name.Name, x_type_ident.Name, field_type_name)
+				    }
 				} else {
-				    fmt.Printf("ERROR:  at %s, found unexpected field.Type type:  %T\n", file_line(), field.Type)
-				    fmt.Printf("ERROR:  struct field Type field is not of a recognized type\n")
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type type:  %T\n", file_line(), field.Type)
+					fmt.Fprintf(diag_file, "ERROR:  struct field Type field is not of a recognized type\n")
+				    }
 				    panic_message = "aborting due to previous errors"
 				    break node_loop
 				}
 				struct_typedefs[spec.(*ast.TypeSpec).Name.Name] = append(struct_typedefs[spec.(*ast.TypeSpec).Name.Name], field_type_name)
 				struct_field_typedefs[spec.(*ast.TypeSpec).Name.Name][name.Name] = field_type_name
 				if field.Tag != nil {
-				    fmt.Printf("    --- struct field tag Value:  %#v\n", field.Tag.Value)
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "    --- struct field tag Value:  %#v\n", field.Tag.Value)
+				    }
 				}
 			    }
 			    // .Type  *ast.Ident
@@ -607,15 +851,21 @@ node_loop:
 			    // .Comment *ast.CommentGroup  // likely nil
 			}
 		    } else if type_interface, ok := spec.(*ast.TypeSpec).Type.(*ast.InterfaceType); ok {
-			fmt.Printf("FIX MAJOR:  Handle this next case (where the type is *ast.InterfaceType)\n")
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "FIX MAJOR:  Handle this next case (where the type is *ast.InterfaceType)\n")
+			}
 			// This is an interface definition, which perhaps mostly declares methods, not simple types,
 			// enumerations, constants, or structs.  Verify that assumption, and perhaps extend this case
 			// to process whatever it might need to.  We might, for instance, at least need to emit function
 			// signatures, even if we don't generate full function bodies.
-			fmt.Printf("--- interface type declaration name and type:  %v %#v\n", spec.(*ast.TypeSpec).Name.Name, type_interface)
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "--- interface type declaration name and type:  %v %#v\n", spec.(*ast.TypeSpec).Name.Name, type_interface)
+			}
 		    } else {
-			fmt.Printf("ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
-			fmt.Printf("ERROR:  spec *ast.TypeSpec Type field is not of a recognized type\n")
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
+			    fmt.Fprintf(diag_file, "ERROR:  spec *ast.TypeSpec Type field is not of a recognized type\n")
+			}
 			panic_message = "aborting due to previous errors"
 			break node_loop
 		    }
@@ -633,13 +883,17 @@ node_loop:
 			if type_ident, ok := spec.(*ast.ValueSpec).Type.(*ast.Ident); ok {
 			    spec_type = type_ident.Name
 			} else {
-			    fmt.Printf("ERROR:  at %s, found unexpected spec.(*ast.ValueSpec).Type type:  %T\n", file_line(), spec.(*ast.ValueSpec).Type)
-			    fmt.Printf("ERROR:  spec *ast.ValueSpec Type field is not of a recognized type\n")
+			    if print_diagnostics {
+				fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.ValueSpec).Type type:  %T\n", file_line(), spec.(*ast.ValueSpec).Type)
+				fmt.Fprintf(diag_file, "ERROR:  spec *ast.ValueSpec Type field is not of a recognized type\n")
+			    }
 			    panic_message = "aborting due to previous errors"
 			    break node_loop
 			}
 			// value_type := spec.(*ast.ValueSpec).Type
-			// fmt.Printf("value_type = %T %[1]v %+[1]v %#[1]v %[1]s\n", value_type)
+			if print_diagnostics {
+			    // fmt.Fprintf(diag_file, "value_type = %T %[1]v %+[1]v %#[1]v %[1]s\n", value_type)
+			}
 		    }
 		    var const_value string
 		    for i, name := range spec.(*ast.ValueSpec).Names {
@@ -652,15 +906,19 @@ node_loop:
 					iota_value++
 					const_value = fmt.Sprintf("%d", iota_value)
 				    } else {
-					fmt.Printf("ERROR:  at %s, value name is %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, value name is %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Name)
+					}
 					panic_message = "unexpected const value name"
 					break node_loop
 				    }
 				    if spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Obj != nil {
-					fmt.Printf("ERROR:  at %s, value object kind is %#v\n",
-					    file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Obj.Kind)
-					fmt.Printf("ERROR:  at %s, value object name is %#v\n",
-					    file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Obj.Name)
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, value object kind is %#v\n",
+						file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Obj.Kind)
+					    fmt.Fprintf(diag_file, "ERROR:  at %s, value object name is %#v\n",
+						file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.Ident).Obj.Name)
+					}
 				    }
 				case *ast.BasicLit:
 				    switch spec.(*ast.ValueSpec).Values[i].(*ast.BasicLit).Kind {
@@ -684,20 +942,29 @@ node_loop:
 					    break node_loop
 				    }
 				case *ast.BinaryExpr:
-				    fmt.Printf("ERROR:  at %s, value expression is %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.BinaryExpr))
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "ERROR:  at %s, value expression is %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i].(*ast.BinaryExpr))
+				    }
 				    // FIX MAJOR:  This setting of spec_type is nowhere near a thorough analysis.
 				    if spec_type == "" {
 					spec_type = "int"
 				    }
 				    r, err := eval_int_expr(spec.(*ast.ValueSpec).Values[i].(*ast.BinaryExpr), &iota_value)
 				    if err != nil {
-					fmt.Println(err)
+					if print_diagnostics {
+					    fmt.Fprintln(diag_file, err)
+					}
+					if print_errors {
+					    fmt.Println(err)
+					}
 					panic_message = "cannot evaluate binary expression"
 					break node_loop
 				    }
 				    const_value = fmt.Sprintf("%d", r)
 				default:
-				    fmt.Printf("ERROR:  at %s, found const value type %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i])
+				    if print_diagnostics {
+					fmt.Fprintf(diag_file, "ERROR:  at %s, found const value type %#v\n", file_line(), spec.(*ast.ValueSpec).Values[i])
+				    }
 				    panic_message = "unexpected const value type"
 				    break node_loop
 			    }
@@ -706,7 +973,9 @@ node_loop:
 			    const_value = fmt.Sprintf("%d", iota_value)
 			}
 			// FIX MAJOR:  This is not yet showing the "int" spec_type for a "1 << iota" expression.
-			fmt.Printf("--- const element name, type, and value:  %v %v %v\n", name.Name, spec_type, const_value)
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "--- const element name, type, and value:  %v %v %v\n", name.Name, spec_type, const_value)
+			}
 			// It's not required by Go syntax that every assignment in a single const block has exactly
 			// the same type, but we insist on that here to simplify our work.  If we encounter code that
 			// violates this constraint, the code in this conversion tool will need to be extended.
@@ -715,8 +984,10 @@ node_loop:
 			    const_groups[const_token_position] = spec_type
 			    const_group_nodes[const_token_position] = gen_decl
 			} else if const_groups[const_token_position] != spec_type {
-			    fmt.Printf("ERROR:  at %s, found conflicting const types in a single const block:  %s %s\n",
-				file_line(), const_groups[const_token_position], spec_type)
+			    if print_diagnostics {
+				fmt.Fprintf(diag_file, "ERROR:  at %s, found conflicting const types in a single const block:  %s %s\n",
+				    file_line(), const_groups[const_token_position], spec_type)
+			    }
 			    panic_message = "found conflicting const types in a single const block"
 			    break node_loop
 			}
@@ -726,11 +997,16 @@ node_loop:
 	}
     }
 
-    fmt.Println("=== AST:")
-    ast.Print(fset, f)
+    if print_diagnostics {
+	fmt.Fprintln(diag_file, "=== AST:")
+	// Unexported struct fields are never printed.
+	ast.Fprint(diag_file, fset, f, ast.NotNilFilter)
+    }
 
     if panic_message != "" {
-	fmt.Printf("%s\n", panic_message)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "%s\n", panic_message)
+	}
 	panic(panic_message)
     }
 
@@ -880,20 +1156,20 @@ func topologically_sort_nodes(
     // Output at this stage is only for initial development, to ensure that we have the expected
     // kinds of data at this point.
     for typedef_name, typedef_type := range simple_typedefs {
-	if debug {
-	    fmt.Printf("simple typedef:  %s => %s\n", typedef_name, typedef_type)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "simple typedef:  %s => %s\n", typedef_name, typedef_type)
 	}
 	dependency[typedef_name] = type_dependency{"simple", simple_typedef_nodes[typedef_name].TokPos, []string{typedef_type}}
     }
     for enum_name, enum_type := range enum_typedefs {
-	if debug {
-	    fmt.Printf("enum typedef:  %s => %s\n", enum_name, enum_type)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "enum typedef:  %s => %s\n", enum_name, enum_type)
 	}
 	dependency[enum_name] = type_dependency{"enum", enum_typedef_nodes[enum_name].TokPos, []string{enum_type}}
     }
     for const_group_name, const_group_type := range const_groups {
-	if debug {
-	    fmt.Printf("const group:  %s => %s\n", const_group_name, const_group_type)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "const group:  %s => %s\n", const_group_name, const_group_type)
 	}
 	// Here, the TokPos value we provide is just a placeholder.  It does represent the position of the
 	// original const group in the source code, but if this const block represents an set of enumeration
@@ -902,8 +1178,8 @@ func topologically_sort_nodes(
 	dependency[const_group_name] = type_dependency{"const", const_group_nodes[const_group_name].TokPos, []string{const_group_type}}
     }
     for struct_name, struct_field_type_list := range struct_typedefs {
-	if debug {
-	    fmt.Printf("struct typedef:  %s => %v\n", struct_name, struct_field_type_list)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "struct typedef:  %s => %v\n", struct_name, struct_field_type_list)
 	}
 	dependency[struct_name] = type_dependency{"struct", struct_typedef_nodes[struct_name].TokPos, struct_field_type_list}
     }
@@ -913,7 +1189,9 @@ func topologically_sort_nodes(
     // as a copy of the type_dependency object (or at least its []string component), not an alias.
     // So when we wish to alter the base data structure, we must refer to it directly.
     for type_name, type_dep := range dependency{
-	// fmt.Printf("=== dep types before filtering: %v\n", type_dep.depends_on_type_name)
+	if print_diagnostics {
+	    // fmt.Fprintf(diag_file, "=== dep types before filtering: %v\n", type_dep.depends_on_type_name)
+	}
 	// In this block, we effectively shrink the array of depends-on names.  In the next for loop, because of
 	// either aliasing or a level of indirection imposed by the type_dep.depends_on_type_name[] slice which
 	// points to the same underlying array as the original item we're iterating over, we directly change the
@@ -973,8 +1251,10 @@ func topologically_sort_nodes(
 	    type_dep.type_pos = dependency[type_dep.depends_on_type_name[0]].type_pos
 	}
 
-	// fmt.Printf("   base typedef:  %#v %#v\n", type_name, dependency[type_name])
-	// fmt.Printf("generic typedef:  %#v %#v\n", type_name, type_dep)
+	if print_diagnostics {
+	    // fmt.Fprintf(diag_file, "   base typedef:  %#v %#v\n", type_name, dependency[type_name])
+	    // fmt.Fprintf(diag_file, "generic typedef:  %#v %#v\n", type_name, type_dep)
+	}
 
 	tentative_type_order = append(tentative_type_order, type_name)
     }
@@ -986,9 +1266,9 @@ func topologically_sort_nodes(
 	return dependency[tentative_type_order[i]].type_pos < dependency[tentative_type_order[j]].type_pos
     })
 
-    if debug {
+    if print_diagnostics {
 	for _, type_name := range tentative_type_order {
-	    fmt.Printf("sorted generic typedef:  %#v %#v\n", type_name, dependency[type_name])
+	    fmt.Fprintf(diag_file, "sorted generic typedef:  %#v %#v\n", type_name, dependency[type_name])
 	}
     }
 
@@ -1016,9 +1296,9 @@ func topologically_sort_nodes(
     }
     process_type_names(tentative_type_order)
 
-    if debug {
+    if print_diagnostics {
 	for _, decl_kind := range final_type_order {
-	    fmt.Printf("final sorted generic typedef:  %#v %#v %#v\n", decl_kind.type_name, decl_kind.type_kind, dependency[decl_kind.type_name])
+	    fmt.Fprintf(diag_file, "final sorted generic typedef:  %#v %#v %#v\n", decl_kind.type_name, decl_kind.type_kind, dependency[decl_kind.type_name])
 	}
     }
 
@@ -1181,15 +1461,21 @@ func print_type_declarations(
     ) {
     package_defined_type := map[string]bool{};
     for key, _ := range simple_typedefs {
-	fmt.Printf("+++ simple typedef for %s\n", key)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "+++ simple typedef for %s\n", key)
+	}
 	package_defined_type[key] = true
     }
     for key, _ := range enum_typedefs {
-	fmt.Printf("+++   enum typedef for %s\n", key)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "+++   enum typedef for %s\n", key)
+	}
 	package_defined_type[key] = true
     }
     for key, _ := range struct_typedefs {
-	fmt.Printf("+++ struct typedef for %s\n", key)
+	if print_diagnostics {
+	    fmt.Fprintf(diag_file, "+++ struct typedef for %s\n", key)
+	}
 	package_defined_type[key] = true
     }
 
@@ -1230,10 +1516,11 @@ func print_type_declarations(
 
     current_year := time.Now().Year()
     header_filename := package_name + ".h"
+    header_filepath := filepath.Join(output_directory, header_filename)
     header_symbol := "_" + strings.ToUpper( slash.ReplaceAllLiteralString(package_name, "_") ) + "_H"
     boilerplate_variables := C_header_boilerplate_fields{Year: current_year, HeaderFilename: header_filename, HeaderSymbol: header_symbol}
 
-    header_file, err := os.Create(header_filename);
+    header_file, err := os.Create(header_filepath);
     if err != nil {
 	panic(err)
     }
@@ -1248,7 +1535,9 @@ func print_type_declarations(
     }
 
     for _, decl_kind := range final_type_order {
-	// fmt.Printf("processing type %s %s\n", decl_kind.type_name, decl_kind.type_kind)
+	if print_diagnostics {
+	    // fmt.Fprintf(diag_file, "processing type %s %s\n", decl_kind.type_name, decl_kind.type_kind)
+	}
 	switch decl_kind.type_kind {
 	    case "simple":
 		type_name := simple_typedefs[decl_kind.type_name]
@@ -1444,7 +1733,9 @@ func print_type_declarations(
 				panic(err)
 			    }
 			}
-			fmt.Printf("struct %s field tag:  %s\n", decl_kind.type_name, field_tag)
+			if print_diagnostics {
+			    fmt.Fprintf(diag_file, "struct %s field tag:  %s\n", decl_kind.type_name, field_tag)
+			}
 			for _, name := range field.Names {
 			    switch field.Type.(type) {
 				case *ast.Ident:
@@ -1467,16 +1758,22 @@ func print_type_declarations(
 				    var x_type_ident *ast.Ident
 				    var ok bool
 				    if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
-					// fmt.Printf("    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					if print_diagnostics {
+					    // fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+					}
 				    } else {
-					fmt.Printf("ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
-					    file_line, type_selectorexpr.X)
-					fmt.Printf("ERROR:  struct field Type.X field is not of a recognized type\n")
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+						file_line, type_selectorexpr.X)
+					    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+					}
 					// panic_message = "aborting due to previous errors"
 					// break node_loop
 				    }
 				    if type_selectorexpr.Sel == nil {
-					fmt.Printf("ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					if print_diagnostics {
+					    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, struct field Type Sel field is unexpectedly nil\n", file_line())
+					}
 					// panic_message = "aborting due to previous errors"
 					// break node_loop
 				    }
@@ -1987,9 +2284,11 @@ func generate_all_decode_tree_routines(
     all_decode_function_code = ""
 
     // Prove that we really do have the struct_field_tags data structure populated as we expect it to be, in full detail.
-    for struct_name, field_tags := range struct_field_tags {
-	for field_name, field_tag := range field_tags {
-	    fmt.Printf("struct_field_tags[%s][%s] = %s\n", struct_name, field_name, field_tag)
+    if print_diagnostics {
+	for struct_name, field_tags := range struct_field_tags {
+	    for field_name, field_tag := range field_tags {
+		fmt.Fprintf(diag_file, "struct_field_tags[%s][%s] = %s\n", struct_name, field_name, field_tag)
+	    }
 	}
     }
 
@@ -4028,6 +4327,7 @@ func print_type_conversions(
 
     current_year    := time.Now().Year()
     code_filename   := package_name + ".c"
+    code_filepath   := filepath.Join(output_directory, code_filename)
     header_filename := package_name + ".h"
     boilerplate_variables := C_code_boilerplate_fields{
 	Year: current_year,
@@ -4036,7 +4336,7 @@ func print_type_conversions(
 	HeaderFilename: header_filename,
     }
 
-    code_file, err := os.Create(code_filename);
+    code_file, err := os.Create(code_filepath);
     if err != nil {
 	panic(err)
     }

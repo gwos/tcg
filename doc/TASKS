@@ -1,5 +1,12 @@
 Items to take care of:
 
+(*) Make the recommended Go-code changes.
+
+    See the sibling RECOMMENDED_CHANGES file.  There are a few
+    changes either strongly or possibly recommanded there.  Making
+    such adjustments may require a few corresponding adjustments
+    elsewhere in TNG code.
+
 (*) Consolidate all similar conversion routines, normalize them to a
     standard form, and generate a boilerplate template for that form.
     Make sure that NULL pointers are tested for and correctly handled
@@ -37,7 +44,11 @@ Items to take care of:
 
 (*) Pay attention to the Go-code struct field tags, with respect
     to both field renaming and the "omitempty" option, in both
-    directions of conversion.
+    directions of conversion.  As of this writing, the support for
+    those tags is incomplete, present in some cases and likely still
+    missing in other cases.  We will probably want to construct
+    a specific Go source test file to implement every last case,
+    so we can prove we have full coverage.
 
 (*) Support a special form of Go-code struct field tags, which will
     allow us to specify what is effectively a union structure, which
@@ -98,3 +109,7 @@ Items to take care of:
 
     Are there any objects other than strings that need such handling?
 
+(*) Check out the support for iota.  In my testing so far, it has not
+    been needed, but if gotocjson must be applied to the production
+    copy of config.go (a conclusion which has not yet been reached),
+    such support will be required.
