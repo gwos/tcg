@@ -6,7 +6,7 @@ import (
     "flag"
     "fmt"
     "github.com/gwos/tng/milliseconds"
-    serverConnector "github.com/gwos/tng/serverconnector"
+    "github.com/gwos/tng/services"
     "github.com/gwos/tng/transit"
     "log"
     "math/rand"
@@ -23,10 +23,30 @@ func valueOf(x int64) *int64 {
     return &x
 }
 
+var transitService = services.GetTransitService()
+
 // examples
 func main() {
     flag.Parse()
     fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
+
+    err := transitService.StartNats()
+    if err != nil {
+        fmt.Printf("%s", err.Error())
+        return
+    }
+
+    defer func() {
+        err = transitService.StopNats()
+        if err != nil {
+            fmt.Printf("%s", err.Error())
+        }
+        cmd := exec.Command("rm", "-rf", "src")
+        _, err = cmd.Output()
+        if err != nil {
+            fmt.Printf("%s", err.Error())
+        }
+    }()
 
     // VLAD - I think the gatherMetrics could be made into an advanced feature built into the ServerConnector:
     // 	1. From the PID, we can get the process name
@@ -34,59 +54,75 @@ func main() {
     //  3. Look up the CPU usage for a process with a given name and turn it into a Service
     //  This way we can (a) get the status of processes running on a server (b) get their cpu usage with thresholds
     //  After finishing serverConnector.CollectMetrics(), please implement this in the ServerConnector
-    processes := gatherMetrics()
+    //processes := gatherMetrics()
 
-    for _, p := range processes {
-        log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
+    //for _, p := range processes {
+    //    log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
+    //}
+
+    //server := serverConnector.CollectMetrics()
+    //println(server.Name)
+
+    err = sendInventoryResources()
+    if err != nil {
+        fmt.Printf("%s", err.Error())
+        return
     }
 
-    server := serverConnector.CollectMetrics()
-    println(server.Name)
+    time.Sleep(5 * time.Second)
 
-    // TODO: start TNG
-    sendInventoryResources()
-    sendMonitoredResources()
-    // TODO: stop TNG:
+    err = sendMonitoredResources()
+    if err != nil {
+        fmt.Printf("%s", err.Error())
+        return
+    }
+
+    time.Sleep(10 * time.Second)
 }
 
-func sendInventoryResources() {
-    // Example Service
-    localLoadService := transit.InventoryService{
-        Name: "local_load",
+func sendInventoryResources() error {
+    inventoryRequest := transit.InventoryRequest{
+        Context: transit.TracerContext{
+            AppType:    "VEMA",
+            AgentID:    "3939333393342",
+            TraceToken: "token-99e93",
+            TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+        },
+        Resources: []transit.InventoryResource{
+            {
+                Name: "geneva",
+                Type: "HOST",
+                Services: []transit.InventoryService{
+                    {
+                        Name:  "local_load",
+                        Type:  "network-device",
+                        Owner: "geneva",
+                    },
+                },
+            },
+        },
+        Groups: nil,
     }
 
-    // Example Monitored Resource of type Host
-    geneva := transit.InventoryResource{
-        Name:     "geneva",
-        Type:     transit.Host,
-        Services: []transit.InventoryService{localLoadService},
-    }
-    // Build Inventory
-    inventory := []transit.InventoryResource{geneva}
-
-    // TODO: call into API
-
-    b, err := json.Marshal(inventory)
-    if err == nil {
-        s := string(b)
-        println(s)
+    b, err := json.Marshal(inventoryRequest)
+    if err != nil {
+        return err
     }
 
+    err = transitService.SynchronizeInventory(b)
+
+    return err
 }
 
-func sendMonitoredResources() {
+func sendMonitoredResources() error {
     // Create a Metrics Sample
     metricSample := makeMetricSample()
     sampleValue := transit.TimeSeries{
         MetricName: "local_load_5",
         // Labels:      []*LabelDescriptor{&cores, &sampleTime},
-        MetricSamples: []*transit.MetricSample{
-            {
-                SampleType: transit.Value,
-                Interval:   metricSample.Interval,
-                Value:      metricSample.Value,
-            },
-        },
+        SampleType: transit.Value,
+        Interval:   metricSample.Interval,
+        Value:      metricSample.Value,
         Tags: map[string]string{
             "deviceTag":     "127.0.0.1",
             "httpMethodTag": "POST",
@@ -97,13 +133,9 @@ func sendMonitoredResources() {
     metricSample = makeMetricSample()
     sampleCritical := transit.TimeSeries{
         MetricName: "local_load_5_cr",
-        MetricSamples: []*transit.MetricSample{
-            {
-                SampleType: transit.Critical,
-                Interval:   metricSample.Interval,
-                Value:      metricSample.Value,
-            },
-        },
+        SampleType: transit.Critical,
+        Interval:   metricSample.Interval,
+        Value:      metricSample.Value,
         Tags: map[string]string{
             "deviceTag":     "127.0.0.1",
             "httpMethodTag": "POST",
@@ -114,13 +146,9 @@ func sendMonitoredResources() {
     metricSample = makeMetricSample()
     sampleWarning := transit.TimeSeries{
         MetricName: "local_load_5_wn",
-        MetricSamples: []*transit.MetricSample{
-            {
-                SampleType: transit.Warning,
-                Interval:   metricSample.Interval,
-                Value:      metricSample.Value,
-            },
-        },
+        SampleType: transit.Warning,
+        Interval:   metricSample.Interval,
+        Value:      metricSample.Value,
         Tags: map[string]string{
             "deviceTag":     "127.0.0.1",
             "httpMethodTag": "POST",
@@ -131,51 +159,72 @@ func sendMonitoredResources() {
 
     // Example Service
     var localLoadService = transit.MonitoredService{
-        Name:             "local_load",
-        Type:             transit.Service,
-        Status:           transit.ServiceOk,
-        LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-        NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-        LastPlugInOutput: "foo | bar",
+        Name:          "local_load",
+        Type:          transit.Service,
+        Owner:         "geneva",
+        Status:        transit.ServiceOk,
+        LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+        NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+        //LastPlugInOutput: "foo | bar",
         Properties: map[string]transit.TypedValue{
-            "stateType":       {StringValue: "SOFT"},
-            "checkType":       {StringValue: "ACTIVE"},
-            "PerformanceData": {StringValue: "007-321 RAD"},
-            "ExecutionTime":   {DoubleValue: 3.0},
-            "CurrentAttempt":  {IntegerValue: 2},
-            "InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+            "stateType": {
+                ValueType:   "StringType",
+                StringValue: "SOFT",
+            },
+            "checkType": {
+                ValueType:   "StringType",
+                StringValue: "ACTIVE",
+            },
+            "PerformanceData": {
+                ValueType:   "StringType",
+                StringValue: "007-321 RAD",
+            },
+            "ExecutionTime": {
+                ValueType:   "DoubleType",
+                DoubleValue: 3.0,
+            },
+            "CurrentAttempt": {
+                ValueType:    "IntegerType",
+                IntegerValue: 2,
+            },
         },
         Metrics: []transit.TimeSeries{sampleValue, sampleWarning, sampleCritical},
     } // Example Monitored Resource of type Host
 
-    geneva := transit.MonitoredResource{
-        Name:             "geneva",
-        Type:             transit.Host,
-        Status:           transit.HostUp,
-        LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-        NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-        LastPlugInOutput: "44/55/888 QA00005-BC",
-        Properties: map[string]transit.TypedValue{
-            "stateType":       {StringValue: "SOFT"},
-            "checkType":       {StringValue: "ACTIVE"},
-            "PerformanceData": {StringValue: "007-321 RAD"},
-            "ExecutionTime":   {DoubleValue: 3.0},
-            "CurrentAttempt":  {IntegerValue: 2},
-            "InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+    //geneva := transit.MonitoredResource{
+    //    Name:             "geneva",
+    //    Type:             transit.Host,
+    //    Status:           transit.HostUp,
+    //    LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+    //    NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+    //    LastPlugInOutput: "44/55/888 QA00005-BC",
+    //    Properties: map[string]transit.TypedValue{
+    //        "stateType":       {StringValue: "SOFT"},
+    //        "checkType":       {StringValue: "ACTIVE"},
+    //        "PerformanceData": {StringValue: "007-321 RAD"},
+    //        "ExecutionTime":   {DoubleValue: 3.0},
+    //        "CurrentAttempt":  {IntegerValue: 2},
+    //        "InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+    //    },
+    //    Services: []transit.MonitoredService{localLoadService},
+    //}
+
+    request := transit.ResourceWithServicesRequest{
+        Context: transit.TracerContext{
+            AppType:    "VEMA",
+            AgentID:    "3939333393342",
+            TraceToken: "token-99e93",
+            TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
         },
-        Services: []transit.MonitoredService{localLoadService},
+        Resources: []transit.MonitoredService{localLoadService},
     }
 
-    // Build Monitored Resources
-    resources := []transit.MonitoredResource{geneva}
-
-    // TODO: call into API
-
-    b, err := json.Marshal(resources)
-    if err == nil {
-        s := string(b)
-        println(s)
+    b, err := json.Marshal(request)
+    if err != nil {
+        return err
     }
+
+    return transitService.SendResourceWithMetrics(b)
 }
 
 func makeMetricSample() *transit.MetricSample {
@@ -184,7 +233,7 @@ func makeMetricSample() *transit.MetricSample {
     return &transit.MetricSample{
         SampleType: transit.Value,
         Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
-        Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
+        Value:      &transit.TypedValue{ValueType: "DoubleType", DoubleValue: random},
     }
 }
 

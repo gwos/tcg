@@ -98,7 +98,7 @@ const (
 type ServiceType string
 
 const (
-	Service 	ServiceType = "service"
+	Service 	ServiceType = "SERVICE"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -159,7 +159,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	//TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
@@ -187,10 +187,13 @@ type MetricSample struct {
 // TimeSeries defines a collection of data samples that describes the
 // time-varying values of a metric.
 type TimeSeries struct {
-	MetricName    string            `json:"metricName"`
-	MetricSamples []*MetricSample   `json:"metricSamples"`
-	Tags          map[string]string `json:"tags,omitempty"`
-	Unit          UnitType          `json:"unit,omitempty"`
+	MetricName string            `json:"metricName"`
+	SampleType MetricSampleType  `json:"sampleType"`
+	Interval   *TimeInterval      `json:"interval"`
+	Value      *TypedValue        `json:"value"`
+	Tags       map[string]string `json:"tags,omitempty"`
+	Unit       UnitType          `json:"unit,omitempty"`
+	//MetricSamples []*MetricSample   `json:"metricSamples"`
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -321,7 +324,7 @@ type InventoryResource struct {
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 	// Inventory Service collection
-	Services []InventoryService
+	Services []InventoryService `json:"services"`
 }
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
@@ -419,7 +422,7 @@ type MonitoredResourceRef struct {
 // TracerContext describes a Transit call
 type TracerContext struct {
 	AppType    string                            `json:"appType"`
-	AgentID    string                            `json:"agentID"`
+	AgentID    string                            `json:"agentId"`
 	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
 }
@@ -454,6 +457,12 @@ type ResourceGroup struct {
 type ResourceWithServicesRequest struct {
 	Context   TracerContext          `json:"context"`
 	Resources []MonitoredService `json:"resources"`
+}
+
+type InventoryRequest struct {
+	Context   TracerContext       `json:"context"`
+	Resources []InventoryResource `json:"resources"`
+	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
 // Alerts received from cloud services
