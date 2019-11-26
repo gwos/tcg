@@ -57,7 +57,7 @@ import (
 //     import "github.com/galdor/go-cmdline"
 //     import "gopkg.in/alecthomas/kingpin.v2"
 //     import "github.com/docopt/docopt-go"
-//     import "github.com/jessevdk/go-flags" 
+//     import "github.com/jessevdk/go-flags"
 //
 // See:
 //
@@ -192,7 +192,7 @@ func main() {
     }
     if exit_early {
 	// Go ought to have a ternary operator, but doesn't.  Sigh.
-        if bad_args {
+	if bad_args {
 	    os.Exit(1)
 	} else {
 	    os.Exit(0)
@@ -323,22 +323,22 @@ func parse_file(filepath string) (*token.FileSet, *ast.File, error) {
 //     struct_typedef_nodes map[     struct_name string]decl_node *ast.GenDecl
 //
 func process_parse_nodes(
-	fset *token.FileSet,
-	f *ast.File,
-    ) (
-	package_name          string,
-	simple_typedefs       map[string]string,
-	enum_typedefs         map[string]string,
-	const_groups          map[string]string,
-	struct_typedefs       map[string][]string,		// list of unique simplified types of the fields
-	struct_field_typedefs map[string]map[string]string,
-	simple_typedef_nodes  map[string]*ast.GenDecl,
-	enum_typedef_nodes    map[string]*ast.GenDecl,
-	const_group_nodes     map[string]*ast.GenDecl,
-	struct_typedef_nodes  map[string]*ast.GenDecl,
-	other_headers         string,
-	err error,
-    ) {
+    fset *token.FileSet,
+    f *ast.File,
+) (
+    package_name          string,
+    simple_typedefs       map[string]string,
+    enum_typedefs         map[string]string,
+    const_groups          map[string]string,
+    struct_typedefs       map[string][]string,		// list of unique simplified types of the fields
+    struct_field_typedefs map[string]map[string]string,
+    simple_typedef_nodes  map[string]*ast.GenDecl,
+    enum_typedef_nodes    map[string]*ast.GenDecl,
+    const_group_nodes     map[string]*ast.GenDecl,
+    struct_typedef_nodes  map[string]*ast.GenDecl,
+    other_headers         string,
+    err error,
+) {
     // FIX MINOR:
     // Having this function in play turns out to be somewhat less than completely desirable,
     // because the simple error message does not include all the failure-coordinate data that
@@ -1131,19 +1131,18 @@ type declaration_kind struct {
 // That's why we pass in the *_nodes maps, to have access to the declaration position info.
 //
 func topologically_sort_nodes(
-	simple_typedefs      map[string]string,
-	enum_typedefs        map[string]string,
-	const_groups         map[string]string,
-	struct_typedefs      map[string][]string,
-	simple_typedef_nodes map[string]*ast.GenDecl,
-	enum_typedef_nodes   map[string]*ast.GenDecl,
-	const_group_nodes    map[string]*ast.GenDecl,
-	struct_typedef_nodes map[string]*ast.GenDecl,
-    ) (
-	final_type_order []declaration_kind,
-	err error,
-    ) {
-
+    simple_typedefs      map[string]string,
+    enum_typedefs        map[string]string,
+    const_groups         map[string]string,
+    struct_typedefs      map[string][]string,
+    simple_typedef_nodes map[string]*ast.GenDecl,
+    enum_typedef_nodes   map[string]*ast.GenDecl,
+    const_group_nodes    map[string]*ast.GenDecl,
+    struct_typedef_nodes map[string]*ast.GenDecl,
+) (
+    final_type_order []declaration_kind,
+    err error,
+) {
     type type_dependency struct {
 	type_kind string
 	type_pos token.Pos
@@ -1188,7 +1187,7 @@ func topologically_sort_nodes(
     // type_dep here (or at least its type_dep.depends_on_type_name component) apparently ends up
     // as a copy of the type_dependency object (or at least its []string component), not an alias.
     // So when we wish to alter the base data structure, we must refer to it directly.
-    for type_name, type_dep := range dependency{
+    for type_name, type_dep := range dependency {
 	if print_diagnostics {
 	    // fmt.Fprintf(diag_file, "=== dep types before filtering: %v\n", type_dep.depends_on_type_name)
 	}
@@ -1435,31 +1434,31 @@ var C_code_boilerplate = `//
 `
 
 func print_type_declarations(
-	package_name          string,
-	final_type_order      []declaration_kind,
-	simple_typedefs       map[string]string,
-	enum_typedefs         map[string]string,
-	const_groups          map[string]string,
-	struct_typedefs       map[string][]string,
-	struct_field_typedefs map[string]map[string]string,
-	simple_typedef_nodes  map[string]*ast.GenDecl,
-	enum_typedef_nodes    map[string]*ast.GenDecl,
-	const_group_nodes     map[string]*ast.GenDecl,
-	struct_typedef_nodes  map[string]*ast.GenDecl,
-    ) (
-	pointer_base_types      map[string]string,
-	pointer_list_base_types []string,
-	simple_list_base_types  []string,
-	list_base_types         []string,
-	key_value_pair_types    map[string][]string,
-	struct_fields           map[string][]string,
-	struct_field_Go_types   map[string]map[string]string,
-	struct_field_C_types    map[string]map[string]string,
-	struct_field_tags       map[string]map[string]string,
-	generated_C_code        string,
-	err error,
-    ) {
-    package_defined_type := map[string]bool{};
+    package_name          string,
+    final_type_order      []declaration_kind,
+    simple_typedefs       map[string]string,
+    enum_typedefs         map[string]string,
+    const_groups          map[string]string,
+    struct_typedefs       map[string][]string,
+    struct_field_typedefs map[string]map[string]string,
+    simple_typedef_nodes  map[string]*ast.GenDecl,
+    enum_typedef_nodes    map[string]*ast.GenDecl,
+    const_group_nodes     map[string]*ast.GenDecl,
+    struct_typedef_nodes  map[string]*ast.GenDecl,
+) (
+    pointer_base_types      map[string]string,
+    pointer_list_base_types []string,
+    simple_list_base_types  []string,
+    list_base_types         []string,
+    key_value_pair_types    map[string][]string,
+    struct_fields           map[string][]string,
+    struct_field_Go_types   map[string]map[string]string,
+    struct_field_C_types    map[string]map[string]string,
+    struct_field_tags       map[string]map[string]string,
+    generated_C_code        string,
+    err error,
+) {
+    package_defined_type := map[string]bool{}
     for key, _ := range simple_typedefs {
 	if print_diagnostics {
 	    fmt.Fprintf(diag_file, "+++ simple typedef for %s\n", key)
@@ -1520,7 +1519,7 @@ func print_type_declarations(
     header_symbol := "_" + strings.ToUpper( slash.ReplaceAllLiteralString(package_name, "_") ) + "_H"
     boilerplate_variables := C_header_boilerplate_fields{Year: current_year, HeaderFilename: header_filename, HeaderSymbol: header_symbol}
 
-    header_file, err := os.Create(header_filepath);
+    header_file, err := os.Create(header_filepath)
     if err != nil {
 	panic(err)
     }
@@ -1531,7 +1530,7 @@ func print_type_declarations(
     }()
 
     if err = header_boilerplate.Execute(header_file, boilerplate_variables); err != nil {
-	panic("C header-file header processing failed");
+	panic("C header-file header processing failed")
     }
 
     for _, decl_kind := range final_type_order {
@@ -1802,14 +1801,14 @@ func print_type_declarations(
 					list_type := star_base_type + "_List"
 					if !have_list_struct[list_type] {
 					    have_list_struct[list_type] = true
-					    fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type);
-					    fmt.Fprintf(header_file, "    size_t count;\n");
-					    fmt.Fprintf(header_file, "    %s *items;\n", star_base_type);
-					    fmt.Fprintf(header_file, "} %s;\n", list_type);
-					    fmt.Fprintf(header_file, "\n");
+					    fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
+					    fmt.Fprintf(header_file, "    size_t count;\n")
+					    fmt.Fprintf(header_file, "    %s *items;\n", star_base_type)
+					    fmt.Fprintf(header_file, "} %s;\n", list_type)
+					    fmt.Fprintf(header_file, "\n")
 					    fmt.Fprintf(header_file, "extern bool is_%[1]s_List_ptr_zero_value(const %[1]s_List *%[1]s_List_ptr);\n",
-						star_base_type);
-					    fmt.Fprintf(header_file, "\n");
+						star_base_type)
+					    fmt.Fprintf(header_file, "\n")
 					    struct_fields[list_type] = append(struct_fields[list_type], "count")
 					    struct_fields[list_type] = append(struct_fields[list_type], "items")
 					    struct_field_C_types[list_type] = map[string]string{}
@@ -1835,8 +1834,8 @@ func print_type_declarations(
 				    base_type_ptr := base_type + "_Ptr"
 				    if !have_ptr_type[base_type] {
 					have_ptr_type[base_type] = true
-					fmt.Fprintf(header_file, "typedef %s *%[1]s_Ptr;\n", base_type);
-					fmt.Fprintf(header_file, "\n");
+					fmt.Fprintf(header_file, "typedef %s *%[1]s_Ptr;\n", base_type)
+					fmt.Fprintf(header_file, "\n")
 					pointer_base_types[base_type_ptr] = base_type
 				    }
 				    field_type := base_type_ptr
@@ -1859,8 +1858,8 @@ func print_type_declarations(
 					array_base_type_ptr := array_base_type + "_Ptr"
 					if !have_ptr_type[array_base_type] {
 					    have_ptr_type[array_base_type] = true
-					    fmt.Fprintf(header_file, "typedef %s *%[1]s_Ptr;\n", array_base_type);
-					    fmt.Fprintf(header_file, "\n");
+					    fmt.Fprintf(header_file, "typedef %s *%[1]s_Ptr;\n", array_base_type)
+					    fmt.Fprintf(header_file, "\n")
 					    pointer_list_base_types = append(pointer_list_base_types, array_base_type)
 					    pointer_base_types[array_base_type_ptr] = array_base_type
 					}
@@ -1877,14 +1876,14 @@ func print_type_declarations(
 				    list_type := array_base_type + "_List"
 				    if !have_list_struct[list_type] {
 					have_list_struct[list_type] = true
-					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type);
-					fmt.Fprintf(header_file, "    size_t count;\n");
-					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type);
-					fmt.Fprintf(header_file, "} %s;\n", list_type);
-					fmt.Fprintf(header_file, "\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
+					fmt.Fprintf(header_file, "    size_t count;\n")
+					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
+					fmt.Fprintf(header_file, "} %s;\n", list_type)
+					fmt.Fprintf(header_file, "\n")
 					fmt.Fprintf(header_file, "extern bool is_%[1]s_List_ptr_zero_value(const %[1]s_List *%[1]s_List_ptr);\n",
-					    array_base_type);
-					fmt.Fprintf(header_file, "\n");
+					    array_base_type)
+					fmt.Fprintf(header_file, "\n")
 					struct_fields[list_type] = append(struct_fields[list_type], "count")
 					struct_fields[list_type] = append(struct_fields[list_type], "items")
 					struct_field_C_types[list_type] = map[string]string{}
@@ -1915,25 +1914,25 @@ func print_type_declarations(
 				    type_pair_list_type := type_pair_type + "_List"
 				    if !have_pair_structs[type_pair_type] {
 					have_pair_structs[type_pair_type] = true
-					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_type);
-					fmt.Fprintf(header_file, "    %s key;\n", key_type);
-					fmt.Fprintf(header_file, "    %s value;\n", value_type);
-					fmt.Fprintf(header_file, "} %s;\n", type_pair_type);
-					fmt.Fprintf(header_file, "\n");
-					fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_type);
-					fmt.Fprintf(header_file, "\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_type)
+					fmt.Fprintf(header_file, "    %s key;\n", key_type)
+					fmt.Fprintf(header_file, "    %s value;\n", value_type)
+					fmt.Fprintf(header_file, "} %s;\n", type_pair_type)
+					fmt.Fprintf(header_file, "\n")
+					fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_type)
+					fmt.Fprintf(header_file, "\n")
 					struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "key")
 					struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "value")
 					struct_field_C_types[type_pair_type] = map[string]string{}
 					struct_field_C_types[type_pair_type]["key"] = key_type
 					struct_field_C_types[type_pair_type]["value"] = value_type
-					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_list_type);
-					fmt.Fprintf(header_file, "    size_t count;\n");
-					fmt.Fprintf(header_file, "    %s *items;\n", type_pair_type);
-					fmt.Fprintf(header_file, "} %s;\n", type_pair_list_type);
-					fmt.Fprintf(header_file, "\n");
-					fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_list_type);
-					fmt.Fprintf(header_file, "\n");
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_list_type)
+					fmt.Fprintf(header_file, "    size_t count;\n")
+					fmt.Fprintf(header_file, "    %s *items;\n", type_pair_type)
+					fmt.Fprintf(header_file, "} %s;\n", type_pair_list_type)
+					fmt.Fprintf(header_file, "\n")
+					fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_list_type)
+					fmt.Fprintf(header_file, "\n")
 					struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "count")
 					struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "items")
 					struct_field_C_types[type_pair_list_type] = map[string]string{}
@@ -1980,7 +1979,7 @@ func print_type_declarations(
     }
 
     if err = footer_boilerplate.Execute(header_file, boilerplate_variables); err != nil {
-	panic("C header-file footer processing failed");
+	panic("C header-file footer processing failed")
     }
     return pointer_base_types, pointer_list_base_types, simple_list_base_types, list_base_types, key_value_pair_types,
 	struct_fields, struct_field_Go_types, struct_field_C_types, struct_field_tags, generated_C_code, nil
@@ -2068,36 +2067,36 @@ func interpret_json_field_tag(field_name string, struct_field_tag string) json_f
 // FIX MAJOR:  When generating these routines, apply the "json"-related content of struct field tags.
 
 func generate_all_encode_tree_routines(
-	package_name string,
-	final_type_order []declaration_kind,
+    package_name string,
+    final_type_order []declaration_kind,
 
-	// map[base_type_ptr]base_type
-	pointer_base_types map[string]string,
+    // map[base_type_ptr]base_type
+    pointer_base_types map[string]string,
 
-	// []base_type
-	list_base_types []string,
+    // []base_type
+    list_base_types []string,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_Go_type
-	struct_field_Go_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_Go_type
+    struct_field_Go_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_tag
-	struct_field_tags map[string]map[string]string,
-    ) (
-	all_encode_function_code string,
-	err error,
-    ) {
+    // map[struct_name]map[field_name] = field_tag
+    struct_field_tags map[string]map[string]string,
+) (
+    all_encode_function_code string,
+    err error,
+) {
     all_encode_function_code = ""
     pointer_type_zero_value_code := ""
 
@@ -2163,11 +2162,11 @@ bool is_%[1]s_List_ptr_zero_value(const %[1]s_List *%[1]s_List_ptr) {
 }
 
 func generate_decode_pointer_list_tree(
-	base_type string,
-    ) (
-	function_code string,
-	err error,
-    ) {
+    base_type string,
+) (
+    function_code string,
+    err error,
+) {
     function_code += fmt.Sprintf(`
 %[1]s_Ptr_List *JSON_as_%[1]s_Ptr_List_ptr(json_t *json) {
     %[1]s_Ptr_List *%[1]s_Ptr_List_ptr = (%[1]s_Ptr_List *) calloc(1, sizeof(%[1]s_Ptr_List));
@@ -2205,11 +2204,11 @@ func generate_decode_pointer_list_tree(
 }
 
 func generate_decode_simple_list_tree(
-	base_type string,
-    ) (
-	function_code string,
-	err error,
-    ) {
+    base_type string,
+) (
+    function_code string,
+    err error,
+) {
     function_code += fmt.Sprintf(`
 %[1]s_List *JSON_as_%[1]s_List_ptr(json_t *json) {
     %[1]s_List *%[1]s_List_ptr = (%[1]s_List *) calloc(1, sizeof(%[1]s_List));
@@ -2248,39 +2247,39 @@ func generate_decode_simple_list_tree(
 }
 
 func generate_all_decode_tree_routines(
-	package_name string,
-	final_type_order []declaration_kind,
+    package_name string,
+    final_type_order []declaration_kind,
 
-	// map[base_type_ptr]base_type
-	pointer_base_types map[string]string,
+    // map[base_type_ptr]base_type
+    pointer_base_types map[string]string,
 
-	// []list_base_type
-	pointer_list_base_types []string,
+    // []list_base_type
+    pointer_list_base_types []string,
 
-	// []base_type
-	simple_list_base_types []string,
+    // []base_type
+    simple_list_base_types []string,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_Go_type
-	struct_field_Go_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_Go_type
+    struct_field_Go_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_tag
-	struct_field_tags map[string]map[string]string,
-    ) (
-	all_decode_function_code string,
-	err error,
-    ) {
+    // map[struct_name]map[field_name] = field_tag
+    struct_field_tags map[string]map[string]string,
+) (
+    all_decode_function_code string,
+    err error,
+) {
     all_decode_function_code = ""
 
     // Prove that we really do have the struct_field_tags data structure populated as we expect it to be, in full detail.
@@ -2334,24 +2333,24 @@ func generate_all_decode_tree_routines(
 }
 
 func generate_all_destroy_tree_routines(
-	package_name string,
-	final_type_order []declaration_kind,
+    package_name string,
+    final_type_order []declaration_kind,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
-    ) (
-	all_destroy_function_code string,
-	err error,
-    ) {
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
+) (
+    all_destroy_function_code string,
+    err error,
+) {
     all_destroy_function_code = ""
     for _, final_type := range final_type_order {
 	if final_type.type_kind == "struct" {
@@ -2479,7 +2478,7 @@ json_t *{{.ListType}}_ptr_as_JSON_ptr(const {{.ListType}} *{{.ListType}}_ptr) {
 
     var complete_code bytes.Buffer
     if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
-	panic("encode routine complete processing failed");
+	panic("encode routine complete processing failed")
     }
     function_code += complete_code.String()
 
@@ -2603,7 +2602,7 @@ json_t *{{.PairListType}}_ptr_as_JSON_ptr(const {{.PairListType}} *{{.PairListTy
 
     var complete_code bytes.Buffer
     if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
-	panic("encode routine complete processing failed");
+	panic("encode routine complete processing failed")
     }
     function_code += complete_code.String()
 
@@ -2719,13 +2718,13 @@ string_transit_TypedValue_Pair_List *JSON_as_string_transit_TypedValue_Pair_List
 
     var complete_code bytes.Buffer
     if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
-	panic("decode routine complete processing failed");
+	panic("decode routine complete processing failed")
     }
     function_code += complete_code.String()
 
 /*
 bool is_string_transit_TypedValue_Pair_ptr_zero_value(const string_transit_TypedValue_Pair *string_transit_TypedValue_Pair_ptr) {
-    return  
+    return
 	is_string_ptr_zero_value(&string_transit_TypedValue_Pair_ptr->key) &&
 	is_transit_TypedValue_ptr_zero_value(&string_transit_TypedValue_Pair_ptr->value)
     ;
@@ -2735,7 +2734,7 @@ bool is_string_transit_TypedValue_Pair_List_ptr_zero_value(const string_transit_
     for (int index = string_transit_TypedValue_Pair_List_ptr->count; --index >= 0; ) {
 	if (!is_string_transit_TypedValue_Pair_ptr_zero_value(&string_transit_TypedValue_Pair_List_ptr->items[index])) {
 	    return false;
-	}       
+	}
     }
     return true;
 }
@@ -2743,7 +2742,7 @@ bool is_string_transit_TypedValue_Pair_List_ptr_zero_value(const string_transit_
 
     function_code += fmt.Sprintf(`
 bool is_%[1]s_%s_Pair_ptr_zero_value(const %[1]s_%s_Pair *%[1]s_%s_Pair_ptr) {
-    return  
+    return
 	is_%[1]s_ptr_zero_value(&%[1]s_%s_Pair_ptr->key) &&
 	is_%[2]s_ptr_zero_value(&%[1]s_%s_Pair_ptr->value)
     ;
@@ -2753,7 +2752,7 @@ bool is_%[1]s_%s_Pair_List_ptr_zero_value(const %[1]s_%s_Pair_List *%[1]s_%s_Pai
     for (int index = %[1]s_%s_Pair_List_ptr->count; --index >= 0; ) {
 	if (!is_%[1]s_%s_Pair_ptr_zero_value(&%[1]s_%s_Pair_List_ptr->items[index])) {
 	    return false;
-	}       
+	}
     }
     return true;
 }
@@ -2764,34 +2763,33 @@ bool is_%[1]s_%s_Pair_List_ptr_zero_value(const %[1]s_%s_Pair_List *%[1]s_%s_Pai
 }
 
 func generate_encode_PackageName_StructTypeName_ptr_tree(
-	package_name string,
-	struct_name string,
+    package_name string,
+    struct_name string,
 
-	// map[base_type_ptr]base_type
-	pointer_base_types map[string]string,
+    // map[base_type_ptr]base_type
+    pointer_base_types map[string]string,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_Go_type
-	struct_field_Go_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_Go_type
+    struct_field_Go_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_tag
-	struct_field_tags map[string]map[string]string,
-    ) (
-	function_code string,
-	err error,
-    ) {
-
+    // map[struct_name]map[field_name] = field_tag
+    struct_field_tags map[string]map[string]string,
+) (
+    function_code string,
+    err error,
+) {
     // Here's the template for the standard encoding function we need to generate.
     // There are also a few extra flavors, which we will get to in due course.
 
@@ -2903,7 +2901,7 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 
     var header_code bytes.Buffer
     if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
-	panic("encode routine header processing failed");
+	panic("encode routine header processing failed")
     }
     function_code += header_code.String()
 
@@ -2971,8 +2969,8 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			// include_condition, field_tag.json_field_name, package_name, struct_name, field_name,
 			include_condition, json_field_name, package_name, struct_name, field_name,
 		    )
-		case "int":    fallthrough;
-		case "int32":  fallthrough;
+		case "int":    fallthrough
+		case "int32":  fallthrough
 		case "int64":
 		    if field_tag.json_omitempty {
 			include_condition = fmt.Sprintf("%s_%s_ptr->%s != 0", package_name, struct_name, field_name)
@@ -3385,7 +3383,7 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 
     var footer_code bytes.Buffer
     if err := footer_template.Execute(&footer_code, boilerplate_variables); err != nil {
-	panic("encode routine footer processing failed");
+	panic("encode routine footer processing failed")
     }
     function_code += footer_code.String()
 
@@ -3451,33 +3449,33 @@ bool is_milliseconds_MillisecondTimestamp_ptr_zero_value(const milliseconds_Mill
 */
 
 func generate_decode_PackageName_StructTypeName_ptr_tree(
-	package_name string,
-	struct_name string,
+    package_name string,
+    struct_name string,
 
-	// map[base_type_ptr]base_type
-	pointer_base_types map[string]string,
+    // map[base_type_ptr]base_type
+    pointer_base_types map[string]string,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_Go_type
-	struct_field_Go_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_Go_type
+    struct_field_Go_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
 
-	// map[struct_name]map[field_name] = field_tag
-	struct_field_tags map[string]map[string]string,
-    ) (
-	function_code string,
-	err error,
-    ) {
+    // map[struct_name]map[field_name] = field_tag
+    struct_field_tags map[string]map[string]string,
+) (
+    function_code string,
+    err error,
+) {
     /*
     trailing_List := regexp.MustCompile(`(.+)_List$`)
     trailing_Ptr  := regexp.MustCompile(`(.+)_Ptr$`)
@@ -3647,7 +3645,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 		fprintf(stderr, FILE_LINE "ERROR:  cannot find the %[4]s enumeration value for %[3]s '%%s'\n", %[3]s_as_string);
 		failed = 1;
 	    }
-`, package_name, struct_name, field_name, field_C_type);
+`, package_name, struct_name, field_name, field_C_type)
 			} else {
 			    field_unpacks += fmt.Sprintf("            // , \"%s\",%*s&json_%s\n",
 				json_field_name, max_json_field_name_len - json_field_name_len + 1, " ", field_name)
@@ -3986,19 +3984,19 @@ package_name, struct_name, field_name, field_C_type)
     var object_template_code7 bytes.Buffer
 
     if err := object_template_part1.Execute(&object_template_code1, object_template_values); err != nil {
-	panic("object template processing failed");
+	panic("object template processing failed")
     }
 
     if err := object_template_part3.Execute(&object_template_code3, object_template_values); err != nil {
-	panic("object template processing failed");
+	panic("object template processing failed")
     }
 
     if err := object_template_part5.Execute(&object_template_code5, object_template_values); err != nil {
-	panic("object template processing failed");
+	panic("object template processing failed")
     }
 
     if err := object_template_part7.Execute(&object_template_code7, object_template_values); err != nil {
-	panic("object template processing failed");
+	panic("object template processing failed")
     }
 
     function_code += object_template_code1.String()
@@ -4044,7 +4042,7 @@ package_name, struct_name, field_name, field_C_type)
 
     var header_code bytes.Buffer
     if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
-	panic("decode routine header processing failed");
+	panic("decode routine header processing failed")
     }
     function_code += header_code.String()
 
@@ -4054,33 +4052,33 @@ package_name, struct_name, field_name, field_C_type)
 // Let's define a function that will generate the destroy_StructTypeName_ptr_tree() code, given the StructTypeName
 // and a list of all the available structs and their individual fields and field types.
 func generate_destroy_PackageName_StructTypeName_ptr_tree(
-	package_name string,
-	struct_name string,
+    package_name string,
+    struct_name string,
 
-	// map[key_type][]value_type
-	key_value_pair_types map[string][]string,
+    // map[key_type][]value_type
+    key_value_pair_types map[string][]string,
 
-	// map[enum_name]enum_type
-	enum_typedefs map[string]string,
+    // map[enum_name]enum_type
+    enum_typedefs map[string]string,
 
-	// map[struct_name][]field_name
-	struct_fields map[string][]string,
+    // map[struct_name][]field_name
+    struct_fields map[string][]string,
 
-	// map[struct_name]map[field_name] = field_type
-	struct_field_C_types map[string]map[string]string,
-    ) (
-	function_code string,
-	err error,
-    ) {
+    // map[struct_name]map[field_name] = field_type
+    struct_field_C_types map[string]map[string]string,
+) (
+    function_code string,
+    err error,
+) {
     trailing_List   := regexp.MustCompile(`(.+)_List$`)
     // FIX QUICK:  Check out the details of this pattern, once everything else is working; should we only recognize _Ptr (capital) again?
     trailing_Ptr    := regexp.MustCompile(`(.+)_[Pp]tr$`)
     leading_package := regexp.MustCompile(package_name + "_(.+)")
     function_code = ""
 
-var destroy_routine_header_template = `void destroy_{{.StructName}}_ptr_tree({{.StructName}} *{{.StructName}}_ptr, json_t *json, bool free_pointers) {
+    var destroy_routine_header_template = `void destroy_{{.StructName}}_ptr_tree({{.StructName}} *{{.StructName}}_ptr, json_t *json, bool free_pointers) {
 `
-var destroy_routine_footer_template = `        free_JSON(json);
+    var destroy_routine_footer_template = `        free_JSON(json);
     }
 }
 
@@ -4097,7 +4095,7 @@ var destroy_routine_footer_template = `        free_JSON(json);
 
     var header_code bytes.Buffer
     if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
-	panic("destroy routine header processing failed");
+	panic("destroy routine header processing failed")
     }
     function_code += header_code.String()
 
@@ -4261,7 +4259,7 @@ var destroy_routine_footer_template = `        free_JSON(json);
 		} else {
 		    address_op = "&"
 		}
-	        // We have a structure from some other package.  We must call its own destroy...() routine,
+		// We have a structure from some other package.  We must call its own destroy...() routine,
 		// and deal correctly with both its json argument (which we must pass) and deleting the
 		// pointers we pass (which we must cause it to skip).
 		function_code += fmt.Sprintf("%sdestroy_%s_ptr_tree(%s%s_%s%s%s, json, false);\n",
@@ -4274,7 +4272,7 @@ var destroy_routine_footer_template = `        free_JSON(json);
 
     var footer_code bytes.Buffer
     if err := footer_template.Execute(&footer_code, boilerplate_variables); err != nil {
-	panic("destroy routine footer processing failed");
+	panic("destroy routine footer processing failed")
     }
     function_code += footer_code.String()
 
@@ -4293,28 +4291,28 @@ var destroy_routine_footer_template = `        free_JSON(json);
 //     extern void destroy_PackageName_StructTypeName_ptr_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr, json_t *json, bool free_pointers);
 //
 func print_type_conversions(
-	other_headers           string,
-	generated_C_code        string,
-	package_name            string,
-	final_type_order        []declaration_kind,
-	pointer_base_types      map[string]string,
-	pointer_list_base_types []string,
-	simple_list_base_types  []string,
-	list_base_types         []string,
-	key_value_pair_types    map[string][]string,
-	simple_typedefs         map[string]string,
-	enum_typedefs           map[string]string,
-	const_groups            map[string]string,
-	struct_typedefs         map[string][]string,
-	simple_typedef_nodes    map[string]*ast.GenDecl,
-	enum_typedef_nodes      map[string]*ast.GenDecl,
-	const_group_nodes       map[string]*ast.GenDecl,
-	struct_typedef_nodes    map[string]*ast.GenDecl,
-	struct_fields           map[string][]string,
-	struct_field_Go_types   map[string]map[string]string,
-	struct_field_C_types    map[string]map[string]string,
-	struct_field_tags       map[string]map[string]string,
-    ) error {
+    other_headers           string,
+    generated_C_code        string,
+    package_name            string,
+    final_type_order        []declaration_kind,
+    pointer_base_types      map[string]string,
+    pointer_list_base_types []string,
+    simple_list_base_types  []string,
+    list_base_types         []string,
+    key_value_pair_types    map[string][]string,
+    simple_typedefs         map[string]string,
+    enum_typedefs           map[string]string,
+    const_groups            map[string]string,
+    struct_typedefs         map[string][]string,
+    simple_typedef_nodes    map[string]*ast.GenDecl,
+    enum_typedef_nodes      map[string]*ast.GenDecl,
+    const_group_nodes       map[string]*ast.GenDecl,
+    struct_typedef_nodes    map[string]*ast.GenDecl,
+    struct_fields           map[string][]string,
+    struct_field_Go_types   map[string]map[string]string,
+    struct_field_C_types    map[string]map[string]string,
+    struct_field_tags       map[string]map[string]string,
+) error {
 
     header_boilerplate := template.Must(template.New("code_file_header").Parse(C_code_boilerplate))
 
@@ -4336,7 +4334,7 @@ func print_type_conversions(
 	HeaderFilename: header_filename,
     }
 
-    code_file, err := os.Create(code_filepath);
+    code_file, err := os.Create(code_filepath)
     if err != nil {
 	panic(err)
     }
@@ -4347,10 +4345,10 @@ func print_type_conversions(
     }()
 
     if err := header_boilerplate.Execute(code_file, boilerplate_variables); err != nil {
-	panic("C code-file header processing failed");
+	panic("C code-file header processing failed")
     }
 
-    fmt.Fprintf(code_file, "%s", generated_C_code);
+    fmt.Fprintf(code_file, "%s", generated_C_code)
 
     all_encode_function_code, err := generate_all_encode_tree_routines(
 	package_name, final_type_order, pointer_base_types, list_base_types, key_value_pair_types,
@@ -4359,7 +4357,7 @@ func print_type_conversions(
     if err != nil {
 	panic(err)
     }
-    fmt.Fprintf(code_file, "%s", all_encode_function_code);
+    fmt.Fprintf(code_file, "%s", all_encode_function_code)
 
     all_decode_function_code, err := generate_all_decode_tree_routines(
 	package_name, final_type_order,
@@ -4369,7 +4367,7 @@ func print_type_conversions(
     if err != nil {
 	panic(err)
     }
-    fmt.Fprintf(code_file, "%s", all_decode_function_code);
+    fmt.Fprintf(code_file, "%s", all_decode_function_code)
 
     all_destroy_function_code, err := generate_all_destroy_tree_routines(
 	package_name, final_type_order, key_value_pair_types, enum_typedefs, struct_fields, struct_field_C_types,
@@ -4377,7 +4375,7 @@ func print_type_conversions(
     if err != nil {
 	panic(err)
     }
-    fmt.Fprintf(code_file, "%s", all_destroy_function_code);
+    fmt.Fprintf(code_file, "%s", all_destroy_function_code)
 
     return nil
 }
