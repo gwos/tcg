@@ -131,6 +131,7 @@ func CollectMetrics() transit.MonitoredResource {
     diskFreeService := transit.MonitoredService{
         Name:          "diskFree",
         Status:        transit.ServiceOk,
+        Owner:         hostStat.Hostname,
         LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
         Metrics:       []transit.TimeSeries{diskFree},
     }
