@@ -127,6 +127,8 @@ func CollectMetrics() transit.MonitoredResource {
     // TODO: GET CPU STATS AND AVERAGE LOAD ACROSS ALL CPUS -- see above
     // TODO: advanced - one CPU service, multiple metrics per CPU1, CPU2 ... (probably not very useful)
     // TODO: hostStat.Procs -- number of processes running
+    // TODO: send thresholds (warning, critical) -- these will eventually come
+    //       out of a configuration api - for now - simply send some sensible values
 
     diskFreeService := transit.MonitoredService{
         Name:          "diskFree",
