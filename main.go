@@ -28,8 +28,12 @@ func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 
-	// VLAD - I am no longer using this -- suppose we could do something like look up the process by PID and create
-	// a new service for each process name we want to monitor. Lets hold off on that for now... feel free to delete
+	// VLAD - I think the gatherMetrics could be made into an advanced feature built into the ServerConnector:
+	// 	1. From the PID, we can get the process name
+	//  2. provide a list of process names that we want to monitor
+	//  3. Look up the CPU usage for a process with a given name and turn it into a Service
+	//  This way we can (a) get the status of processes running on a server (b) get their cpu usage with thresholds
+	//  After finishing serverConnector.CollectMetrics(), please implement this in the ServerConnector
 	processes := gatherMetrics()
 
 	for _, p := range processes {
