@@ -29,7 +29,7 @@ func main() {
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 
 	// VLAD - I am no longer using this -- suppose we could do something like look up the process by PID and create
-	// a new service for each process name we want to monitor. Lets hold off on that for now... feel free to delete 
+	// a new service for each process name we want to monitor. Lets hold off on that for now... feel free to delete
 	processes := gatherMetrics()
 
 	for _, p := range processes {
