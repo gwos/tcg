@@ -8,6 +8,18 @@
 # field tags) in the original Go code.  This tool may find use when exchanging data
 # between Go and C contexts.
 
+# The enum.go file in this directory is used for ad-hoc testing of the gotocjson tool,
+# during development.
+
+# The copies of config.go, milliseconds.go, and transit.go in this directory are NOT the
+# production copies.  Instead, they are test copies, intended to freeze stable versions of
+# enumerations and data structures that we can reliably use for testing the gotocjson tool
+# ehile developint it.
+
+# The convert_go_to_c.h and convert_go_to_c.c files comprise an integral part of the
+# implementation of the gotocjson tool.  They provide routines which are not derived
+# from converted Go code, but which are necessary to support the converted Go code.
+
 # The Jansson library is used for parsing and generating JSON strings from C-language
 # code.  We use a locally-built copy of this library because it is fairly likely to be
 # more up-to-date than a system-provided copy.
@@ -17,6 +29,12 @@ JANSSON_INCLUDE_DIRECTORY = ../local/include
 
 # Location of the compiled Jansson library, for linking purposes.
 JANSSON_LIB_DIRECTORY = ../local/lib
+
+# JSON test files are expected to be named as "json.{package}.{structure}.{item}",
+# where the {item} is a two-digit number that allows for multiple JSON files to be
+# used to test the same structure.
+JSON_TEST_FILES = json.transit.*
+# JSON_TEST_FILES = json.transit.InventoryResource.01
 
 KERNEL_NAME := $(shell uname -s)
 ifeq ($(KERNEL_NAME),Linux)
@@ -46,54 +64,60 @@ all	: gotocjson
 test	: unittest
 	./unittest
 
+# To test each individual JSON file, we must identify the nature of that file and compile
+# specific code that understands the particular data structure involved, calling just the
+# conversion routines that are tailored for that one data structure.  To make it easier to
+# add more test cases over time, here we dynamically construct the C test code.  That way,
+# you don't have have to edit any C code yourself.  All you have to do is provide a new
+# JSON-string test file using an appropriate filename.
+tests	: ${JSON_TEST_FILES} testjson.c convert_go_to_c.o config.o milliseconds.o transit.o Makefile
+	for json_file in ${JSON_TEST_FILES}; do			\
+	    echo "================================================================================================";	\
+	    echo Processing json test file $$json_file;		\
+	    package=$${json_file#json.};			\
+	    structure=$${package#*.};				\
+	    item=$${structure#*.};				\
+	    package=$${package%%.*};				\
+	    structure=$${structure%%.*};			\
+	    # echo "package   = '$$package'";			\
+	    # echo "structure = '$$structure'";			\
+	    # echo "item      = '$$item'";			\
+	    ${CC} -c testjson.c -DPackage=$$package -DStructure=$$structure -I${JANSSON_INCLUDE_DIRECTORY};		\
+	    ${CC} -o testjson convert_go_to_c.o config.o milliseconds.o transit.o testjson.o ${JANSSON_LINK_FLAGS};	\
+	    if ! testjson $$json_file; then			\
+	        echo "ERROR:  Test of $$json_file failed!";	\
+		exit 1;						\
+	    fi;							\
+	done
+
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
 
+# Run the set of unit tests while looking for full detail on memory leaks.
 fullcheck	: unittest
 	valgrind --leak-check=full ./unittest
 
+# Run the set of unit tests while looking for basic info on memory leaks.
 check	: unittest
 	valgrind ./unittest
 
 unittest	: config.o milliseconds.o transit.o unittest.o convert_go_to_c.o Makefile
 	${CC} -o unittest config.o milliseconds.o transit.o unittest.o convert_go_to_c.o ${JANSSON_LINK_FLAGS}
 
-# Obsolete, still-in-development entry.
-# Will be cleaned out when we also delete c.c, m.c, and t.c code and the support for it below.
-#unittest	: c.o milliseconds.o transit.o unittest.o convert_go_to_c.o Makefile
-#	${CC} -o unittest c.o milliseconds.o transit.o unittest.o convert_go_to_c.o ${JANSSON_LINK_FLAGS}
-
-# Obsolete, still-in-development entry.
-# Will be cleaned out when we also delete c.c, m.c, and t.c code and the support for it below.
-#unittest	: c.o m.o transit.o unittest.o convert_go_to_c.o Makefile
-#	${CC} -o unittest c.o m.o transit.o unittest.o convert_go_to_c.o ${JANSSON_LINK_FLAGS}
-
 unittest.o	: unittest.c convert_go_to_c.h config.h milliseconds.h transit.h
 	${CC} -c unittest.c -I${JANSSON_INCLUDE_DIRECTORY}
-
-# c.c, m.c, and t.c were early manually-written templates for the conversion code, used
-# as patterns and substitutes for the automatic conversions until those became available.
-
-c.o	: c.c convert_go_to_c.h config.h
-	${CC} -c c.c -I${JANSSON_INCLUDE_DIRECTORY}
-
-m.o	: m.c convert_go_to_c.h milliseconds.h
-	${CC} -c m.c -I${JANSSON_INCLUDE_DIRECTORY}
-
-t.o	: t.c convert_go_to_c.h config.h milliseconds.h transit.h
-	${CC} -c t.c -I${JANSSON_INCLUDE_DIRECTORY}
 
 convert_go_to_c.o	: convert_go_to_c.h convert_go_to_c.c
 	${CC} -c convert_go_to_c.c -I${JANSSON_INCLUDE_DIRECTORY}
 
 config.h config.c	: gotocjson config.go
-	./gotocjson config.go > ,c
+	./gotocjson -d config.go > ,config-diagnostics
 
 milliseconds.h milliseconds.c	: gotocjson milliseconds.go
-	./gotocjson milliseconds.go > ,m
+	./gotocjson -d milliseconds.go > ,milliseconds-diagnostics
 
 transit.h transit.c	: gotocjson transit.go
-	./gotocjson transit.go > ,t
+	./gotocjson -d transit.go > ,transit-diagnostics
 
 config.o	: config.h config.c convert_go_to_c.h
 	${CC} -c config.c -I${JANSSON_INCLUDE_DIRECTORY}
@@ -104,11 +128,19 @@ milliseconds.o	: milliseconds.h milliseconds.c convert_go_to_c.h
 transit.o	: config.h milliseconds.h transit.h transit.c convert_go_to_c.h
 	${CC} -c transit.c -I${JANSSON_INCLUDE_DIRECTORY}
 
-transit	: config.o milliseconds.o transit.o
-	${CC} -o transit config.o milliseconds.o transit.o ${JANSSON_LINK_FLAGS}
+transit_main.o	: transit_main.c
+	${CC} -c transit_main.c -I${JANSSON_INCLUDE_DIRECTORY}
+
+# A kind of sample application.  Here just to elucidate the linking aspects of such a build,
+# not to produce an actively useful binary program.
+transit	: convert_go_to_c.o config.o milliseconds.o transit.o transit_main.o
+	${CC} -o transit convert_go_to_c.o config.o milliseconds.o transit.o transit_main.o ${JANSSON_LINK_FLAGS}
+
+enum.h enum.c	: gotocjson enum.go
+	./gotocjson -d enum.go > ,enum-diagnostics
 
 clean	:
-	rm -f gotocjson *.o config.h config.c milliseconds.h milliseconds.c transit.h transit.c
+	rm -f gotocjson *.o config.h config.c milliseconds.h milliseconds.c transit.h transit.c enum.h enum.c
 
 realclean	: clean
-	rm -f ,c ,e ,g ,m ,t foo.o foo unittest
+	rm -f ,config-diagnostics ,enum-diagnostics ,milliseconds-diagnostics ,transit-diagnostics unittest transit testjson
