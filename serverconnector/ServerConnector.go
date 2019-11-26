@@ -129,6 +129,7 @@ func CollectMetrics() transit.MonitoredResource {
     // TODO: GET MEMORY USAGE -- see above -- total, used, free, percent
     // TODO: GET CPU STATS AND AVERAGE LOAD ACROSS ALL CPUS -- see above
     // TODO: advanced - one CPU service, multiple metrics per CPU1, CPU2 ... (probably not very useful)
+    // TODO: hostStat.Procs -- number of processes running
 
     diskFreeService := transit.MonitoredService{
         Name:             "diskFree",
