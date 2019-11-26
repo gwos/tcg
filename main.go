@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
+	serverConnector "github.com/gwos/tng/serverconnector"
 	"github.com/gwos/tng/transit"
 	"log"
 	"math/rand"
@@ -27,17 +28,16 @@ func main() {
 	flag.Parse()
 	fmt.Printf("Starting Groundwork Agent on port %d\n", *argPort)
 
+	// VLAD - I am no longer using this -- suppose we could do something like look up the process by PID and create
+	// a new service for each process name we want to monitor. Lets hold off on that for now... feel free to delete 
 	processes := gatherMetrics()
 
 	for _, p := range processes {
 		log.Println("Process ", p.pid, " takes ", p.cpu, " % of the CPU")
 	}
 
-	// metrics live!
-	// works only in Linux, not mac
-	//contents, _ := ioutil.ReadFile("/proc/stat")
-	// fmt.Println(contents)
-	// @see: https://github.com/c9s/goprocinfo
+	server := serverConnector.CollectMetrics()
+	println(server.Name)
 
 	// TODO: start TNG
 	sendInventoryResources()
@@ -143,6 +143,7 @@ func sendMonitoredResources() {
 		},
 		Metrics: []transit.TimeSeries{sampleValue, sampleWarning, sampleCritical},
 	} // Example Monitored Resource of type Host
+
 	geneva := transit.MonitoredResource{
 		Name:             "geneva",
 		Type:             transit.Host,

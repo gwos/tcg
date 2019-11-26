@@ -30,6 +30,7 @@ require (
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/procfs v0.0.5 // indirect
+	github.com/shirou/gopsutil v2.19.10+incompatible
 	github.com/stretchr/testify v1.3.0
 	github.com/ugorji/go v1.1.7 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
