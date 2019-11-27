@@ -1,0 +1,23 @@
+{
+    "name": "TestCustomName",
+    "description": "TestDescription",
+    "displayName": "TestDisplayName",
+    "labels": [
+        {
+            "description": "TestDescription",
+            "key": "TestKey",
+            "valueType": "StringType"
+        }
+    ],
+    "thresholds": [
+        {
+            "key": "TestKey",
+            "value": 2
+        }
+    ],
+    "type": "TestType",
+    "unit": "1",
+    "valueType": "IntegerType",
+    "computeType": "Query",
+    "metricKind": "GAUGE"
+}
