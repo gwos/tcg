@@ -1,9 +1,9 @@
 package milliseconds
 
 import (
-    "fmt"
-    "strconv"
-    "time"
+	"fmt"
+	"strconv"
+	"time"
 )
 
 // MillisecondTimestamp refers to the JSON representation of timestamps, for
@@ -71,24 +71,24 @@ import (
 // unmarshalling data structures that contain such fields.
 //
 type MillisecondTimestamp struct {
-    time.Time
+	time.Time
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
-    strInput := string(input)
+	strInput := string(input)
 
-    i, err := strconv.ParseInt(strInput, 10, 64)
-    if err != nil {
-        return err
-    }
+	i, err := strconv.ParseInt(strInput, 10, 64)
+	if err != nil {
+		return err
+	}
 
-    i *= int64(time.Millisecond)
-    *t = MillisecondTimestamp{time.Unix(0, i).UTC()}
-    return nil
+	i *= int64(time.Millisecond)
+	*t = MillisecondTimestamp{time.Unix(0, i).UTC()}
+	return nil
 }
 
 // MarshalJSON implements json.Marshaler.
 func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-    return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
+	return []byte("\"" + fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond)) + "\""), nil
 }
