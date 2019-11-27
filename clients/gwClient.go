@@ -42,7 +42,7 @@ var client *GWClient
 // GetGWClient implements Singleton pattern
 func GetGWClient() *GWClient {
 	onceGWClient.Do(func() {
-		client = &GWClient{GWConfig: config.GetConfig().GWConfig}
+		client = &GWClient{GWConfig: config.GetConfig().GWConfigs[0]}
 	})
 	return client
 }

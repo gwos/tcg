@@ -20,11 +20,12 @@ agentConfig:
   startTransport: True
   startController: True
   loggingLevel: 0
-gwConfig:
-  host: "localhost:80"
-  account: "RESTAPIACCESS"
-  password: ""
-  appName: "gw8"
+gwConfigs:
+  -
+    host: "localhost:80"
+    account: "RESTAPIACCESS"
+    password: ""
+    appName: "gw8"
 `)
 
 	tmpfile, err := ioutil.TempFile("", "config")
@@ -37,18 +38,29 @@ gwConfig:
 
 	os.Setenv(ConfigEnv, tmpfile.Name())
 	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_GWCONFIG_PASSWORD", "SECRET")
+	os.Setenv("TNG_GWCONFIGS", "[{\"password\":\"SEC RET\"},{\"appName\":\"gw8\"}]")
 
 	expected := Config{
 		AgentConfig: &AgentConfig{":8081", "", "", 15, "datastore", "MEMORY", ":4222", true, true, true, 0},
-		GWConfig:    &GWConfig{"localhost:80", "RESTAPIACCESS", "SECRET", "gw8"},
+		GWConfigs: GWConfigs{
+			&GWConfig{"localhost:80", "RESTAPIACCESS", "SEC RET", "gw8"},
+			&GWConfig{AppName: "gw8"},
+		},
 	}
 
 	got := GetConfig()
+
 	if !reflect.DeepEqual(got.AgentConfig, expected.AgentConfig) {
-		t.Errorf("got %v, expected %v", got.AgentConfig, expected.AgentConfig)
+		t.Errorf("got: %v, expected: %v", got.AgentConfig, expected.AgentConfig)
 	}
-	if !reflect.DeepEqual(got.GWConfig, expected.GWConfig) {
-		t.Errorf("got %v, expected %v", got.GWConfig, expected.GWConfig)
+
+	if len(got.GWConfigs) != len(expected.GWConfigs) {
+		t.Errorf("got: %v, expected: %v", len(got.GWConfigs), len(expected.GWConfigs))
+	}
+
+	for k, v := range got.GWConfigs {
+		if !reflect.DeepEqual(v, expected.GWConfigs[k]) {
+			t.Errorf("key: %v, got: %v, expected: %v", k, v, expected.GWConfigs[k])
+		}
 	}
 }
