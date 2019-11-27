@@ -1,3 +1,7 @@
+The JSON strings presented here were used as the initial basis for the unit
+tests for the gotocjson tool.  In some cases, the JSON strings shown here are
+subtly wrong, and corrections have been made in the gotocjson/unittest.c code.
+
 >TimeInterval:  
 
     {"endTime":1572955806397,"startTime":1572955806397}
