@@ -1,11 +1,11 @@
 package integration
 
 import (
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
-	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -30,7 +30,7 @@ func TestNatsQueue_1(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
+	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
 	testMessage, err := parseJson()
@@ -52,7 +52,7 @@ func TestNatsQueue_1(t *testing.T) {
 	}
 
 	services.GetTransitService().Config.GWConfig.Host = GWValidHost
-	log.Println("Invalid path was changed to valid one")
+	log.Info("Invalid path was changed to valid one")
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
 
@@ -68,7 +68,7 @@ func TestNatsQueue_2(t *testing.T) {
 	err := configNats(t)
 	assert.NoError(t, err)
 
-	log.Println("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
+	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
 
 	defer cleanNats(t)
@@ -90,19 +90,19 @@ func TestNatsQueue_2(t *testing.T) {
 		return
 	}
 
-	log.Println("Stopping NATS server ...")
+	log.Info("Stopping NATS server ...")
 	err = services.GetTransitService().StopNats()
 	assert.NoError(t, err)
-	log.Println("NATS Server was stopped successfully")
+	log.Info("NATS Server was stopped successfully")
 
 	services.GetTransitService().Config.GWConfig.Host = GWValidHost
-	log.Println("Invalid path was changed to valid one")
+	log.Info("Invalid path was changed to valid one")
 
-	log.Println("Starting NATS server ...")
+	log.Info("Starting NATS server ...")
 	err = services.GetTransitService().StartNats()
 	assert.NoError(t, err)
 
-	log.Println("NATS Server was started successfully")
+	log.Info("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 2 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent == 0 {

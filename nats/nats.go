@@ -2,11 +2,10 @@ package nats
 
 import (
 	"fmt"
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -92,7 +91,7 @@ func StopServer() {
 }
 
 // StartDispatcher subscribes processors by subject
-func StartDispatcher(dispatcherMap *DispatcherMap, loggingLevel config.LoggingLevel) error {
+func StartDispatcher(dispatcherMap *DispatcherMap) error {
 	var err error
 	if dispatcherConn == nil {
 		dispatcherConn, err = stan.Connect(
@@ -112,18 +111,12 @@ func StartDispatcher(dispatcherMap *DispatcherMap, loggingLevel config.LoggingLe
 			DispatcherQueueGroup,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-					if loggingLevel == 0 {
-						log.Println("Not delivered")
-					} else {
-						log.Println("Not delivered\nError: ", err.Error(), "\nMessage: ", msg)
-					}
+						log.Info("Not delivered")
+						log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
 				} else {
 					_ = msg.Ack()
-					if loggingLevel == 0 {
-						log.Println("Delivered")
-					} else {
-						log.Println("Delivered\nMessage:", msg)
-					}
+						log.Info("Delivered")
+						log.Debug("Message:", msg)
 				}
 			},
 			stan.SetManualAckMode(),
