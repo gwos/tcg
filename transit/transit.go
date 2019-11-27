@@ -41,6 +41,9 @@ type UnitType string
 const (
 	UnitCounter UnitType = "1"
 	PercentCPU           = "%{cpu}"
+	KB					 = "KB"
+	MB					 = "MB"
+	GB					 = "GB"
 )
 
 // ComputeType defines CloudHub Compute Types

@@ -5,6 +5,7 @@ import (
     "fmt"
     "github.com/gwos/tng/milliseconds"
     "github.com/gwos/tng/transit"
+    "github.com/shirou/gopsutil/cpu"
     "github.com/shirou/gopsutil/disk"
     "github.com/shirou/gopsutil/host"
     "github.com/shirou/gopsutil/mem"
@@ -15,7 +16,11 @@ import (
     "time"
 )
 
-var hostName string
+const (
+    MB  uint64 = 1048576
+)
+
+var hostName string // TODO: Vlad why use global?
 
 var LastCheck milliseconds.MillisecondTimestamp
 
@@ -118,7 +123,7 @@ func getTotalDiskUsageService() *transit.MonitoredService {
         Status:        transit.ServiceOk,
         Owner:         hostName,
         LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-        NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+        NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},  // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST
         Metrics: []transit.TimeSeries{
             {
                 MetricName: "totalDiskUsage",
@@ -129,8 +134,9 @@ func getTotalDiskUsageService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(diskStats.Total),
+                    IntegerValue: int64(diskStats.Total / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -148,7 +154,7 @@ func getDiskUsedService() *transit.MonitoredService {
         Status:        transit.ServiceOk,
         Owner:         hostName,
         LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-        NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+        NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST	EEEE
         Metrics: []transit.TimeSeries{
             {
                 MetricName: "diskUsed",
@@ -159,8 +165,9 @@ func getDiskUsedService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(diskStats.Used),
+                    IntegerValue: int64(diskStats.Used / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -190,8 +197,9 @@ func getDiskFreeService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(diskStats.Free),
+                    IntegerValue: int64(diskStats.Free / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -220,8 +228,9 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(vmStats.Total),
+                    IntegerValue: int64(vmStats.Total / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -249,8 +258,9 @@ func getMemoryUsedService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(vmStats.Used),
+                    IntegerValue: int64(vmStats.Used / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -279,8 +289,9 @@ func getMemoryFreeService() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(vmStats.Free),
+                    IntegerValue: int64(vmStats.Free / MB),
                 },
+                Unit: transit.MB,
             },
         },
     }
@@ -333,14 +344,24 @@ func getTotalCpuUsage() *transit.MonitoredService {
                 },
                 Value: &transit.TypedValue{
                     ValueType:    transit.IntegerType,
-                    IntegerValue: int64(gatherMetrics()),
+                    IntegerValue: int64(collectProcessMetrics()), // see getCpuUsage
                 },
             },
         },
     }
 }
 
-func gatherMetrics() float64 {
+// this uses gopsutil
+func getCpuUsage() {
+    // TODO implement this
+    percentages, _ := cpu.Percent(0, true)
+    for _, cpupercent := range percentages {
+        strconv.FormatFloat(cpupercent, 'f', 2, 64);
+    }
+
+}
+// TODO: this function should support named process matching
+func collectProcessMetrics() float64 {
     cmd := exec.Command("ps", "aux")
     var out bytes.Buffer
     cmd.Stdout = &out
