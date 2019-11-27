@@ -1,11 +1,11 @@
-package transit
+package transport
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/subseconds"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -119,12 +119,12 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime milliseconds.MillisecondTimestamp `json:"endTime,omitempty"`
+	EndTime subseconds.MillisecondTimestamp `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
+	StartTime subseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
 // TypedValue defines a single strongly-typed value.
@@ -147,7 +147,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	TimeValue subseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
@@ -321,9 +321,9 @@ type ResourceStatus struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
 	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime subseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime subseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPlugInOutput,omitempty"`
 	// Foundation Properties
@@ -343,10 +343,10 @@ type MonitoredResource struct {
 
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string                            `json:"appType"`
-	AgentID    string                            `json:"agentID"`
-	TraceToken string                            `json:"traceToken"`
-	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	AppType    string                          `json:"appType"`
+	AgentID    string                          `json:"agentID"`
+	TraceToken string                          `json:"traceToken"`
+	TimeStamp  subseconds.MillisecondTimestamp `json:"timeStamp"`
 }
 
 // SendInventoryRequest defines SendInventory payload
@@ -405,7 +405,7 @@ type Operations interface {
 
 // Transit implements Operations interface
 type Transit struct {
-	*config.Config
+	*setup.Config
 }
 
 // Connect implements Operations.Connect.

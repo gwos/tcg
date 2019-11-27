@@ -388,7 +388,8 @@ func process_parse_nodes(
     if print_diagnostics {
 	fmt.Fprintln(diag_file, "=== Imports:")
     }
-    special_package_prefix := regexp.MustCompile(`^github.com/gwos/tng/([^/]+)$`)
+    // special_package_prefix := regexp.MustCompile(`^github.com/gwos/tng/([^/]+)$`)
+    special_package_prefix := regexp.MustCompile(`^github.com/gwos/.*/([^/]+)$`)
     include_headers := []string{}
     for _, s := range f.Imports {
 	if print_diagnostics {
