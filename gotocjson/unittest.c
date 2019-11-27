@@ -1,4 +1,4 @@
-// Unit tests for routines generated from the transit.go source code.
+// Unit tests for routines generated from the transport.go source code.
 
 #include <string.h>
 
@@ -6,54 +6,54 @@
 
 #include "convert_go_to_c.h"
 
-#include "config.h"
-#include "milliseconds.h"
-#include "transit.h"
+#include "setup.h"
+#include "subseconds.h"
+#include "transport.h"
 
 #define	FAILURE	0	// for use in routine return values 
 #define	SUCCESS	1	// for use in routine return values
 
 // Sample routines for use by application code:
 
-// extern char   *transit_Transit_ptr_as_JSON_str(const transit_Transit *transit_Transit);
-// extern transit_Transit *JSON_str_as_transit_Transit_ptr(const char *json_str, json_t **json);
+// extern char   *transport_Transit_ptr_as_JSON_str(const transport_Transit *transport_Transit);
+// extern transport_Transit *JSON_str_as_transport_Transit_ptr(const char *json_str, json_t **json);
 
-// extern char *transit_MonitoredResource_ptr_as_JSON_str(const transit_MonitoredResource *transit_MonitoredResource);
-// extern transit_MonitoredResource *JSON_str_as_transit_MonitoredResource_ptr(const char *json_str, json_t **json);
+// extern char *transport_MonitoredResource_ptr_as_JSON_str(const transport_MonitoredResource *transport_MonitoredResource);
+// extern transport_MonitoredResource *JSON_str_as_transport_MonitoredResource_ptr(const char *json_str, json_t **json);
 
 // Sample internal conversion routines, generally not of interest to applications:
 
-// extern json_t *transit_Transit_ptr_as_JSON_ptr(const transit_Transit *transit_Transit);
-// extern transit_Transit *JSON_as_transit_Transit(json_t *json); 
+// extern json_t *transport_Transit_ptr_as_JSON_ptr(const transport_Transit *transport_Transit);
+// extern transport_Transit *JSON_as_transport_Transit(json_t *json); 
 
-// extern json_t *transit_MonitoredResource_ptr_as_JSON_ptr(const transit_MonitoredResource *transit_MonitoredResource);
-// extern transit_MonitoredResource *JSON_as_transit_MonitoredResource(json_t *json);
+// extern json_t *transport_MonitoredResource_ptr_as_JSON_ptr(const transport_MonitoredResource *transport_MonitoredResource);
+// extern transport_MonitoredResource *JSON_as_transport_MonitoredResource(json_t *json);
 
 // We make this a const string to attempt to bypass some overly aggressive compiler security warnings.
 const char separation_line[] = "--------------------------------------------------------------------------------\n";
 
-char *initial_transit_TimeInterval_as_json_string = "{\n"
+char *initial_transport_TimeInterval_as_json_string = "{\n"
 "    \"endTime\": 1572955806397,\n"
 "    \"startTime\": 1572955806397\n"
 "}";
 
-char *initial_transit_TypedValue_as_json_string = "{\n"
+char *initial_transport_TypedValue_as_json_string = "{\n"
 "    \"valueType\": \"IntegerType\",\n"
 "    \"integerValue\": 1\n"
 "}";
 
-char *initial_transit_LabelDescriptor_as_json_string = "{\n"
+char *initial_transport_LabelDescriptor_as_json_string = "{\n"
 "    \"description\": \"TestDescription\",\n"
 "    \"key\": \"TestKey\",\n"
 "    \"valueType\": \"StringType\"\n"
 "}";
 
-char *initial_transit_ThresholdDescriptor_as_json_string = "{\n"
+char *initial_transport_ThresholdDescriptor_as_json_string = "{\n"
 "    \"key\": \"TestKey\",\n"
 "    \"value\": 2\n"
 "}";
 
-char *initial_transit_SendInventoryRequest_as_json_string = "{\n"
+char *initial_transport_SendInventoryRequest_as_json_string = "{\n"
 "    \"resources\": [\n"
 "        {\n"
 "            \"name\": \"TestName\",\n"
@@ -84,7 +84,7 @@ char *initial_transit_SendInventoryRequest_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-char *initial_transit_OperationResult_as_json_string = "{\n"
+char *initial_transport_OperationResult_as_json_string = "{\n"
 "    \"entity\": \"TestEntity\",\n"
 "    \"status\": \"TestStatus\",\n"
 "    \"message\": \"TestMessage\",\n"
@@ -92,7 +92,7 @@ char *initial_transit_OperationResult_as_json_string = "{\n"
 "    \"entityID\": 173\n"
 "}";
 
-char *initial_transit_ResourceGroup_as_json_string = "{\n"
+char *initial_transport_ResourceGroup_as_json_string = "{\n"
 "    \"groupName\": \"TestGroupName\",\n"
 "    \"resources\": [\n"
 "        {\n"
@@ -103,7 +103,7 @@ char *initial_transit_ResourceGroup_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-char *initial_transit_ResourceWithMetricsRequest_as_json_string = "{\n"
+char *initial_transport_ResourceWithMetricsRequest_as_json_string = "{\n"
 "    \"context\": {\n"
 "        \"appType\": \"TestAppType\",\n"
 "        \"agentID\": \"TestAgentID\",\n"
@@ -154,13 +154,13 @@ char *initial_transit_ResourceWithMetricsRequest_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-char *initial_transit_MonitoredResource_as_json_string = "{\n"
+char *initial_transport_MonitoredResource_as_json_string = "{\n"
 "    \"name\": \"dbserver\",\n"
 "    \"type\": \"host\",\n"
 "    \"owner\": \"charley\"\n"
 "}";
 
-char *initial_transit_Transit_as_json_string = "{\n"
+char *initial_transport_Transit_as_json_string = "{\n"
 "    \"Config\": {\n"
 "        \"AgentConfig\": {\n"
 "            \"ControllerAddr\": \":http\",\n"
@@ -199,7 +199,7 @@ char *initial_transit_Transit_as_json_string = "{\n"
 "    }\n"
 "}";
 
-char *initial_transit_MetricSample_as_json_string = "{\n"
+char *initial_transport_MetricSample_as_json_string = "{\n"
 "    \"sampleType\": \"Warning\",\n"
 "    \"interval\": {\n"
 "        \"endTime\": 1572955806397,\n"
@@ -211,14 +211,14 @@ char *initial_transit_MetricSample_as_json_string = "{\n"
 "    }\n"
 "}";
 
-char *initial_transit_TracerContext_as_json_string = "{\n"
+char *initial_transport_TracerContext_as_json_string = "{\n"
 "    \"appType\": \"TestAppType\",\n"
 "    \"agentID\": \"TestAgentID\",\n"
 "    \"traceToken\": \"TestTraceToken\",\n"
 "    \"timeStamp\": 1572955806398\n"
 "}";
 
-char *initial_transit_TimeSeries_as_json_string = "{\n"
+char *initial_transport_TimeSeries_as_json_string = "{\n"
 "    \"metricName\": \"TestMetric\",\n"
 "    \"metricSamples\": [\n"
 "        {\n"
@@ -240,7 +240,7 @@ char *initial_transit_TimeSeries_as_json_string = "{\n"
 "    \"unit\": \"1\"\n"
 "}";
 
-char *initial_transit_ResourceWithMetrics_as_json_string = "{\n"
+char *initial_transport_ResourceWithMetrics_as_json_string = "{\n"
 "    \"resource\": {\n"
 "        \"name\": \"TestName\",\n"
 "        \"type\": \"TestType\",\n"
@@ -281,7 +281,7 @@ char *initial_transit_ResourceWithMetrics_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-char *initial_transit_OperationResults_as_json_string = "{\n"
+char *initial_transport_OperationResults_as_json_string = "{\n"
 "    \"successful\": 1,\n"
 "    \"failed\": 0,\n"
 "    \"entityType\": \"TestEntity\",\n"
@@ -299,7 +299,7 @@ char *initial_transit_OperationResults_as_json_string = "{\n"
 "    ]\n"
 "}";
 
-char *initial_transit_AgentStats_as_json_string = "{\n"
+char *initial_transport_AgentStats_as_json_string = "{\n"
 "    \"AgentID\": \"TestAgentId\",\n"
 "    \"AppType\": \"TestAgentType\",\n"
 "    \"BytesSent\": 1567,\n"
@@ -313,7 +313,7 @@ char *initial_transit_AgentStats_as_json_string = "{\n"
 "    \"LastError\": \"Test last error\"\n"
 "}";
 
-char *initial_transit_MetricDescriptor_as_json_string = "{\n"
+char *initial_transport_MetricDescriptor_as_json_string = "{\n"
 "    \"name\": \"TestCustomName\",\n"
 "    \"description\": \"TestDescription\",\n"
 "    \"displayName\": \"TestDisplayName\",\n"
@@ -337,7 +337,7 @@ char *initial_transit_MetricDescriptor_as_json_string = "{\n"
 "    \"metricKind\": \"GAUGE\"\n"
 "}";
 
-char *initial_transit_ResourceStatus_as_json_string = "{\n"
+char *initial_transport_ResourceStatus_as_json_string = "{\n"
 "    \"name\": \"TestName\",\n"
 "    \"type\": \"TestType\",\n"
 "    \"owner\": \"TestOwner\",\n"
@@ -353,7 +353,7 @@ char *initial_transit_ResourceStatus_as_json_string = "{\n"
 "    }\n"
 "}";
 
-char *initial_transit_InventoryResource_as_json_string = "{\n"
+char *initial_transport_InventoryResource_as_json_string = "{\n"
 "    \"name\": \"TestName\",\n"
 "    \"type\": \"TestType\",\n"
 "    \"owner\": \"TestOwner\",\n"
@@ -475,52 +475,52 @@ int test_##OBJECT##_json_string(bool enable) {											\
 #define run_object_test(ENABLE, OBJECT)		test_##OBJECT##_json_string(ENABLE)
 
 // Generate all the individual test functions for particular objects.
-test_object(transit_TimeInterval)
-test_object(transit_TypedValue)
-test_object(transit_LabelDescriptor)
-test_object(transit_ThresholdDescriptor)
-test_object(transit_SendInventoryRequest)
-test_object(transit_OperationResult)
-test_object(transit_ResourceGroup)
-test_object(transit_ResourceWithMetricsRequest)
-test_object(transit_MonitoredResource)
-test_object(transit_Transit)
-test_object(transit_MetricSample)
-test_object(transit_TracerContext)
-test_object(transit_TimeSeries)
-test_object(transit_ResourceWithMetrics)
-test_object(transit_OperationResults)
+test_object(transport_TimeInterval)
+test_object(transport_TypedValue)
+test_object(transport_LabelDescriptor)
+test_object(transport_ThresholdDescriptor)
+test_object(transport_SendInventoryRequest)
+test_object(transport_OperationResult)
+test_object(transport_ResourceGroup)
+test_object(transport_ResourceWithMetricsRequest)
+test_object(transport_MonitoredResource)
+test_object(transport_Transit)
+test_object(transport_MetricSample)
+test_object(transport_TracerContext)
+test_object(transport_TimeSeries)
+test_object(transport_ResourceWithMetrics)
+test_object(transport_OperationResults)
 // This section is awaiting an update of the upstream Go code, to make AgentStats available.
-// test_object(transit_AgentStats)
-test_object(transit_MetricDescriptor)
-test_object(transit_ResourceStatus)
-test_object(transit_InventoryResource)
+// test_object(transport_AgentStats)
+test_object(transport_MetricDescriptor)
+test_object(transport_ResourceStatus)
+test_object(transport_InventoryResource)
 
 int main (int argc, char *argv[]) {
     json_t *json;
 
     int success = 1
-	&& run_object_test(true, transit_TimeInterval)
-	&& run_object_test(true, transit_TypedValue)
-	&& run_object_test(true, transit_LabelDescriptor)
-	&& run_object_test(true, transit_ThresholdDescriptor)
-	&& run_object_test(true, transit_SendInventoryRequest)
-	&& run_object_test(true, transit_OperationResult)
-	&& run_object_test(true, transit_ResourceGroup)
-	&& run_object_test(true, transit_ResourceWithMetricsRequest)
-	&& run_object_test(true, transit_MonitoredResource)
-	&& run_object_test(true, transit_Transit)
-	&& run_object_test(true, transit_MetricSample)
-	&& run_object_test(true, transit_TracerContext)
+	&& run_object_test(true, transport_TimeInterval)
+	&& run_object_test(true, transport_TypedValue)
+	&& run_object_test(true, transport_LabelDescriptor)
+	&& run_object_test(true, transport_ThresholdDescriptor)
+	&& run_object_test(true, transport_SendInventoryRequest)
+	&& run_object_test(true, transport_OperationResult)
+	&& run_object_test(true, transport_ResourceGroup)
+	&& run_object_test(true, transport_ResourceWithMetricsRequest)
+	&& run_object_test(true, transport_MonitoredResource)
+	&& run_object_test(true, transport_Transit)
+	&& run_object_test(true, transport_MetricSample)
+	&& run_object_test(true, transport_TracerContext)
 	// || 0
-	&& run_object_test(true, transit_TimeSeries)
-	&& run_object_test(true, transit_ResourceWithMetrics)
-	&& run_object_test(true, transit_OperationResults)
+	&& run_object_test(true, transport_TimeSeries)
+	&& run_object_test(true, transport_ResourceWithMetrics)
+	&& run_object_test(true, transport_OperationResults)
 	// This section is awaiting an update of the upstream Go code, to make AgentStats available.
-	// && run_object_test(true, transit_AgentStats)
-	&& run_object_test(true, transit_MetricDescriptor)
-	&& run_object_test(true, transit_ResourceStatus)
-	&& run_object_test(true, transit_InventoryResource)
+	// && run_object_test(true, transport_AgentStats)
+	&& run_object_test(true, transport_MetricDescriptor)
+	&& run_object_test(true, transport_ResourceStatus)
+	&& run_object_test(true, transport_InventoryResource)
     ;
     printf(separation_line);
     if (success) {

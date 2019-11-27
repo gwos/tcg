@@ -27,9 +27,9 @@
 // we would need here (though generating that line via preprocessor macro
 // substitution within this file is perhaps impossible).
 //
-#include "config.h"
-#include "milliseconds.h"
-#include "transit.h"
+#include "setup.h"
+#include "subseconds.h"
+#include "transport.h"
 
 #define	FAILURE	0	// for use in routine return values 
 #define	SUCCESS	1	// for use in routine return values
