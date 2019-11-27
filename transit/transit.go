@@ -159,7 +159,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	//TimeValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
+	//DateValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
