@@ -6,9 +6,9 @@
 
 // Required on a per-package basis, for using any of the declarations
 // and definitions provided in the respective header files.
-#include "config.h"
-#include "milliseconds.h"
-#include "transit.h"
+#include "setup.h"
+#include "subseconds.h"
+#include "transport.h"
 
 // Dummy main program, just to get this sample program to compile.
 int main(int argc, char *argv[])
