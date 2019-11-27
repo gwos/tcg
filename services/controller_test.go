@@ -1,8 +1,8 @@
 package services
 
 import (
+	"github.com/gwos/tng/log"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -41,7 +41,7 @@ func TestController_StartStopNats(t *testing.T) {
 		cmd := exec.Command("rm", "-rf", "src")
 		_, err := cmd.Output()
 		if err != nil {
-			log.Println(err)
+			log.Error(err)
 		}
 	}()
 
@@ -88,7 +88,7 @@ func TestController_StartStopTransport(t *testing.T) {
 		cmd := exec.Command("rm", "-rf", "src")
 		_, err := cmd.Output()
 		if err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 		}
 	}()
 

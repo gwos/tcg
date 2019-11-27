@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
 	"github.com/stretchr/testify/assert"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -158,12 +158,12 @@ func runJavaSendResourceWithMetricsTest() error {
 func clean(headers map[string]string) {
 	_, _, err := clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
 	if err != nil {
-		log.Println(err)
+		log.Error(err.Error())
 	}
 
 	cmd := exec.Command("rm", "-rf", "../gw-transit/src/main/resources/datastore")
 	_, err = cmd.Output()
 	if err != nil {
-		log.Println(err)
+		log.Error(err.Error())
 	}
 }
