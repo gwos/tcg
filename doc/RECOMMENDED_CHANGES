@@ -1,3 +1,8 @@
+Information in this file may be obsolete.  It has not yet been
+reviewed for current status.
+
+----------------------------------------------------------------
+
 Herewith are the changes that I know we need to make to the Go source
 code to make it possible generate corresponding acceptable clean C code.
 
