@@ -19,16 +19,19 @@ const (
 	EnvConfigPrefix = "TNG"
 )
 
-type LoggingLevel int
+// LogLevel defines levels for logrus
+type LogLevel int
 
+// Enum levels
 const (
-	Info LoggingLevel = iota
+	Error LogLevel = iota
 	Warn
+	Info
 	Debug
 )
 
-func (l LoggingLevel) String() string {
-	return [...]string{"Info", "Warn", "Debug"}[l]
+func (l LogLevel) String() string {
+	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
 // GWConfig defines Groundwork Connection configuration
@@ -60,8 +63,8 @@ type AgentConfig struct {
 	StartController bool   `yaml:"startController"`
 	StartNats       bool   `yaml:"startNats"`
 	// StartTransport defines that NATS starts with Transport
-	StartTransport bool         `yaml:"startTransport"`
-	LogLevel       LoggingLevel `yaml:"loggingLevel"`
+	StartTransport bool     `yaml:"startTransport"`
+	LogLevel       LogLevel `yaml:"logLevel"`
 }
 
 // Config defines TNG Agent configuration
