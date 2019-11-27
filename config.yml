@@ -8,8 +8,14 @@ agentConfig:
   startTransport: True
   startController: True
   loggingLevel: 0
-gwConfig:
-  host: "localhost:80"
-  account: "RESTAPIACCESS"
-  password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
-  appName: "gw8"
+gwConfigs:
+  -
+    host: "localhost:80"
+    account: "RESTAPIACCESS"
+    password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+    appName: "gw8"
+  -
+    host: "localhost:88"
+    account: "RESTAPIACCESS"
+    password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+    appName: "gw8"
