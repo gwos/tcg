@@ -43,7 +43,7 @@ func main() {
 
         serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 
-        time.Sleep(5 * time.Second)
+        time.Sleep(20 * time.Second)
     }
 }
 
