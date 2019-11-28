@@ -1472,19 +1472,19 @@ func print_type_declarations(
 	err error,
 ) {
 	package_defined_type := map[string]bool{}
-	for key, _ := range simple_typedefs {
+	for key := range simple_typedefs {
 		if print_diagnostics {
 			fmt.Fprintf(diag_file, "+++ simple typedef for %s\n", key)
 		}
 		package_defined_type[key] = true
 	}
-	for key, _ := range enum_typedefs {
+	for key := range enum_typedefs {
 		if print_diagnostics {
 			fmt.Fprintf(diag_file, "+++   enum typedef for %s\n", key)
 		}
 		package_defined_type[key] = true
 	}
-	for key, _ := range struct_typedefs {
+	for key := range struct_typedefs {
 		if print_diagnostics {
 			fmt.Fprintf(diag_file, "+++ struct typedef for %s\n", key)
 		}
@@ -2825,23 +2825,23 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	}`
 
 	/*
-	    var encode_routine_struct_timespec_body_format = `
-		json_error_t error;
-		size_t flags = 0;
-		// We special-case the field packing in this routine, based on the "struct_timespec" field type.
-		// The "I" conversion is used to handle a 64-bit number.
-		json = json_pack_ex(&error, flags, "I"
-		     // struct_timespec Time_;  // go: time.Time
-		     , (json_int_t) (
-			 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
-			 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
-		     )
-		);
-		if (json == NULL) {
-		    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n", error.text, error.source, error.line, error.column, error.position);
-		    failure = error.text;
-		    break;
-		}`
+		    var encode_routine_struct_timespec_body_format = `
+			json_error_t error;
+			size_t flags = 0;
+			// We special-case the field packing in this routine, based on the "struct_timespec" field type.
+			// The "I" conversion is used to handle a 64-bit number.
+			json = json_pack_ex(&error, flags, "I"
+			     // struct_timespec Time_;  // go: time.Time
+			     , (json_int_t) (
+				 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
+				 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
+			     )
+			);
+			if (json == NULL) {
+			    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n", error.text, error.source, error.line, error.column, error.position);
+			    failure = error.text;
+			    break;
+			}`
 	*/
 
 	var encode_routine_struct_timespec_body_format = `
