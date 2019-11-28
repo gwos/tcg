@@ -36,17 +36,6 @@ type GWClient struct {
 	token string
 }
 
-var onceGWClient sync.Once
-var client *GWClient
-
-// GetGWClient implements Singleton pattern
-func GetGWClient() *GWClient {
-	onceGWClient.Do(func() {
-		client = &GWClient{GWConfig: config.GetConfig().GWConfigs[0]}
-	})
-	return client
-}
-
 // Connect implements GWOperations.Connect.
 func (client *GWClient) Connect() error {
 	prevToken := client.token
