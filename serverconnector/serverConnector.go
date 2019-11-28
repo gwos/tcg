@@ -17,7 +17,34 @@ import (
 )
 
 const (
-	MB uint64 = 1048576
+	TotalDiskUsageServiceName   = "total.disk.usage"
+	TotalMemoryUsageServiceName = "total.memory.usage"
+	TotalCpuUsageServiceName    = "cpu.usage.total"
+	DiskUsedServiceName         = "disk.used"
+	MemoryUsedServiceName       = "memory.used"
+	DiskFreeServiceName         = "disk.free"
+	MemoryFreeServiceName       = "memory.free"
+	ProcessesNumberServiceName  = "processes.number"
+)
+
+const (
+	MB                            uint64 = 1048576
+	TotalDiskUsageCriticalValue          = 500000
+	TotalDiskUsageWarningValue           = 350000
+	TotalMemoryUsageCriticalValue        = 50000
+	TotalMemoryUsageWarningValue         = 35000
+	TotalCpuUsageCriticalValue           = 90
+	TotalCpuUsageWarningValue            = 70
+	DiskUsedCriticalValue                = 400000
+	DiskUsedWarningValue                 = 300000
+	MemoryUsedCriticalValue              = 400000
+	MemoryUsedWarningValue               = 300000
+	DiskFreeCriticalValue                = 10000
+	DiskFreeWarningValue                 = 30000
+	MemoryFreeCriticalValue              = 100
+	MemoryFreeWarningValue               = 300
+	ProcessesNumberCriticalValue         = 120
+	ProcessesNumberWarningValue          = 80
 )
 
 var hostName string // TODO: Vlad why use global?
@@ -37,46 +64,46 @@ func Synchronize() *transit.InventoryResource {
 
 	return &transit.InventoryResource{
 		Name: hostName,
-		Type: "HOST",
+		Type: transit.Host,
 		Services: []transit.InventoryService{
 			{
-				Name:  "total.disk.usage",
-				Type:  "network-device",
+				Name:  TotalDiskUsageServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "disk.used",
-				Type:  "network-device",
+				Name:  DiskUsedServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "disk.free",
-				Type:  "network-device",
+				Name:  DiskFreeServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "total.memory.usage",
-				Type:  "network-device",
+				Name:  TotalMemoryUsageServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "memory.used",
-				Type:  "network-device",
+				Name:  MemoryUsedServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "memory.free",
-				Type:  "network-device",
+				Name:  MemoryFreeServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "processes.number",
-				Type:  "network-device",
+				Name:  ProcessesNumberServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 			{
-				Name:  "cpu.usage.total",
-				Type:  "network-device",
+				Name:  TotalCpuUsageServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 		},
@@ -119,11 +146,11 @@ func getTotalDiskUsageService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "total.disk.usage",
+		Name:          TotalDiskUsageServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalDiskUsage",
@@ -135,6 +162,32 @@ func getTotalDiskUsageService() *transit.MonitoredService {
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(diskStats.Total / MB),
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "totalDiskUsage_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalDiskUsageCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "totalDiskUsage_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalDiskUsageWarningValue,
 				},
 				Unit: transit.MB,
 			},
@@ -150,11 +203,11 @@ func getDiskUsedService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "disk.used",
+		Name:          DiskUsedServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST	EEEE
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskUsed",
@@ -166,6 +219,32 @@ func getDiskUsedService() *transit.MonitoredService {
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(diskStats.Used / MB),
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "diskUsed_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: DiskUsedCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "diskUsed_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: DiskUsedWarningValue,
 				},
 				Unit: transit.MB,
 			},
@@ -182,11 +261,11 @@ func getDiskFreeService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "disk.free",
+		Name:          DiskFreeServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskFree",
@@ -198,6 +277,32 @@ func getDiskFreeService() *transit.MonitoredService {
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(diskStats.Free / MB),
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "diskFree_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: DiskFreeCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "diskFree_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: DiskFreeWarningValue,
 				},
 				Unit: transit.MB,
 			},
@@ -213,11 +318,11 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "total.memory.usage",
+		Name:          TotalMemoryUsageServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalMemoryUsage",
@@ -232,6 +337,32 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 				},
 				Unit: transit.MB,
 			},
+			{
+				MetricName: "totalMemoryUsage_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalMemoryUsageCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "totalMemoryUsage_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalMemoryUsageWarningValue,
+				},
+				Unit: transit.MB,
+			},
 		},
 	}
 }
@@ -243,11 +374,11 @@ func getMemoryUsedService() *transit.MonitoredService {
 		return nil
 	}
 	return &transit.MonitoredService{
-		Name:          "memory.used",
+		Name:          MemoryUsedServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryUsed",
@@ -259,6 +390,32 @@ func getMemoryUsedService() *transit.MonitoredService {
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(vmStats.Used / MB),
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "memoryUsed_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: MemoryUsedCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "memoryUsed_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: MemoryUsedWarningValue,
 				},
 				Unit: transit.MB,
 			},
@@ -274,11 +431,11 @@ func getMemoryFreeService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "memory.free",
+		Name:          MemoryFreeServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryFree",
@@ -290,6 +447,32 @@ func getMemoryFreeService() *transit.MonitoredService {
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(vmStats.Free / MB),
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "memoryFree_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: MemoryFreeCriticalValue,
+				},
+				Unit: transit.MB,
+			},
+			{
+				MetricName: "memoryFree_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: MemoryFreeWarningValue,
 				},
 				Unit: transit.MB,
 			},
@@ -305,11 +488,11 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 	}
 
 	return &transit.MonitoredService{
-		Name:          "processes.number",
+		Name:          ProcessesNumberServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "processesNumber",
@@ -323,17 +506,41 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 					IntegerValue: int64(hostStat.Procs),
 				},
 			},
+			{
+				MetricName: "processesNumber_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: ProcessesNumberCriticalValue,
+				},
+			},
+			{
+				MetricName: "processesNumber_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: ProcessesNumberWarningValue,
+				},
+			},
 		},
 	}
 }
 
 func getTotalCpuUsage() *transit.MonitoredService {
-	return &transit.MonitoredService{
-		Name:          "cpu.usage.total",
+	service := &transit.MonitoredService{
+		Name:          TotalCpuUsageServiceName,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "cpuUsageTotal",
@@ -344,26 +551,70 @@ func getTotalCpuUsage() *transit.MonitoredService {
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
-					IntegerValue: int64(collectProcessMetrics()), // see getCpuUsage
+					IntegerValue: getCpuUsage(), // see getCpuUsage
+				},
+			},
+			{
+				MetricName: "cpuUsageTotal_cr",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalCpuUsageCriticalValue, // see getCpuUsage
+				},
+			},
+			{
+				MetricName: "cpuUsageTotal_wn",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: TotalCpuUsageWarningValue,
 				},
 			},
 		},
 	}
-}
 
-// this uses gopsutil
-func getCpuUsage() {
-	// TODO implement this
-	percentages, _ := cpu.Percent(0, true)
-	for _, cpupercent := range percentages {
-		strconv.FormatFloat(cpupercent, 'f', 2, 64)
+	processesMap := collectProcesses()
+
+	for processName, cpuValue := range processesMap {
+		tm := transit.TimeSeries{
+			MetricName: processName,
+			SampleType: transit.Value,
+			Interval: &transit.TimeInterval{
+				EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+				StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+			},
+			Value: &transit.TypedValue{
+				ValueType:   transit.DoubleType,
+				DoubleValue: cpuValue,
+			},
+		}
+		service.Metrics = append(service.Metrics, tm)
 	}
 
+	return service
 }
 
-// TODO: this function should support named process matching
-func collectProcessMetrics() float64 {
-	cmd := exec.Command("ps", "aux")
+func getCpuUsage() int64 {
+	percentages, _ := cpu.Percent(0, false)
+	return int64(percentages[0])
+}
+
+type Process struct {
+	name string
+	cpu  float64
+}
+
+func collectProcesses() map[string]float64 {
+	//TODO: Make ps to print full name
+	cmd := exec.Command("ps", "-Ao", "fname,pcpu", "--no-headers")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	err := cmd.Run()
@@ -371,8 +622,7 @@ func collectProcessMetrics() float64 {
 		log.Fatal(err)
 	}
 
-	var totalCpu float64
-	var totalCount int
+	processes := make([]*Process, 0)
 	for {
 		line, err := out.ReadString('\n')
 		if err != nil {
@@ -385,17 +635,27 @@ func collectProcessMetrics() float64 {
 				ft = append(ft, t)
 			}
 		}
-		_, err = strconv.Atoi(ft[1])
-		if err != nil {
-			continue
-		}
-		cpuUsed, err := strconv.ParseFloat(ft[2], 64)
+		cpuUsed, err := strconv.ParseFloat(ft[1][:len(ft[1])-1], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		totalCpu += cpuUsed
-		totalCount++
+		if cpuUsed == 0 {
+			cpuUsed = 0.1
+		}
+
+		processes = append(processes, &Process{ft[0], cpuUsed})
+
 	}
 
-	return totalCpu / float64(totalCount) * 100
+	m := make(map[string]float64)
+	for _, process := range processes {
+		_, exists := m[process.name]
+		if exists {
+			m[process.name] = m[process.name] + process.cpu
+		} else {
+			m[process.name] = process.cpu
+		}
+	}
+
+	return m
 }

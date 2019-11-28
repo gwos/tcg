@@ -83,7 +83,7 @@ type ResourceType string
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	Host           ResourceType = "host"
+	Host           ResourceType = "HOST"
 	Hypervisor                  = "hypervisor"
 	Instance                    = "instance"
 	VirtualMachine              = "virtual-machine"
