@@ -97,9 +97,10 @@ const (
 	NetworkDevice               = "network-device"
 )
 
-// Service Type defines the service type
+// ServiceType defines the service type
 type ServiceType string
 
+// Possible Types
 const (
 	Service ServiceType = "SERVICE"
 )
@@ -411,7 +412,7 @@ type MonitoredService struct {
 	Metrics []TimeSeries `json:"metrics"`
 }
 
-// A reference to a MonitoredResource in a group collection
+// MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
@@ -456,25 +457,26 @@ type ResourceGroup struct {
 	Resources []MonitoredResourceRef `json:"resources"`
 }
 
-// ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
+// ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
 	Context   TracerContext       `json:"context"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
+// InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
 	Context   TracerContext       `json:"context"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
-// Alerts received from cloud services
+// IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
-	IncidentId    string                            `json:"incidentId"`
+	IncidentID    string                            `json:"incidentId"`
 	ResourceName  string                            `json:"resourceName,required"`
 	Status        string                            `json:"status"`
 	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
-	EndedAt       milliseconds.MillisecondTimestamp `json:"startedAt,omitempty"`
+	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
 	ConditionName string                            `json:"conditionName"`
 	URL           string                            `json:"url,omitempty"`
 	Summary       string                            `json:"summary,omitempty"`

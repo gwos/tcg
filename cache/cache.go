@@ -9,5 +9,5 @@ var AuthCache = cache.New(8*time.Hour, time.Hour)
 
 type Credentials struct {
 	GwosAppName  string
-	GwosApiToken string
+	GwosAPIToken string
 }
