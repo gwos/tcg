@@ -8,6 +8,6 @@ import (
 var AuthCache = cache.New(8*time.Hour, time.Hour)
 
 type Credentials struct {
-	GwosAppName string
+	GwosAppName  string
 	GwosApiToken string
 }
