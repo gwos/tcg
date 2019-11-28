@@ -57,7 +57,7 @@ type AgentConfig struct {
 	StartController bool   `yaml:"startController"`
 	StartNATS       bool   `yaml:"startNATS"`
 	// StartTransport defines that NATS starts with Transport
-	StartTransport  bool   `yaml:"startTransport"`
+	StartTransport bool `yaml:"startTransport"`
 }
 
 // Config defines TNG Agent configuration

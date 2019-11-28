@@ -11,10 +11,10 @@ package enum
 type MetricKindEnum int
 
 const (
-	GAUGE                   MetricKindEnum = iota
-	DELTA                                  
-	CUMULATIVE                             
-	METRIC_KIND_UNSPECIFIED                
+	GAUGE MetricKindEnum = iota
+	DELTA
+	CUMULATIVE
+	METRIC_KIND_UNSPECIFIED
 )
 
 type IntegerFlags int
@@ -38,17 +38,17 @@ const (
 )
 
 type Inner struct {
-    X int `json:"x"`
-    Y int `json:"y"`
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 type Outer struct {
-    Inner `json:"inner"`
-    *Inner `json:"ptr_inner"`
+	Inner  `json:"inner"`
+	*Inner `json:"ptr_inner"`
 }
 
 // doc for the dummy function
 // more doc, too
 func standin(int a) int {
-    return a
+	return a
 }
