@@ -140,7 +140,9 @@ enum.h enum.c	: gotocjson enum.go
 	./gotocjson -d enum.go > ,enum-diagnostics
 
 clean	:
-	rm -f gotocjson *.o setup.h setup.c subseconds.h subseconds.c transport.h transport.c enum.h enum.c
+	rm -f *.o setup.h setup.c subseconds.h subseconds.c transport.h transport.c enum.h enum.c
 
 realclean	: clean
-	rm -f ,setup-diagnostics ,enum-diagnostics ,subseconds-diagnostics ,transport-diagnostics unittest transport testjson
+	rm -f gotocjson ,setup-diagnostics ,enum-diagnostics ,subseconds-diagnostics ,transport-diagnostics unittest transport testjson
+
+distclean	: realclean
