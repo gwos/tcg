@@ -41,9 +41,9 @@ type UnitType string
 const (
 	UnitCounter UnitType = "1"
 	PercentCPU           = "%{cpu}"
-	KB					 = "KB"
-	MB					 = "MB"
-	GB					 = "GB"
+	KB                   = "KB"
+	MB                   = "MB"
+	GB                   = "GB"
 )
 
 // ComputeType defines CloudHub Compute Types
@@ -83,25 +83,25 @@ type ResourceType string
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, where as CloudHub can be more rich
 const (
-	Host 		ResourceType  = "host"
-	Hypervisor				  = "hypervisor"
-	Instance				  = "instance"
-	VirtualMachine			  = "virtual-machine"
-	CloudApp   				  = "cloud-app"
-	CloudFunction			  = "cloud-function"
-	LoadBalancer              = "load-balancer"
-	Container  				  = "container"
-	Storage					  = "storage"
-	Network					  = "network"
-	NetworkSwitch			  = "network-switch"
-	NetworkDevice             = "network-device"
+	Host           ResourceType = "host"
+	Hypervisor                  = "hypervisor"
+	Instance                    = "instance"
+	VirtualMachine              = "virtual-machine"
+	CloudApp                    = "cloud-app"
+	CloudFunction               = "cloud-function"
+	LoadBalancer                = "load-balancer"
+	Container                   = "container"
+	Storage                     = "storage"
+	Network                     = "network"
+	NetworkSwitch               = "network-switch"
+	NetworkDevice               = "network-device"
 )
 
 // Service Type defines the service type
 type ServiceType string
 
 const (
-	Service 	ServiceType = "SERVICE"
+	Service ServiceType = "SERVICE"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -192,8 +192,8 @@ type MetricSample struct {
 type TimeSeries struct {
 	MetricName string            `json:"metricName"`
 	SampleType MetricSampleType  `json:"sampleType"`
-	Interval   *TimeInterval      `json:"interval"`
-	Value      *TypedValue        `json:"value"`
+	Interval   *TimeInterval     `json:"interval"`
+	Value      *TypedValue       `json:"value"`
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
 	//MetricSamples []*MetricSample   `json:"metricSamples"`
@@ -408,7 +408,7 @@ type MonitoredService struct {
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 	// metrics
-	Metrics  []TimeSeries   `json:"metrics"`
+	Metrics []TimeSeries `json:"metrics"`
 }
 
 // A reference to a MonitoredResource in a group collection
@@ -458,7 +458,7 @@ type ResourceGroup struct {
 
 // ResourceWithMetricsRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   TracerContext          `json:"context"`
+	Context   TracerContext       `json:"context"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
@@ -470,13 +470,12 @@ type InventoryRequest struct {
 
 // Alerts received from cloud services
 type IncidentAlert struct {
-	IncidentId string 	`json:"incidentId"`
-	ResourceName string `json:"resourceName,required"`
-	Status string 		`json:"status"`
-	StartedAt milliseconds.MillisecondTimestamp `json:"startedAt"`
-	EndedAt milliseconds.MillisecondTimestamp `json:"startedAt,omitempty"`
-	ConditionName string `json:"conditionName"`
-	URL string `json:"url,omitempty"`
-	Summary string `json:"summary,omitempty"`
+	IncidentId    string                            `json:"incidentId"`
+	ResourceName  string                            `json:"resourceName,required"`
+	Status        string                            `json:"status"`
+	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
+	EndedAt       milliseconds.MillisecondTimestamp `json:"startedAt,omitempty"`
+	ConditionName string                            `json:"conditionName"`
+	URL           string                            `json:"url,omitempty"`
+	Summary       string                            `json:"summary,omitempty"`
 }
-
