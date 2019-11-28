@@ -11,10 +11,10 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*clients.GWClient
 	*config.AgentConfig
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
+	gwClients   []*clients.GWClient
 }
 
 var onceAgentService sync.Once
@@ -23,8 +23,13 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
+		gwConfigs := config.GetConfig().GWConfigs
+		gwClients := make([]*clients.GWClient, len(gwConfigs))
+		for i := range gwConfigs {
+			gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
+		}
+
 		agentService = &AgentService{
-			clients.GetGWClient(),
 			config.GetConfig().AgentConfig,
 			&AgentStats{},
 			&AgentStatus{
@@ -32,6 +37,7 @@ func GetAgentService() *AgentService {
 				Nats:       Pending,
 				Transport:  Pending,
 			},
+			gwClients,
 		}
 	})
 	return agentService
@@ -85,7 +91,7 @@ func (service *AgentService) StopNats() error {
 func (service *AgentService) StartTransport() error {
 	dispatcherMap := nats.DispatcherMap{
 		SubjSendResourceWithMetrics: func(b []byte) error {
-			_, err := service.GWClient.SendResourcesWithMetrics(b)
+			_, err := service.gwClients[0].SendResourcesWithMetrics(b)
 			service.agentStats.Lock()
 			if err == nil {
 				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
@@ -98,7 +104,7 @@ func (service *AgentService) StartTransport() error {
 			return err
 		},
 		SubjSynchronizeInventory: func(b []byte) error {
-			_, err := service.GWClient.SynchronizeInventory(b)
+			_, err := service.gwClients[0].SynchronizeInventory(b)
 			service.agentStats.Lock()
 			if err == nil {
 				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}

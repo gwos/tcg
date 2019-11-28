@@ -199,7 +199,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.GWClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
+		err := controller.gwClients[0].ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
