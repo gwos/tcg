@@ -1,25 +1,21 @@
 package serverconnector
 
 import (
-	"bytes"
-	"fmt"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
-	"log"
-	"os/exec"
-	"strconv"
-	"strings"
+	"github.com/shirou/gopsutil/process"
 	"time"
 )
 
 const (
 	TotalDiskUsageServiceName   = "total.disk.usage"
 	TotalMemoryUsageServiceName = "total.memory.usage"
-	TotalCpuUsageServiceName    = "cpu.usage.total"
+	TotalCpuUsageServiceName    = "total.cpu.usage"
 	DiskUsedServiceName         = "disk.used"
 	MemoryUsedServiceName       = "memory.used"
 	DiskFreeServiceName         = "disk.free"
@@ -43,18 +39,18 @@ const (
 	DiskFreeWarningValue                 = 30000
 	MemoryFreeCriticalValue              = 100
 	MemoryFreeWarningValue               = 300
-	ProcessesNumberCriticalValue         = 120
-	ProcessesNumberWarningValue          = 80
+	ProcessesNumberCriticalValue         = 800
+	ProcessesNumberWarningValue          = 700
 )
 
-var hostName string // TODO: Vlad why use global?
+var hostName string // TODO: Vlad why use global? - Because we need to set owner in all functions but owner always the same
 
 var LastCheck milliseconds.MillisecondTimestamp
 
 func Synchronize() *transit.InventoryResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
@@ -113,7 +109,7 @@ func Synchronize() *transit.InventoryResource {
 func CollectMetrics() *transit.MonitoredResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
@@ -141,12 +137,13 @@ func CollectMetrics() *transit.MonitoredResource {
 func getTotalDiskUsageService() *transit.MonitoredService {
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          TotalDiskUsageServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -198,12 +195,13 @@ func getTotalDiskUsageService() *transit.MonitoredService {
 func getDiskUsedService() *transit.MonitoredService {
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          DiskUsedServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -256,12 +254,13 @@ func getDiskUsedService() *transit.MonitoredService {
 func getDiskFreeService() *transit.MonitoredService {
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err.Error())
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          DiskFreeServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -313,12 +312,13 @@ func getDiskFreeService() *transit.MonitoredService {
 func getTotalMemoryUsageService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err.Error())
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          TotalMemoryUsageServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -370,11 +370,12 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 func getMemoryUsedService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err.Error())
 		return nil
 	}
 	return &transit.MonitoredService{
 		Name:          MemoryUsedServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -426,12 +427,13 @@ func getMemoryUsedService() *transit.MonitoredService {
 func getMemoryFreeService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err.Error())
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          MemoryFreeServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -483,19 +485,20 @@ func getMemoryFreeService() *transit.MonitoredService {
 func getNumberOfProcessesService() *transit.MonitoredService {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
 	return &transit.MonitoredService{
 		Name:          ProcessesNumberServiceName,
+		Type:          transit.Service,
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
-				MetricName: "processesNumber",
+				MetricName: "processes.number",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
 					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -505,9 +508,10 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 					ValueType:    transit.IntegerType,
 					IntegerValue: int64(hostStat.Procs),
 				},
+				Unit: transit.UnitCounter,
 			},
 			{
-				MetricName: "processesNumber_cr",
+				MetricName: "processes.number_cr",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
 					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -517,9 +521,10 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 					ValueType:    transit.IntegerType,
 					IntegerValue: ProcessesNumberCriticalValue,
 				},
+				Unit: transit.UnitCounter,
 			},
 			{
-				MetricName: "processesNumber_wn",
+				MetricName: "processes.number_wn",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
 					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -529,77 +534,86 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 					ValueType:    transit.IntegerType,
 					IntegerValue: ProcessesNumberWarningValue,
 				},
+				Unit: transit.UnitCounter,
 			},
 		},
 	}
 }
 
 func getTotalCpuUsage() *transit.MonitoredService {
-	service := &transit.MonitoredService{
-		Name:          TotalCpuUsageServiceName,
-		Status:        transit.ServiceOk,
-		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
+	interval := time.Now()
+
+	service := transit.MonitoredService{
+		Name:             TotalCpuUsageServiceName,
+		Type:             transit.Service,
+		Status:           transit.ServiceOk,
+		Owner:            hostName,
+		LastPlugInOutput: "CPU OK",
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * 5)},
 		Metrics: []transit.TimeSeries{
 			{
-				MetricName: "cpuUsageTotal",
+				MetricName: "cpu.usage.total",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+					StartTime: milliseconds.MillisecondTimestamp{Time: interval},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
-					IntegerValue: getCpuUsage(), // see getCpuUsage
+					IntegerValue: getCpuUsage(),
 				},
+				Unit: transit.PercentCPU,
 			},
 			{
-				MetricName: "cpuUsageTotal_cr",
+				MetricName: "cpu.usage.total_cr",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+					StartTime: milliseconds.MillisecondTimestamp{Time: interval},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
-					IntegerValue: TotalCpuUsageCriticalValue, // see getCpuUsage
+					IntegerValue: TotalCpuUsageCriticalValue,
 				},
+				Unit: transit.PercentCPU,
 			},
 			{
-				MetricName: "cpuUsageTotal_wn",
+				MetricName: "cpu.usage.total_wn",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+					StartTime: milliseconds.MillisecondTimestamp{Time: interval},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
 					IntegerValue: TotalCpuUsageWarningValue,
 				},
+				Unit: transit.PercentCPU,
 			},
 		},
 	}
 
 	processesMap := collectProcesses()
 
-	for processName, cpuValue := range processesMap {
-		tm := transit.TimeSeries{
+	for processName, processCpu := range processesMap {
+		service.Metrics = append(service.Metrics, transit.TimeSeries{
 			MetricName: processName,
 			SampleType: transit.Value,
 			Interval: &transit.TimeInterval{
-				EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-				StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+				StartTime: milliseconds.MillisecondTimestamp{Time: interval},
 			},
 			Value: &transit.TypedValue{
 				ValueType:   transit.DoubleType,
-				DoubleValue: cpuValue,
+				DoubleValue: processCpu,
 			},
-		}
-		service.Metrics = append(service.Metrics, tm)
+			Unit: transit.PercentCPU,
+		})
+		break
 	}
 
-	return service
+	return &service
 }
 
 func getCpuUsage() int64 {
@@ -613,47 +627,32 @@ type Process struct {
 }
 
 func collectProcesses() map[string]float64 {
-	//TODO: Make ps to print full name
-	cmd := exec.Command("ps", "-Ao", "fname,pcpu", "--no-headers")
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	err := cmd.Run()
-	if err != nil {
-		log.Fatal(err)
-	}
+	pr, _ := process.Processes()
 
 	processes := make([]*Process, 0)
-	for {
-		line, err := out.ReadString('\n')
+	for _, proc := range pr {
+
+		cpuUsed, err := proc.CPUPercent()
 		if err != nil {
-			break
-		}
-		tokens := strings.Split(line, " ")
-		ft := make([]string, 0)
-		for _, t := range tokens {
-			if t != "" && t != "\t" {
-				ft = append(ft, t)
-			}
-		}
-		cpuUsed, err := strconv.ParseFloat(ft[1][:len(ft[1])-1], 64)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if cpuUsed == 0 {
-			cpuUsed = 0.1
+			log.Error(err)
 		}
 
-		processes = append(processes, &Process{ft[0], cpuUsed})
+		name, err := proc.Name()
+		if err != nil {
+			log.Error(err)
+		}
+
+		processes = append(processes, &Process{name, cpuUsed})
 
 	}
 
 	m := make(map[string]float64)
-	for _, process := range processes {
-		_, exists := m[process.name]
+	for _, p := range processes {
+		_, exists := m[p.name]
 		if exists {
-			m[process.name] = m[process.name] + process.cpu
+			m[p.name] = m[p.name] + p.cpu
 		} else {
-			m[process.name] = process.cpu
+			m[p.name] = p.cpu
 		}
 	}
 
