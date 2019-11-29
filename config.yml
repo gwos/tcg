@@ -7,9 +7,9 @@ agentConfig:
   startNats: True
   startTransport: True
   startController: True
-  loggingLevel: 0
+  logLevel: 2
 gwConfig:
   host: "localhost:80"
   account: "RESTAPIACCESS"
-  password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+  password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
   appName: "gw8"

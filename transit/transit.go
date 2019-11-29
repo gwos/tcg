@@ -1,6 +1,8 @@
 package transit
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
 )
@@ -28,7 +30,7 @@ const (
 	DoubleType                = "DoubleType"
 	StringType                = "StringType"
 	BooleanType               = "BooleanType"
-	TimeType                  = "TimeType"
+	DateType                  = "DateType"
 	UnspecifiedType           = "UnspecifiedType"
 )
 
@@ -163,7 +165,55 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	//DateValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
+	DateValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler.
+func (t TypedValue) MarshalJSON() ([]byte, error) {
+	switch t.ValueType {
+	case BooleanType:
+		return json.Marshal(&struct {
+			ValueType ValueType `json:"valueType"`
+			BoolValue bool      `json:"boolValue"`
+		}{
+			ValueType: t.ValueType,
+			BoolValue: t.BoolValue,
+		})
+	case DoubleType:
+		return json.Marshal(&struct {
+			ValueType   ValueType `json:"valueType"`
+			DoubleValue float64   `json:"doubleValue"`
+		}{
+			ValueType:   t.ValueType,
+			DoubleValue: t.DoubleValue,
+		})
+	case IntegerType:
+		return json.Marshal(&struct {
+			ValueType    ValueType `json:"valueType"`
+			IntegerValue int64     `json:"integerValue"`
+		}{
+			ValueType:    t.ValueType,
+			IntegerValue: t.IntegerValue,
+		})
+	case StringType:
+		return json.Marshal(&struct {
+			ValueType   ValueType `json:"valueType"`
+			StringValue string    `json:"stringValue"`
+		}{
+			ValueType:   t.ValueType,
+			StringValue: t.StringValue,
+		})
+	case DateType:
+		return json.Marshal(&struct {
+			ValueType ValueType                         `json:"valueType"`
+			DateValue milliseconds.MillisecondTimestamp `json:"dateValue"`
+		}{
+			ValueType: t.ValueType,
+			DateValue: t.DateValue,
+		})
+	}
+
+	return nil, errors.New("Couldn't parse 'ValueType' field\n")
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
