@@ -7,7 +7,7 @@ agentConfig:
   startNats: True
   startTransport: True
   startController: True
-  loggingLevel: 0
+  logLevel: 1
 gwConfigs:
   -
     host: "localhost:80"
