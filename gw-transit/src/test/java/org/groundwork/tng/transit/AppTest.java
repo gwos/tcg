@@ -1,5 +1,6 @@
 package org.groundwork.tng.transit;
 
+import org.groundwork.rs.dto.DtoMonitorServer;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
@@ -42,10 +43,9 @@ public class AppTest {
                 .setTraceToken("token-99e93")
                 .build();
 
-        List<DtoTimeSeries> timeSeries = new ArrayList<>();
-        timeSeries.add(DtoTimeSeries.builder()
+        DtoTimeSeries timeSeries = DtoTimeSeries.builder()
                 .setMetricName(TEST_SERVICE_NAME)
-                .setSampleType(DtoMetricSampleType.Warning)
+                .setSampleType(DtoMetricSampleType.Value)
                 .setInterval(DtoTimeInterval.builder()
                         .setStartTime(new SimpleDateFormat("dd/MM/yyyy").parse("21/10/2019"))
                         .setEndTime(new SimpleDateFormat("dd/MM/yyyy").parse("23/10/2019"))
@@ -54,29 +54,32 @@ public class AppTest {
                         .setValueType(DtoValueType.IntegerType)
                         .setIntegerValue(1)
                         .build())
-                .build());
+                .build();
 
-        DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder().setContext(context).build();
+        DtoMonitoredResource resource = DtoMonitoredResource.builder()
+                .setName(TEST_HOST_NAME)
+                .setType(HOST_RESOURCE_TYPE)
+                .setStatus(DtoMonitorStatus.HOST_UP)
+                .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                .build();
 
-        resources.add(DtoResourceWithMetrics.builder()
-                .setResource(DtoResourceStatus.builder()
-                        .setName(TEST_HOST_NAME)
-                        .setType(HOST_RESOURCE_TYPE)
-                        .setStatus(DtoMonitorStatus.HOST_UP)
-                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .build())
-                .build());
+        DtoMonitoredService service = DtoMonitoredService.builder()
+                .setName(TEST_SERVICE_NAME)
+                .setType(SERVICE_RESOURCE_TYPE)
+                .setStatus(DtoMonitorStatus.SERVICE_OK)
+                .setOwner(TEST_HOST_NAME)
+                .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                .build();
 
-        resources.add(DtoResourceWithMetrics.builder()
-                .setMetrics(timeSeries)
-                .setResource(DtoResourceStatus.builder()
-                        .setName(TEST_SERVICE_NAME + "_0")
-                        .setType(SERVICE_RESOURCE_TYPE)
-                        .setStatus(DtoMonitorStatus.SERVICE_OK)
-                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .setOwner(TEST_HOST_NAME)
-                        .build())
-                .build());
+        service.addMetric(timeSeries);
+
+        resource.addService(service);
+
+        DtoResourcesWithServices resources = DtoResourcesWithServices.builder()
+                .setContext(context)
+                .build();
+
+        resources.add(resource);
 
         transit.SendResourcesWithMetrics(resources);
     }
@@ -108,26 +111,20 @@ public class AppTest {
                 .setName(TEST_HOST_NAME)
                 .setType(HOST_RESOURCE_TYPE)
                 .build();
-        DtoInventoryResource service = DtoInventoryResource.builder()
+        host.addService(DtoInventoryService.builder()
                 .setName(TEST_SERVICE_NAME)
                 .setType(SERVICE_RESOURCE_TYPE)
                 .setOwner(TEST_HOST_NAME)
-                .build();
+                .build());
 
-        System.out.println("LOADED 2");
 
         DtoGroup group = new DtoGroup();
-        List<DtoMonitoredResource> resources = new ArrayList<>();
         group.setGroupName("GW8");
-        group.setResources(resources);
 
         DtoInventory dtoInventory = new DtoInventory();
         dtoInventory.setContext(context);
         dtoInventory.add(host);
-        dtoInventory.add(service);
         dtoInventory.add(group);
-
-        System.out.println("LOADED 3");
 
         transit.SynchronizeInventory(dtoInventory);
     }
@@ -204,8 +201,7 @@ public class AppTest {
                 .setTraceToken("token-99e93")
                 .build();
 
-        List<DtoTimeSeries> timeSeries = new ArrayList<>();
-        timeSeries.add(DtoTimeSeries.builder()
+        DtoTimeSeries timeSeries = DtoTimeSeries.builder()
                 .setMetricName(TEST_SERVICE_NAME)
                 .setSampleType(DtoMetricSampleType.Warning)
                 .setInterval(DtoTimeInterval.builder()
@@ -216,22 +212,22 @@ public class AppTest {
                         .setValueType(DtoValueType.IntegerType)
                         .setIntegerValue(1)
                         .build())
-                .build());
+                .build();
 
-        DtoResourceWithMetricsList resources = DtoResourceWithMetricsList.builder().setContext(context).build();
+        DtoResourcesWithServices resources = DtoResourcesWithServices.builder().setContext(context).build();
 
-        resources.add(DtoResourceWithMetrics.builder()
-                .setResource(DtoResourceStatus.builder()
-                        .setName(TEST_HOST_NAME)
-                        .setType(HOST_RESOURCE_TYPE)
-                        .setStatus(DtoMonitorStatus.HOST_UP)
-                        .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
-                        .build())
-                .build());
+        DtoMonitoredResource host = DtoMonitoredResource.builder()
+                .setName(TEST_HOST_NAME)
+                .setType(HOST_RESOURCE_TYPE)
+                .setStatus(DtoMonitorStatus.HOST_UP)
+                .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
+                .build();
+
+        resources.add(host);
 
         for (int i = 0; i < TEST_SERVICES_COUNT; i++) {
             for (int j = 0; j < TEST_METRICS_COUNT; j++) {
-                DtoResourceStatus resource = DtoResourceStatus.builder()
+                DtoMonitoredService service = DtoMonitoredService.builder()
                         .setName(TEST_SERVICE_NAME + "_" + i)
                         .setType(SERVICE_RESOURCE_TYPE)
                         .setLastCheckTime(new SimpleDateFormat("dd/MM/yyyy").parse("22/10/2019"))
@@ -239,15 +235,13 @@ public class AppTest {
                         .build();
 
                 if (i % 2 == 0) {
-                    resource.setStatus(DtoMonitorStatus.SERVICE_OK);
+                    service.setStatus(DtoMonitorStatus.SERVICE_OK);
                 } else {
-                    resource.setStatus(DtoMonitorStatus.SERVICE_WARNING);
+                    service.setStatus(DtoMonitorStatus.SERVICE_WARNING);
                 }
 
-                resources.add(DtoResourceWithMetrics.builder()
-                        .setMetrics(timeSeries)
-                        .setResource(resource)
-                        .build());
+                service.addMetric(timeSeries);
+                host.addService(service);
 
                 transit.SendResourcesWithMetrics(resources);
             }
