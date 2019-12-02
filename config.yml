@@ -13,9 +13,9 @@ gwConfigs:
     host: "localhost:80"
     account: "RESTAPIACCESS"
     password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
-    appName: "gw8"
+    appName: "tng"
   -
     host: "localhost:88"
     account: "RESTAPIACCESS"
     password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
-    appName: "gw8"
+    appName: "tng"
