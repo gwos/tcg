@@ -1,6 +1,7 @@
 package integration
 
 import (
+	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
@@ -31,7 +32,7 @@ func TestNatsQueue_1(t *testing.T) {
 		return
 	}
 	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
+	GetConfig().GWConfigs[0].Host = GWInvalidHost
 
 	testMessage, err := parseJSON()
 	assert.NoError(t, err)
@@ -51,7 +52,7 @@ func TestNatsQueue_1(t *testing.T) {
 		return
 	}
 
-	services.GetTransitService().Config.GWConfig.Host = GWValidHost
+	GetConfig().GWConfigs[0].Host = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
@@ -69,7 +70,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, err)
 
 	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	services.GetTransitService().Config.GWConfig.Host = GWInvalidHost
+	GetConfig().GWConfigs[0].Host = GWInvalidHost
 
 	defer cleanNats(t)
 
@@ -95,7 +96,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, err)
 	log.Info("NATS Server was stopped successfully")
 
-	services.GetTransitService().Config.GWConfig.Host = GWValidHost
+	GetConfig().GWConfigs[0].Host = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
 	log.Info("Starting NATS server ...")
@@ -121,7 +122,6 @@ func configNats(t *testing.T) error {
 
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
-	assert.NoError(t, service.Connect())
 
 	return nil
 }

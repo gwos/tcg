@@ -34,16 +34,6 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// GWConfig defines Groundwork Connection configuration
-type GWConfig struct {
-	// Host accepts value for combined "host:port"
-	// used as `url.URL{Host}`
-	Host     string
-	Account  string
-	Password string
-	AppName  string `yaml:"appName"`
-}
-
 // AgentConfig defines TNG Transit Agent configuration
 type AgentConfig struct {
 	// ControllerAddr accepts value for combined "host:port"
@@ -67,10 +57,52 @@ type AgentConfig struct {
 	LogLevel       LogLevel `yaml:"logLevel"`
 }
 
+// GWConfig defines Groundwork Connection configuration
+type GWConfig struct {
+	// Host accepts value for combined "host:port"
+	// used as `url.URL{Host}`
+	Host     string
+	Account  string
+	Password string
+	AppName  string `yaml:"appName"`
+}
+
+// GWConfigs defines a set of configurations
+type GWConfigs []*GWConfig
+
+// Decode implements envconfig.Decoder interface
+func (gwConfigs *GWConfigs) Decode(value string) error {
+	var overrides GWConfigs
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if len(overrides) > len(*gwConfigs) {
+		buf := GWConfigs(make([]*GWConfig, len(overrides)))
+		copy(buf, overrides)
+		copy(buf, *gwConfigs)
+		*gwConfigs = *(&buf)
+	}
+	for i, v := range overrides {
+		if v.Host != "" {
+			(*gwConfigs)[i].Host = v.Host
+		}
+		if v.Account != "" {
+			(*gwConfigs)[i].Account = v.Account
+		}
+		if v.Password != "" {
+			(*gwConfigs)[i].Password = v.Password
+		}
+		if v.AppName != "" {
+			(*gwConfigs)[i].AppName = v.AppName
+		}
+	}
+	return nil
+}
+
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig AgentConfig `yaml:"agentConfig"`
-	GWConfig    GWConfig    `yaml:"gwConfig"`
+	AgentConfig *AgentConfig `yaml:"agentConfig"`
+	GWConfigs   GWConfigs    `yaml:"gwConfigs"`
 }
 
 // GetConfig implements Singleton pattern

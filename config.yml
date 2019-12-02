@@ -7,9 +7,15 @@ agentConfig:
   startNats: True
   startTransport: True
   startController: True
-  loggingLevel: 0
-gwConfig:
-  host: "localhost:80"
-  account: "RESTAPIACCESS"
-  password: "***REMOVED***"
-  appName: "gw8"
+  logLevel: 1
+gwConfigs:
+  -
+    host: "localhost:80"
+    account: "RESTAPIACCESS"
+    password: "***REMOVED***"
+    appName: "tng"
+  -
+    host: "localhost:88"
+    account: "RESTAPIACCESS"
+    password: "***REMOVED***"
+    appName: "tng"
