@@ -31,20 +31,9 @@ const (
 
 // GWClient implements GWOperations interface
 type GWClient struct {
-	*config.Config
+	*config.GWConfig
 	sync.Mutex
 	token string
-}
-
-var onceGWClient sync.Once
-var client *GWClient
-
-// GetGWClient implements Singleton pattern
-func GetGWClient() *GWClient {
-	onceGWClient.Do(func() {
-		client = &GWClient{Config: config.GetConfig()}
-	})
-	return client
 }
 
 // Connect implements GWOperations.Connect.

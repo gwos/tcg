@@ -1,7 +1,9 @@
 package services
 
 import (
+	"fmt"
 	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
@@ -10,9 +12,10 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*clients.GWClient
+	*config.AgentConfig
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
+	gwClients   []*clients.GWClient
 }
 
 var onceAgentService sync.Once
@@ -21,14 +24,21 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
+		gwConfigs := config.GetConfig().GWConfigs
+		gwClients := make([]*clients.GWClient, len(gwConfigs))
+		for i := range gwConfigs {
+			gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
+		}
+
 		agentService = &AgentService{
-			clients.GetGWClient(),
+			config.GetConfig().AgentConfig,
 			&AgentStats{},
 			&AgentStatus{
 				Controller: Pending,
 				Nats:       Pending,
 				Transport:  Pending,
 			},
+			gwClients,
 		}
 	})
 	return agentService
@@ -80,36 +90,51 @@ func (service *AgentService) StopNats() error {
 
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
-	dispatcherMap := nats.DispatcherMap{
-		SubjSendResourceWithMetrics: func(b []byte) error {
-			_, err := service.GWClient.SendResourcesWithMetrics(b)
-			service.agentStats.Lock()
-			if err == nil {
-				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
-				service.agentStats.BytesSent += len(b)
-				service.agentStats.MessagesSent++
-			} else {
-				service.agentStats.LastError = err.Error()
-			}
-			service.agentStats.Unlock()
-			return err
-		},
-		SubjSynchronizeInventory: func(b []byte) error {
-			_, err := service.GWClient.SynchronizeInventory(b)
-			service.agentStats.Lock()
-			if err == nil {
-				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
-				service.agentStats.BytesSent += len(b)
-				service.agentStats.MessagesSent++
-			} else {
-				service.agentStats.LastError = err.Error()
-			}
-			service.agentStats.Unlock()
-			return err
-		},
+	var dispatcherOptions []nats.DispatcherOption
+	for _, gwClient := range service.gwClients {
+		durableID := fmt.Sprintf("%s", gwClient.Host)
+		dispatcherOptions = append(
+			dispatcherOptions,
+			nats.DispatcherOption{
+				DurableID: durableID,
+				Subject:   SubjSendResourceWithMetrics,
+				Handler: func(b []byte) error {
+					// TODO: filter the message by rules per gwClient
+					_, err := gwClient.SendResourcesWithMetrics(b)
+					service.agentStats.Lock()
+					if err == nil {
+						service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+						service.agentStats.BytesSent += len(b)
+						service.agentStats.MessagesSent++
+					} else {
+						service.agentStats.LastError = err.Error()
+					}
+					service.agentStats.Unlock()
+					return err
+				},
+			},
+			nats.DispatcherOption{
+				DurableID: durableID,
+				Subject:   SubjSynchronizeInventory,
+				Handler: func(b []byte) error {
+					// TODO: filter the message by rules per gwClient
+					_, err := gwClient.SynchronizeInventory(b)
+					service.agentStats.Lock()
+					if err == nil {
+						service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+						service.agentStats.BytesSent += len(b)
+						service.agentStats.MessagesSent++
+					} else {
+						service.agentStats.LastError = err.Error()
+					}
+					service.agentStats.Unlock()
+					return err
+				},
+			},
+		)
 	}
 
-	err := nats.StartDispatcher(&dispatcherMap)
+	err := nats.StartDispatcher(dispatcherOptions)
 	if err == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running

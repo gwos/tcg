@@ -43,7 +43,7 @@ func Config(level int) {
 		logger.SetLevel(logrus.WarnLevel)
 	case 2:
 		logger.SetLevel(logrus.InfoLevel)
-	case 3:
+	default:
 		logger.SetLevel(logrus.DebugLevel)
 	}
 }

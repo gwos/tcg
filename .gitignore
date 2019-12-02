@@ -26,6 +26,7 @@ vendor
 
 # NATS Datastore
 datastore
+integration/test_datastore/
 
 # Compiled Go-to-C conversion tool
 gotocjson/gotocjson
