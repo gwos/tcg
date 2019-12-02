@@ -17,15 +17,15 @@ public class TransitServicesImpl implements TransitServices {
     public TransitServicesImpl() {
         this.objectMapper = new ConfiguredObjectMapper();
         String path = System.getenv(LIBTRANSIT_LIBRARY_PATH_ENV);
-        if (path.isEmpty()) {
-            path = "/home/vsenkevich/Projects/effectivesoft/groundwork/_rep/tng/libtransit/libtransit.so";
+        if (path == null || path.isEmpty()) {
+            path = "/home/vladislavsenkevich/Projects/groundwork/_rep/tng/libtransit/libtransit.so";
         }
         this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
     }
 
     @Override
-    public void SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException {
+    public void SendResourcesWithMetrics(DtoResourcesWithServices resources) throws TransitException {
         String resourcesJson = null;
         try {
             resourcesJson = objectMapper.writeValueAsString(resources);
