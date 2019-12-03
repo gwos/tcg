@@ -15,7 +15,7 @@ var cfg *Config
 // ConfigEnv defines environment variable for config file path
 const (
 	ConfigEnv       = "TNG_CONFIG"
-	ConfigName      = "config.yml"
+	ConfigName      = "tng_config.yaml"
 	EnvConfigPrefix = "TNG"
 )
 

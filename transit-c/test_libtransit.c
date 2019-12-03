@@ -22,7 +22,7 @@ The test supports environment variables:
     LIBTRANSIT=/path/to/libtransit.so
     TEST_ENDLESS - cycle run test_dlSendResourcesWithMetrics
 And all environment variables supported by libtransit itself:
-    TNG_CONFIG=/path/to/config.yml
+    TNG_CONFIG=/path/to/tng_config.yaml
     TNG_AGENTCONFIG_NATSSTORETYPE=MEMORY
 For more info see package `config`
 */
