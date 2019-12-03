@@ -22,7 +22,7 @@ The test supports environment variables:
     LIBTRANSIT=/path/to/libtransit.so
     TEST_ENDLESS - cycle run test_dlSendResourcesWithMetrics
 And all environment variables supported by libtransit itself:
-    TNG_CONFIG=/path/to/config.yml
+    TNG_CONFIG=/path/to/tng_config.yaml
     TNG_AGENTCONFIG_NATSSTORETYPE=MEMORY
 For more info see package `config`
 */
@@ -91,11 +91,11 @@ void test_dl_libtransit_control() {
   char errorBuf[ERROR_LEN] = "";
   bool res = false;
 
-  res = stopController((char *)&errorBuf);
+  res = stopController(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
-  res = stopNats((char *)&errorBuf);
+  res = stopNats(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
@@ -115,15 +115,15 @@ void test_dl_libtransit_control() {
   if (res) {
     fail("Transport still running");
   }
-  res = startController((char *)&errorBuf);
+  res = startController(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
-  res = startNats((char *)&errorBuf);
+  res = startNats(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
-  res = startTransport((char *)&errorBuf);
+  res = startTransport(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
@@ -154,7 +154,7 @@ void test_dlSendResourcesWithMetrics() {
       "\"HOST_UP\", \"type\": \"gce_instance\"}";
 
   char errorBuf[ERROR_LEN] = "";
-  bool res = sendResourcesWithMetrics(requestJSON, (char *)&errorBuf);
+  bool res = sendResourcesWithMetrics(requestJSON, errorBuf);
   printf("\n_res:errorBuf: %d : %s", res, errorBuf);
 }
 

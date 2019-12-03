@@ -18,7 +18,7 @@ type ConfigEnvironmentVariables string
 // ConfigEnv defines environment variable for config file path
 const (
 	ConfigEnv       ConfigEnvironmentVariables = "TNG_CONFIG"
-	ConfigName                                 = "config.yml"
+	ConfigName                                 = "tng_config.yaml"
 	EnvConfigPrefix                            = "TNG"
 )
 
@@ -57,7 +57,7 @@ type AgentConfig struct {
 	StartController bool   `yaml:"startController"`
 	StartNATS       bool   `yaml:"startNATS"`
 	// StartTransport defines that NATS starts with Transport
-	StartTransport  bool   `yaml:"startTransport"`
+	StartTransport bool `yaml:"startTransport"`
 }
 
 // Config defines TNG Agent configuration

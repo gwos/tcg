@@ -53,6 +53,7 @@ func putError(errorBuf *C.char, err error) {
 	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
 }
 
+// SendResourcesWithMetrics is a C API for transitService.SendResourceWithMetrics
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
 	if err := transitService.
@@ -63,6 +64,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 	return true
 }
 
+// SynchronizeInventory is a C API for transitService.SynchronizeInventory
 //export SynchronizeInventory
 func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 	if err := transitService.
@@ -73,6 +75,7 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 	return true
 }
 
+// StartController is a C API for transitService.StartController
 //export StartController
 func StartController(errorBuf *C.char) bool {
 	if err := transitService.StartController(); err != nil {
@@ -82,6 +85,7 @@ func StartController(errorBuf *C.char) bool {
 	return true
 }
 
+// StopController is a C API for transitService.StopController
 //export StopController
 func StopController(errorBuf *C.char) bool {
 	if err := transitService.StopController(); err != nil {
@@ -91,6 +95,7 @@ func StopController(errorBuf *C.char) bool {
 	return true
 }
 
+// StartNats is a C API for transitService.StartNats
 //export StartNats
 func StartNats(errorBuf *C.char) bool {
 	if err := transitService.StartNats(); err != nil {
@@ -100,6 +105,7 @@ func StartNats(errorBuf *C.char) bool {
 	return true
 }
 
+// StopNats is a C API for transitService.StopNats
 //export StopNats
 func StopNats(errorBuf *C.char) bool {
 	if err := transitService.StopNats(); err != nil {
@@ -109,6 +115,7 @@ func StopNats(errorBuf *C.char) bool {
 	return true
 }
 
+// StartTransport is a C API for transitService.StartTransport
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
 	if err := transitService.StartTransport(); err != nil {
@@ -118,6 +125,7 @@ func StartTransport(errorBuf *C.char) bool {
 	return true
 }
 
+// StopTransport is a C API for transitService.StopTransport
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
 	if err := transitService.StopTransport(); err != nil {
@@ -127,21 +135,25 @@ func StopTransport(errorBuf *C.char) bool {
 	return true
 }
 
+// IsControllerRunning is a C API for transitService.Status().Controller
 //export IsControllerRunning
 func IsControllerRunning() bool {
 	return transitService.Status().Controller == services.Running
 }
 
+// IsNatsRunning is a C API for transitService.Status().Nats
 //export IsNatsRunning
 func IsNatsRunning() bool {
 	return transitService.Status().Nats == services.Running
 }
 
+// IsTransportRunning is a C API for transitService.Status().Transport
 //export IsTransportRunning
 func IsTransportRunning() bool {
 	return transitService.Status().Transport == services.Running
 }
 
+// RegisterListMetricsHandler is a C API for controller.RegisterListMetricsHandler
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
@@ -153,6 +165,7 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	})
 }
 
+// RemoveListMetricsHandler is a C API for controller.RemoveListMetricsHandler
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
 	controller.RemoveListMetricsHandler()
