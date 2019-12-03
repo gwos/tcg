@@ -3,13 +3,13 @@ package serverconnector
 import (
 	"bytes"
 	"fmt"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
-	"log"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -27,7 +27,7 @@ var LastCheck milliseconds.MillisecondTimestamp
 func Synchronize() *transit.InventoryResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
@@ -86,7 +86,7 @@ func Synchronize() *transit.InventoryResource {
 func CollectMetrics() *transit.MonitoredResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
@@ -177,7 +177,7 @@ func getDiskUsedService() *transit.MonitoredService {
 func getDiskFreeService() *transit.MonitoredService {
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 
@@ -208,7 +208,7 @@ func getDiskFreeService() *transit.MonitoredService {
 func getTotalMemoryUsageService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 
@@ -239,7 +239,7 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 func getMemoryUsedService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 	return &transit.MonitoredService{
@@ -269,7 +269,7 @@ func getMemoryUsedService() *transit.MonitoredService {
 func getMemoryFreeService() *transit.MonitoredService {
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Println(err.Error())
+		log.Error(err)
 		return nil
 	}
 
@@ -300,7 +300,7 @@ func getMemoryFreeService() *transit.MonitoredService {
 func getNumberOfProcessesService() *transit.MonitoredService {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
 		return nil
 	}
 
@@ -368,7 +368,7 @@ func collectProcessMetrics() float64 {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 	var totalCpu float64
@@ -391,7 +391,7 @@ func collectProcessMetrics() float64 {
 		}
 		cpuUsed, err := strconv.ParseFloat(ft[2], 64)
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
 		}
 		totalCpu += cpuUsed
 		totalCount++

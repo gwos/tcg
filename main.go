@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/serverconnector"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
-	"log"
 	"os/exec"
 	"time"
 )
@@ -38,7 +38,7 @@ func main() {
 	for {
 		err := sendMonitoredResources(*serverconnector.CollectMetrics())
 		if err != nil {
-			log.Println(err.Error())
+			log.Error(err.Error())
 		}
 
 		serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
