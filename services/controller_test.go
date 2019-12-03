@@ -13,7 +13,7 @@ import (
 
 const (
 	ConfigEnv  = "TNG_CONFIG"
-	ConfigName = "config.yml"
+	ConfigName = "tng_config.yaml"
 )
 
 func TestController_StartStopNats(t *testing.T) {
