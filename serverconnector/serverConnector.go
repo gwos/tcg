@@ -58,7 +58,7 @@ func Synchronize() *transit.InventoryResource {
 
 	LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 
-	return &transit.InventoryResource{
+	inventoryResource := transit.InventoryResource{
 		Name: hostName,
 		Type: transit.Host,
 		Services: []transit.InventoryService{
@@ -104,6 +104,18 @@ func Synchronize() *transit.InventoryResource {
 			},
 		},
 	}
+
+	processesMap := collectProcesses()
+
+	for processName, _ := range processesMap {
+		inventoryResource.Services = append(inventoryResource.Services, transit.InventoryService{
+			Name:  processName,
+			Type:  transit.NetworkDevice,
+			Owner: hostName,
+		})
+	}
+
+	return &inventoryResource
 }
 
 func CollectMetrics() *transit.MonitoredResource {
@@ -115,7 +127,7 @@ func CollectMetrics() *transit.MonitoredResource {
 
 	hostName = hostStat.Hostname
 
-	return &transit.MonitoredResource{
+	monitoredResource := transit.MonitoredResource{
 		Name:          hostStat.Hostname,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
@@ -132,6 +144,62 @@ func CollectMetrics() *transit.MonitoredResource {
 			*getTotalCpuUsage(),
 		},
 	}
+
+	processesMap := collectProcesses()
+
+	for processName, processCpu := range processesMap {
+		monitoredResource.Services = append(monitoredResource.Services, transit.MonitoredService{
+			Name:          processName,
+			Type:          transit.Service,
+			Status:        transit.ServiceOk,
+			Owner:         hostName,
+			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Second * 5)},
+			Metrics: []transit.TimeSeries{
+				{
+					MetricName: processName,
+					SampleType: transit.Value,
+					Interval: &transit.TimeInterval{
+						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					},
+					Value: &transit.TypedValue{
+						ValueType:   transit.DoubleType,
+						DoubleValue: processCpu,
+					},
+					Unit: transit.PercentCPU,
+				},
+				{
+					MetricName: processName + "_cr",
+					SampleType: transit.Value,
+					Interval: &transit.TimeInterval{
+						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					},
+					Value: &transit.TypedValue{
+						ValueType:   transit.DoubleType,
+						DoubleValue: TotalCpuUsageCriticalValue,
+					},
+					Unit: transit.PercentCPU,
+				},
+				{
+					MetricName: processName + "_wn",
+					SampleType: transit.Value,
+					Interval: &transit.TimeInterval{
+						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					},
+					Value: &transit.TypedValue{
+						ValueType:    transit.IntegerType,
+						IntegerValue: TotalCpuUsageWarningValue,
+					},
+					Unit: transit.PercentCPU,
+				},
+			},
+		})
+	}
+
+	return &monitoredResource
 }
 
 func getTotalDiskUsageService() *transit.MonitoredService {
@@ -594,24 +662,24 @@ func getTotalCpuUsage() *transit.MonitoredService {
 		},
 	}
 
-	processesMap := collectProcesses()
-
-	for processName, processCpu := range processesMap {
-		service.Metrics = append(service.Metrics, transit.TimeSeries{
-			MetricName: processName,
-			SampleType: transit.Value,
-			Interval: &transit.TimeInterval{
-				EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
-				StartTime: milliseconds.MillisecondTimestamp{Time: interval},
-			},
-			Value: &transit.TypedValue{
-				ValueType:   transit.DoubleType,
-				DoubleValue: processCpu,
-			},
-			Unit: transit.PercentCPU,
-		})
-		break
-	}
+	//processesMap := collectProcesses()
+	//
+	//for processName, processCpu := range processesMap {
+	//	service.Metrics = append(service.Metrics, transit.TimeSeries{
+	//		MetricName: processName,
+	//		SampleType: transit.Value,
+	//		Interval: &transit.TimeInterval{
+	//			EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+	//			StartTime: milliseconds.MillisecondTimestamp{Time: interval},
+	//		},
+	//		Value: &transit.TypedValue{
+	//			ValueType:   transit.DoubleType,
+	//			DoubleValue: processCpu,
+	//		},
+	//		Unit: transit.PercentCPU,
+	//	})
+	//	break
+	//}
 
 	return &service
 }
