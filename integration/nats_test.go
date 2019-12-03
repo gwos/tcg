@@ -55,7 +55,7 @@ func TestNatsQueue_1(t *testing.T) {
 	GetConfig().GWConfigs[0].Host = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
-	time.Sleep(TestMessagesCount * 2 * time.Second)
+	time.Sleep(TestMessagesCount * 3 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",

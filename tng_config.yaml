@@ -7,15 +7,15 @@ agentConfig:
   startNats: True
   startTransport: True
   startController: True
-  logLevel: 1
+  logLevel: 2
 gwConfigs:
   -
     host: "localhost:80"
     account: "RESTAPIACCESS"
-    password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
     appName: "tng"
   -
     host: "localhost:88"
     account: "RESTAPIACCESS"
-    password: "6d2Ygwsw6dM8abSiGCaFvTyWXT8JP8XmuvwX4yynt5TH"
+    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
     appName: "tng"

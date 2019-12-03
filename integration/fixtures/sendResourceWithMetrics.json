@@ -3,40 +3,38 @@
     "appType": "VEMA",
     "agentId": "3939333393342",
     "traceToken": "token-99e93",
-    "timeStamp": "2019-10-21T21:00:00.000+0000"
+    "timeStamp": "1575367534330"
   },
   "resources": [
     {
-      "resource": {
-        "properties": {},
-        "name": "GW8_TNG_TEST_HOST_1",
-        "type": "HOST",
-        "status": "HOST_UP",
-        "lastCheckTime": "2019-10-21T21:00:00.000+0000"
-      }
-    },
-    {
-      "resource": {
-        "properties": {},
-        "name": "GW8_TNG_TEST_SERVICE_0",
-        "type": "SERVICE",
-        "owner": "GW8_TNG_TEST_HOST_1",
-        "status": "SERVICE_OK",
-        "lastCheckTime": "2019-10-21T21:00:00.000+0000"
-      },
-      "metrics": [
+      "name": "watcher",
+      "type": "host",
+      "status": "HOST_UP",
+      "lastCheckTime": "1575367534293",
+      "nextCheckTime": "1575367534302",
+      "services": [
         {
-          "tags": {},
-          "metricName": "GW8_TNG_TEST_SERVICE",
-          "sampleType": "Warning",
-          "interval": {
-            "startTime": "2019-10-20T21:00:00.000+0000",
-            "endTime": "2019-10-22T21:00:00.000+0000"
-          },
-          "value": {
-            "valueType": "IntegerType",
-            "integerValue": 1
-          }
+          "name": "disk.free",
+          "type": "",
+          "owner": "watcher",
+          "status": "SERVICE_OK",
+          "lastCheckTime": "1575367534302",
+          "nextCheckTime": "1575367534302",
+          "metrics": [
+            {
+              "metricName": "diskFree",
+              "sampleType": "Value",
+              "interval": {
+                "endTime": "1575367534302",
+                "startTime": "1575367534302"
+              },
+              "value": {
+                "valueType": "IntegerType",
+                "integerValue": 117369
+              },
+              "unit": "MB"
+            }
+          ]
         }
       ]
     }

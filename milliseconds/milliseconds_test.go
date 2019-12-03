@@ -65,19 +65,19 @@ func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
 		{
 			name:    "1900-01-01",
 			fields:  fields{time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("-2208988800000"),
+			want:    ([]byte)("\"-2208988800000\""),
 			wantErr: false,
 		},
 		{
 			name:    "1970-01-01",
 			fields:  fields{time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("0"),
+			want:    ([]byte)("\"0\""),
 			wantErr: false,
 		},
 		{
 			name:    "2020-12-31",
 			fields:  fields{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("1609372800000"),
+			want:    ([]byte)("\"1609372800000\""),
 			wantErr: false,
 		},
 	}
