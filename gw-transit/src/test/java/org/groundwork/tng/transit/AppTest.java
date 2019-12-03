@@ -1,6 +1,5 @@
 package org.groundwork.tng.transit;
 
-import org.groundwork.rs.dto.DtoMonitorServer;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
@@ -11,7 +10,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 /**
  * Unit test for simple App.
@@ -98,8 +96,6 @@ public class AppTest {
     public void shouldSynchronizeInventory() {
         TransitServices transit = new TransitServicesImpl();
 
-        System.out.println("LOADED 1");
-
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
                 .setAppType("VEMA")
@@ -113,18 +109,13 @@ public class AppTest {
                 .build();
         host.addService(DtoInventoryService.builder()
                 .setName(TEST_SERVICE_NAME)
-                .setType(SERVICE_RESOURCE_TYPE)
+                .setType("network-device")
                 .setOwner(TEST_HOST_NAME)
                 .build());
-
-
-        DtoGroup group = new DtoGroup();
-        group.setGroupName("GW8");
 
         DtoInventory dtoInventory = new DtoInventory();
         dtoInventory.setContext(context);
         dtoInventory.add(host);
-        dtoInventory.add(group);
 
         transit.SynchronizeInventory(dtoInventory);
     }
