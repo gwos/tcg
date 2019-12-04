@@ -48,6 +48,9 @@ func (service *AgentService) StartController() error {
 // StopController implements AgentServices.StopController interface
 func (service *AgentService) StopController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
+	if service.agentStatus.Controller == Stopped || service.agentStatus.Controller == Pending {
+		return nil
+	}
 	return GetController().StopController()
 }
 
@@ -69,6 +72,10 @@ func (service *AgentService) StartNats() error {
 
 // StopNats implements AgentServices.StopNats interface
 func (service *AgentService) StopNats() error {
+	if service.agentStatus.Nats == Stopped || service.agentStatus.Nats == Pending {
+		return nil
+	}
+
 	// StopTransport as dependency
 	err := service.StopTransport()
 	// skip StopTransport error checking
@@ -146,6 +153,10 @@ func (service *AgentService) StartTransport() error {
 
 // StopTransport implements AgentServices.StopTransport interface
 func (service *AgentService) StopTransport() error {
+	if service.agentStatus.Transport == Stopped || service.agentStatus.Transport == Pending {
+		return nil
+	}
+
 	err := nats.StopDispatcher()
 	if err == nil {
 		service.agentStatus.Lock()
