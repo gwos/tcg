@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
@@ -24,12 +25,6 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		gwConfigs := config.GetConfig().GWConfigs
-		gwClients := make([]*clients.GWClient, len(gwConfigs))
-		for i := range gwConfigs {
-			gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
-		}
-
 		agentService = &AgentService{
 			config.GetConfig().AgentConfig,
 			&AgentStats{},
@@ -38,7 +33,7 @@ func GetAgentService() *AgentService {
 				Nats:       Pending,
 				Transport:  Pending,
 			},
-			gwClients,
+			nil,
 		}
 	})
 	return agentService
@@ -90,9 +85,19 @@ func (service *AgentService) StopNats() error {
 
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
+	gwConfigs := config.GetConfig().GWConfigs
+	gwClients := make([]*clients.GWClient, len(gwConfigs))
+	for i := range gwConfigs {
+		gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
+	}
+
+	service.gwClients = gwClients
+
 	var dispatcherOptions []nats.DispatcherOption
 	for _, gwClient := range service.gwClients {
+		gwClientCopy := gwClient
 		durableID := fmt.Sprintf("%s", gwClient.Host)
+		log.Debug(gwClient.Host)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			nats.DispatcherOption{
@@ -100,7 +105,7 @@ func (service *AgentService) StartTransport() error {
 				Subject:   SubjSendResourceWithMetrics,
 				Handler: func(b []byte) error {
 					// TODO: filter the message by rules per gwClient
-					_, err := gwClient.SendResourcesWithMetrics(b)
+					_, err := gwClientCopy.SendResourcesWithMetrics(b)
 					service.agentStats.Lock()
 					if err == nil {
 						service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
@@ -118,7 +123,7 @@ func (service *AgentService) StartTransport() error {
 				Subject:   SubjSynchronizeInventory,
 				Handler: func(b []byte) error {
 					// TODO: filter the message by rules per gwClient
-					_, err := gwClient.SynchronizeInventory(b)
+					_, err := gwClientCopy.SynchronizeInventory(b)
 					service.agentStats.Lock()
 					if err == nil {
 						service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
