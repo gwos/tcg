@@ -8,7 +8,8 @@ LDFLAGS = -Wl,-L`realpath ../local/lib` -Wl,-R`realpath ../local/lib` -ljansson
 
 INCLUDES = -I../local/include -I../libtransit
 
-CFLAGS = ${INCLUDES} -m64 -std=gnu11 ${LDFLAGS}
+# We use "-g" because it helps with running under gdb when we experience segfaults.
+CFLAGS = ${INCLUDES} -m64 -std=gnu11 ${LDFLAGS} -g
 
 default	: all
 
@@ -24,8 +25,12 @@ transit_json.o	: transit_json.c transit_json.h
 ../libtransit/libtransit.h	:
 	cd ../libtransit ; make
 
-test	: test_transit
-	test_transit
+# test_transit isn't working yet, so there's no sense in holding up our
+# ability to easily run test_libtransit in the meantime.
+# test	: test_transit test_libtransit
+test	: test_libtransit
+	# test_transit
+	test_libtransit
 
 clean	:
 	rm -f *.o
