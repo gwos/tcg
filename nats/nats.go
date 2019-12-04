@@ -13,11 +13,9 @@ import (
 
 // Define NATS IDs
 const (
-	ClusterID            = "tng-cluster"
-	DispatcherClientID   = "tng-dispatcher"
-	DispatcherDurableID  = "tng-store-dispatcher"
-	DispatcherQueueGroup = "tng-queue-dispatcher"
-	PublisherID          = "tng-publisher"
+	ClusterID          = "tng-cluster"
+	DispatcherClientID = "tng-dispatcher"
+	PublisherID        = "tng-publisher"
 )
 
 var (
@@ -38,8 +36,12 @@ type Config struct {
 // DispatcherFn defines message processor
 type DispatcherFn func([]byte) error
 
-// DispatcherMap maps subject-processor
-type DispatcherMap map[string]DispatcherFn
+// DispatcherOption defines subscription
+type DispatcherOption struct {
+	DurableID string
+	Subject   string
+	Handler   DispatcherFn
+}
 
 // Connect returns connection
 func Connect(clientID string) (stan.Conn, error) {
@@ -91,8 +93,11 @@ func StopServer() {
 }
 
 // StartDispatcher subscribes processors by subject
-func StartDispatcher(dispatcherMap *DispatcherMap) error {
-	var err error
+func StartDispatcher(options []DispatcherOption) error {
+	err := StopDispatcher()
+	if err != nil {
+		return err
+	}
 	if dispatcherConn == nil {
 		dispatcherConn, err = stan.Connect(
 			ClusterID,
@@ -104,24 +109,23 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 		return err
 	}
 
-	for subject, fn := range *dispatcherMap {
-		dispatcherFn := fn /* prevent loop override */
-		_, err = dispatcherConn.QueueSubscribe(
-			subject,
-			DispatcherQueueGroup,
+	for _, o := range options {
+		dispatcherFn := o.Handler /* prevent loop override */
+		_, err = dispatcherConn.Subscribe(
+			o.Subject,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-						log.Info("Not delivered")
-						log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
+					log.Info("Not delivered")
+					log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
 				} else {
 					_ = msg.Ack()
-						log.Info("Delivered")
-						log.Debug("Message:", msg)
+					log.Info("Delivered")
+					log.Debug("Message:", msg)
 				}
 			},
 			stan.SetManualAckMode(),
 			stan.AckWait(cfg.DispatcherAckWait),
-			stan.DurableName(DispatcherDurableID),
+			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherClientID, o.DurableID)),
 			stan.StartWithLastReceived(),
 		)
 		if err != nil {

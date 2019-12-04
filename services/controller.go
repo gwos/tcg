@@ -186,20 +186,20 @@ func (controller *Controller) status(c *gin.Context) {
 func (controller *Controller) validateToken(c *gin.Context) {
 	credentials := cache.Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
-		GwosApiToken: c.Request.Header.Get("GWOS-API-TOKEN"),
+		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
 
-	if credentials.GwosAppName == "" || credentials.GwosApiToken == "" {
+	if credentials.GwosAppName == "" || credentials.GwosAPIToken == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid \"GWOS-APP-NAME\" or \"GWOS-API-TOKEN\""})
 		c.Abort()
 		return
 	}
 
-	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosApiToken)
+	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosAPIToken)
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.GWClient.ValidateToken(credentials.GwosAppName, credentials.GwosApiToken)
+		err := controller.gwClients[0].ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
