@@ -14,53 +14,10 @@ package main
 //}
 import "C"
 import (
-	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
 	"os"
-	"sync"
 	"unsafe"
 )
-
-// instantiateServicesOnce guards initialization by instantiateServices
-var instantiateServicesOnce sync.Once
-
-var controller *services.Controller
-var transitService *services.TransitService
-
-// Encapsulating this initialization into a function, and calling that function when necessary,
-// as opposed to making these assignments as global-variable initializaation assignments, gives
-// the calling application a chance to alter the environment variables before they are frozen
-// by the underlying os.Getenv() routine.
-func instantiateServices() {
-	controller = services.GetController()
-	transitService = services.GetTransitService()
-}
-
-//export Startup
-func Startup() bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	var err error
-	if transitService.AgentConfig.StartController {
-		if err = transitService.StartController(); err != nil {
-			log.Error(err.Error())
-		}
-	}
-	if err == nil {
-		if transitService.AgentConfig.StartNats {
-			if err = transitService.StartNats(); err != nil {
-				log.Error(err.Error())
-			}
-		}
-	}
-	// NOTE:  transitService.AgentConfig.StartTransport is already
-	// called by transitService.StartNats, so we don't call it here
-	log.Info("libtransit:", transitService.Status())
-
-	if err != nil {
-	    return false
-	}
-	return true
-}
 
 func main() {
 }
@@ -76,9 +33,9 @@ func min(a, b int) int {
 // a manner that will be understood by the Go runtime.  We need it because the standard
 // C-language putenv() and setenv() routines do not alter the Go environment as intended,
 // due to issues with when os.Getenv() or related routines first get called.  To affect
-// the setup for the services managed by libtransit, calls to GoSetenv() must be made
-// *before* a call to Startup() or any of the other routines that might probe for or
-// attempt to start, stop, or otherwise interact with one of the services.
+// the initial setup for the services managed by libtransit, calls to GoSetenv() must be
+// made *before* any call to one of the routines that might probe for or attempt to start,
+// stop, or otherwise interact with one of the services.
 
 //export GoSetenv
 func GoSetenv(key, value *C.char) int {
@@ -100,11 +57,10 @@ func putError(errorBuf *C.char, err error) {
 	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
 }
 
-// SendResourcesWithMetrics is a C API for transitService.SendResourceWithMetrics
+// SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.
+	if err := services.GetTransitService().
 		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -112,11 +68,10 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 	return true
 }
 
-// SynchronizeInventory is a C API for transitService.SynchronizeInventory
+// SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
 func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.
+	if err := services.GetTransitService().
 		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -124,99 +79,89 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 	return true
 }
 
-// StartController is a C API for transitService.StartController
+// StartController is a C API for services.GetTransitService().StartController
 //export StartController
 func StartController(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StartController(); err != nil {
+	if err := services.GetTransitService().StartController(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// StopController is a C API for transitService.StopController
+// StopController is a C API for services.GetTransitService().StopController
 //export StopController
 func StopController(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StopController(); err != nil {
+	if err := services.GetTransitService().StopController(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// StartNats is a C API for transitService.StartNats
+// StartNats is a C API for services.GetTransitService().StartNats
 //export StartNats
 func StartNats(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StartNats(); err != nil {
+	if err := services.GetTransitService().StartNats(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// StopNats is a C API for transitService.StopNats
+// StopNats is a C API for services.GetTransitService().StopNats
 //export StopNats
 func StopNats(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StopNats(); err != nil {
+	if err := services.GetTransitService().StopNats(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// StartTransport is a C API for transitService.StartTransport
+// StartTransport is a C API for services.GetTransitService().StartTransport
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StartTransport(); err != nil {
+	if err := services.GetTransitService().StartTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// StopTransport is a C API for transitService.StopTransport
+// StopTransport is a C API for services.GetTransitService().StopTransport
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	if err := transitService.StopTransport(); err != nil {
+	if err := services.GetTransitService().StopTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
 	}
 	return true
 }
 
-// IsControllerRunning is a C API for transitService.Status().Controller
+// IsControllerRunning is a C API for services.GetTransitService().Status().Controller
 //export IsControllerRunning
 func IsControllerRunning() bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	return transitService.Status().Controller == services.Running
+	return services.GetTransitService().Status().Controller == services.Running
 }
 
-// IsNatsRunning is a C API for transitService.Status().Nats
+// IsNatsRunning is a C API for services.GetTransitService().Status().Nats
 //export IsNatsRunning
 func IsNatsRunning() bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	return transitService.Status().Nats == services.Running
+	return services.GetTransitService().Status().Nats == services.Running
 }
 
-// IsTransportRunning is a C API for transitService.Status().Transport
+// IsTransportRunning is a C API for services.GetTransitService().Status().Transport
 //export IsTransportRunning
 func IsTransportRunning() bool {
-        instantiateServicesOnce.Do(instantiateServices)
-	return transitService.Status().Transport == services.Running
+	return services.GetTransitService().Status().Transport == services.Running
 }
 
-// RegisterListMetricsHandler is a C API for controller.RegisterListMetricsHandler
+// RegisterListMetricsHandler is a C API for services.GetController().RegisterListMetricsHandler
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.getTextHandlerType) {
-        instantiateServicesOnce.Do(instantiateServices)
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
-	controller.RegisterListMetricsHandler(func() ([]byte, error) {
+	services.GetController().RegisterListMetricsHandler(func() ([]byte, error) {
 		textPtr := C.invokeGetTextHandler(fn)
 		bytes := []byte(C.GoString(textPtr))
 		C.free(unsafe.Pointer(textPtr))
@@ -224,9 +169,8 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	})
 }
 
-// RemoveListMetricsHandler is a C API for controller.RemoveListMetricsHandler
+// RemoveListMetricsHandler is a C API for services.GetController().RemoveListMetricsHandler
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
-        instantiateServicesOnce.Do(instantiateServices)
-	controller.RemoveListMetricsHandler()
+	services.GetController().RemoveListMetricsHandler()
 }

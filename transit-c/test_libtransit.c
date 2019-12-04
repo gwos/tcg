@@ -28,7 +28,6 @@ For more info see package `config`
 */
 
 /* define handlers for general libtransit functions */
-bool (*startup)() = NULL;
 int (*goSetenv)(char *, char *) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
 bool (*sendResourcesWithMetrics)(char *requestJSON, char *errorBuf) = NULL;
@@ -83,7 +82,6 @@ void test_dl_libtransit() {
     fail(dlerror());
   }
 
-  startup                    = find_symbol( "Startup" );
   goSetenv                   = find_symbol( "GoSetenv" );
   registerListMetricsHandler = find_symbol( "RegisterListMetricsHandler" );
   sendResourcesWithMetrics   = find_symbol( "SendResourcesWithMetrics" );
@@ -120,41 +118,24 @@ void test_dl_libtransit_control() {
     }
   }
 
-  // If true (the normal setting), test the Startup() routine and the related StopNats()
-  // and StopController() routines as well.  If false, don't bother starting, so we can
-  // test the behavior of the StopNats() and StopController() routines under the condition
-  // where those components have never been started.
-  bool test_Startup = true;
+  // If true, force a test of StopNats(), to see if it will generate a segfault if
+  // NATS has not previously been started.  If false, skip testing the StopNats()
+  // routine ut the beginning, before NATS has been started.
+  bool test_StopNats = false;
 
-  // If true (the normal setting), force a test of StopNats(), to see if it will generate a
-  // segfault if NATS has not previously been started.  If false, skip testing the StopNats()
-  // routine unless NATS has previously been started.
-  bool test_StopNats = true;
+  // If true, force a test of StopController(), to see if it will generate a segfault
+  // if the controller has not previously been started. If false, skip testing the
+  // StopController() routine at the beginning, before the controller has been started.
+  bool test_StopController = false;
 
-  // If true (the normal setting), force a test of StopController(), to see if it will
-  // generate a segfault if the controller has not previously been started. If false, skip
-  // testing the StopController() routine unless the controller has previously been started.
-  bool test_StopController = true;
-
-  if (test_Startup) {
-    printf("Testing Startup ...\n");
-    res = startup();
-    if (!res) {
-      fail("Could not start up libtransit");
-    }
-  }
-  else {
-    printf("Skipping test of Startup.\n");
-  }
-
-  // Since Startup() starts the controller before starting NATS, it seems
-  // to make sense that we should stop NATS before stopping the controller.
+  // Since we start the controller before starting NATS, it seems to make sense that
+  // we should stop NATS before stopping the controller.
 
   // At least in our stack as of this writing, StopNats() will segfault inside the
   // github.com/nats-io/nats-streaming-server/server.(*StanServer).Shutdown code if
   // NATS has not previously been started.  The github.com/gwos/tng/nats.StopServer()
   // code should be revised to not pass stuff to NATS that causes it to segfault.
-  if (test_Startup || test_StopNats) {
+  if (test_StopNats) {
     printf("Testing StopNats ...\n");
     res = stopNats(errorBuf);
     if (!res) {
@@ -169,7 +150,7 @@ void test_dl_libtransit_control() {
   // the net/http.(*Server).Shutdown() code if the controller has not previously been
   // started.  The github.com/gwos/tng/services.(*Controller).StopController() code
   // should be revised to not pass stuff to net/http that causes it to segfault.
-  if (test_Startup || test_StopController) {
+  if (test_StopController) {
     printf("Testing StopController ...\n");
     res = stopController(errorBuf);
     if (!res) {
@@ -244,6 +225,33 @@ void test_dl_libtransit_control() {
 
   printf("Testing RegisterListMetricsHandler ...\n");
   registerListMetricsHandler(listMetricsHandler);
+
+  printf("Testing StopNats ...\n");
+  res = stopNats(errorBuf);
+  if (!res) {
+    fail(errorBuf);
+  }
+
+  printf("Testing StopController ...\n");
+  res = stopController(errorBuf);
+  if (!res) {
+    fail(errorBuf);
+  }
+
+  // We want to leave Transit running, for later tests outside of this routine.
+  // So we restart it here.
+
+  printf("Testing StartController ...\n");
+  res = startController(errorBuf);
+  if (!res) {
+    fail(errorBuf);
+  }
+
+  printf("Testing StartNats ...\n");
+  res = startNats(errorBuf);
+  if (!res) {
+    fail(errorBuf);
+  }
 }
 
 void test_dlSendResourcesWithMetrics() {
