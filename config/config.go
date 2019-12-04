@@ -50,10 +50,6 @@ type AgentConfig struct {
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
 	NatsHost        string `yaml:"natsHost"`
-	StartController bool   `yaml:"startController"`
-	StartNats       bool   `yaml:"startNats"`
-	// StartTransport defines that NATS starts with Transport
-	StartTransport bool     `yaml:"startTransport"`
 	LogLevel       LogLevel `yaml:"logLevel"`
 }
 

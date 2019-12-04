@@ -63,10 +63,6 @@ func (service *AgentService) StartNats() error {
 		service.agentStatus.Lock()
 		service.agentStatus.Nats = Running
 		service.agentStatus.Unlock()
-		// StartTransport as dependency
-		if service.AgentConfig.StartTransport {
-			err = service.StartTransport()
-		}
 	}
 	return err
 }
