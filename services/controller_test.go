@@ -20,6 +20,7 @@ func TestController_StartStopNats(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 		service := GetTransitService()
+		service.NatsStoreType = "MEMORY"
 
 		switch req.URL.String() {
 		case "/nats/start":
@@ -35,15 +36,6 @@ func TestController_StartStopNats(t *testing.T) {
 		}
 		res.WriteHeader(http.StatusOK)
 	}))
-
-	defer func() {
-		testServer.Close()
-		cmd := exec.Command("rm", "-rf", "src")
-		_, err := cmd.Output()
-		if err != nil {
-			log.Error(err)
-		}
-	}()
 
 	startReq, err := http.NewRequest(http.MethodGet, testServer.URL+"/nats/start", nil)
 	assert.NoError(t, err)

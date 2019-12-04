@@ -6,6 +6,8 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
+	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"net/http"
 	"net/http/pprof"
@@ -18,6 +20,7 @@ type Controller struct {
 	*AgentService
 	srv                *http.Server
 	listMetricsHandler GetBytesHandlerType
+	authClient         *clients.GWClient
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -28,7 +31,12 @@ var controller *Controller
 // GetController implements Singleton pattern
 func GetController() *Controller {
 	onceController.Do(func() {
-		controller = &Controller{GetAgentService(), nil, nil}
+		controller = &Controller{
+			GetAgentService(),
+			nil,
+			nil,
+			nil,
+		}
 	})
 	return controller
 }
@@ -58,6 +66,8 @@ func (controller *Controller) StartController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("controller: already started")
 	}
+
+	controller.authClient = &clients.GWClient{GWConfig: config.GetConfig().GWConfigs[0]}
 
 	addr := controller.AgentConfig.ControllerAddr
 	certFile := controller.AgentConfig.ControllerCertFile
@@ -199,7 +209,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.gwClients[0].ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
+		err := controller.authClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
