@@ -36,8 +36,9 @@ func instantiateServices() {
 	transitService = services.GetTransitService()
 }
 
-func Startup() (err error) {
+func Startup() bool {
         instantiateServicesOnce.Do(instantiateServices)
+	var err error
 	if transitService.AgentConfig.StartController {
 		if err = transitService.StartController(); err != nil {
 			log.Error(err.Error())
@@ -54,7 +55,10 @@ func Startup() (err error) {
 	// called by transitService.StartNats, so we don't call it here
 	log.Info("libtransit:", transitService.Status())
 
-	return err
+	if err != nil {
+	    return false
+	}
+	return true
 }
 
 func main() {
