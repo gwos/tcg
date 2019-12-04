@@ -49,6 +49,6 @@ type Outer struct {
 
 // doc for the dummy function
 // more doc, too
-func standin(int a) int {
+func standin(a int) int {
     return a
 }
