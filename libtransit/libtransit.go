@@ -16,26 +16,45 @@ import "C"
 import (
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
+	"os"
+	"sync"
 	"unsafe"
 )
 
-var controller = services.GetController()
-var transitService = services.GetTransitService()
+// instantiateServicesOnce guards initialization by instantiateServices
+var instantiateServicesOnce sync.Once
 
-func init() {
+var controller *services.Controller
+var transitService *services.TransitService
+
+// Encapsulating this initialization into a function, and calling that function when necessary,
+// as opposed to making these assignments as global-variable initializaation assignments, gives
+// the calling application a chance to alter the environment variables before they are frozen
+// by the underlying os.Getenv() routine.
+func instantiateServices() {
+	controller = services.GetController()
+	transitService = services.GetTransitService()
+}
+
+func Startup() (err error) {
+        instantiateServicesOnce.Do(instantiateServices)
 	if transitService.AgentConfig.StartController {
-		if err := transitService.StartController(); err != nil {
+		if err = transitService.StartController(); err != nil {
 			log.Error(err.Error())
 		}
 	}
-	if transitService.AgentConfig.StartNats {
-		if err := transitService.StartNats(); err != nil {
-			log.Error(err.Error())
+	if err == nil {
+		if transitService.AgentConfig.StartNats {
+			if err = transitService.StartNats(); err != nil {
+				log.Error(err.Error())
+			}
 		}
 	}
-	// NOTE: the transitService.AgentConfig.StartTransport
-	// processed by transitService.StartNats itself
+	// NOTE:  transitService.AgentConfig.StartTransport is already
+	// called by transitService.StartNats, so we don't call it here
 	log.Info("libtransit:", transitService.Status())
+
+	return err
 }
 
 func main() {
@@ -48,6 +67,29 @@ func min(a, b int) int {
 	return b
 }
 
+// GoSetenv() is for use by a calling application to alter environment variables in
+// a manner that will be understood by the Go runtime.  We need it because the standard
+// C-language putenv() and setenv() routines do not alter the Go environment as intended,
+// due to issues with when os.Getenv() or related routines first get called.  To affect
+// the setup for the services managed by libtransit, calls to GoSetenv() must be made
+// *before* a call to Startup() or any of the other routines that might probe for or
+// attempt to start, stop, or otherwise interact with one of the services.
+
+//export GoSetenv
+func GoSetenv(key, value *C.char) int {
+    err := os.Setenv(C.GoString(key), C.GoString(value))
+    if err != nil {
+	// Logically, we would like to set errno here. corresponding
+	// to what one would see with the POSIX setenv() routine.
+	//     errno = ENOMEM
+	//     errno = EINVAL
+	// But until and unless we figure out how to do that, we just
+	// skip that part of the setenv() emulation.
+        return -1
+    }
+    return 0
+}
+
 func putError(errorBuf *C.char, err error) {
 	buf := (*[int(C.ERROR_LEN)]byte)(unsafe.Pointer(errorBuf))
 	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
@@ -55,6 +97,7 @@ func putError(errorBuf *C.char, err error) {
 
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.
 		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
 		putError(errorBuf, err)
@@ -65,6 +108,7 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 
 //export SynchronizeInventory
 func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.
 		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
 		putError(errorBuf, err)
@@ -75,6 +119,7 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 
 //export StartController
 func StartController(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StartController(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -84,6 +129,7 @@ func StartController(errorBuf *C.char) bool {
 
 //export StopController
 func StopController(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StopController(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -93,6 +139,7 @@ func StopController(errorBuf *C.char) bool {
 
 //export StartNats
 func StartNats(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StartNats(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -102,6 +149,7 @@ func StartNats(errorBuf *C.char) bool {
 
 //export StopNats
 func StopNats(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StopNats(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -111,6 +159,7 @@ func StopNats(errorBuf *C.char) bool {
 
 //export StartTransport
 func StartTransport(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StartTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -120,6 +169,7 @@ func StartTransport(errorBuf *C.char) bool {
 
 //export StopTransport
 func StopTransport(errorBuf *C.char) bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	if err := transitService.StopTransport(); err != nil {
 		putError(errorBuf, err)
 		return false
@@ -129,21 +179,25 @@ func StopTransport(errorBuf *C.char) bool {
 
 //export IsControllerRunning
 func IsControllerRunning() bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	return transitService.Status().Controller == services.Running
 }
 
 //export IsNatsRunning
 func IsNatsRunning() bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	return transitService.Status().Nats == services.Running
 }
 
 //export IsTransportRunning
 func IsTransportRunning() bool {
+        instantiateServicesOnce.Do(instantiateServices)
 	return transitService.Status().Transport == services.Running
 }
 
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.getTextHandlerType) {
+        instantiateServicesOnce.Do(instantiateServices)
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
 	controller.RegisterListMetricsHandler(func() ([]byte, error) {
 		textPtr := C.invokeGetTextHandler(fn)
@@ -155,5 +209,6 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
+        instantiateServicesOnce.Do(instantiateServices)
 	controller.RemoveListMetricsHandler()
 }
