@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
+	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/services"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
@@ -21,8 +21,6 @@ const (
 	HostStatusPending = "PENDING"
 	HostStatusUp      = "UP"
 	TestHostName      = "GW8_TNG_TEST_HOST"
-	ConfigEnv         = "TNG_CONFIG"
-	ConfigName        = "config.yml"
 )
 
 type Response struct {
@@ -34,7 +32,7 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	headers, err = config()
+	headers, err = config(t)
 	defer clean(headers)
 	assert.NoError(t, err)
 
@@ -57,23 +55,18 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func config() (map[string]string, error) {
+func config(t *testing.T) (map[string]string, error) {
 	err := os.Setenv(ConfigEnv, path.Join("..", ConfigName))
-	if err != nil {
-		return nil, err
-	}
+	assert.NoError(t, err)
 
-	service := services.GetTransitService()
+	gwClient := &clients.GWClient{GWConfig: GetConfig().GWConfigs[0]}
+	err = gwClient.Connect()
+	assert.NoError(t, err)
 
-	err = service.Connect()
-	if err != nil {
-		return nil, err
-	}
-
-	token := reflect.ValueOf(service).Elem().FieldByName("token").String()
+	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  service.GWConfig.AppName,
+		"GWOS-APP-NAME":  gwClient.GWConfig.AppName,
 		"GWOS-API-TOKEN": token,
 	}
 

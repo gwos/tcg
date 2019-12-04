@@ -1,0 +1,21 @@
+agentConfig:
+  controllerAddr: ":8081"
+  natsAckWait: 15
+  natsFilestoreDir: "src/main/resources/datastore"
+  natsStoreType: "FILE"
+  natsHost: ":4222"
+  startNats: True
+  startTransport: True
+  startController: True
+  logLevel: 2
+gwConfigs:
+  -
+    host: "localhost:80"
+    account: "RESTAPIACCESS"
+    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
+    appName: "tng"
+  -
+    host: "localhost:88"
+    account: "RESTAPIACCESS"
+    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
+    appName: "tng"

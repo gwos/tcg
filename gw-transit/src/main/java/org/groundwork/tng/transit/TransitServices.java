@@ -1,12 +1,12 @@
 package org.groundwork.tng.transit;
 
 import org.groundwork.rs.transit.DtoInventory;
-import org.groundwork.rs.transit.DtoResourceWithMetricsList;
+import org.groundwork.rs.transit.DtoResourcesWithServices;
 
 
 public interface TransitServices {
 
-    void SendResourcesWithMetrics(DtoResourceWithMetricsList resources) throws TransitException;
+    void SendResourcesWithMetrics(DtoResourcesWithServices resources) throws TransitException;
 
     void SynchronizeInventory(DtoInventory inventory) throws TransitException;
 
