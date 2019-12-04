@@ -36,6 +36,7 @@ func instantiateServices() {
 	transitService = services.GetTransitService()
 }
 
+//export Startup
 func Startup() bool {
         instantiateServicesOnce.Do(instantiateServices)
 	var err error

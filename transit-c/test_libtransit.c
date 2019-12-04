@@ -28,6 +28,8 @@ For more info see package `config`
 */
 
 /* define handlers for general libtransit functions */
+bool (*startup)() = NULL;
+int (*goSetenv)(char *, char *) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
 bool (*sendResourcesWithMetrics)(char *requestJSON, char *errorBuf) = NULL;
 bool (*synchronizeInventory)(char *requestJSON, char *errorBuf) = NULL;
@@ -54,96 +56,135 @@ char *listMetricsHandler() {
   return buf;
 }
 
+void *libtransit_handle;
+
+// Follow the full approved procedure for finding a symbol, including all the correct error detection.
+void *find_symbol(char *symbol) {
+  dlerror();  // clear any old error condition, before looking for the symbol
+  void *address = dlsym( libtransit_handle, symbol );
+  char *error = dlerror();
+  if (error != NULL) {
+    fail(error);
+  }
+  return address;
+}
+
 void test_dl_libtransit() {
-  void *handle;
   char *error;
 
   char *libtransit = getenv("LIBTRANSIT");
   if (!libtransit) {
-    libtransit = "libtransit.so";
+    libtransit = "../libtransit/libtransit.so";
   }
 
-  handle = dlopen(libtransit, RTLD_LAZY);
-  if (!handle) {
+  libtransit_handle = dlopen(libtransit, RTLD_LAZY);
+  if (!libtransit_handle) {
     fail(dlerror());
   }
 
-  registerListMetricsHandler = dlsym(handle, "RegisterListMetricsHandler");
-  sendResourcesWithMetrics = dlsym(handle, "SendResourcesWithMetrics");
-  isControllerRunning = dlsym(handle, "IsControllerRunning");
-  isNatsRunning = dlsym(handle, "IsNatsRunning");
-  isTransportRunning = dlsym(handle, "IsTransportRunning");
-  startController = dlsym(handle, "StartController");
-  startNats = dlsym(handle, "StartNats");
-  startTransport = dlsym(handle, "StartTransport");
-  stopController = dlsym(handle, "StopController");
-  stopNats = dlsym(handle, "StopNats");
-  stopTransport = dlsym(handle, "StopTransport");
-
-  if ((error = dlerror()) != NULL) {
-    fail(error);
-  }
-
-  dlclose(handle);
+  startup                    = find_symbol( "Startup" );
+  goSetenv                   = find_symbol( "GoSetenv" );
+  registerListMetricsHandler = find_symbol( "RegisterListMetricsHandler" );
+  sendResourcesWithMetrics   = find_symbol( "SendResourcesWithMetrics" );
+  isControllerRunning        = find_symbol( "IsControllerRunning" );
+  isNatsRunning              = find_symbol( "IsNatsRunning" );
+  isTransportRunning         = find_symbol( "IsTransportRunning" );
+  startController            = find_symbol( "StartController" );
+  startNats                  = find_symbol( "StartNats" );
+  startTransport             = find_symbol( "StartTransport" );
+  stopController             = find_symbol( "StopController" );
+  stopNats                   = find_symbol( "StopNats" );
+  stopTransport              = find_symbol( "StopTransport" );
 }
 
 void test_dl_libtransit_control() {
   char errorBuf[ERROR_LEN] = "";
   bool res = false;
 
+  char *tng_config = getenv("TNG_CONFIG");
+  if (!tng_config) {
+    goSetenv("TNG_CONFIG", "../tng_config.yaml");
+  }
+
+  printf("Testing Startup ...\n");
+  res = startup();
+  if (!res) {
+    fail("Could not start up libtransit");
+  }
+
+  printf("Testing StopController ...\n");
   res = stopController(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
+
+  printf("Testing StopNats ...\n");
   res = stopNats(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
 
-  printf("\n_sleep 5 sec");
+  printf("sleeping for 5 seconds ...\n");
   sleep(5);
 
+  printf("Testing IsControllerRunning ...\n");
   res = isControllerRunning();
   if (res) {
     fail("Controller still running");
   }
+
+  printf("Testing IsNatsRunning ...\n");
   res = isNatsRunning();
   if (res) {
     fail("Nats still running");
   }
+
+  printf("Testing IsTransportRunning ...\n");
   res = isTransportRunning();
   if (res) {
     fail("Transport still running");
   }
+
+  printf("Testing StartController ...\n");
   res = startController(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
+
+  printf("Testing StartNats ...\n");
   res = startNats(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
+
+  printf("Testing StartTransport ...\n");
   res = startTransport(errorBuf);
   if (!res) {
     fail(errorBuf);
   }
 
-  printf("\n_sleep 5 sec");
+  printf("sleeping for 5 seconds ...\n");
   sleep(5);
 
+  printf("Testing IsControllerRunning ...\n");
   res = isControllerRunning();
   if (!res) {
     fail("Controller still not running");
   }
+
+  printf("Testing IsNatsRunning ...\n");
   res = isNatsRunning();
   if (!res) {
     fail("Nats still not running");
   }
+
+  printf("Testing IsTransportRunning ...\n");
   res = isTransportRunning();
   if (!res) {
     fail("Transport still not running");
   }
 
+  printf("Testing RegisterListMetricsHandler ...\n");
   registerListMetricsHandler(listMetricsHandler);
 }
 
@@ -155,7 +196,7 @@ void test_dlSendResourcesWithMetrics() {
 
   char errorBuf[ERROR_LEN] = "";
   bool res = sendResourcesWithMetrics(requestJSON, errorBuf);
-  printf("\n_res:errorBuf: %d : %s", res, errorBuf);
+  printf("sendResourcesWithMetrics: boolean result %d, error '%s'\n", res, errorBuf);
 }
 
 int main(void) {
@@ -163,7 +204,8 @@ int main(void) {
   test_dl_libtransit_control();
   test_dlSendResourcesWithMetrics();
 
-  fprintf(stdout, "\nall tests passed");
+  printf("\n");
+  printf("all tests passed\n");
 
   if (getenv("TEST_ENDLESS") != NULL) {
     fprintf(stderr, "\n\nTEST_ENDLESS: press ctrl-c to exit\n\n");
@@ -172,6 +214,12 @@ int main(void) {
       test_dlSendResourcesWithMetrics();
     }
   }
+
+  // We can't call this until we're actually done with the dynamically loaded
+  // code, as ehen we do so the reference count will drop to zero, no other
+  // loaded library will use symbols in it, and the dynamically loaded library
+  // will be unloaded.
+  dlclose(libtransit_handle);
 
   return 0;
 }
