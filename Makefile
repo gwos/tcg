@@ -33,7 +33,7 @@ ifeq ($(KERNEL_NAME),Linux)
     # we set things up so the LIBTRANSITJSON_LIBRARY (libtransitjson.so)
     # to which the JANSSON_LINK_FLAGS get applied will refer at run time
     # to the production copy of the Jansson library.
-    JANSSON_LINK_FLAGS += -Wl,-L${JANSSON_BUILD_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_INSTALLED_LIB_DIRECTORY}
+    JANSSON_LINK_FLAGS = -Wl,-L${JANSSON_BUILD_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_INSTALLED_LIB_DIRECTORY}
 endif
 ifeq ($(KERNEL_NAME),Darwin)
     # The linker -rpath option (-Wl,-R... as it may appear on the compiler commmand line
@@ -41,7 +41,7 @@ ifeq ($(KERNEL_NAME),Darwin)
     # so we can't use (but don't need) -Wl,-R... on this platform.  But that also means
     # our build is going to have to install the library in the final installed location
     # before we can link to it at build time -- and that part is not yet covered here.
-    JANSSON_LINK_FLAGS += -Wl,-L${JANSSON_INSTALLED_LIB_DIRECTORY} -ljansson
+    JANSSON_LINK_FLAGS = -Wl,-L${JANSSON_INSTALLED_LIB_DIRECTORY} -ljansson
 endif
 
 # The current definition here is a placeholder for whatever we actually

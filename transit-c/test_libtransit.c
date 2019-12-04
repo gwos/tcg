@@ -59,6 +59,7 @@ char *listMetricsHandler() {
 void *libtransit_handle;
 
 // Follow the full approved procedure for finding a symbol, including all the correct error detection.
+// This allows us to immediately identify any specific symbol we're having trouble with.
 void *find_symbol(char *symbol) {
   dlerror();  // clear any old error condition, before looking for the symbol
   void *address = dlsym( libtransit_handle, symbol );
@@ -103,25 +104,80 @@ void test_dl_libtransit_control() {
 
   char *tng_config = getenv("TNG_CONFIG");
   if (!tng_config) {
-    goSetenv("TNG_CONFIG", "../tng_config.yaml");
+    if (goSetenv("TNG_CONFIG", "../tng_config.yaml") != 0) {
+      fail("Could not set TNG_CONFIG");
+    }
   }
 
-  printf("Testing Startup ...\n");
-  res = startup();
-  if (!res) {
-    fail("Could not start up libtransit");
+  // We allow our forced selection here to be externally overridden, but in general
+  // for casual test purposes, we don't want the FILE type (as is specified by our
+  // ../tng_config.yaml file) to be in operation during this testing, as that will
+  // cause a buildup of queued items as this test is run and re-run.
+  char *nats_stor_type = getenv("TNG_AGENTCONFIG_NATSSTORETYPE");
+  if (!nats_stor_type) {
+    if (goSetenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY") != 0) {
+      fail("Could not set TNG_AGENTCONFIG_NATSSTORETYPE");
+    }
   }
 
-  printf("Testing StopController ...\n");
-  res = stopController(errorBuf);
-  if (!res) {
-    fail(errorBuf);
+  // If true (the normal setting), test the Startup() routine and the related StopNats()
+  // and StopController() routines as well.  If false, don't bother starting, so we can
+  // test the behavior of the StopNats() and StopController() routines under the condition
+  // where those components have never been started.
+  bool test_Startup = true;
+
+  // If true (the normal setting), force a test of StopNats(), to see if it will generate a
+  // segfault if NATS has not previously been started.  If false, skip testing the StopNats()
+  // routine unless NATS has previously been started.
+  bool test_StopNats = true;
+
+  // If true (the normal setting), force a test of StopController(), to see if it will
+  // generate a segfault if the controller has not previously been started. If false, skip
+  // testing the StopController() routine unless the controller has previously been started.
+  bool test_StopController = true;
+
+  if (test_Startup) {
+    printf("Testing Startup ...\n");
+    res = startup();
+    if (!res) {
+      fail("Could not start up libtransit");
+    }
+  }
+  else {
+    printf("Skipping test of Startup.\n");
   }
 
-  printf("Testing StopNats ...\n");
-  res = stopNats(errorBuf);
-  if (!res) {
-    fail(errorBuf);
+  // Since Startup() starts the controller before starting NATS, it seems
+  // to make sense that we should stop NATS before stopping the controller.
+
+  // At least in our stack as of this writing, StopNats() will segfault inside the
+  // github.com/nats-io/nats-streaming-server/server.(*StanServer).Shutdown code if
+  // NATS has not previously been started.  The github.com/gwos/tng/nats.StopServer()
+  // code should be revised to not pass stuff to NATS that causes it to segfault.
+  if (test_Startup || test_StopNats) {
+    printf("Testing StopNats ...\n");
+    res = stopNats(errorBuf);
+    if (!res) {
+      fail(errorBuf);
+    }
+  }
+  else {
+    printf("Skipping test of StopNats.\n");
+  }
+
+  // At least in our stack as of this writing, StopController() will segfauult inside
+  // the net/http.(*Server).Shutdown() code if the controller has not previously been
+  // started.  The github.com/gwos/tng/services.(*Controller).StopController() code
+  // should be revised to not pass stuff to net/http that causes it to segfault.
+  if (test_Startup || test_StopController) {
+    printf("Testing StopController ...\n");
+    res = stopController(errorBuf);
+    if (!res) {
+      fail(errorBuf);
+    }
+  }
+  else {
+    printf("Skipping test of StopController.\n");
   }
 
   printf("sleeping for 5 seconds ...\n");
@@ -157,6 +213,8 @@ void test_dl_libtransit_control() {
     fail(errorBuf);
   }
 
+  // StartNats() should have already started the transport,
+  // so this call should be safely idempotent.
   printf("Testing StartTransport ...\n");
   res = startTransport(errorBuf);
   if (!res) {
@@ -216,7 +274,7 @@ int main(void) {
   }
 
   // We can't call this until we're actually done with the dynamically loaded
-  // code, as ehen we do so the reference count will drop to zero, no other
+  // code, as when we do so the reference count will drop to zero, no other
   // loaded library will use symbols in it, and the dynamically loaded library
   // will be unloaded.
   dlclose(libtransit_handle);
