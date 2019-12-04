@@ -31,7 +31,7 @@ func TestNatsQueue_1(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
+	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConfigs[0].Host = GWInvalidHost
 
 	testMessage, err := parseJSON()
@@ -55,7 +55,7 @@ func TestNatsQueue_1(t *testing.T) {
 	GetConfig().GWConfigs[0].Host = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
-	time.Sleep(TestMessagesCount * 3 * time.Second)
+	time.Sleep(TestMessagesCount * 2 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
@@ -69,7 +69,7 @@ func TestNatsQueue_2(t *testing.T) {
 	err := configNats(t)
 	assert.NoError(t, err)
 
-	log.Info("Config have invalid path to Groundwork Foundation, messages will be stored in a datastore:")
+	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConfigs[0].Host = GWInvalidHost
 
 	defer cleanNats(t)
@@ -104,7 +104,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, err)
 
 	log.Info("NATS Server was started successfully")
-	time.Sleep(TestMessagesCount * 2 * time.Second)
+	time.Sleep(TestMessagesCount * 1 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
@@ -115,13 +115,21 @@ func TestNatsQueue_2(t *testing.T) {
 func configNats(t *testing.T) error {
 	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 
+	GetConfig().GWConfigs = []*GWConfig{
+		{
+			Host:     "localhost:80",
+			Account:  "RESTAPIACCESS",
+			Password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw",
+			AppName:  "tng",
+		},
+	}
+
 	service := services.GetTransitService()
 
 	service.AgentConfig.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
 	service.AgentConfig.NatsAckWait = TestNatsAckWait
 
 	assert.NoError(t, service.StartNats())
-	assert.NoError(t, service.StartTransport())
 
 	return nil
 }
