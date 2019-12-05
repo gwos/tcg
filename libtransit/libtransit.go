@@ -29,27 +29,21 @@ func min(a, b int) int {
 	return b
 }
 
-// GoSetenv() is for use by a calling application to alter environment variables in
+// GoSetenv is for use by a calling application to alter environment variables in
 // a manner that will be understood by the Go runtime.  We need it because the standard
 // C-language putenv() and setenv() routines do not alter the Go environment as intended,
 // due to issues with when os.Getenv() or related routines first get called.  To affect
 // the initial setup for the services managed by libtransit, calls to GoSetenv() must be
 // made *before* any call to one of the routines that might probe for or attempt to start,
 // stop, or otherwise interact with one of the services.
-
 //export GoSetenv
-func GoSetenv(key, value *C.char) int {
-    err := os.Setenv(C.GoString(key), C.GoString(value))
-    if err != nil {
-	// Logically, we would like to set errno here. corresponding
-	// to what one would see with the POSIX setenv() routine.
-	//     errno = ENOMEM
-	//     errno = EINVAL
-	// But until and unless we figure out how to do that, we just
-	// skip that part of the setenv() emulation.
-        return -1
-    }
-    return 0
+func GoSetenv(key, value, errorBuf *C.char) bool {
+	err := os.Setenv(C.GoString(key), C.GoString(value))
+	if err != nil {
+		putError(errorBuf, err)
+		return false
+	}
+	return true
 }
 
 func putError(errorBuf *C.char, err error) {
