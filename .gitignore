@@ -49,4 +49,4 @@ jansson-2.12/*
 *.tar.gz
 
 # Build directory
-BUILD
+build
