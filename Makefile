@@ -46,11 +46,11 @@ endif
 
 # The current definition here is a placeholder for whatever we actually
 # want to use according to some sort of project-standard file tree.
-BUILD_TARGET_DIRECTORY = BUILD
+BUILD_TARGET_DIRECTORY = build
 
 CONVERT_GO_TO_C_BUILD_OBJECTS = \
-	gotocjson/convert_go_to_c.c	\
-	gotocjson/convert_go_to_c.h
+	gotocjson/_c_code/convert_go_to_c.c	\
+	gotocjson/_c_code/convert_go_to_c.h
 
 MILLISECONDS_BUILD_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/milliseconds.c	\
@@ -122,13 +122,13 @@ ${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARG
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} transit/transit.go
 
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
-	${CC} -c gotocjson/convert_go_to_c.c -o $@ -Igotocjson -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@ -I${JANSSON_INCLUDE_DIRECTORY}
 
 ${BUILD_TARGET_DIRECTORY}/milliseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/milliseconds.c -o $@ -Igotocjson -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/milliseconds.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
 
 ${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
 
 ${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LIBRARY}
 	${LINK.c} -shared -o $@ -fPIC ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LINK_FLAGS}

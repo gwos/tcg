@@ -49,7 +49,7 @@ endif
 
 # The current definition here is a placeholder for whatever we actually
 # want to use according to some sort of project-standard file tree.
-BUILD_TARGET_DIRECTORY = BUILD
+BUILD_TARGET_DIRECTORY = build
 
 # We currently specify "-g" to assist in debugging and possibly also in memory-leak detection.
 CFLAGS = -std=c11 -g
