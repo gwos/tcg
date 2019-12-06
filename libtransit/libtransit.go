@@ -22,18 +22,26 @@ import (
 func main() {
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func min(args ...int) int {
+	m := args[0]
+	for i := range args {
+		if m > args[i] {
+			m = args[i]
+		}
 	}
-	return b
+	return m
 }
 
 // bufStr puts Go string into C buffer
 func bufStr(buf *C.char, bufLen C.size_t, str string) {
-	b := *(*[]byte)(unsafe.Pointer(buf))
-	idxEnd := int(bufLen - 1)
-	b[min(copy(b[:idxEnd], str), idxEnd)] = 0
+	NulTermLen := 1
+	if bufLen > 0 {
+		/* cast the buf as big enough then use with length respect */
+		b := (*[4096]byte)(unsafe.Pointer(buf))
+		m := min(4096-NulTermLen, int(bufLen)-NulTermLen, len(str))
+		n := copy(b[:], str[:m])
+		b[n] = 0 /* set nul termination */
+	}
 }
 
 // GoSetenv is for use by a calling application to alter environment variables in
