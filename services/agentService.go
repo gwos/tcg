@@ -89,6 +89,9 @@ func (service *AgentService) StopNats() error {
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
 	gwConfigs := config.GetConfig().GWConfigs
+	if len(gwConfigs) == 0 {
+		return fmt.Errorf("StartTransport: %v", "empty GWConfigs")
+	}
 	gwClients := make([]*clients.GWClient, len(gwConfigs))
 	for i := range gwConfigs {
 		gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}

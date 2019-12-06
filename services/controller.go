@@ -64,7 +64,10 @@ func (controller *Controller) RemoveListMetricsHandler() {
 // starts the http server
 func (controller *Controller) StartController() error {
 	if controller.srv != nil {
-		return fmt.Errorf("controller: already started")
+		return fmt.Errorf("StartController: already started")
+	}
+	if len(config.GetConfig().GWConfigs) == 0 {
+		return fmt.Errorf("StartController: %v", "empty GWConfigs")
 	}
 
 	controller.authClient = &clients.GWClient{GWConfig: config.GetConfig().GWConfigs[0]}
