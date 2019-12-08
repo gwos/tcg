@@ -39,8 +39,8 @@ char *typeof_json_item(const json_t *json) {
     return buf;
 }
 
-// As a convenience for the caller, JSON_as_string_ptr() eats what is probably the last reference
-// to the "json" object that is passed in.  That circumstance needs to be understood if you want to
+// As a convenience for the caller, JSON_as_str() eats what is probably the last reference to
+// the "json" object that is passed in.  That circumstance needs to be understood if you want to
 // produce a JSON string in some context where you want the JSON object to stick around afterward.
 // In that case, you must call json_incref(json) before calling the JSON_as_str() routine.
 //
@@ -158,6 +158,14 @@ bool is_struct_timespec_ptr_zero_value(const struct_timespec *struct_timespec_pt
 	    struct_timespec_ptr->tv_nsec == 0
 	)
     );
+}
+
+// Convert from/to:
+// "struct timeval",  with time_t tv_sec (seconds) and suseconds_t tv_usec (microseconds) members
+// "struct timespec", with time_t tv_sec (seconds) and long tv_nsec (nanoseconds) members
+struct_timespec timeval_to_timespec(struct timeval timeval_timestamp) {
+    struct_timespec timespec_timestamp = {timeval_timestamp.tv_sec, timeval_timestamp.tv_usec * NANOSECONDS_PER_MICROSECOND};
+    return timespec_timestamp;
 }
 
 json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *struct_timespec) {
