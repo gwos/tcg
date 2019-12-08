@@ -81,7 +81,7 @@ const (
 type ResourceType string
 
 // The resource type uniquely defining the resource type
-// General Nagios Types are host and service, where as CloudHub can be more rich
+// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
 	Host           ResourceType = "host"
 	Hypervisor                  = "hypervisor"
@@ -315,7 +315,7 @@ type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, where as CloudHub can be more rich
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -366,7 +366,7 @@ type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type
-	// General Nagios Types are hosts, where as CloudHub can be more rich
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -394,7 +394,7 @@ type MonitoredService struct {
 	// The unique name of the service
 	Name string `json:"name,required"`
 	// Type: Required. The service type uniquely defining the service type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type ServiceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -417,7 +417,7 @@ type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type string `json:"type,resquired"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
