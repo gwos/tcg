@@ -24,9 +24,9 @@ func main() {
 
 func min(args ...int) int {
 	m := args[0]
-	for i := range args {
-		if m > args[i] {
-			m = args[i]
+	for _, arg := range args[1:] {
+		if m > arg {
+			m = arg
 		}
 	}
 	return m
