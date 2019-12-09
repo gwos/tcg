@@ -6,7 +6,6 @@ import (
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
-	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -29,10 +28,12 @@ var (
 
 // Config defines NATS configurable options
 type Config struct {
-	DispatcherAckWait time.Duration
-	FilestoreDir      string
-	StoreType         string
-	NatsHost          string
+	DispatcherAckWait     time.Duration
+	DispatcherMaxInflight int
+	MaxPubAcksInflight    int
+	FilestoreDir          string
+	StoreType             string
+	NatsHost              string
 }
 
 // DispatcherFn defines message processor
@@ -131,7 +132,7 @@ func StartDispatcher(options []DispatcherOption) error {
 			},
 			stan.SetManualAckMode(),
 			stan.AckWait(cfg.DispatcherAckWait),
-			stan.MaxInflight(math.MaxInt32),
+			stan.MaxInflight(cfg.DispatcherMaxInflight),
 			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherID, o.DurableID)),
 			stan.StartWithLastReceived(),
 		)
@@ -160,7 +161,7 @@ func Publish(subject string, msg []byte) error {
 			ClusterID,
 			PublisherID,
 			stan.NatsURL(natsURL),
-			stan.MaxPubAcksInflight(math.MaxInt32),
+			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
 		)
 	}
 	if err != nil {

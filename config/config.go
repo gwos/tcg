@@ -43,14 +43,19 @@ type AgentConfig struct {
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
 	// NatsAckWait accepts number of seconds
 	// should be greater then the GWClient request duration
-	NatsAckWait      int64  `yaml:"natsAckWait"`
+	NatsAckWait int64 `yaml:"natsAckWait"`
+	// NatsMaxInflight accepts number of unacknowledged messages
+	// that a publisher may have in-flight at any given time.
+	// When this maximum is reached, further async publish calls will block
+	// until the number of unacknowledged messages falls below the specified limit
+	NatsMaxInflight  int    `yaml:"natsMaxInflight"`
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
-	NatsHost        string `yaml:"natsHost"`
-	LogLevel       LogLevel `yaml:"logLevel"`
+	NatsHost string   `yaml:"natsHost"`
+	LogLevel LogLevel `yaml:"logLevel"`
 }
 
 // GWConfig defines Groundwork Connection configuration
