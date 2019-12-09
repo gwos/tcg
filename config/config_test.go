@@ -13,6 +13,7 @@ func TestGetConfig(t *testing.T) {
 agentConfig:
   controllerAddr: ":8081"
   natsAckWait: 15
+  natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "datastore"
   natsStoreType: "FILE"
   natsHost: ":4222"
@@ -38,7 +39,7 @@ gwConfigs:
 	os.Setenv("TNG_GWCONFIGS", "[{\"password\":\"SEC RET\"},{\"appName\":\"gw8\"}]")
 
 	expected := Config{
-		AgentConfig: &AgentConfig{":8081", "", "", 15, "datastore", "MEMORY", ":4222", 1},
+		AgentConfig: &AgentConfig{":8081", "", "", 15, 2147483647, "datastore", "MEMORY", ":4222", 1},
 		GWConfigs: GWConfigs{
 			&GWConfig{"localhost:80", "RESTAPIACCESS", "SEC RET", "gw8"},
 			&GWConfig{AppName: "gw8"},

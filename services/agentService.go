@@ -56,10 +56,12 @@ func (service *AgentService) StopController() error {
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
 	err := nats.StartServer(nats.Config{
-		DispatcherAckWait: time.Second * time.Duration(service.AgentConfig.NatsAckWait),
-		FilestoreDir:      service.AgentConfig.NatsFilestoreDir,
-		StoreType:         service.AgentConfig.NatsStoreType,
-		NatsHost:          service.AgentConfig.NatsHost,
+		DispatcherAckWait:     time.Second * time.Duration(service.AgentConfig.NatsAckWait),
+		DispatcherMaxInflight: service.AgentConfig.NatsMaxInflight,
+		MaxPubAcksInflight:    service.AgentConfig.NatsMaxInflight,
+		FilestoreDir:          service.AgentConfig.NatsFilestoreDir,
+		StoreType:             service.AgentConfig.NatsStoreType,
+		NatsHost:              service.AgentConfig.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Lock()
