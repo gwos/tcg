@@ -6,6 +6,7 @@ import (
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -130,6 +131,7 @@ func StartDispatcher(options []DispatcherOption) error {
 			},
 			stan.SetManualAckMode(),
 			stan.AckWait(cfg.DispatcherAckWait),
+			stan.MaxInflight(math.MaxInt32),
 			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherID, o.DurableID)),
 			stan.StartWithLastReceived(),
 		)
@@ -158,6 +160,7 @@ func Publish(subject string, msg []byte) error {
 			ClusterID,
 			PublisherID,
 			stan.NatsURL(natsURL),
+			stan.MaxPubAcksInflight(math.MaxInt32),
 		)
 	}
 	if err != nil {
