@@ -4,6 +4,7 @@ import (
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
+	"math"
 	"os"
 	"path"
 	"sync"
@@ -12,7 +13,10 @@ import (
 var once sync.Once
 var cfg *Config
 
-// ConfigEnv defines environment variable for config file path
+// ConfigEnv defines environment variable for config file path, overrides the ConfigName
+// ConfigName defines default filename for look in work directory if ConfigEnv is empty
+// EnvConfigPrefix defines name prefix for environment variables
+//   for example: TNG_AGENTCONFIG_NATSSTORETYPE
 const (
 	ConfigEnv       = "TNG_CONFIG"
 	ConfigName      = "tng_config.yaml"
@@ -35,6 +39,7 @@ func (l LogLevel) String() string {
 }
 
 // AgentConfig defines TNG Transit Agent configuration
+// see GetConfig() for defaults
 type AgentConfig struct {
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
@@ -72,6 +77,7 @@ type GWConfig struct {
 type GWConfigs []*GWConfig
 
 // Decode implements envconfig.Decoder interface
+// merges incoming value with existed structure
 func (gwConfigs *GWConfigs) Decode(value string) error {
 	var overrides GWConfigs
 	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
@@ -109,7 +115,18 @@ type Config struct {
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
-		cfg = &Config{}
+		// set defaults
+		cfg = &Config{
+			AgentConfig: &AgentConfig{
+				ControllerAddr:   ":8081",
+				LogLevel:         1,
+				NatsAckWait:      30,
+				NatsMaxInflight:  math.MaxInt32,
+				NatsFilestoreDir: "natsstore",
+				NatsStoreType:    "FILE",
+				NatsHost:         ":4222",
+			},
+		}
 
 		configPath := os.Getenv(ConfigEnv)
 		if configPath == "" {
