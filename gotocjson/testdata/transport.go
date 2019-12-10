@@ -83,7 +83,7 @@ const (
 type MonitoredResourceType string
 
 // The resource type uniquely defining the resource type
-// General Nagios Types are host and service, where as CloudHub can be more rich
+// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
 	ServiceResource MonitoredResourceType = "service"
 	HostResource                          = "host"
@@ -293,7 +293,7 @@ type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	// FIX MAJOR:  Should this be "Type MonitoredResourceType" instead?  Yes, probably.
 	Type string `json:"type,required"`
 	// Owner relationship for associations like host->service
@@ -313,7 +313,7 @@ type ResourceStatus struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	// FIX MAJOR:  Should this be "Type MonitoredResourceType" instead?  yes, probably.
 	Type string `json:"type,required"`
 	// Owner relationship for associations like host->service
@@ -335,7 +335,7 @@ type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type MonitoredResourceType `json:"type,required"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`

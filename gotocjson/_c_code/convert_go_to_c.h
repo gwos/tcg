@@ -11,6 +11,7 @@ extern "C" {
 #include <stdbool.h>    // as of C99, provides the "bool" datatype, along with "true" and "false" macros
 #include <stdint.h>     // as or C99, provides "int32_t" and "int64_t" datatypes
 #include <time.h>       // to supply "struct timespec", with time_t tv_sec (seconds) and long tv_nsec (nanoseconds) members 
+#include <sys/time.h>   // to supply "struct timeval",  with time_t tv_sec (seconds) and suseconds_t tv_usec (microseconds) members
 
 #include "jansson.h"
 
@@ -84,6 +85,7 @@ extern bool is_float64_ptr_zero_value(const float64 *float64_ptr);
 extern bool is_string_ptr_zero_value(string const *string_ptr);
 extern bool is_struct_timespec_ptr_zero_value(const struct_timespec *struct_timespec_ptr);
 
+extern struct_timespec timeval_to_timespec(struct timeval timeval_timestamp);
 extern json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *milliseconds_MillisecondTimestamp);
 extern struct_timespec *JSON_as_struct_timespec(json_t *json);
 #define time_Time_ptr_as_JSON_ptr struct_timespec_ptr_as_JSON_ptr

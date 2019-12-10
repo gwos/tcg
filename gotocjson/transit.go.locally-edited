@@ -291,7 +291,7 @@ type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	// FIX MAJOR:  should this be "Type MonitoredResourceTypeEnum" instead?
 	Type string `json:"type,required"`
 	//  Owner relationship for associations like host->service
@@ -311,7 +311,7 @@ type ResourceStatus struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	// FIX MAJOR:  should this be "Type MonitoredResourceTypeEnum" instead?
 	Type string `json:"type,required"`
 	// Restrict to a Groundwork Monitor Status
@@ -330,7 +330,7 @@ type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type MonitoredResourceTypeEnum `json:"type,required"`
 }
 
