@@ -100,8 +100,8 @@ func TestNatsQueue_2(t *testing.T) {
 	log.Info("Invalid path was changed to valid one")
 
 	log.Info("Starting NATS server ...")
-	err = services.GetTransitService().StartNats()
-	assert.NoError(t, err)
+	assert.NoError(t, services.GetTransitService().StartNats())
+	assert.NoError(t, services.GetTransitService().StartTransport())
 
 	log.Info("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 1 * time.Second)
@@ -130,6 +130,7 @@ func configNats(t *testing.T) error {
 	service.AgentConfig.NatsAckWait = TestNatsAckWait
 
 	assert.NoError(t, service.StartNats())
+	assert.NoError(t, service.StartTransport())
 
 	return nil
 }
