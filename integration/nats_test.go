@@ -36,7 +36,7 @@ const (
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
 func TestNatsQueue_1(t *testing.T) {
-	assert.NoError(t, configNats(t))
+	assert.NoError(t, configNats(t, 5))
 	defer cleanNats(t)
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConfigs[0].Host = GWInvalidHost
@@ -69,7 +69,7 @@ func TestNatsQueue_1(t *testing.T) {
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
 func TestNatsQueue_2(t *testing.T) {
-	assert.NoError(t, configNats(t))
+	assert.NoError(t, configNats(t, 5))
 
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConfigs[0].Host = GWInvalidHost
@@ -112,7 +112,7 @@ func TestNatsQueue_2(t *testing.T) {
 
 //Test NATS performance
 func TestNatsPerformance(t *testing.T) {
-	assert.NoError(t, configNats(t))
+	assert.NoError(t, configNats(t, 30))
 	defer cleanNats(t)
 
 	var resources []transit.MonitoredResource
@@ -177,7 +177,7 @@ func TestNatsPerformance(t *testing.T) {
 	}
 }
 
-func configNats(t *testing.T) error {
+func configNats(t *testing.T, natsAckWait int64) error {
 	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
 
 	GetConfig().GWConfigs = []*GWConfig{
@@ -192,7 +192,7 @@ func configNats(t *testing.T) error {
 	service := services.GetTransitService()
 
 	service.AgentConfig.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
-	service.AgentConfig.NatsAckWait = 30
+	service.AgentConfig.NatsAckWait = natsAckWait
 
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
