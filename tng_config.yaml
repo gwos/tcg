@@ -4,9 +4,6 @@ agentConfig:
   natsFilestoreDir: "src/main/resources/datastore"
   natsStoreType: "FILE"
   natsHost: ":4222"
-  startNats: True
-  startTransport: True
-  startController: True
   logLevel: 2
 gwConfigs:
   -

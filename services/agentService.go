@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
@@ -89,6 +88,9 @@ func (service *AgentService) StopNats() error {
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
 	gwConfigs := config.GetConfig().GWConfigs
+	if len(gwConfigs) == 0 {
+		return fmt.Errorf("StartTransport: %v", "empty GWConfigs")
+	}
 	gwClients := make([]*clients.GWClient, len(gwConfigs))
 	for i := range gwConfigs {
 		gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
@@ -100,7 +102,6 @@ func (service *AgentService) StartTransport() error {
 	for _, gwClient := range service.gwClients {
 		gwClientCopy := gwClient
 		durableID := fmt.Sprintf("%s", gwClient.Host)
-		log.Debug(gwClient.Host)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			nats.DispatcherOption{

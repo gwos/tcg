@@ -5,14 +5,15 @@ import org.groundwork.rs.transit.DtoResourcesWithServices;
 
 
 public interface TransitServices {
+    boolean GoSetenv(String key, String value, StringByReference errorMsg, Integer errorMsgSize);
 
     void SendResourcesWithMetrics(DtoResourcesWithServices resources) throws TransitException;
 
     void SynchronizeInventory(DtoInventory inventory) throws TransitException;
 
-    void StartNATS() throws TransitException;
+    void StartNats() throws TransitException;
 
-    void StopNATS() throws TransitException;
+    void StopNats() throws TransitException;
 
     void StartTransport() throws TransitException;
 

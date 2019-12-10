@@ -1,12 +1,11 @@
 package services
 
 import (
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/config"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
 	"path"
 	"testing"
 )
@@ -24,13 +23,11 @@ func TestController_StartStopNats(t *testing.T) {
 
 		switch req.URL.String() {
 		case "/nats/start":
-			err := service.StartNats()
-			assert.NoError(t, err)
+			assert.NoError(t, service.StartNats())
 			assert.Equal(t, string(service.Status().Nats), "Running", "nats server status should"+
 				" match the expected one(\"Running\"")
 		case "/nats/stop":
-			err := service.StopNats()
-			assert.NoError(t, err)
+			assert.NoError(t, service.StopNats())
 			assert.Equal(t, string(service.Status().Nats), "Stopped", "nats server status should"+
 				" match the expected one(\"Stopped\"")
 		}
@@ -53,36 +50,35 @@ func TestController_StartStopNats(t *testing.T) {
 }
 
 func TestController_StartStopTransport(t *testing.T) {
-	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
+	if os.Getenv(ConfigEnv) == "" {
+		assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
+	}
 	service := GetTransitService()
+	service.NatsAckWait = 15
+	service.NatsStoreType = "MEMORY"
+	config.GetConfig().GWConfigs = []*config.GWConfig{
+		{
+			Host:     "test",
+			Account:  "test",
+			Password: "test",
+			AppName:  "test",
+		},
+	}
 	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
-		err := service.StartNats()
-		assert.NoError(t, err)
+		assert.NoError(t, service.StartNats())
 
 		switch req.URL.String() {
 		case "/nats/transport/start":
-			err := service.StartTransport()
-			assert.NoError(t, err)
+			assert.NoError(t, service.StartTransport())
 			assert.Equal(t, string(service.Status().Transport), "Running", "nats transport status"+
 				" should match the expected one(\"Running\"")
 		case "/nats/transport/stop":
-			err := service.StopTransport()
-			assert.NoError(t, err)
+			assert.NoError(t, service.StopTransport())
 			assert.Equal(t, string(service.Status().Transport), "Stopped", "nats transport status"+
 				" should match the expected one(\"Stopped\"")
 		}
 		res.WriteHeader(http.StatusOK)
 	}))
-
-	defer func() {
-		testServer.Close()
-		_ = service.StopNats()
-		cmd := exec.Command("rm", "-rf", "src")
-		_, err := cmd.Output()
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
 
 	startReq, err := http.NewRequest(http.MethodGet, testServer.URL+"/nats/transport/start", nil)
 	assert.NoError(t, err)
