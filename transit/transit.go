@@ -75,6 +75,7 @@ const (
 	HostPending                              = "HOST_PENDING"
 	HostScheduledDown                        = "HOST_SCHEDULED_DOWN"
 	HostUnreachable                          = "HOST_UNREACHABLE"
+	HostUnchanged							 = "HOST_UNCHANGED"
 )
 
 // ResourceType defines the resource type
