@@ -34,6 +34,9 @@ public class AppTest {
     public void shouldSendResourceAndMetrics() throws ParseException {
         TransitServices transit = new TransitServicesImpl();
 
+        transit.StartNats();
+        transit.StartTransport();
+
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
                 .setAppType("VEMA")
@@ -93,8 +96,11 @@ public class AppTest {
      * 4. Run test.
      */
     @Test
-    public void shouldSynchronizeInventory() {
+    public void shouldSynchronizeInventory() throws IOException {
         TransitServices transit = new TransitServicesImpl();
+
+        transit.StartNats();
+        transit.StartTransport();
 
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
@@ -136,6 +142,9 @@ public class AppTest {
     @Test
     public void testSynchronizeInventoryPerformance() throws IOException {
         TransitServices transit = new TransitServicesImpl();
+
+        transit.StartNats();
+        transit.StartTransport();
 
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
@@ -184,6 +193,9 @@ public class AppTest {
     @Test
     public void testSendResourceWithMetricsPerformance() throws ParseException, IOException {
         TransitServices transit = new TransitServicesImpl();
+
+        transit.StartNats();
+        transit.StartTransport();
 
         DtoTracerContext context = DtoTracerContext.builder()
                 .setAgentId("3939333393342")
