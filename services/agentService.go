@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
@@ -103,7 +102,6 @@ func (service *AgentService) StartTransport() error {
 	for _, gwClient := range service.gwClients {
 		gwClientCopy := gwClient
 		durableID := fmt.Sprintf("%s", gwClient.Host)
-		log.Debug(gwClient.Host)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			nats.DispatcherOption{
