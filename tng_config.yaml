@@ -1,6 +1,6 @@
 agentConfig:
   controllerAddr: ":8081"
-  natsAckWait: 15
+  natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "src/main/resources/datastore"
   natsStoreType: "FILE"
