@@ -6,7 +6,7 @@ __build_libtransit() {
 }
 
 __go_test() {
-    go test -v $@
+    go test $@
 }
 
 __build_libtransit

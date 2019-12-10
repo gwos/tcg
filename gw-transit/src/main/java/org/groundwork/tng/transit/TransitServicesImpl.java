@@ -18,10 +18,15 @@ public class TransitServicesImpl implements TransitServices {
         this.objectMapper = new ConfiguredObjectMapper();
         String path = System.getenv(LIBTRANSIT_LIBRARY_PATH_ENV);
         if (path == null || path.isEmpty()) {
-            path = "/home/vladislavsenkevich/Projects/groundwork/_rep/tng/libtransit/libtransit.so";
+            path = "/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so";
         }
         this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
         this.errorMsg = new StringByReference("ERROR");
+    }
+
+    @Override
+    public boolean GoSetenv(String key, String value, StringByReference errorMsg, Integer errorMsgSize) {
+        return tngTransitLibrary.GoSetenv(key, value, errorMsg, errorMsgSize);
     }
 
     @Override
@@ -35,7 +40,8 @@ public class TransitServicesImpl implements TransitServices {
             e.printStackTrace();
         }
 
-        boolean isPublished = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg);
+        boolean isPublished = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg,
+                errorMsg.getValue().length());
         if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
         }
@@ -53,34 +59,35 @@ public class TransitServicesImpl implements TransitServices {
             e.printStackTrace();
         }
 
-        boolean isPublished = tngTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg);
+        boolean isPublished = tngTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg,
+                errorMsg.getValue().length());
         if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
-    public void StartNATS() throws TransitException {
-        if (!tngTransitLibrary.StartNATS(errorMsg)) {
+    public void StartNats() throws TransitException {
+        if (!tngTransitLibrary.StartNats(errorMsg, errorMsg.getValue().length())) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
-    public void StopNATS() throws TransitException {
-        tngTransitLibrary.StopNATS();
+    public void StopNats() throws TransitException {
+        tngTransitLibrary.StopNats();
     }
 
     @Override
     public void StartTransport() throws TransitException {
-        if (!tngTransitLibrary.StartTransport(errorMsg)) {
+        if (!tngTransitLibrary.StartTransport(errorMsg, errorMsg.getValue().length())) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
     public void StopTransport() throws TransitException {
-        if (!tngTransitLibrary.StopTransport(errorMsg)) {
+        if (!tngTransitLibrary.StopTransport(errorMsg, errorMsg.getValue().length())) {
             throw new TransitException(errorMsg.getValue());
         }
     }
