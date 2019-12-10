@@ -1,7 +1,7 @@
 package main
 
+//#include <stddef.h>
 //#include <stdlib.h>
-//#define ERROR_LEN 250 /* buffer for error message */
 //
 ///* getTextHandlerType defines a function type that returns an allocated string.
 // * It should be safe to call `C.free` on it. */
@@ -22,47 +22,51 @@ import (
 func main() {
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func min(args ...int) int {
+	m := args[0]
+	for _, arg := range args[1:] {
+		if m > arg {
+			m = arg
+		}
 	}
-	return b
+	return m
 }
 
-// GoSetenv() is for use by a calling application to alter environment variables in
+// bufStr puts Go string into C buffer
+func bufStr(buf *C.char, bufLen C.size_t, str string) {
+	NulTermLen := 1
+	if bufLen > 0 {
+		/* cast the buf as big enough then use with length respect */
+		b := (*[4096]byte)(unsafe.Pointer(buf))
+		m := min(4096-NulTermLen, int(bufLen)-NulTermLen, len(str))
+		n := copy(b[:], str[:m])
+		b[n] = 0 /* set nul termination */
+	}
+}
+
+// GoSetenv is for use by a calling application to alter environment variables in
 // a manner that will be understood by the Go runtime.  We need it because the standard
 // C-language putenv() and setenv() routines do not alter the Go environment as intended,
 // due to issues with when os.Getenv() or related routines first get called.  To affect
 // the initial setup for the services managed by libtransit, calls to GoSetenv() must be
 // made *before* any call to one of the routines that might probe for or attempt to start,
 // stop, or otherwise interact with one of the services.
-
 //export GoSetenv
-func GoSetenv(key, value *C.char) int {
-    err := os.Setenv(C.GoString(key), C.GoString(value))
-    if err != nil {
-	// Logically, we would like to set errno here. corresponding
-	// to what one would see with the POSIX setenv() routine.
-	//     errno = ENOMEM
-	//     errno = EINVAL
-	// But until and unless we figure out how to do that, we just
-	// skip that part of the setenv() emulation.
-        return -1
-    }
-    return 0
-}
-
-func putError(errorBuf *C.char, err error) {
-	buf := (*[int(C.ERROR_LEN)]byte)(unsafe.Pointer(errorBuf))
-	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
+func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
+	err := os.Setenv(C.GoString(key), C.GoString(value))
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
 }
 
 // SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
+func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
 		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -70,10 +74,10 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char)
 
 // SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
+func SynchronizeInventory(sendInventoryRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
 		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -81,9 +85,9 @@ func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
 
 // StartController is a C API for services.GetTransitService().StartController
 //export StartController
-func StartController(errorBuf *C.char) bool {
+func StartController(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StartController(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -91,9 +95,9 @@ func StartController(errorBuf *C.char) bool {
 
 // StopController is a C API for services.GetTransitService().StopController
 //export StopController
-func StopController(errorBuf *C.char) bool {
+func StopController(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StopController(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -101,9 +105,9 @@ func StopController(errorBuf *C.char) bool {
 
 // StartNats is a C API for services.GetTransitService().StartNats
 //export StartNats
-func StartNats(errorBuf *C.char) bool {
+func StartNats(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StartNats(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -111,9 +115,9 @@ func StartNats(errorBuf *C.char) bool {
 
 // StopNats is a C API for services.GetTransitService().StopNats
 //export StopNats
-func StopNats(errorBuf *C.char) bool {
+func StopNats(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StopNats(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -121,9 +125,9 @@ func StopNats(errorBuf *C.char) bool {
 
 // StartTransport is a C API for services.GetTransitService().StartTransport
 //export StartTransport
-func StartTransport(errorBuf *C.char) bool {
+func StartTransport(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StartTransport(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
@@ -131,9 +135,9 @@ func StartTransport(errorBuf *C.char) bool {
 
 // StopTransport is a C API for services.GetTransitService().StopTransport
 //export StopTransport
-func StopTransport(errorBuf *C.char) bool {
+func StopTransport(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().StopTransport(); err != nil {
-		putError(errorBuf, err)
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
