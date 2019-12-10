@@ -78,7 +78,7 @@ diff -u ~/github/gwos/tng/transit/transit.go transit.go
 +type MonitoredResourceType string
 +
  // The resource type uniquely defining the resource type
- // General Nagios Types are host and service, where as CloudHub can be more rich
+ // General Nagios Types are host and service, whereas CloudHub can have richer complexity
  const (
 -	ServiceResource string = "service"
 -	HostResource           = "host"
@@ -90,7 +90,7 @@ diff -u ~/github/gwos/tng/transit/transit.go transit.go
 @@ -292,6 +294,7 @@
  	Name string `json:"name,required"`
  	// Type: Required. The resource type uniquely defining the resource type
- 	// General Nagios Types are host and service, where as CloudHub can be more rich
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 +	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
  	Type string `json:"type,required"`
  	// Owner relationship for associations like host->service
@@ -98,7 +98,7 @@ diff -u ~/github/gwos/tng/transit/transit.go transit.go
 @@ -311,6 +314,7 @@
  	Name string `json:"name,required"`
  	// Type: Required. The resource type uniquely defining the resource type
- 	// General Nagios Types are host and service, where as CloudHub can be more rich
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 +	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
  	Type string `json:"type,required"`
  	// Owner relationship for associations like host->service
@@ -106,7 +106,7 @@ diff -u ~/github/gwos/tng/transit/transit.go transit.go
 @@ -332,7 +336,7 @@
  	Name string `json:"name,required"`
  	// Type: Required. The resource type uniquely defining the resource type
- 	// General Nagios Types are host and service, where as CloudHub can be more rich
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 -	Type string `json:"type,required"`
 +	Type MonitoredResourceType `json:"type,required"`
  	// Owner relationship for associations like host->service

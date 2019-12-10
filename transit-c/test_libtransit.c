@@ -76,7 +76,7 @@ void *find_symbol(char *symbol) {
   return address;
 }
 
-void test_dl_libtransit() {
+void load_libtransit() {
   char *error;
 
   char *libtransit = getenv("LIBTRANSIT");
@@ -103,7 +103,7 @@ void test_dl_libtransit() {
   stopTransport = find_symbol("StopTransport");
 }
 
-void test_dl_libtransit_control() {
+void test_libtransit_control() {
   char errBuf[ERR_BUF_LEN] = "";
   bool res = false;
 
@@ -272,7 +272,7 @@ void test_dl_libtransit_control() {
   }
 }
 
-void test_dlSendResourcesWithMetrics() {
+void test_SendResourcesWithMetrics() {
   /* TODO: should be serialized ResourceWithMetricsRequest */
   char *requestJSON =
       "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
@@ -286,9 +286,9 @@ void test_dlSendResourcesWithMetrics() {
 }
 
 int main(void) {
-  test_dl_libtransit();
-  test_dl_libtransit_control();
-  test_dlSendResourcesWithMetrics();
+  load_libtransit();
+  test_libtransit_control();
+  test_SendResourcesWithMetrics();
 
   printf("\n");
   printf("all tests passed\n");
@@ -297,7 +297,7 @@ int main(void) {
     fprintf(stderr, "\n\nTEST_ENDLESS: press ctrl-c to exit\n\n");
     while (1) {
       sleep(3);
-      test_dlSendResourcesWithMetrics();
+      test_SendResourcesWithMetrics();
     }
   }
 

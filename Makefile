@@ -65,13 +65,22 @@ LIBTRANSITJSON_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/milliseconds.o	\
 	${BUILD_TARGET_DIRECTORY}/transit.o
 
+LIBTRANSIT_DIRECTORY = libtransit
+
+LIBTRANSIT_LIBRARY = ${LIBTRANSIT_DIRECTORY}/libtransit.so
+
 LIBTRANSITJSON_LIBRARY = ${BUILD_TARGET_DIRECTORY}/libtransitjson.so
 
 # We currently specify "-g" to assist in debugging and possibly also in memory-leak detection.
 CFLAGS = -std=c11 -g -D_REENTRANT -D_GNU_SOURCE -fPIC -Wall
 CC = gcc $(CFLAGS)
 
-all	: ${JANSSON_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
+all	: ${JANSSON_LIBRARY} ${LIBTRANSIT_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
+
+.PHONY	: ${LIBTRANSIT_LIBRARY}
+
+${LIBTRANSIT_LIBRARY}	:
+	cd ${LIBTRANSIT_DIRECTORY}; make
 
 # Fetch all third-party Go packages needed either directly or indirectly
 # by the TNG software.
@@ -134,7 +143,7 @@ ${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LIBRARY}
 	${LINK.c} -shared -o $@ -fPIC ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LINK_FLAGS}
 
 clean	:
-	rm -rf BUILD
+	rm -rf ${BUILD_TARGET_DIRECTORY}
 	cd gotocjson; make clean
 
 realclean	:

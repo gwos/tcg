@@ -2868,6 +2868,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	var encode_routine_footer_template = `
     } while (0);
     if (failure) {
+	// FIX MAJOR:  Re-jigger the function call API to either pass back the failure string up the call chain,
+	// or call a logger with which the package has been previously initialilzed.
 	printf(FILE_LINE "ERROR:  failed to create JSON for a %s structure:  %s\n", "{{.StructName}}", failure);
 	if (json) {
 	    json_decref(json);
@@ -2975,7 +2977,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 				function_code += fmt.Sprintf(`
 	if (%s) {
 	    if (json_object_set_new(json, "%s", json_boolean(%s_%s_ptr->%s)) != 0) {
-		failure = "cannot set boolean value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s boolean value into object";
 		break;
 	    }
 	}`,
@@ -2999,7 +3001,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 				function_code += fmt.Sprintf(`
 	if (%s) {
 	    if (json_object_set_new(json, "%s", json_integer((json_int_t) %s_%s_ptr->%s)) != 0) {
-		failure = "cannot set %[6]s value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s %s value into object";
 		break;
 	    }
 	}`,
@@ -3019,7 +3021,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 				function_code += fmt.Sprintf(`
 	if (%s) {
 	    if (json_object_set_new(json, "%s", json_real(%s_%s_ptr->%s)) != 0) {
-		failure = "cannot set double value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s double value into object";
 		break;
 	    }
 	}`,
@@ -3039,7 +3041,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 				function_code += fmt.Sprintf(`
 	if (%s) {
 	    if (json_object_set_new(json, "%s", json_string(%s_%s_ptr->%s)) != 0) {
-		failure = "cannot set string value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s string value into object";
 		break;
 	    }
 	}`,
@@ -3064,8 +3066,8 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	const string %[3]s_%s_%s = %[3]s_%[6]s_String[%[3]s_%s_ptr->%s];
 	if (%[1]s) {
 	    // %[3]s_%s enumeration value, expressed as a string
-	    if (json_object_set_new(json, "%[2]s", json_string(%[3]s_%s_%s)) != 0) {
-		failure = "cannot set enumeration string value into object";
+	    if (json_object_set_new(json, "%[2]s", json_string(%s_%s_%s)) != 0) {
+		failure = "cannot set %[3]s_%s_ptr->%s %s enumeration string value into object";
 		break;
 	    }
 	}`,
@@ -3114,7 +3116,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	if (%[1]s) {
 	    // %[3]s_%s_ptr->%s object value
 	    if (json_object_set_new(json, "%[2]s", %[3]s_%s_%s) != 0) {
-		failure = "cannot set %[6]s subobject value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s %s subobject value into object";
 		break;
 	    }
 	}`,
@@ -3155,8 +3157,8 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 					function_code += fmt.Sprintf(`
 	json_t *%[2]s_%s_%s = %[5]s_ptr_as_JSON_ptr(&%[2]s_%s_ptr->%s);
 	if (%[2]s_%s_ptr->%s.count != 0) {
-	    if (json_object_set_new(json, "%[1]s", %[2]s_%s_%s) != 0) {
-		failure = "cannot set %[5]s subobject value into object";
+	    if (json_object_set_new(json, "%[1]s", %s_%s_%s) != 0) {
+		failure = "cannot set %[2]s_%s_ptr->%s %s subobject value into object";
 		break;
 	    }
 	}`,
@@ -3198,7 +3200,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	json_t *json_%[5]s = %[6]s_ptr_as_JSON_ptr(&%[3]s_%s_ptr->%s);
 	if (json_%[5]s != NULL) {
 	    if (json_object_set_new(json, "%[2]s", json_%[5]s) != 0) {
-		failure = "cannot set %[6]s subobject value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s %s subobject value into object";
 		break;
 	    }
 	}`,
@@ -3242,10 +3244,10 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	if (1) {
 	    // use pointer_base_types[field_C_type] if we need to use this next line
 	    // json_t *json_%[5]s = transit_XXX_List_ptr_as_JSON_ptr(%[3]s_%s_ptr->%[5]s);
-	    json_t *json_%[5]s = %[6]s_ptr_as_JSON_ptr(&%[3]s_%s_ptr->%[5]s);
+	    json_t *json_%[5]s = %[6]s_ptr_as_JSON_ptr(&%[3]s_%s_ptr->%s);
 	    if (json_%[5]s != NULL) {
 		if (json_object_set_new(json, "%[2]s", json_%[5]s) != 0) {
-		    failure = "cannot set %[6]s into object";
+		    failure = "cannot set %[3]s_%s_ptr->%s %s into object";
 		    break;
 		}
 	    }
@@ -3286,7 +3288,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	if (%[1]s) {
 	    // %[3]s_%s_ptr->%s object value
 	    if (json_object_set_new(json, "%[2]s", %[3]s_%s_%s) != 0) {
-		failure = "cannot set %[6]s subobject value into object";
+		failure = "cannot set %[3]s_%s_ptr->%s %s subobject value into object";
 		break;
 	    }
 	}`,
@@ -3361,7 +3363,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	    json_t *json_%[5]s = %[6]s_ptr_as_JSON_ptr(&%[3]s_%s_ptr->%s);
 	    if (json_%[5]s != NULL) {
 		if (json_object_set_new(json, "%[2]s", json_%[5]s) != 0) {
-		    failure = "cannot set %[6]s subobject value into JSON object";
+		    failure = "cannot set %[3]s_%s_ptr->%s %s subobject value into JSON object";
 		    // Hopefully, that failure has failed in a manner which does not capture a copy of the json_%[5]s pointer.
 		    // Assuming that is the case, we ought to free the block of memory here.  However, in order to allow the
 		    // application to continue running for awhile in spite of a possible memory leak here, for the time being
