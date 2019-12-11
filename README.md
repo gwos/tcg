@@ -4,8 +4,16 @@ The New Groundwork Transit connectors (feeders). TNG contains two sub-systems/pa
 1. Transit agent - connects and sends metrics to Groundwork Monitor 
 2. Controller service - an http server for external control of agent
 
-Dependencies
---------
+#### Table of Contents
+1. [Dependencies](#dependencies)
+2. [Building](#building)
+3. [Running](#running)
+4. [Docker](#docker)
+5. [Testing](#testing)
+6. [Environment variables](#envvar)
+
+<a name="dependencies"></a>
+## Dependencies
 The TNG project is built with Go Modules. See `go.mod` for a list of dependencies. Here are some of the main frameworks used by this project:
 1. [Gin Web Framework](github.com/gin-gonic/gin)
 
@@ -13,21 +21,21 @@ The TNG project is built with Go Modules. See `go.mod` for a list of dependencie
       It features a martini-like API with much better performance,
       up to 40 times faster.
     
-        github.com/gin-gonic/gin
+       github.com/gin-gonic/gin
 
 2. [Sessions](github.com/gin-contrib/sessions)
 
     > Gin middleware for session management with multi-backend support.
 
-        github.com/gin-gonic/contrib/sessions
+       github.com/gin-gonic/contrib/sessions
         
 3. [NATS Streaming System](nats.io)
     
     > [About NATS](nats.io/about)
    
-        github.com/nats-io/go-nats-streaming
-        github.com/nats-io/nats-streaming-server/server
-        github.com/nats-io/nats-streaming-server/stores
+       github.com/nats-io/go-nats-streaming
+       github.com/nats-io/nats-streaming-server/server
+       github.com/nats-io/nats-streaming-server/stores
         
 4. [Envconfig](github.com/kelseyhightower/envconfig)
 
@@ -35,11 +43,41 @@ The TNG project is built with Go Modules. See `go.mod` for a list of dependencie
       on a user defined specification. A typical use is using environment variables
       for configuration settings.
     
-        github.com/kelseyhightower/envconfig
-                                                            
+       github.com/kelseyhightower/envconfig
+                                            
+5. [Go-Cache](github.com/patrickmn/go-cache)
    
-Building
---------
+   > Go-Cache is an in-memory key:value store/cache similar to memcached
+     that is suitable for applications running on a single machine. Its major advantage
+     is that, being essentially a thread-safe map[string]interface{} with expiration times, 
+     it doesn't need to serialize or transmit its contents over the network.
+     Any object can be stored, for a given duration or forever, and the cache can be safely 
+     used by multiple goroutines.             
+   
+       github.com/patrickmn/go-cache
+
+6. [Testify](github.com/stretchr/testify)
+
+    > Go code (golang) set of packages that provide many tools for testifying that your 
+      code will behave as you intend.
+
+        github.com/stretchr/testify
+
+7. [Logrus](github.com/sirupsen/logrus)    
+
+    > Logrus is a structured logger for Go (golang), completely API compatible 
+      with the standard library logger.   
+
+       github.com/sirupsen/logrus
+
+8. [Gopsutil](github.com/shirou/gopsutil)
+    
+    > The challenge is porting all psutil functions on some architectures.
+
+       github.com/shirou/gopsutil
+
+<a name="building"></a>
+## Building
 ```
 $ cd tng
 $ go build .
@@ -51,21 +89,20 @@ $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit
 ```
 ***or use Makefiles***
 
-Running 
---------
+<a name="running"></a>
+## Running 
 ```
 $ cd tng
 $ go run .
 ```
-
-Docker
---------
+<a name="docker"></a>
+## Docker
 ***Build image:***
 
     $ docker build -t groundworkdevelopment/tng .
 
-Testing
--------
+<a name="testing"></a>
+## Testing
 The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
 ***Run all tests:***
@@ -95,7 +132,7 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     
     $ ./docker_tests.sh <package_name>
     
-*Available packages:* <b>integration, config, milliseconds, customTime
+*Available packages:* <b>integration, config, milliseconds, customTime</b>
 
 ***Examples:***
 
@@ -104,3 +141,13 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     $ go test -v ./config
     
     $ ./docker_tests.sh milliseconds
+
+<a name="envvar"></a>
+## Environment variables
+***Path to *'libtransit.so'* library.***
+
+    $ export LIBTRANSIT=/path/to/libtransit.so
+    
+***Path to *'tng_config.yaml'* file.***
+    
+    $ export TNG_CONFIG=/path/to/tng_config.yaml
