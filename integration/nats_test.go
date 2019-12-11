@@ -23,7 +23,7 @@ const (
 	PerformanceServicesCount           = 5
 	PerformanceResourcesCount          = 1000
 	TestAppType                        = "VEMA"
-	TestAgentId                        = "3939333393342"
+	TestAgentID                        = "3939333393342"
 	TestTraceToken                     = "token-99e93"
 	GWAccount                          = "RESTAPIACCESS"
 	GWPassword                         = "***REMOVED***"
@@ -158,7 +158,7 @@ func TestNatsPerformance(t *testing.T) {
 		request := transit.ResourcesWithServicesRequest{
 			Context: transit.TracerContext{
 				AppType:    TestAppType,
-				AgentID:    TestAgentId,
+				AgentID:    TestAgentID,
 				TraceToken: TestTraceToken,
 				TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
