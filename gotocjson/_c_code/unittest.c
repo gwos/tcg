@@ -300,7 +300,7 @@ char *initial_transport_OperationResults_as_json_string = "{\n"
 "}";
 
 char *initial_transport_AgentStats_as_json_string = "{\n"
-"    \"AgentID\": \"TestAgentId\",\n"
+"    \"AgentID\": \"TestAgentID\",\n"
 "    \"AppType\": \"TestAgentType\",\n"
 "    \"BytesSent\": 1567,\n"
 "    \"MetricsSent\": 12,\n"
