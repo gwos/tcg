@@ -6,6 +6,9 @@ import (
 	"github.com/gwos/tng/clients"
 	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/services"
+	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
@@ -13,6 +16,7 @@ import (
 	"path"
 	"reflect"
 	"testing"
+	"time"
 )
 
 const (
@@ -32,30 +36,132 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
+	assert.NoError(t, configNats(t, 5))
+	headers, err = config(t)
+	defer cleanNats(t)
+	defer clean(headers)
+	assert.NoError(t, err)
+
+	log.Info("Check for host availability in the database")
+	time.Sleep(1 * time.Second)
+	assert.NoError(t, existenceCheck(false, "irrelevant"))
+
+	log.Info("Send SynchronizeInventory request to GroundWork Foundation")
+	assert.NoError(t, services.GetTransitService().SynchronizeInventory(buildInventoryRequest(t)))
+
+	time.Sleep(5 * time.Second)
+	log.Info("Check for host availability in the database")
+	time.Sleep(1 * time.Second)
+	assert.NoError(t, existenceCheck(true, HostStatusPending))
+
+	log.Info("Send ResourcesWithMetrics request to GroundWork Foundation")
+	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(buildResourceWithMetricsRequest(t)))
+
+	time.Sleep(5 * time.Second)
+
+	log.Info("Check for host availability in the database")
+	time.Sleep(1 * time.Second)
+	assert.NoError(t, existenceCheck(true, HostStatusUp))
+}
+
+func BenchmarkWithJavaIntegration(t *testing.B) {
+	var err error
 	headers, err = config(t)
 	defer clean(headers)
 	assert.NoError(t, err)
 
-	err = existenceCheck(false, "irrelevant")
-	assert.NoError(t, err)
+	assert.NoError(t, existenceCheck(false, "irrelevant"))
 
-	err = installDependencies()
-	assert.NoError(t, err)
+	assert.NoError(t, installDependencies())
 
-	err = runJavaSynchronizeInventoryTest()
-	assert.NoError(t, err)
+	assert.NoError(t, runJavaSynchronizeInventoryTest())
 
-	err = existenceCheck(true, HostStatusPending)
-	assert.NoError(t, err)
+	assert.NoError(t, existenceCheck(true, HostStatusPending))
 
-	err = runJavaSendResourceWithMetricsTest()
-	assert.NoError(t, err)
+	assert.NoError(t, runJavaSendResourceWithMetricsTest())
 
-	err = existenceCheck(true, HostStatusUp)
-	assert.NoError(t, err)
+	assert.NoError(t, existenceCheck(true, HostStatusUp))
 }
 
-func config(t *testing.T) (map[string]string, error) {
+func buildInventoryRequest(t *testing.T) []byte {
+	inventoryResource := transit.InventoryResource{
+		Name: TestHostName,
+		Type: "HOST",
+		Services: []transit.InventoryService{
+			{
+				Name:  "test",
+				Type:  transit.Hypervisor,
+				Owner: TestHostName,
+			},
+		},
+	}
+
+	inventoryRequest := transit.InventoryRequest{
+		Context: transit.TracerContext{
+			AppType:    TestAppType,
+			AgentID:    TestAgentID,
+			TraceToken: TestTraceToken,
+			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		},
+		Resources: []transit.InventoryResource{inventoryResource},
+		Groups:    nil,
+	}
+
+	b, err := json.Marshal(inventoryRequest)
+	assert.NoError(t, err)
+
+	return b
+}
+
+func buildResourceWithMetricsRequest(t *testing.T) []byte {
+	monitoredResource := transit.MonitoredResource{
+		Name:          TestHostName,
+		Type:          transit.Host,
+		Status:        transit.HostUp,
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		Services: []transit.MonitoredService{
+			{
+				Name:          "test",
+				Status:        transit.ServiceOk,
+				Owner:         TestHostName,
+				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				Metrics: []transit.TimeSeries{
+					{
+						MetricName: "testMetric",
+						SampleType: transit.Value,
+						Interval: &transit.TimeInterval{
+							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+						},
+						Value: &transit.TypedValue{
+							ValueType:    transit.IntegerType,
+							IntegerValue: 1000,
+						},
+						Unit: transit.MB,
+					},
+				},
+			},
+		},
+	}
+
+	request := transit.ResourcesWithServicesRequest{
+		Context: transit.TracerContext{
+			AppType:    TestAppType,
+			AgentID:    TestAgentID,
+			TraceToken: TestTraceToken,
+			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		},
+		Resources: []transit.MonitoredResource{monitoredResource},
+	}
+
+	b, err := json.Marshal(request)
+	assert.NoError(t, err)
+	return b
+}
+
+func config(t assert.TestingT) (map[string]string, error) {
 	err := os.Setenv(ConfigEnv, path.Join("..", ConfigName))
 	assert.NoError(t, err)
 
@@ -78,6 +184,12 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	if err != nil {
 		return err
 	}
+	if statusCode == 200 {
+		log.Info(" -> Host exists")
+	} else {
+		log.Info(" -> Host doesn't exist")
+	}
+
 	if !mustExist && statusCode == 404 {
 		return nil
 	}
