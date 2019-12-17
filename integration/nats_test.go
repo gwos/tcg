@@ -3,6 +3,7 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/clients"
 	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -11,17 +12,19 @@ import (
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
+	"reflect"
 	"testing"
 	"time"
 )
 
 const (
 	TestMessagesCount                  = 3
-	PerformanceServicesCount           = 5
-	PerformanceResourcesCount          = 1000
+	PerformanceServicesCount           = 1
+	PerformanceResourcesCount          = 800
 	TestAppType                        = "VEMA"
 	TestAgentID                        = "3939333393342"
 	TestTraceToken                     = "token-99e93"
@@ -117,51 +120,35 @@ func TestNatsPerformance(t *testing.T) {
 
 	var resources []transit.MonitoredResource
 
+	inventoryRes := inventoryResource()
+
+	for i := 0; i < PerformanceServicesCount; i++ {
+		inventoryRes.Services = append(inventoryRes.Services, inventoryService(i))
+	}
+
+	request := transit.InventoryRequest{
+		Context:   context(),
+		Resources: []transit.InventoryResource{inventoryRes},
+	}
+	jsonBytes, err := json.Marshal(request)
+	assert.NoError(t, err)
+	assert.NoError(t, services.GetTransitService().SynchronizeInventory(jsonBytes))
+
 	for i := 0; i < PerformanceResourcesCount; i++ {
-		resource := transit.MonitoredResource{
-			Name:          TestHostName + string(i),
-			Type:          transit.Host,
-			Status:        transit.HostUp,
-			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			Services:      []transit.MonitoredService{},
-		}
+		res := resource()
 
 		for j := 0; j < PerformanceServicesCount; j++ {
-			resource.Services = append(resource.Services, transit.MonitoredService{
-				Name:          fmt.Sprintf("%s_%d_%s", TestHostName, i, "SERVICE"),
-				Status:        transit.ServiceOk,
-				Owner:         TestHostName + string(i),
-				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-				Metrics: []transit.TimeSeries{
-					{
-						MetricName: "Test",
-						SampleType: transit.Value,
-						Interval: &transit.TimeInterval{
-							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-						},
-						Value: &transit.TypedValue{
-							ValueType:    transit.IntegerType,
-							IntegerValue: 1000,
-						},
-						Unit: transit.MB,
-					},
-				},
-			})
+			res.Services = append(res.Services, service(i))
 		}
-		resources = append(resources, resource)
+
+		resources = append(resources, res)
 	}
+
+	time.Sleep(5 * time.Second)
 
 	for _, res := range resources {
 		request := transit.ResourcesWithServicesRequest{
-			Context: transit.TracerContext{
-				AppType:    TestAppType,
-				AgentID:    TestAgentID,
-				TraceToken: TestTraceToken,
-				TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-			},
+			Context:   context(),
 			Resources: []transit.MonitoredResource{res},
 		}
 		jsonBytes, err := json.Marshal(request)
@@ -169,12 +156,14 @@ func TestNatsPerformance(t *testing.T) {
 		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(jsonBytes))
 	}
 
-	time.Sleep(1 * time.Minute)
+	time.Sleep(30 * time.Second)
 
-	if services.GetTransitService().Stats().MessagesSent != PerformanceResourcesCount {
-		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
-			services.GetTransitService().Stats().MessagesSent, "'1000'")
+	if services.GetTransitService().Stats().MessagesSent != PerformanceResourcesCount+1 {
+		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
+			services.GetTransitService().Stats().MessagesSent, PerformanceResourcesCount+1)
 	}
+
+	defer removeHost(t)
 }
 
 func configNats(t *testing.T, natsAckWait int64) error {
@@ -223,4 +212,81 @@ func parseJSON() ([]byte, error) {
 	}
 
 	return byteValue, nil
+}
+
+func context() transit.TracerContext {
+	return transit.TracerContext{
+		AppType:    TestAppType,
+		AgentID:    TestAgentID,
+		TraceToken: TestTraceToken,
+		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+	}
+}
+
+func resource() transit.MonitoredResource {
+	return transit.MonitoredResource{
+		Name:          TestHostName,
+		Type:          transit.Host,
+		Status:        transit.HostUp,
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		Services:      []transit.MonitoredService{},
+	}
+}
+
+func service(i int) transit.MonitoredService {
+	return transit.MonitoredService{
+		Name:          fmt.Sprintf("%s_%s", TestHostName, "SERVICE"),
+		Status:        transit.ServiceOk,
+		Owner:         TestHostName,
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		Metrics: []transit.TimeSeries{
+			{
+				MetricName: "Test",
+				SampleType: transit.Value,
+				Interval: &transit.TimeInterval{
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				},
+				Value: &transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: int64(i),
+				},
+				Unit: transit.MB,
+			},
+		},
+	}
+}
+
+func inventoryResource() transit.InventoryResource {
+	return transit.InventoryResource{
+		Name:   TestHostName,
+		Device: "",
+		Type:   "HOST",
+	}
+}
+
+func inventoryService(i int) transit.InventoryService {
+	return transit.InventoryService{
+		Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
+		Type:  "network-device",
+		Owner: TestHostName,
+	}
+}
+
+func removeHost(t *testing.T) {
+	gwClient := &clients.GWClient{GWConfig: GetConfig().GWConfigs[0]}
+	err := gwClient.Connect()
+	assert.NoError(t, err)
+
+	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"GWOS-APP-NAME":  gwClient.GWConfig.AppName,
+		"GWOS-API-TOKEN": token,
+	}
+
+	_, _, err = clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
+	assert.NoError(t, err)
 }
