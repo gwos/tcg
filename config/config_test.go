@@ -29,7 +29,7 @@ gwConfigs:
 	err = tmpfile.Close()
 	assert.NoError(t, err)
 
-	os.Setenv(ConfigEnv, tmpfile.Name())
+	os.Setenv(string(ConfigEnv), tmpfile.Name())
 	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
 	os.Setenv("TNG_GWCONFIGS", "[{\"password\":\"SEC RET\"},{\"appName\":\"gw8\"}]")
 

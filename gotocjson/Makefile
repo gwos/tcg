@@ -33,8 +33,7 @@ JANSSON_LIB_DIRECTORY = ../local/lib
 # JSON test files are expected to be named as "json.{package}.{structure}.{item}",
 # where the {item} is a two-digit number that allows for multiple JSON files to be
 # used to test the same structure.
-JSON_TEST_FILES = testdata/json.transport.*
-# JSON_TEST_FILES = testdata/json.transport.InventoryResource.01
+JSON_TEST_FILES = testdata/json.setup.* testdata/json.transport.*
 
 KERNEL_NAME := $(shell uname -s)
 ifeq ($(KERNEL_NAME),Linux)
@@ -148,7 +147,14 @@ ${BUILD_TARGET_DIRECTORY}/transport	: ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.
 ${BUILD_TARGET_DIRECTORY}/enum.h ${BUILD_TARGET_DIRECTORY}/enum.c	: gotocjson testdata/enum.go
 	./gotocjson -d -o ${BUILD_TARGET_DIRECTORY} testdata/enum.go > ,enum-diagnostics
 
-enumtest	: ${BUILD_TARGET_DIRECTORY}/enum.h ${BUILD_TARGET_DIRECTORY}/enum.c
+# For this testing, it's not enough to just run the conversion tool.  We also
+# need to check that the generated code will pass muster with the compiler.
+${BUILD_TARGET_DIRECTORY}/enum.o	: gotocjson ${BUILD_TARGET_DIRECTORY}/enum.h ${BUILD_TARGET_DIRECTORY}/enum.c
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/enum.c -o $@ -I_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+
+# A convenient handle for the make command line.  We shouldn't need to go further and create
+# a binary, since this test code doesn't contain any useful main() routine we would never run it.
+enumtest	: ${BUILD_TARGET_DIRECTORY}/enum.o
 
 clean	:
 	rm -f ${BUILD_TARGET_DIRECTORY}/*.o \
