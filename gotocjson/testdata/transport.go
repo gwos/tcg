@@ -57,7 +57,7 @@ const (
 	Query       ComputeType = "Query"
 	Regex                   = "Regex"
 	Synthetic               = "Synthetic"
-	Info                    = "Info"
+	Informational           = "Informational"
 	Performance             = "Performance"
 	Health                  = "Health"
 )
