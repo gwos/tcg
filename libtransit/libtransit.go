@@ -74,9 +74,9 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errBuf *C.char, e
 
 // SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
+func SynchronizeInventory(inventoryRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
-		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
+		SynchronizeInventory([]byte(C.GoString(inventoryRequestJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}

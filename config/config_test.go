@@ -13,10 +13,6 @@ func TestGetConfig(t *testing.T) {
 agentConfig:
   controllerAddr: ":8081"
   natsAckWait: 15
-  natsFilestoreDir: "datastore"
-  natsStoreType: "FILE"
-  natsHost: ":4222"
-  logLevel: 1
 gwConfigs:
   -
     host: "localhost:80"
@@ -33,12 +29,20 @@ gwConfigs:
 	err = tmpfile.Close()
 	assert.NoError(t, err)
 
-	os.Setenv(ConfigEnv, tmpfile.Name())
+	os.Setenv(string(ConfigEnv), tmpfile.Name())
 	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
 	os.Setenv("TNG_GWCONFIGS", "[{\"password\":\"SEC RET\"},{\"appName\":\"gw8\"}]")
 
 	expected := Config{
-		AgentConfig: &AgentConfig{":8081", "", "", 15, "datastore", "MEMORY", ":4222", 1},
+		AgentConfig: &AgentConfig{
+			ControllerAddr:   ":8081",
+			LogLevel:         1,
+			NatsAckWait:      15,
+			NatsMaxInflight:  2147483647,
+			NatsFilestoreDir: "natsstore",
+			NatsStoreType:    "MEMORY",
+			NatsHost:         ":4222",
+		},
 		GWConfigs: GWConfigs{
 			&GWConfig{"localhost:80", "RESTAPIACCESS", "SEC RET", "gw8"},
 			&GWConfig{AppName: "gw8"},

@@ -13,10 +13,10 @@ type MetricKind string
 // Delta - The change in a value during a time interval.
 // Cumulative - A value accumulated over a time interval. Cumulative
 const (
-	Gauge                 MetricKind = "GAUGE"
+	MetricKindUnspecified MetricKind = "METRIC_KIND_UNSPECIFIED"
+	Gauge                            = "GAUGE"
 	Delta                            = "DELTA"
 	Cumulative                       = "CUMULATIVE"
-	MetricKindUnspecified            = "METRIC_KIND_UNSPECIFIED"
 )
 
 // ValueType defines the data type of the value of a metric
@@ -54,7 +54,7 @@ const (
 	Query       ComputeType = "Query"
 	Regex                   = "Regex"
 	Synthetic               = "Synthetic"
-	Info                    = "Info"
+	Informational           = "Informational"
 	Performance             = "Performance"
 	Health                  = "Health"
 )
