@@ -162,7 +162,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 }
 
 func config(t assert.TestingT) (map[string]string, error) {
-	err := os.Setenv(ConfigEnv, path.Join("..", ConfigName))
+	err := os.Setenv(string(ConfigEnv), path.Join("..", ConfigName))
 	assert.NoError(t, err)
 
 	gwClient := &clients.GWClient{GWConfig: GetConfig().GWConfigs[0]}

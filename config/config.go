@@ -13,14 +13,16 @@ import (
 var once sync.Once
 var cfg *Config
 
+type ConfigStringConstant string
+
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
 //   for example: TNG_AGENTCONFIG_NATSSTORETYPE
 const (
-	ConfigEnv       = "TNG_CONFIG"
-	ConfigName      = "tng_config.yaml"
-	EnvConfigPrefix = "TNG"
+	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
+	ConfigName                           = "tng_config.yaml"
+	EnvConfigPrefix                      = "TNG"
 )
 
 // LogLevel defines levels for logrus
@@ -77,7 +79,7 @@ type GWConfig struct {
 type GWConfigs []*GWConfig
 
 // Decode implements envconfig.Decoder interface
-// merges incoming value with existed structure
+// merges incoming value with existing structure
 func (gwConfigs *GWConfigs) Decode(value string) error {
 	var overrides GWConfigs
 	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
@@ -128,7 +130,7 @@ func GetConfig() *Config {
 			},
 		}
 
-		configPath := os.Getenv(ConfigEnv)
+		configPath := os.Getenv(string(ConfigEnv))
 		if configPath == "" {
 			wd, err := os.Getwd()
 			if err != nil {

@@ -167,7 +167,7 @@ func TestNatsPerformance(t *testing.T) {
 }
 
 func configNats(t *testing.T, natsAckWait int64) error {
-	assert.NoError(t, os.Setenv(ConfigEnv, path.Join("..", ConfigName)))
+	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
 
 	GetConfig().GWConfigs = []*GWConfig{
 		{
