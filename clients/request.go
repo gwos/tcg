@@ -35,14 +35,17 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 		if err != nil {
 			return -1, nil, err
 		}
+		request.Header.Set("Connection", "close")
 	case http.MethodPost:
 		request, err = http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(byteBody))
+		request.Header.Set("Connection", "close")
 		if err != nil {
 			return -1, nil, err
 		}
 		defer request.Body.Close()
 	case http.MethodDelete:
 		request, err = http.NewRequest(http.MethodDelete, requestURL, nil)
+		request.Header.Set("Connection", "close")
 		if err != nil {
 			return -1, nil, err
 		}
@@ -64,6 +67,6 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 	if err != nil {
 		return -1, nil, err
 	}
-
+	defer response.Body.Close()
 	return response.StatusCode, responseBody, nil
 }

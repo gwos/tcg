@@ -13,24 +13,27 @@ import (
 
 // Define NATS IDs
 const (
-	ClusterID          = "tng-cluster"
-	DispatcherClientID = "tng-dispatcher"
-	PublisherID        = "tng-publisher"
+	ClusterID    = "tng-cluster"
+	DispatcherID = "tng-dispatcher"
+	PublisherID  = "tng-publisher"
 )
 
 var (
 	cfg            Config
-	dispatcherConn stan.Conn
+	connDispatcher stan.Conn
+	connPublisher  stan.Conn
 	stanServer     *stand.StanServer
 	natsURL        string
 )
 
 // Config defines NATS configurable options
 type Config struct {
-	DispatcherAckWait time.Duration
-	FilestoreDir      string
-	StoreType         string
-	NatsHost          string
+	DispatcherAckWait     time.Duration
+	DispatcherMaxInflight int
+	MaxPubAcksInflight    int
+	FilestoreDir          string
+	StoreType             string
+	NatsHost              string
 }
 
 // DispatcherFn defines message processor
@@ -89,6 +92,10 @@ func StartServer(config Config) error {
 
 // StopServer shutdowns NATS
 func StopServer() {
+	if connPublisher != nil {
+		connPublisher.Close()
+		connPublisher = nil
+	}
 	stanServer.Shutdown()
 }
 
@@ -98,10 +105,10 @@ func StartDispatcher(options []DispatcherOption) error {
 	if err != nil {
 		return err
 	}
-	if dispatcherConn == nil {
-		dispatcherConn, err = stan.Connect(
+	if connDispatcher == nil {
+		connDispatcher, err = stan.Connect(
 			ClusterID,
-			DispatcherClientID,
+			DispatcherID,
 			stan.NatsURL(natsURL),
 		)
 	}
@@ -111,7 +118,7 @@ func StartDispatcher(options []DispatcherOption) error {
 
 	for _, o := range options {
 		dispatcherFn := o.Handler /* prevent loop override */
-		_, err = dispatcherConn.Subscribe(
+		_, err = connDispatcher.Subscribe(
 			o.Subject,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
@@ -125,7 +132,8 @@ func StartDispatcher(options []DispatcherOption) error {
 			},
 			stan.SetManualAckMode(),
 			stan.AckWait(cfg.DispatcherAckWait),
-			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherClientID, o.DurableID)),
+			stan.MaxInflight(cfg.DispatcherMaxInflight),
+			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherID, o.DurableID)),
 			stan.StartWithLastReceived(),
 		)
 		if err != nil {
@@ -137,9 +145,9 @@ func StartDispatcher(options []DispatcherOption) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	if dispatcherConn != nil {
-		err := dispatcherConn.Close()
-		dispatcherConn = nil
+	if connDispatcher != nil {
+		err := connDispatcher.Close()
+		connDispatcher = nil
 		return err
 	}
 	return nil
@@ -147,20 +155,19 @@ func StopDispatcher() error {
 
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
-	connection, err := stan.Connect(
-		ClusterID,
-		PublisherID,
-		stan.NatsURL(natsURL),
-	)
+	var err error
+	if connPublisher == nil {
+		connPublisher, err = stan.Connect(
+			ClusterID,
+			PublisherID,
+			stan.NatsURL(natsURL),
+			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
+		)
+	}
 	if err != nil {
 		return err
 	}
 
-	err = connection.Publish(subject, msg)
-	if err != nil {
-		return err
-	}
-
-	err = connection.Close()
+	err = connPublisher.Publish(subject, msg)
 	return err
 }
