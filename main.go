@@ -47,7 +47,6 @@ func main() {
 
 
 	err = sendInventoryResources(*serverconnector.Synchronize())
-	return
 
 	for {
 		err := sendMonitoredResources(*serverconnector.CollectMetrics())
@@ -56,7 +55,6 @@ func main() {
 		}
 
 		serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-
 		time.Sleep(20 * time.Second)
 	}
 }
@@ -106,7 +104,30 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 		},
 		Resources: []transit.MonitoredResource{resource},
 	}
-
+	// Test a Time type sample
+	timeSample := transit.TimeSeries{
+		MetricName: "timeSample",
+		SampleType: transit.Value,
+		Interval: &transit.TimeInterval{
+			EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+			StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		},
+		Value: &transit.TypedValue{
+			ValueType:    transit.TimeType,
+			TimeValue:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		},
+	}
+	timeSampleService := transit.MonitoredService{
+		Name:             "timeSample",
+		Type:             transit.Service,
+		Status:           transit.ServiceOk,
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastPlugInOutput: "test",
+		Owner:            request.Resources[0].Name, // set host
+		Metrics:          []transit.TimeSeries{timeSample},
+	}
+	request.Resources[0].Services = append(request.Resources[0].Services, timeSampleService)
 	b, err := json.Marshal(request)
 	if err != nil {
 		return err
