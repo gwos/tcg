@@ -6,6 +6,7 @@ import org.groundwork.rs.common.ConfiguredObjectMapper;
 import org.groundwork.rs.transit.*;
 
 import java.io.IOException;
+import java.util.Collections;
 
 public class TransitServicesImpl implements TransitServices {
     private static final String LIBTRANSIT_LIBRARY_PATH_ENV = "LIBTRANSIT";
@@ -21,7 +22,7 @@ public class TransitServicesImpl implements TransitServices {
             path = "/home/vladislavsenkevich/Projects/groundwork/_rep/tng/gw-transit/src/main/resources/libtransit.so";
         }
         this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
-        this.errorMsg = new StringByReference("ERROR");
+        this.errorMsg = new StringByReference(String.join("", Collections.nCopies(128, " ")));
     }
 
     @Override
