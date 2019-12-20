@@ -3,9 +3,7 @@ package org.groundwork.tng.transit;
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -176,11 +174,8 @@ public class AppTest {
                     .setType(SERVICE_RESOURCE_TYPE)
                     .setOwner(TEST_HOST_NAME)
                     .build());
-            transit.SynchronizeInventory(dtoInventory);
         }
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
+        transit.SynchronizeInventory(dtoInventory);
     }
 
     /**
@@ -249,12 +244,9 @@ public class AppTest {
                 service.addMetric(timeSeries);
                 host.addService(service);
 
-                transit.SendResourcesWithMetrics(resources);
             }
         }
-
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        String name = reader.readLine();
+        transit.SendResourcesWithMetrics(resources);
     }
 
     /*Example of callback func*/
