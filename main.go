@@ -20,7 +20,6 @@ func main() {
 		fmt.Printf("%s", err.Error())
 		return
 	}
-
 	defer func() {
 		err = transitService.StopNats()
 		if err != nil {
@@ -33,7 +32,22 @@ func main() {
 		}
 	}()
 
+	err = transitService.StartTransport()
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+		return
+	}
+
+	defer func() {
+		err = transitService.StopTransport()
+		if err != nil {
+			fmt.Printf("%s", err.Error())
+		}
+	}()
+
+
 	err = sendInventoryResources(*serverconnector.Synchronize())
+	return
 
 	for {
 		err := sendMonitoredResources(*serverconnector.CollectMetrics())
@@ -48,6 +62,17 @@ func main() {
 }
 
 func sendInventoryResources(resource transit.InventoryResource) error {
+
+	reference := transit.MonitoredResourceRef{
+		Name:  resource.Name,
+		Type:  transit.Host,
+	}
+
+	resourceGroup := transit.ResourceGroup{
+		GroupName: "LocalServer",
+		Type:      transit.HostGroup,
+		Resources: []transit.MonitoredResourceRef{reference},
+	}
 	inventoryRequest := transit.InventoryRequest{
 		Context: transit.TracerContext{
 			AppType:    "VEMA",
@@ -56,7 +81,9 @@ func sendInventoryResources(resource transit.InventoryResource) error {
 			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Resources: []transit.InventoryResource{resource},
-		Groups:    nil,
+		Groups:    []transit.ResourceGroup{
+				resourceGroup,
+		},
 	}
 
 	b, err := json.Marshal(inventoryRequest)
