@@ -10,6 +10,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 /**
  * Unit test for simple App.
@@ -160,8 +161,10 @@ public class AppTest {
 
         DtoGroup group = new DtoGroup();
         group.setGroupName("GW8");
-        group.setResources(new ArrayList<>());
-
+        group.setType(DtoGroupType.HostGroup);
+        List<DtoMonitoredResourceRef> refs = new ArrayList<>();
+        refs.add(new DtoMonitoredResourceRef(host));
+        group.setResources(refs);
         DtoInventory dtoInventory = new DtoInventory();
         dtoInventory.setContext(context);
         dtoInventory.add(host);
