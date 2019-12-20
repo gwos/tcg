@@ -63,7 +63,7 @@ func main() {
 
 func sendInventoryResources(resource transit.InventoryResource) error {
 
-	reference := transit.MonitoredResourceRef{
+	monitoredResourceRef := transit.MonitoredResourceRef{
 		Name:  resource.Name,
 		Type:  transit.Host,
 	}
@@ -71,7 +71,7 @@ func sendInventoryResources(resource transit.InventoryResource) error {
 	resourceGroup := transit.ResourceGroup{
 		GroupName: "LocalServer",
 		Type:      transit.HostGroup,
-		Resources: []transit.MonitoredResourceRef{reference},
+		Resources: []transit.MonitoredResourceRef{monitoredResourceRef},
 	}
 	inventoryRequest := transit.InventoryRequest{
 		Context: transit.TracerContext{
