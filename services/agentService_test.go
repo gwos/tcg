@@ -1,14 +1,14 @@
 package services
 
 import (
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/setup"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func init() {
-	config.GetConfig().AgentConfig.NatsStoreType = "MEMORY"
-	config.GetConfig().GWConfigs = []*config.GWConfig{
+	setup.GetConfig().AgentConfig.NatsStoreType = "MEMORY"
+	setup.GetConfig().GWConfigs = []*setup.GWConfig{
 		{
 			Host:     "test",
 			Account:  "test",

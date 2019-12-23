@@ -3,7 +3,7 @@ package clients
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/setup"
 	"github.com/gwos/tng/transit"
 	"net/http"
 	"net/url"
@@ -31,7 +31,7 @@ const (
 
 // GWClient implements GWOperations interface
 type GWClient struct {
-	*config.GWConfig
+	*setup.GWConfig
 	sync.Mutex
 	token string
 }
