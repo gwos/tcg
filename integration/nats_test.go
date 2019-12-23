@@ -236,7 +236,7 @@ func resource() transit.MonitoredResource {
 
 func service(i int) transit.MonitoredService {
 	return transit.MonitoredService{
-		Name:          fmt.Sprintf("%s_%s", TestHostName, "SERVICE"),
+		Name:          fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
 		Status:        transit.ServiceOk,
 		Owner:         TestHostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
