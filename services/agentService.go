@@ -3,8 +3,8 @@ package services
 import (
 	"fmt"
 	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/nats"
 	"sync"
 	"time"
@@ -12,7 +12,7 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*config.AgentConfig
+	*setup.AgentConfig
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
 	gwClients   []*clients.GWClient
@@ -32,7 +32,7 @@ var agentService *AgentService
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
 		agentService = &AgentService{
-			config.GetConfig().AgentConfig,
+			setup.GetConfig().AgentConfig,
 			&AgentStats{},
 			&AgentStatus{
 				Controller: Pending,
@@ -98,7 +98,7 @@ func (service *AgentService) StopNats() error {
 
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
-	gwConfigs := config.GetConfig().GWConfigs
+	gwConfigs := setup.GetConfig().GWConfigs
 	if len(gwConfigs) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConfigs")
 	}
@@ -211,9 +211,9 @@ func (service *AgentService) listenChanel() {
 			service.agentStats.MessagesSent++
 			switch res.subject {
 			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = subseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = subseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 		}
 	}

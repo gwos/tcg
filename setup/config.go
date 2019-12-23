@@ -1,4 +1,4 @@
-package config
+package setup
 
 import (
 	"github.com/gwos/tng/log"
@@ -15,7 +15,7 @@ var cfg *Config
 
 type ConfigStringConstant string
 
-// ConfigEnv defines environment variable for config file path, overrides the ConfigName
+// ConfigEnv defines environment variable for setup file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
 //   for example: TNG_AGENTCONFIG_NATSSTORETYPE
