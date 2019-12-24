@@ -466,6 +466,7 @@ type OperationResults struct {
 type ResourceGroup struct {
 	GroupName string					`json:"groupName,required"`
 	Type GroupType 						`json:"type,required"`
+	Description string 					`json:"description,omitempty"`
 	Resources []MonitoredResourceRef 	`json:"resources,required"`
 }
 
