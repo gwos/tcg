@@ -427,7 +427,7 @@ type MonitoredService struct {
 type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The resource type uniquely defining the resource type
+	// Type: Optional. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,omitempty"`
 	// Owner relationship for associations like host->service
