@@ -14,6 +14,7 @@ import (
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
 	"net/http/pprof"
+	"strings"
 	"sync"
 	"time"
 )
@@ -74,8 +75,12 @@ func (controller *Controller) StartController() error {
 	}
 
 	controller.authClient = &clients.GWClient{GWConfig: setup.GetConfig().GWConfigs[0]}
-
-	addr := controller.AgentConfig.ControllerAddr
+	var addr string
+	if strings.HasPrefix(controller.AgentConfig.ControllerAddr, ":") {
+		addr = "localhost" + controller.AgentConfig.ControllerAddr
+	} else {
+		addr = controller.AgentConfig.ControllerAddr
+	}
 	certFile := controller.AgentConfig.ControllerCertFile
 	keyFile := controller.AgentConfig.ControllerKeyFile
 
