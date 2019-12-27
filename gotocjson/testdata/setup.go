@@ -18,7 +18,7 @@ var cfg *Config
 // will need to be explicitly converted to "string" type in the Go code.
 type ConfigStringConstant string
 
-// ConfigEnv defines environment variable for config file path
+// ConfigEnv defines environment variable for setup file path
 const (
 	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
 	ConfigName                           = "tng_config.yaml"

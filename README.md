@@ -82,6 +82,19 @@ The TNG project is built with Go Modules. See `go.mod` for a list of dependencie
 
         github.com/shirou/gopsutil
 
+9. [Gin-Swagger](github.com/swaggo/gin-swagger)
+    
+    > Gin Gonic middleware to automatically generate RESTful API documentation with Swagger 2.0.
+                                                        
+        github.com/swaggo/gin-swagger
+        
+    > Generate 'docs.go' for Swagger UI
+        
+        $ swag init
+    
+    > Swagger url:
+
+        {host}:{port}/swagger/index.html
 
 <a name="building"></a>
 ## Building
@@ -179,7 +192,7 @@ Defines path to `libtransit.so` library in docker container and tests.
     $ export LIBTRANSIT=/path/to/libtransit.so
 
 
-### TNG_
+### TNG
 
 By default the config file is looked for in the work directory as `tng_config.yaml`.
 
