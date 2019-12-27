@@ -1,4 +1,4 @@
-package config
+package setup
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ gwConfigs:
     appName: "gw8"
 `)
 
-	tmpfile, err := ioutil.TempFile("", "config")
+	tmpfile, err := ioutil.TempFile("", "setup")
 	defer os.Remove(tmpfile.Name())
 	assert.NoError(t, err)
 	_, err = tmpfile.Write(configYAML)

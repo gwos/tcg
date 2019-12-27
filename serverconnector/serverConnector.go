@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
@@ -22,7 +22,7 @@ const (
 
 var hostName string // TODO: Vlad why use global?
 
-var LastCheck milliseconds.MillisecondTimestamp
+var LastCheck subseconds.MillisecondTimestamp
 
 func Synchronize() *transit.InventoryResource {
 	hostStat, err := host.Info()
@@ -33,7 +33,7 @@ func Synchronize() *transit.InventoryResource {
 
 	hostName = hostStat.Hostname
 
-	LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
+	LastCheck = subseconds.MillisecondTimestamp{Time: time.Now()}
 
 	return &transit.InventoryResource{
 		Name: hostName,
@@ -97,7 +97,7 @@ func CollectMetrics() *transit.MonitoredResource {
 		Type:          transit.Host,
 		Status:        transit.HostUp,
 		LastCheckTime: LastCheck,
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Services: []transit.MonitoredService{
 			*getDiskFreeService(),
 			*getTotalDiskUsageService(),
@@ -122,15 +122,15 @@ func getTotalDiskUsageService() *transit.MonitoredService {
 		Name:          "total.disk.usage",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalDiskUsage",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -153,15 +153,15 @@ func getDiskUsedService() *transit.MonitoredService {
 		Name:          "disk.used",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST	EEEE
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST	EEEE
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskUsed",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -185,15 +185,15 @@ func getDiskFreeService() *transit.MonitoredService {
 		Name:          "disk.free",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskFree",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -216,15 +216,15 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 		Name:          "total.memory.usage",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalMemoryUsage",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -246,15 +246,15 @@ func getMemoryUsedService() *transit.MonitoredService {
 		Name:          "memory.used",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryUsed",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -277,15 +277,15 @@ func getMemoryFreeService() *transit.MonitoredService {
 		Name:          "memory.free",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryFree",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -308,15 +308,15 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 		Name:          "processes.number",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "processesNumber",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
@@ -332,15 +332,15 @@ func getTotalCpuUsage() *transit.MonitoredService {
 		Name:          "cpu.usage.total",
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "cpuUsageTotal",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,

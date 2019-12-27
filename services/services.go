@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/subseconds"
 	"sync"
 	"time"
 )
@@ -30,11 +30,11 @@ type AgentStats struct {
 	BytesSent              int
 	MetricsSent            int
 	MessagesSent           int
-	LastInventoryRun       milliseconds.MillisecondTimestamp
-	LastMetricsRun         milliseconds.MillisecondTimestamp
+	LastInventoryRun       subseconds.MillisecondTimestamp
+	LastMetricsRun         subseconds.MillisecondTimestamp
 	ExecutionTimeInventory time.Duration
 	ExecutionTimeMetrics   time.Duration
-	UpSince                milliseconds.MillisecondTimestamp
+	UpSince                subseconds.MillisecondTimestamp
 	LastError              string
 	sync.Mutex
 }

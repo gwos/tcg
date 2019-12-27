@@ -564,7 +564,7 @@ node_loop:
 										//  .  .  .  .  .  .  .  .  .  .  X: *ast.SelectorExpr {
 										//  .  .  .  .  .  .  .  .  .  .  .  X: *ast.Ident {
 										//  .  .  .  .  .  .  .  .  .  .  .  .  NamePos: transit.go:404:3
-										//  .  .  .  .  .  .  .  .  .  .  .  .  Name: "config"
+										//  .  .  .  .  .  .  .  .  .  .  .  .  Name: "setup"
 										//  .  .  .  .  .  .  .  .  .  .  .  }
 										//  .  .  .  .  .  .  .  .  .  .  .  Sel: *ast.Ident {
 										//  .  .  .  .  .  .  .  .  .  .  .  .  NamePos: transit.go:404:10
@@ -3123,7 +3123,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			json_field_name = field_tag.json_field_name
 		} else if matches := last_go_type_component.FindStringSubmatch(go_type); matches != nil {
 			// This possible adjustment of the field name is needed because we might have a complex
-			// Go field with a Go type like "*config.Config" that is represented in the Go code as
+			// Go field with a Go type like "*setup.Config" that is represented in the Go code as
 			// an anonymous field (i.e., with no stated name).  In that case, Go's JSON package
 			// will encode that field using a field name which is only the last component of the Go
 			// typename, not the entire typename.  So we must replicate that behavior here.
@@ -3294,7 +3294,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 						    json_field_name = field_tag.json_field_name
 						} else if matches := last_go_type_component.FindStringSubmatch(go_type); matches != nil {
 						    // This possible adjustment of the field name is needed because we might have a complex
-						    // Go field with a Go type like "*config.Config" that is represented in the Go code as
+						    // Go field with a Go type like "*setup.Config" that is represented in the Go code as
 						    // an anonymous field (i.e., with no stated name).  In that case, Go's JSON package
 						    // will encode that field using a field name which is only the last component of the Go
 						    // typename, not the entire typename.  So we must replicate that behavior here.
@@ -3462,7 +3462,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 						    json_field_name = field_tag.json_field_name
 						} else if matches := last_go_type_component.FindStringSubmatch(go_type); matches != nil {
 						    // This possible adjustment of the field name is needed because we might have a complex
-						    // Go field with a Go type like "*config.Config" that is represented in the Go code as
+						    // Go field with a Go type like "*setup.Config" that is represented in the Go code as
 						    // an anonymous field (i.e., with no stated name).  In that case, Go's JSON package
 						    // will encode that field using a field name which is only the last component of the Go
 						    // typename, not the entire typename.  So we must replicate that behavior here.
@@ -3576,7 +3576,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 			}
 
 			// FIX QUICK:  clean this up
-			// package_name = milliseconds
+			// package_name = subseconds
 			//  struct_name = MillisecondTimestamp
 			//   field_name = Time_
 			// field_C_type = struct_timespec
@@ -3618,7 +3618,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
   if (json) {
     fprintf(stderr, "decode{{.StructName}} error on line %d: %s\n", error.line, error.text);
   } else {
-    json_t *jsonCfg         = json_object_get(json, "config");
+    json_t *jsonCfg         = json_object_get(json, "setup");
     json_t *jsonCfgHostName = json_object_get(jsonCfg, "hostName");
     json_t *jsonCfgAccount  = json_object_get(jsonCfg, "account");
     json_t *jsonCfgToken    = json_object_get(jsonCfg, "token");
@@ -3642,12 +3642,12 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
     } else {
       char *ptr = (char *){{.StructName}}_ptr;
       ptr += sizeof({{.StructName}});
-      {{.StructName}}_ptr->config.hostName = strcpy(ptr, json_string_value(jsonCfgHostName));
+      {{.StructName}}_ptr->setup.hostName = strcpy(ptr, json_string_value(jsonCfgHostName));
       ptr += jsonCfgHostName_len + NUL_TERM_LEN;
-      {{.StructName}}_ptr->config.account = strcpy(ptr, json_string_value(jsonCfgAccount));
+      {{.StructName}}_ptr->setup.account = strcpy(ptr, json_string_value(jsonCfgAccount));
       ptr += jsonCfgAccount_len + NUL_TERM_LEN;
-      {{.StructName}}_ptr->config.token = strcpy(ptr, json_string_value(jsonCfgToken));
-      {{.StructName}}_ptr->config.ssl = json_boolean_value(jsonCfgSSL);
+      {{.StructName}}_ptr->setup.token = strcpy(ptr, json_string_value(jsonCfgToken));
+      {{.StructName}}_ptr->setup.ssl = json_boolean_value(jsonCfgSSL);
     }
 
     json_decref(json);
@@ -3810,7 +3810,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 			json_field_name = field_tag.json_field_name
 		} else if matches := last_go_type_component.FindStringSubmatch(go_type); matches != nil {
 			// This possible adjustment of the field name is needed because we might have a complex
-			// Go field with a Go type like "*config.Config" that is represented in the Go code as
+			// Go field with a Go type like "*setup.Config" that is represented in the Go code as
 			// an anonymous field (i.e., with no stated name).  In that case, Go's JSON package
 			// will encode that field using a field name which is only the last component of the Go
 			// typename, not the entire typename.  So we must replicate that behavior here.
@@ -4065,7 +4065,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					field_values += fmt.Sprintf("            // field_C_type = %s\n", field_C_type)
 					field_objects += fmt.Sprintf("        json_t *json_%s;\n", field_name)
 					// FIX MAJOR:  Possibly change the JSON field name in this next item, based on
-					// an analysis of the Go type (for "*config.Config", reduce to just "Config")
+					// an analysis of the Go type (for "*setup.Config", reduce to just "Config")
 					// and then on a possible override from the struct field tag.
 					field_tags := struct_field_tags[struct_name][field_name]
 					// FIX QUICK:  Verify that this block of code has been moved up intact, then delete it here.
@@ -4079,7 +4079,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 						    json_field_name_len = len(json_field_name)
 						} else if matches := last_go_type_component.FindStringSubmatch(go_type); matches != nil {
 						    // This possible adjustment of the field name is needed because we might have a complex
-						    // Go field with a Go type like "*config.Config" that is represented in the Go code as
+						    // Go field with a Go type like "*setup.Config" that is represented in the Go code as
 						    // an anonymous field (i.e., with no stated name).  In that case, Go's JSON package
 						    // will encode that field using a field name which is only the last component of the Go
 						    // typename, not the entire typename.  So we must replicate that behavior here.
