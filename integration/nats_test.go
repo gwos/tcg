@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/config"
+	. "github.com/gwos/tng/setup"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
@@ -219,7 +219,7 @@ func context() transit.TracerContext {
 		AppType:    TestAppType,
 		AgentID:    TestAgentID,
 		TraceToken: TestTraceToken,
-		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 }
 
@@ -228,8 +228,8 @@ func resource() transit.MonitoredResource {
 		Name:          TestHostName,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Services:      []transit.MonitoredService{},
 	}
 }
@@ -239,15 +239,15 @@ func service(i int) transit.MonitoredService {
 		Name:          fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
 		Status:        transit.ServiceOk,
 		Owner:         TestHostName,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,

@@ -2,7 +2,7 @@ package transit
 
 import (
 	"fmt"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/subseconds"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -146,12 +146,12 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime milliseconds.MillisecondTimestamp `json:"endTime,omitempty"`
+	EndTime subseconds.MillisecondTimestamp `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
+	StartTime subseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
 // TypedValue defines a single strongly-typed value.
@@ -174,7 +174,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	TimeValue subseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
 // MetricSample defines a single data sample in a time series, which may represent
@@ -384,9 +384,9 @@ type MonitoredResource struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
 	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime subseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime subseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Foundation Properties
@@ -412,9 +412,9 @@ type MonitoredService struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
 	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime subseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime subseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Foundation Properties
@@ -436,10 +436,10 @@ type MonitoredResourceRef struct {
 
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string                            `json:"appType"`
-	AgentID    string                            `json:"agentId"`
-	TraceToken string                            `json:"traceToken"`
-	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	AppType    string                          `json:"appType"`
+	AgentID    string                          `json:"agentId"`
+	TraceToken string                          `json:"traceToken"`
+	TimeStamp  subseconds.MillisecondTimestamp `json:"timeStamp"`
 }
 
 // OperationResult defines API answer
@@ -485,12 +485,12 @@ type InventoryRequest struct {
 
 // IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
-	IncidentID    string                            `json:"incidentId"`
-	ResourceName  string                            `json:"resourceName,required"`
-	Status        string                            `json:"status"`
-	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
-	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
-	ConditionName string                            `json:"conditionName"`
-	URL           string                            `json:"url,omitempty"`
-	Summary       string                            `json:"summary,omitempty"`
+	IncidentID    string                          `json:"incidentId"`
+	ResourceName  string                          `json:"resourceName,required"`
+	Status        string                          `json:"status"`
+	StartedAt     subseconds.MillisecondTimestamp `json:"startedAt"`
+	EndedAt       subseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
+	ConditionName string                          `json:"conditionName"`
+	URL           string                          `json:"url,omitempty"`
+	Summary       string                          `json:"summary,omitempty"`
 }

@@ -1,4 +1,4 @@
-package milliseconds
+package subseconds
 
 import (
 	"fmt"
@@ -8,13 +8,13 @@ import (
 
 // MillisecondTimestamp refers to the JSON representation of timestamps, for
 // time-data interchange, as a single integer representing a modified version of
-// whole milliseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
+// whole subseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
 // Individual languages (Go, C, Java) will typically implement this structure
 // using a more-complex construction in their respective contexts, containing even
 // finer granularity for local data storage, typically at the nanosecond level.
 //
 // The "modified version" comment reflects the following simplification.
-// Despite the already fine-grained representation as milliseconds, this data
+// Despite the already fine-grained representation as subseconds, this data
 // value takes no account of leap seconds; for all of our calculations, we
 // simply pretend they don't exist.  Individual feeders will typically map a
 // 00:00:60 value for a leap second, obtained as a string so the presence of the
@@ -26,7 +26,7 @@ import (
 // sub-second time differences might run into surprises, since the following
 // timestamps could appear in temporal order:
 //
-//         actual time   relative reported time in milliseconds
+//         actual time   relative reported time in subseconds
 //     A:  00:00:59.000  59000
 //     B:  00:00:60.000  60000
 //     C:  00:00:60.700  60700
@@ -64,7 +64,7 @@ import (
 //
 // Finally, note that the Go zero-value of the internal implementation object
 // we use in that language does not have a reasonable value when interpreted
-// as milliseconds since the UNIX epoch.  For that reason, the general rule is
+// as subseconds since the UNIX epoch.  For that reason, the general rule is
 // that the JSON representation of a zero-value for any field of this type, no
 // matter what the originating language, will be to simply omit it from the
 // JSON string.  That fact must be taken into account when marshalling and
