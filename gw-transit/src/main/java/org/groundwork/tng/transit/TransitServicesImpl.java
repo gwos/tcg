@@ -7,6 +7,7 @@ import org.groundwork.rs.transit.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 
 public class TransitServicesImpl implements TransitServices {
     public static final Integer LIBTRANSIT_ERR_LENGTH = 1000;
@@ -25,7 +26,7 @@ public class TransitServicesImpl implements TransitServices {
             path = lib.getAbsolutePath();
         }
         this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
-        this.errorMsg = new StringByReference("ERROR");
+        this.errorMsg = new StringByReference(String.join("", Collections.nCopies(128, " ")));
     }
 
     @Override

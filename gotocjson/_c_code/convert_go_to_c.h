@@ -85,6 +85,12 @@ extern bool is_float64_ptr_zero_value(const float64 *float64_ptr);
 extern bool is_string_ptr_zero_value(string const *string_ptr);
 extern bool is_struct_timespec_ptr_zero_value(const struct_timespec *struct_timespec_ptr);
 
+static inline struct_timespec time_t_to_struct_timespec(time_t moment) 
+{
+    struct_timespec clock = {moment, 0};
+    return clock;
+}
+
 extern struct_timespec timeval_to_timespec(struct timeval timeval_timestamp);
 extern json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *milliseconds_MillisecondTimestamp);
 extern struct_timespec *JSON_as_struct_timespec(json_t *json);

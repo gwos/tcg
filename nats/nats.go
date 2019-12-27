@@ -118,15 +118,16 @@ func StartDispatcher(options []DispatcherOption) error {
 
 	for _, o := range options {
 		dispatcherFn := o.Handler /* prevent loop override */
+		durableId := o.DurableID
 		_, err = connDispatcher.Subscribe(
 			o.Subject,
 			func(msg *stan.Msg) {
 				if err := dispatcherFn(msg.Data); err != nil {
-					log.Info("Not delivered")
+					log.Info("Not delivered: " + msg.Subject + ", " + durableId)
 					log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
 				} else {
 					_ = msg.Ack()
-					log.Info("Delivered")
+					log.Info("Delivered: " + msg.Subject + ", " + durableId)
 					log.Debug("Message:", msg)
 				}
 			},

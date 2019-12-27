@@ -106,6 +106,16 @@ const (
 	Service ServiceType = "SERVICE"
 )
 
+// GroupType defines the foundation group type
+type GroupType string
+
+// The group type uniquely defining corresponding foundation group type
+const (
+	HostGroup           GroupType = "HostGroup"
+	ServiceGroup        		  = "ServiceGroup"
+	CustomGroup        			  = "CustomGroup"
+)
+
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
 type MetricSampleType string
 
@@ -417,9 +427,9 @@ type MonitoredService struct {
 type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The resource type uniquely defining the resource type
+	// Type: Optional. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
-	Type string `json:"type,resquired"`
+	Type ResourceType `json:"type,omitempty"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 }
@@ -454,8 +464,10 @@ type OperationResults struct {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName string                 `json:"groupName"`
-	Resources []MonitoredResourceRef `json:"resources"`
+	GroupName string					`json:"groupName,required"`
+	Type GroupType 						`json:"type,required"`
+	Description string 					`json:"description,omitempty"`
+	Resources []MonitoredResourceRef 	`json:"resources,required"`
 }
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
