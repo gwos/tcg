@@ -56,3 +56,6 @@ build
 # Location of installed headers, libraries, etc.
 install/*
 
+# Temp NATS store
+gw-transit/natsstore/
+natsstore/

@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/config"
+	. "github.com/gwos/tng/setup"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
@@ -101,7 +101,7 @@ func buildInventoryRequest(t *testing.T) []byte {
 			AppType:    TestAppType,
 			AgentID:    TestAgentID,
 			TraceToken: TestTraceToken,
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Resources: []transit.InventoryResource{inventoryResource},
 		Groups:    nil,
@@ -118,22 +118,22 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 		Name:          TestHostName,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 		Services: []transit.MonitoredService{
 			{
 				Name:          "test",
 				Status:        transit.ServiceOk,
 				Owner:         TestHostName,
-				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+				NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 				Metrics: []transit.TimeSeries{
 					{
 						MetricName: "testMetric",
 						SampleType: transit.Value,
 						Interval: &transit.TimeInterval{
-							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+							EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
+							StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
 						},
 						Value: &transit.TypedValue{
 							ValueType:    transit.IntegerType,
@@ -151,7 +151,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 			AppType:    TestAppType,
 			AgentID:    TestAgentID,
 			TraceToken: TestTraceToken,
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Resources: []transit.MonitoredResource{monitoredResource},
 	}
