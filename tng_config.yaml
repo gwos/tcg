@@ -1,4 +1,7 @@
-agentConfig:
+connector:
+  agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
+  appName: "tng"
+  appType: "VEMA"
   controllerAddr: ":8081"
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
@@ -6,14 +9,16 @@ agentConfig:
   natsStoreType: "FILE"
   natsHost: ":4222"
   logLevel: 2
-gwConfigs:
+dsConnection:
+  hostName: "localhost:3001"
+  userName: "RESTAPIACCESS"
+  password: "***REMOVED***"
+gwConnections:
   -
-    host: "localhost:80"
-    account: "RESTAPIACCESS"
+    hostName: "localhost:80"
+    userName: "RESTAPIACCESS"
     password: "***REMOVED***"
-    appName: "tng"
   -
-    host: "localhost:88"
-    account: "RESTAPIACCESS"
+    hostName: "localhost:88"
+    userName: "RESTAPIACCESS"
     password: "***REMOVED***"
-    appName: "tng"

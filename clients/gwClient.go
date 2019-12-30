@@ -2,7 +2,7 @@ package clients
 
 import (
 	"encoding/json"
-	"errors"
+	"fmt"
 	"github.com/gwos/tng/setup"
 	"github.com/gwos/tng/transit"
 	"net/http"
@@ -31,7 +31,8 @@ const (
 
 // GWClient implements GWOperations interface
 type GWClient struct {
-	*setup.GWConfig
+	AppName string
+	*setup.GWConnection
 	sync.Mutex
 	token string
 }
@@ -48,9 +49,9 @@ func (client *GWClient) Connect() error {
 	}
 
 	formValues := map[string]string{
-		"gwos-app-name": client.GWConfig.AppName,
-		"user":          client.GWConfig.Account,
-		"password":      client.GWConfig.Password,
+		"gwos-app-name": client.AppName,
+		"user":          client.GWConnection.UserName,
+		"password":      client.GWConnection.Password,
 	}
 
 	headers := map[string]string{
@@ -60,7 +61,7 @@ func (client *GWClient) Connect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GWConfig.Host,
+		Host:   client.GWConnection.HostName,
 		Path:   GWEntrypointConnect,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
@@ -73,13 +74,13 @@ func (client *GWClient) Connect() error {
 		return nil
 	}
 
-	return errors.New(string(byteResponse))
+	return fmt.Errorf(string(byteResponse))
 }
 
 // Disconnect implements GWOperations.Disconnect.
 func (client *GWClient) Disconnect() error {
 	formValues := map[string]string{
-		"gwos-app-name":  client.GWConfig.AppName,
+		"gwos-app-name":  client.AppName,
 		"gwos-api-token": client.token,
 	}
 
@@ -90,7 +91,7 @@ func (client *GWClient) Disconnect() error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GWConfig.Host,
+		Host:   client.GWConnection.HostName,
 		Path:   GWEntrypointDisconnect,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
@@ -101,7 +102,7 @@ func (client *GWClient) Disconnect() error {
 	if statusCode == 200 {
 		return nil
 	}
-	return errors.New(string(byteResponse))
+	return fmt.Errorf(string(byteResponse))
 }
 
 // ValidateToken implements GWOperations.ValidateToken.
@@ -118,7 +119,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GWConfig.Host,
+		Host:   client.GWConnection.HostName,
 		Path:   GWEntrypointValidateToken,
 	}
 
@@ -130,9 +131,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 			if b {
 				return nil
 			}
-			return errors.New("invalid gwos-app-name or gwos-api-token")
+			return fmt.Errorf("invalid gwos-app-name or gwos-api-token")
 		}
-		return errors.New(string(byteResponse))
+		return fmt.Errorf(string(byteResponse))
 	}
 
 	return err
@@ -144,12 +145,12 @@ func (client *GWClient) SynchronizeInventory(inventory []byte) (*transit.Operati
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": client.token,
-		"GWOS-APP-NAME":  client.GWConfig.AppName,
+		"GWOS-APP-NAME":  client.AppName,
 	}
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GWConfig.Host,
+		Host:   client.GWConnection.HostName,
 		Path:   GWEntrypointSynchronizeInventory,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, inventory)
@@ -165,7 +166,7 @@ func (client *GWClient) SynchronizeInventory(inventory []byte) (*transit.Operati
 		return nil, err
 	}
 	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
+		return nil, fmt.Errorf(string(byteResponse))
 	}
 
 	var operationResults transit.OperationResults
@@ -184,12 +185,12 @@ func (client *GWClient) SendResourcesWithMetrics(resources []byte) (*transit.Ope
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-API-TOKEN": client.token,
-		"GWOS-APP-NAME":  client.GWConfig.AppName,
+		"GWOS-APP-NAME":  client.AppName,
 	}
 
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.GWConfig.Host,
+		Host:   client.GWConnection.HostName,
 		Path:   GWEntrypointSendResourceWithMetrics,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
@@ -205,7 +206,7 @@ func (client *GWClient) SendResourcesWithMetrics(resources []byte) (*transit.Ope
 		return nil, err
 	}
 	if statusCode != 200 {
-		return nil, errors.New(string(byteResponse))
+		return nil, fmt.Errorf(string(byteResponse))
 	}
 
 	var operationResults transit.OperationResults

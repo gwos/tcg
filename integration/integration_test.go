@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/setup"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/services"
+	. "github.com/gwos/tng/setup"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -165,14 +165,17 @@ func config(t assert.TestingT) (map[string]string, error) {
 	err := os.Setenv(string(ConfigEnv), path.Join("..", ConfigName))
 	assert.NoError(t, err)
 
-	gwClient := &clients.GWClient{GWConfig: GetConfig().GWConfigs[0]}
+	gwClient := &clients.GWClient{
+		AppName:      GetConfig().Connector.AppName,
+		GWConnection: GetConfig().GWConnections[0],
+	}
 	err = gwClient.Connect()
 	assert.NoError(t, err)
 
 	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  gwClient.GWConfig.AppName,
+		"GWOS-APP-NAME":  gwClient.AppName,
 		"GWOS-API-TOKEN": token,
 	}
 

@@ -2,14 +2,15 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/setup"
 	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/setup"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
@@ -22,9 +23,10 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*AgentService
-	srv                *http.Server
-	listMetricsHandler GetBytesHandlerType
-	authClient         *clients.GWClient
+	srv                        *http.Server
+	dsClient                   *clients.DSClient
+	listMetricsHandler         GetBytesHandlerType
+	updateGWConnectionsHandler SetBytesHandlerType
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -40,9 +42,15 @@ func GetController() *Controller {
 			nil,
 			nil,
 			nil,
+			nil,
 		}
 	})
 	return controller
+}
+
+// ListGWConnections implements Controllers.ListGWConnections interface
+func (controller *Controller) ListGWConnections() ([]byte, error) {
+	return json.Marshal(setup.GetConfig().GWConnections)
 }
 
 // ListMetrics implements Controllers.ListMetrics interface
@@ -58,9 +66,50 @@ func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType)
 	controller.listMetricsHandler = fn
 }
 
+// RegisterUpdateGWConnectionsHandler implements Controllers.RegisterUpdateGWConnectionsHandler interface
+func (controller *Controller) RegisterUpdateGWConnectionsHandler(fn SetBytesHandlerType) {
+	controller.updateGWConnectionsHandler = fn
+}
+
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
 	controller.listMetricsHandler = nil
+}
+
+// RemoveUpdateGWConnectionsHandler implements Controllers.RemoveUpdateGWConnectionsHandler interface
+func (controller *Controller) RemoveUpdateGWConnectionsHandler() {
+	controller.updateGWConnectionsHandler = nil
+}
+
+// UpdateGWConnections implements Controllers.UpdateGWConnections interface
+func (controller *Controller) UpdateGWConnections(input []byte) error {
+
+	// TODO: implement
+	log.Error("#UpdateGWConnections not implemented", string(input))
+
+	restartFlags := struct {
+		nats      bool
+		transport bool
+	}{
+		controller.Status().Nats == Running,
+		controller.Status().Transport == Running,
+	}
+
+	if restartFlags.transport {
+		controller.StopTransport()
+	}
+	if restartFlags.nats {
+		controller.StopNats()
+		controller.StartNats()
+	}
+	if restartFlags.transport {
+		controller.StartTransport()
+	}
+
+	if controller.updateGWConnectionsHandler != nil {
+		return controller.updateGWConnectionsHandler(input)
+	}
+	return nil
 }
 
 // StartController implements AgentServices.StartController interface
@@ -70,19 +119,23 @@ func (controller *Controller) StartController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("StartController: already started")
 	}
-	if len(setup.GetConfig().GWConfigs) == 0 {
+	if len(setup.GetConfig().GWConnections) == 0 {
 		return fmt.Errorf("StartController: %v", "empty GWConfigs")
 	}
 
-	controller.authClient = &clients.GWClient{GWConfig: setup.GetConfig().GWConfigs[0]}
-	var addr string
-	if strings.HasPrefix(controller.AgentConfig.ControllerAddr, ":") {
-		addr = "localhost" + controller.AgentConfig.ControllerAddr
-	} else {
-		addr = controller.AgentConfig.ControllerAddr
+	controller.dsClient = &clients.DSClient{
+		AppName:      controller.AppName,
+		DSConnection: setup.GetConfig().DSConnection,
 	}
-	certFile := controller.AgentConfig.ControllerCertFile
-	keyFile := controller.AgentConfig.ControllerKeyFile
+
+	var addr string
+	if strings.HasPrefix(controller.Connector.ControllerAddr, ":") {
+		addr = "localhost" + controller.Connector.ControllerAddr
+	} else {
+		addr = controller.Connector.ControllerAddr
+	}
+	certFile := controller.Connector.ControllerCertFile
+	keyFile := controller.Connector.ControllerKeyFile
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -137,7 +190,7 @@ func (controller *Controller) StartController() error {
 // overrides AgentService implementation
 // gracefully shutdowns the http server
 func (controller *Controller) StopController() error {
-	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartServer itself
+	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
 	log.Info("Controller: shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -155,6 +208,48 @@ func (controller *Controller) StopController() error {
 }
 
 //
+// @Description The following API endpoint can be used to get list of GroundworkConnections from the server.
+// @Tags Metrics
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} GWConfigs
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal server error"
+// @Router /gw-connections [get]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
+func (controller *Controller) listGWConnections(c *gin.Context) {
+	output, err := controller.ListGWConnections()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	c.Data(http.StatusOK, gin.MIMEJSON, output)
+}
+
+//
+// @Description The following API endpoint can be used to update list of GroundworkConnections from the server.
+// @Tags Metrics
+// @Accept  json
+// @Produce  json
+// @Success 200 {object} GWConfigs
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal server error"
+// @Router /gw-connections [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
+func (controller *Controller) updateGWConnections(c *gin.Context) {
+	input, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+	}
+	err = controller.UpdateGWConnections(input)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+//
 // @Description The following API endpoint can be used to get list of metrics from the server.
 // @Tags Metrics
 // @Accept  json
@@ -162,7 +257,7 @@ func (controller *Controller) StopController() error {
 // @Success 200 {object} services.AgentStatus
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /listMetrics [get]
+// @Router /metrics [get]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) listMetrics(c *gin.Context) {
@@ -170,7 +265,6 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
 	c.Data(http.StatusOK, gin.MIMEJSON, metrics)
 }
 
@@ -190,7 +284,6 @@ func (controller *Controller) startNats(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
 	c.JSON(http.StatusOK, controller.Status())
 }
 
@@ -210,7 +303,6 @@ func (controller *Controller) stopNats(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
 	c.JSON(http.StatusOK, controller.Status())
 }
 
@@ -230,7 +322,6 @@ func (controller *Controller) startTransport(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
 	c.JSON(http.StatusOK, controller.Status())
 }
 
@@ -250,7 +341,6 @@ func (controller *Controller) stopTransport(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-
 	c.JSON(http.StatusOK, controller.Status())
 }
 
@@ -298,7 +388,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.authClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
+		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
@@ -315,19 +405,21 @@ func (controller *Controller) validateToken(c *gin.Context) {
 }
 
 func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
-	swaggerUrl := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerUrl))
+	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
 	apiV1Group := router.Group("/api/v1")
 	apiV1Group.Use(controller.validateToken)
 
-	apiV1Group.GET("/listMetrics", controller.listMetrics)
-	apiV1Group.GET("/stats", controller.stats)
-	apiV1Group.GET("/status", controller.status)
+	apiV1Group.GET("/gw-connections", controller.listGWConnections)
+	apiV1Group.POST("/gw-connections", controller.updateGWConnections)
+	apiV1Group.GET("/metrics", controller.listMetrics)
 	apiV1Group.POST("/nats", controller.startNats)
 	apiV1Group.DELETE("/nats", controller.stopNats)
 	apiV1Group.POST("/nats/transport", controller.startTransport)
 	apiV1Group.DELETE("/nats/transport", controller.stopTransport)
+	apiV1Group.GET("/stats", controller.stats)
+	apiV1Group.GET("/status", controller.status)
 
 	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
