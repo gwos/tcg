@@ -68,9 +68,16 @@ type TransitServices interface {
 // GetBytesHandlerType defines handler type
 type GetBytesHandlerType func() ([]byte, error)
 
+// SetBytesHandlerType defines handler type
+type SetBytesHandlerType func([]byte) error
+
 // Controllers defines TNG Agent controllers interface
 type Controllers interface {
+	ListGWConnections() ([]byte, error)
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(GetBytesHandlerType)
+	RegisterUpdateGWConnectionsHandler(SetBytesHandlerType)
 	RemoveListMetricsHandler()
+	RemoveUpdateGWConnectionsHandler()
+	UpdateGWConnections([]byte) error
 }

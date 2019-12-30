@@ -10,15 +10,21 @@ import (
 
 func TestGetConfig(t *testing.T) {
 	configYAML := []byte(`
-agentConfig:
+connector:
+  agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
+  appName: "test-app"
+  appType: "test"
   controllerAddr: ":8081"
   natsAckWait: 15
-gwConfigs:
+dsConnection:
+  hostName: "localhost:3001"
+  userName: "RESTAPIACCESS"
+  password: ""
+gwConnections:
   -
-    host: "localhost:80"
-    account: "RESTAPIACCESS"
+    hostName: "localhost:80"
+    userName: "RESTAPIACCESS"
     password: ""
-    appName: "gw8"
 `)
 
 	tmpfile, err := ioutil.TempFile("", "setup")
@@ -30,11 +36,15 @@ gwConfigs:
 	assert.NoError(t, err)
 
 	os.Setenv(string(ConfigEnv), tmpfile.Name())
-	os.Setenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_GWCONFIGS", "[{\"password\":\"SEC RET\"},{\"appName\":\"gw8\"}]")
+	os.Setenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	os.Setenv("TNG_DSCONNECTION", "{\"password\":\"SECRET\"}")
+	os.Setenv("TNG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := Config{
-		AgentConfig: &AgentConfig{
+		Connector: &Connector{
+			AgentID:          "3dcd9a52-949d-4531-a3b0-b14622f7dd39",
+			AppName:          "test-app",
+			AppType:          "test",
 			ControllerAddr:   ":8081",
 			LogLevel:         1,
 			NatsAckWait:      15,
@@ -43,25 +53,30 @@ gwConfigs:
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		GWConfigs: GWConfigs{
-			&GWConfig{"localhost:80", "RESTAPIACCESS", "SEC RET", "gw8"},
-			&GWConfig{AppName: "gw8"},
+		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		GWConnections: GWConnections{
+			&GWConnection{"localhost:80", "RESTAPIACCESS", "SEC RET"},
+			&GWConnection{HostName: "localhost:3001"},
 		},
 	}
 
 	got := GetConfig()
 
-	if !reflect.DeepEqual(got.AgentConfig, expected.AgentConfig) {
-		t.Errorf("got: %v, expected: %v", got.AgentConfig, expected.AgentConfig)
+	if !reflect.DeepEqual(got.Connector, expected.Connector) {
+		t.Errorf("got: %v, expected: %v", got.Connector, expected.Connector)
 	}
 
-	if len(got.GWConfigs) != len(expected.GWConfigs) {
-		t.Errorf("got: %v, expected: %v", len(got.GWConfigs), len(expected.GWConfigs))
+	if !reflect.DeepEqual(got.DSConnection, expected.DSConnection) {
+		t.Errorf("got: %v, expected: %v", got.DSConnection, expected.DSConnection)
 	}
 
-	for k, v := range got.GWConfigs {
-		if !reflect.DeepEqual(v, expected.GWConfigs[k]) {
-			t.Errorf("key: %v, got: %v, expected: %v", k, v, expected.GWConfigs[k])
+	if len(got.GWConnections) != len(expected.GWConnections) {
+		t.Errorf("got: %v, expected: %v", len(got.GWConnections), len(expected.GWConnections))
+	}
+
+	for k, v := range got.GWConnections {
+		if !reflect.DeepEqual(v, expected.GWConnections[k]) {
+			t.Errorf("key: %v, got: %v, expected: %v", k, v, expected.GWConnections[k])
 		}
 	}
 }
