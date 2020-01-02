@@ -1663,7 +1663,24 @@ func print_type_declarations(
 					list_base_types = append(list_base_types, array_base_type)
 				}
 			}
-			fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
+			// If type_name is defined as a struct in this package, (that is, if we are defining a direct alias of the
+			// previous struct name, without any extra complexity) we must qualify its reference with the package name,
+			// just like we defined that struct.  But then, to satisfy various references to the alias name, we must
+			// go on to emit several additional declarations.
+			//
+			// On the other hand, if type_name is defined as an enumeration in this package, for simplicity (for the
+			// time being) we just use the unqualified enumeration name, since that is how (at least for the time being)
+			// we are emitting the name of the enumeration.
+			if _, ok := struct_typedefs[type_name]; ok {
+				// FIX LATER:  Check C compilations to see if we need to declare arguments for these macro definitions
+				// so we can include some explicit typecasting.
+				fmt.Fprintf(header_file, "typedef %s_%s %[1]s_%[3]s;\n", package_name, type_name, decl_kind.type_name)
+				fmt.Fprintf(header_file, "#define is_%s_%s_ptr_zero_value is_%[1]s_%[3]s_ptr_zero_value\n", package_name, decl_kind.type_name, type_name)
+				fmt.Fprintf(header_file, "#define %s_%s_ptr_as_JSON_ptr %[1]s_%[3]s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, type_name)
+				fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%[1]s_%[3]s_ptr\n", package_name, decl_kind.type_name, type_name)
+			} else {
+				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
+			}
 			fmt.Fprintf(header_file, "\n")
 		case "enum":
 			//
@@ -2517,6 +2534,9 @@ func generate_all_destroy_tree_routines(
 	// map[enum_name]enum_type
 	enum_typedefs map[string]string,
 
+	// map[struct_name][]field_type
+	struct_typedefs map[string][]string,
+
 	// map[struct_name][]field_name
 	struct_fields map[string][]string,
 
@@ -2530,7 +2550,8 @@ func generate_all_destroy_tree_routines(
 	for _, final_type := range final_type_order {
 		if final_type.type_kind == "struct" {
 			function_code, err := generate_destroy_PackageName_StructTypeName_ptr_tree(
-				package_name, final_type.type_name, key_value_pair_types, simple_typedefs, enum_typedefs, struct_fields, struct_field_C_types,
+				package_name, final_type.type_name, key_value_pair_types,
+				simple_typedefs, enum_typedefs, struct_typedefs, struct_fields, struct_field_C_types,
 			)
 			if err != nil {
 				panic(err)
@@ -2540,7 +2561,8 @@ func generate_all_destroy_tree_routines(
 			// This code is experimental.  It will get us a destroy routine built for the typedef name itself. as a
 			// top-level object Whether or not we need that is as yet uncertain, but we leave this in just in case.
 			function_code, err := generate_destroy_PackageName_StructTypeName_ptr_tree(
-				package_name, final_type.type_name, key_value_pair_types, simple_typedefs, enum_typedefs, struct_fields, struct_field_C_types,
+				package_name, final_type.type_name, key_value_pair_types,
+				simple_typedefs, enum_typedefs, struct_typedefs, struct_fields, struct_field_C_types,
 			)
 			if err != nil {
 				panic(err)
@@ -4287,6 +4309,9 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 	// map[enum_name]enum_type
 	enum_typedefs map[string]string,
 
+	// map[struct_name][]field_type
+	struct_typedefs map[string][]string,
+
 	// map[struct_name][]field_name
 	struct_fields map[string][]string,
 
@@ -4454,11 +4479,16 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 				} else {
 					address_op = "&"
 				}
-				// We have a structure from some other package.  We must call its own destroy...() routine,
-				// and deal correctly with both its json argument (which we must pass) and deleting the
-				// pointers we pass (which we must cause it to skip).
-				function_code += fmt.Sprintf("%sdestroy_%s_ptr_tree(%s%s_%s%s%s, json, false);\n",
-					line_prefix, typedef_type, address_op, package_name, item_prefix, member_op, item_name)
+				// We have a structure from either the same package or some other package.  In either case,
+				// we must call its own destroy...() routine, and deal correctly with both its json argument
+				// (which we must pass) and deleting the pointers we pass (which we must cause it to skip).
+				if _, ok := struct_typedefs[typedef_type]; ok {
+					function_code += fmt.Sprintf("%sdestroy_%s_%s_ptr_tree(%s%[2]s_%[5]s%s%s, json, false);\n",
+						line_prefix, package_name, typedef_type, address_op, item_prefix, member_op, item_name)
+				} else {
+					function_code += fmt.Sprintf("%sdestroy_%s_ptr_tree(%s%s_%s%s%s, json, false);\n",
+						line_prefix, typedef_type, address_op, package_name, item_prefix, member_op, item_name)
+				}
 			}
 		} else if item_type == "bool" {
 			// There's nothing to do in this case for de-allocation of an embedded scalar field,
@@ -4620,7 +4650,8 @@ func print_type_conversions(
 	fmt.Fprintf(code_file, "%s", all_decode_function_code)
 
 	all_destroy_function_code, err := generate_all_destroy_tree_routines(
-		package_name, final_type_order, key_value_pair_types, simple_typedefs, enum_typedefs, struct_fields, struct_field_C_types,
+		package_name, final_type_order, key_value_pair_types,
+		simple_typedefs, enum_typedefs, struct_typedefs, struct_fields, struct_field_C_types,
 	)
 	if err != nil {
 		panic(err)
