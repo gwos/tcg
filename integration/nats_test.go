@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/setup"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
+	. "github.com/gwos/tng/setup"
+	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -30,7 +30,6 @@ const (
 	TestTraceToken                     = "token-99e93"
 	GWAccount                          = "RESTAPIACCESS"
 	GWPassword                         = "***REMOVED***"
-	GWAppName                          = "tng"
 	GWValidHost                        = "localhost:80"
 	GWInvalidHost                      = "localhost:23"
 	TestTngAgentConfigNatsFileStoreDir = "test_datastore"
@@ -42,7 +41,7 @@ func TestNatsQueue_1(t *testing.T) {
 	assert.NoError(t, configNats(t, 5))
 	defer cleanNats(t)
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	GetConfig().GWConfigs[0].Host = GWInvalidHost
+	GetConfig().GWConnections[0].HostName = GWInvalidHost
 
 	testMessage, err := parseJSON()
 	assert.NoError(t, err)
@@ -58,7 +57,7 @@ func TestNatsQueue_1(t *testing.T) {
 		return
 	}
 
-	GetConfig().GWConfigs[0].Host = GWValidHost
+	GetConfig().GWConnections[0].HostName = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
@@ -75,7 +74,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, configNats(t, 5))
 
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	GetConfig().GWConfigs[0].Host = GWInvalidHost
+	GetConfig().GWConnections[0].HostName = GWInvalidHost
 
 	defer cleanNats(t)
 
@@ -97,7 +96,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
 	log.Info("NATS Server was stopped successfully")
 
-	GetConfig().GWConfigs[0].Host = GWValidHost
+	GetConfig().GWConnections[0].HostName = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
 	log.Info("Starting NATS server ...")
@@ -169,19 +168,18 @@ func TestNatsPerformance(t *testing.T) {
 func configNats(t *testing.T, natsAckWait int64) error {
 	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
 
-	GetConfig().GWConfigs = []*GWConfig{
+	GetConfig().GWConnections = []*GWConnection{
 		{
-			Host:     GWValidHost,
-			Account:  GWAccount,
+			HostName: GWValidHost,
+			UserName: GWAccount,
 			Password: GWPassword,
-			AppName:  GWAppName,
 		},
 	}
 
 	service := services.GetTransitService()
 
-	service.AgentConfig.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
-	service.AgentConfig.NatsAckWait = natsAckWait
+	service.Connector.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
+	service.Connector.NatsAckWait = natsAckWait
 
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
@@ -276,14 +274,17 @@ func inventoryService(i int) transit.InventoryService {
 }
 
 func removeHost(t *testing.T) {
-	gwClient := &clients.GWClient{GWConfig: GetConfig().GWConfigs[0]}
+	gwClient := &clients.GWClient{
+		AppName:      GetConfig().Connector.AppName,
+		GWConnection: GetConfig().GWConnections[0],
+	}
 	err := gwClient.Connect()
 	assert.NoError(t, err)
 
 	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
 	headers := map[string]string{
 		"Accept":         "application/json",
-		"GWOS-APP-NAME":  gwClient.GWConfig.AppName,
+		"GWOS-APP-NAME":  gwClient.AppName,
 		"GWOS-API-TOKEN": token,
 	}
 

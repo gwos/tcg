@@ -32,6 +32,7 @@ For more info see package `config`
 */
 
 /* define handlers for general libtransit functions */
+bool (*getConnectorConfig)(char *buf, size_t bufLen, char *errBuf, size_t errBufLen) = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
 bool (*sendResourcesWithMetrics)(char *requestJSON, char *errBuf,
@@ -89,6 +90,7 @@ void load_libtransit() {
     fail(dlerror());
   }
 
+  getConnectorConfig = find_symbol("GetConnectorConfig");
   goSetenv = find_symbol("GoSetenv");
   registerListMetricsHandler = find_symbol("RegisterListMetricsHandler");
   sendResourcesWithMetrics = find_symbol("SendResourcesWithMetrics");
@@ -120,14 +122,23 @@ void test_libtransit_control() {
   // specified by our ../tng_config.yaml file) to be in operation during this
   // testing, as that will cause a buildup of queued items as this test is run
   // and re-run.
-  char *nats_stor_type = getenv("TNG_AGENTCONFIG_NATSSTORETYPE");
+  char *nats_stor_type = getenv("TNG_CONNECTOR_NATSSTORETYPE");
   if (!nats_stor_type) {
-    res = goSetenv("TNG_AGENTCONFIG_NATSSTORETYPE", "MEMORY", errBuf,
+    res = goSetenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY", errBuf,
                    ERR_BUF_LEN);
     if (!res) {
       fail(errBuf);
     }
   }
+
+  // Check config
+  printf("Testing GetConnectorConfig ...\n");
+  char buf[1024] = "";
+  res = getConnectorConfig(buf, 1024, errBuf, ERR_BUF_LEN);
+  if (!res) {
+    fail(errBuf);
+  }
+  printf("\n%s\n\n", buf);
 
   // If true, force a test of StopNats(), to see if it will generate a segfault
   // if NATS has not previously been started.  If false, skip testing the

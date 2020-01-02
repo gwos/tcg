@@ -14,6 +14,7 @@ package main
 //}
 import "C"
 import (
+	"encoding/json"
 	"github.com/gwos/tng/services"
 	"os"
 	"unsafe"
@@ -177,4 +178,20 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
 	services.GetController().RemoveListMetricsHandler()
+}
+
+// GetConnectorConfig is a C API for getting services.GetTransitService().Connector
+//export GetConnectorConfig
+func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
+	bytes, err := json.Marshal(services.GetTransitService().Connector)
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	if len(bytes) > int(bufLen) {
+		bufStr(errBuf, errBufLen, "Buffer too small")
+		return false
+	}
+	bufStr(buf, bufLen, string(bytes))
+	return true
 }
