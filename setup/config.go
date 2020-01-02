@@ -13,12 +13,13 @@ import (
 var once sync.Once
 var cfg *Config
 
+// ConfigStringConstant defines string constant type
 type ConfigStringConstant string
 
 // ConfigEnv defines environment variable for setup file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
-//   for example: TNG_AGENTCONFIG_NATSSTORETYPE
+//   for example: TNG_CONNECTOR_NATSSTORETYPE
 const (
 	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
 	ConfigName                           = "tng_config.yaml"
@@ -40,9 +41,12 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// AgentConfig defines TNG Transit Agent configuration
+// Connector defines TNG Connector configuration
 // see GetConfig() for defaults
-type AgentConfig struct {
+type Connector struct {
+	AgentID string `yaml:"agentId"`
+	AppName string `yaml:"appName"`
+	AppType string `yaml:"appType"`
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
@@ -65,53 +69,78 @@ type AgentConfig struct {
 	LogLevel LogLevel `yaml:"logLevel"`
 }
 
-// GWConfig defines Groundwork Connection configuration
-type GWConfig struct {
-	// Host accepts value for combined "host:port"
-	// used as `url.URL{Host}`
-	Host     string
-	Account  string
-	Password string
-	AppName  string `yaml:"appName"`
+// GWConnection defines Groundwork Connection configuration
+type GWConnection struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName string `yaml:"hostName"`
+	UserName string `yaml:"userName"`
+	Password string `yaml:"password"`
 }
 
-// GWConfigs defines a set of configurations
-type GWConfigs []*GWConfig
-
 // Decode implements envconfig.Decoder interface
-// merges incoming value with existing structure
-func (gwConfigs *GWConfigs) Decode(value string) error {
-	var overrides GWConfigs
+// merges incoming value with existed structure
+func (con *GWConnection) Decode(value string) error {
+	var overrides GWConnection
 	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
 		return err
 	}
-	if len(overrides) > len(*gwConfigs) {
-		buf := GWConfigs(make([]*GWConfig, len(overrides)))
+	if overrides.HostName != "" {
+		con.HostName = overrides.HostName
+	}
+	if overrides.UserName != "" {
+		con.UserName = overrides.UserName
+	}
+	if overrides.Password != "" {
+		con.Password = overrides.Password
+	}
+	return nil
+}
+
+// GWConnections defines a set of configurations
+type GWConnections []*GWConnection
+
+// Decode implements envconfig.Decoder interface
+// merges incoming value with existing structure
+func (cons *GWConnections) Decode(value string) error {
+	var overrides GWConnections
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if len(overrides) > len(*cons) {
+		buf := GWConnections(make([]*GWConnection, len(overrides)))
 		copy(buf, overrides)
-		copy(buf, *gwConfigs)
-		*gwConfigs = *(&buf)
+		copy(buf, *cons)
+		*cons = *(&buf)
 	}
 	for i, v := range overrides {
-		if v.Host != "" {
-			(*gwConfigs)[i].Host = v.Host
+		if v.HostName != "" {
+			(*cons)[i].HostName = v.HostName
 		}
-		if v.Account != "" {
-			(*gwConfigs)[i].Account = v.Account
+		if v.UserName != "" {
+			(*cons)[i].UserName = v.UserName
 		}
 		if v.Password != "" {
-			(*gwConfigs)[i].Password = v.Password
-		}
-		if v.AppName != "" {
-			(*gwConfigs)[i].AppName = v.AppName
+			(*cons)[i].Password = v.Password
 		}
 	}
 	return nil
 }
 
+// DSConnection defines DalekServices Connection configuration
+type DSConnection GWConnection
+
+// Decode implements envconfig.Decoder interface
+// merges incoming value with existed structure
+func (con *DSConnection) Decode(value string) error {
+	return (*GWConnection)(con).Decode(value)
+}
+
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig *AgentConfig `yaml:"agentConfig"`
-	GWConfigs   GWConfigs    `yaml:"gwConfigs"`
+	Connector     *Connector    `yaml:"connector"`
+	DSConnection  *DSConnection `yaml:"dsConnection"`
+	GWConnections GWConnections `yaml:"gwConnections"`
 }
 
 // GetConfig implements Singleton pattern
@@ -119,7 +148,7 @@ func GetConfig() *Config {
 	once.Do(func() {
 		// set defaults
 		cfg = &Config{
-			AgentConfig: &AgentConfig{
+			Connector: &Connector{
 				ControllerAddr:   ":8081",
 				LogLevel:         1,
 				NatsAckWait:      30,
@@ -128,6 +157,7 @@ func GetConfig() *Config {
 				NatsStoreType:    "FILE",
 				NatsHost:         ":4222",
 			},
+			DSConnection: &DSConnection{},
 		}
 
 		configPath := os.Getenv(string(ConfigEnv))
@@ -152,7 +182,7 @@ func GetConfig() *Config {
 			log.Warn(err)
 		}
 
-		log.Config(int(cfg.AgentConfig.LogLevel))
+		log.Config(int(cfg.Connector.LogLevel))
 	})
 	return cfg
 }

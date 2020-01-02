@@ -3,16 +3,16 @@ package services
 import (
 	"fmt"
 	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/setup"
 	"github.com/gwos/tng/subseconds"
-	"github.com/gwos/tng/nats"
 	"sync"
 	"time"
 )
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*setup.AgentConfig
+	*setup.Connector
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
 	gwClients   []*clients.GWClient
@@ -31,9 +31,13 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
+		agentConnector := setup.GetConfig().Connector
 		agentService = &AgentService{
-			setup.GetConfig().AgentConfig,
-			&AgentStats{},
+			agentConnector,
+			&AgentStats{
+				AgentID: agentConnector.AgentID,
+				AppType: agentConnector.AppType,
+			},
 			&AgentStatus{
 				Controller: Pending,
 				Nats:       Pending,
@@ -65,12 +69,12 @@ func (service *AgentService) StopController() error {
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
 	err := nats.StartServer(nats.Config{
-		DispatcherAckWait:     time.Second * time.Duration(service.AgentConfig.NatsAckWait),
-		DispatcherMaxInflight: service.AgentConfig.NatsMaxInflight,
-		MaxPubAcksInflight:    service.AgentConfig.NatsMaxInflight,
-		FilestoreDir:          service.AgentConfig.NatsFilestoreDir,
-		StoreType:             service.AgentConfig.NatsStoreType,
-		NatsHost:              service.AgentConfig.NatsHost,
+		DispatcherAckWait:     time.Second * time.Duration(service.Connector.NatsAckWait),
+		DispatcherMaxInflight: service.Connector.NatsMaxInflight,
+		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
+		FilestoreDir:          service.Connector.NatsFilestoreDir,
+		StoreType:             service.Connector.NatsStoreType,
+		NatsHost:              service.Connector.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Lock()
@@ -98,13 +102,16 @@ func (service *AgentService) StopNats() error {
 
 // StartTransport implements AgentServices.StartTransport interface
 func (service *AgentService) StartTransport() error {
-	gwConfigs := setup.GetConfig().GWConfigs
-	if len(gwConfigs) == 0 {
+	gwCons := setup.GetConfig().GWConnections
+	if len(gwCons) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConfigs")
 	}
-	gwClients := make([]*clients.GWClient, len(gwConfigs))
-	for i := range gwConfigs {
-		gwClients[i] = &clients.GWClient{GWConfig: gwConfigs[i]}
+	gwClients := make([]*clients.GWClient, len(gwCons))
+	for i := range gwCons {
+		gwClients[i] = &clients.GWClient{
+			AppName:      service.AppName,
+			GWConnection: gwCons[i],
+		}
 	}
 
 	service.gwClients = gwClients
@@ -112,7 +119,7 @@ func (service *AgentService) StartTransport() error {
 	var dispatcherOptions []nats.DispatcherOption
 	for _, gwClient := range service.gwClients {
 		gwClientCopy := gwClient
-		durableID := fmt.Sprintf("%s", gwClient.Host)
+		durableID := fmt.Sprintf("%s", gwClient.HostName)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			nats.DispatcherOption{

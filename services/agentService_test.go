@@ -7,13 +7,12 @@ import (
 )
 
 func init() {
-	setup.GetConfig().AgentConfig.NatsStoreType = "MEMORY"
-	setup.GetConfig().GWConfigs = []*setup.GWConfig{
+	setup.GetConfig().Connector.NatsStoreType = "MEMORY"
+	setup.GetConfig().GWConnections = []*setup.GWConnection{
 		{
-			Host:     "test",
-			Account:  "test",
+			HostName: "test",
+			UserName: "test",
 			Password: "test",
-			AppName:  "test",
 		},
 	}
 }
