@@ -8,7 +8,6 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/setup"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -24,7 +23,6 @@ import (
 type Controller struct {
 	*AgentService
 	srv                        *http.Server
-	dsClient                   *clients.DSClient
 	listMetricsHandler         GetBytesHandlerType
 	updateGWConnectionsHandler SetBytesHandlerType
 }
@@ -39,7 +37,6 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetAgentService(),
-			nil,
 			nil,
 			nil,
 			nil,
@@ -82,32 +79,18 @@ func (controller *Controller) RemoveUpdateGWConnectionsHandler() {
 }
 
 // UpdateGWConnections implements Controllers.UpdateGWConnections interface
-func (controller *Controller) UpdateGWConnections(input []byte) error {
-
-	// TODO: implement
-	log.Error("#UpdateGWConnections not implemented", string(input))
-
-	restartFlags := struct {
-		nats      bool
-		transport bool
-	}{
-		controller.Status().Nats == Running,
-		controller.Status().Transport == Running,
+func (controller *Controller) UpdateGWConnections(bytes []byte) error {
+	var cons setup.GWConnections
+	if err := json.Unmarshal(bytes, &cons); err != nil {
+		return err
 	}
-
-	if restartFlags.transport {
+	setup.GetConfig().GWConnections = cons
+	if controller.Status().Transport == Running {
 		controller.StopTransport()
+		controller.StartTransport(cons...)
 	}
-	if restartFlags.nats {
-		controller.StopNats()
-		controller.StartNats()
-	}
-	if restartFlags.transport {
-		controller.StartTransport()
-	}
-
 	if controller.updateGWConnectionsHandler != nil {
-		return controller.updateGWConnectionsHandler(input)
+		return controller.updateGWConnectionsHandler(bytes)
 	}
 	return nil
 }
@@ -120,12 +103,7 @@ func (controller *Controller) StartController() error {
 		return fmt.Errorf("StartController: already started")
 	}
 	if len(setup.GetConfig().GWConnections) == 0 {
-		return fmt.Errorf("StartController: %v", "empty GWConfigs")
-	}
-
-	controller.dsClient = &clients.DSClient{
-		AppName:      controller.AppName,
-		DSConnection: setup.GetConfig().DSConnection,
+		return fmt.Errorf("StartController: %v", "empty GWConnections")
 	}
 
 	var addr string
@@ -212,7 +190,7 @@ func (controller *Controller) StopController() error {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} GWConfigs
+// @Success 200 {object} GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [get]
@@ -231,18 +209,18 @@ func (controller *Controller) listGWConnections(c *gin.Context) {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} GWConfigs
+// @Success 200 {object} GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) updateGWConnections(c *gin.Context) {
-	input, err := c.GetRawData()
+	value, err := c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 	}
-	err = controller.UpdateGWConnections(input)
+	err = controller.UpdateGWConnections(value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
