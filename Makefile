@@ -13,47 +13,6 @@ BUILD_TARGET_DIRECTORY = build
 # or "include" (which also is not specific to this package).
 INSTALL_BASE_DIRECTORY = install
 
-# Here, we do not assume that the jansson library is available from an
-# OS-provided package.  That's because such a package is likely to be out
-# of date.  Instead, we download and install an appropriate package here.
-
-JANSSON_VERSION = 2.12
-
-JANSSON_BUILD_BASE_DIRECTORY = ${INSTALL_BASE_DIRECTORY}
-
-JANSSON_INSTALLED_BASE_DIRECTORY = /usr/local/groundwork/common
-
-# Location of the Jansson library include files.
-JANSSON_INCLUDE_DIRECTORY = ${JANSSON_BUILD_BASE_DIRECTORY}/include
-
-# Location of the compiled Jansson library, for build purposes.
-JANSSON_BUILD_LIB_DIRECTORY = ${JANSSON_BUILD_BASE_DIRECTORY}/lib
-
-# Location of the compiled Jansson library, for production linking purposes.
-# It will be up to external procedures to place the compiled library in this location.
-JANSSON_INSTALLED_LIB_DIRECTORY = ${JANSSON_INSTALLED_BASE_DIRECTORY}/lib
-
-JANSSON_LIBRARY = ${JANSSON_BUILD_LIB_DIRECTORY}/libjansson.so
-
-KERNEL_NAME := $(shell uname -s)
-ifeq (${KERNEL_NAME},Linux)
-    # Here we link at build time to our local copy of the Jansson library,
-    # since our build machine won't have a copy of that library installed
-    # in the location where that library will reside in production.  But
-    # we set things up so the LIBTRANSITJSON_LIBRARY (libtransitjson.so)
-    # to which the JANSSON_LINK_FLAGS get applied will refer at run time
-    # to the production copy of the Jansson library.
-    JANSSON_LINK_FLAGS = -Wl,-L${JANSSON_BUILD_LIB_DIRECTORY} -ljansson -Wl,-R${JANSSON_INSTALLED_LIB_DIRECTORY}
-endif
-ifeq (${KERNEL_NAME},Darwin)
-    # The linker -rpath option (-Wl,-R... as it may appear on the compiler commmand line
-    # on other platforms) is apparently built into dynamic libraries on Darwin (MacOS),
-    # so we can't use (but don't need) -Wl,-R... on this platform.  But that also means
-    # our build is going to have to install the library in the final installed location
-    # before we can link to it at build time -- and that part is not yet covered here.
-    JANSSON_LINK_FLAGS = -Wl,-L${JANSSON_INSTALLED_LIB_DIRECTORY} -ljansson
-endif
-
 CONVERT_GO_TO_C_BUILD_OBJECTS = \
 	gotocjson/_c_code/convert_go_to_c.c	\
 	gotocjson/_c_code/convert_go_to_c.h
@@ -109,11 +68,11 @@ INSTALL_DYNAMIC_LIBRARIES = $(addprefix ${INSTALL_BASE_DIRECTORY}/lib/,$(notdir 
 CFLAGS = -std=c11 -g -D_REENTRANT -D_GNU_SOURCE -fPIC -Wall
 CC = gcc ${CFLAGS}
 
-all	: ${JANSSON_LIBRARY} ${LIBTRANSIT_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
+all	: ${LIBTRANSIT_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
 
 .PHONY	: install
 
-install	: ${JANSSON_LIBRARY} ${INSTALL_HEADER_FILES} ${INSTALL_DYNAMIC_LIBRARIES} | ${INSTALL_DIRECTORIES}
+install	: ${INSTALL_HEADER_FILES} ${INSTALL_DYNAMIC_LIBRARIES} | ${INSTALL_DIRECTORIES}
 
 # called with arguments:  install directory, build-file path
 define INSTALLED_FILE_template =
@@ -141,23 +100,6 @@ get	:
 	go get github.com/nats-io/go-nats-streaming
 	go get github.com/nats-io/nats-streaming-server/server
 
-# For no good reason, the upstream code does not follow the universal
-# standard for naming the release tarball after the top-level directory
-# that contains it.  So we must play a game here to clean that up.
-jansson-${JANSSON_VERSION}.tar.gz	:
-	wget https://github.com/akheron/jansson/archive/v${JANSSON_VERSION}.tar.gz
-	mv v${JANSSON_VERSION}.tar.gz jansson-${JANSSON_VERSION}.tar.gz
-
-jansson-${JANSSON_VERSION}/configure	: jansson-${JANSSON_VERSION}.tar.gz
-	rm -rf jansson-${JANSSON_VERSION}
-	tar xfz jansson-${JANSSON_VERSION}.tar.gz
-	cd jansson-${JANSSON_VERSION}; autoreconf -i
-
-${JANSSON_LIBRARY}	: jansson-${JANSSON_VERSION}/configure
-	cd jansson-${JANSSON_VERSION}; ./configure --prefix=${PWD}/${JANSSON_BUILD_BASE_DIRECTORY}
-	cd jansson-${JANSSON_VERSION}; make
-	cd jansson-${JANSSON_VERSION}; make install
-
 ${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_SOURCE}
 	cd ${LIBTRANSIT_DIRECTORY}; make
 
@@ -183,19 +125,19 @@ ${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARG
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} transit/transit.go
 
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
-	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@ -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@
 
 ${BUILD_TARGET_DIRECTORY}/setup.o	: ${CONFIG_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/setup.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/setup.c -o $@ -Igotocjson/_c_code
 
 ${BUILD_TARGET_DIRECTORY}/subseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/subseconds.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/subseconds.c -o $@ -Igotocjson/_c_code
 
 ${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code
 
-${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LIBRARY}
-	${LINK.c} -shared -o $@ -fPIC ${LIBTRANSITJSON_OBJECTS} ${JANSSON_LINK_FLAGS}
+${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS}
+	${LINK.c} -shared -o $@ -fPIC ${LIBTRANSITJSON_OBJECTS} -ljansson
 
 .PHONY	: clean
 
@@ -206,12 +148,11 @@ clean	:
 .PHONY	: realclean
 
 realclean	:
-	rm -rf jansson-${JANSSON_VERSION}
 	rm -rf bin pkg src ../src
 	cd gotocjson; make realclean
 
 .PHONY	: distclean
 
 distclean	: realclean
-	rm -rf ${JANSSON_BUILD_BASE_DIRECTORY} v${JANSSON_VERSION}.tar.gz jansson-${JANSSON_VERSION}.tar.gz ${INSTALL_BASE_DIRECTORY}
+	rm -rf ${INSTALL_BASE_DIRECTORY}
 	cd gotocjson; make distclean
