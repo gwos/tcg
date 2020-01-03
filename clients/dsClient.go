@@ -13,7 +13,7 @@ import (
 // DSOperations defines DalekServices operations interface
 type DSOperations interface {
 	Connect() error
-	GetGWConnections(request []byte) (setup.GWConnections, error)
+	GetGWConnections() (setup.GWConnections, error)
 	ValidateToken(appName, apiToken string) error
 }
 
@@ -107,7 +107,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 }
 
 // GetGWConnections implements GWOperations.GetGWConnections.
-func (client *DSClient) GetGWConnections(request []byte) (setup.GWConnections, error) {
+func (client *DSClient) GetGWConnections() (setup.GWConnections, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
