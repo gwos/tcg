@@ -102,9 +102,6 @@ func (controller *Controller) StartController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("StartController: already started")
 	}
-	if len(setup.GetConfig().GWConnections) == 0 {
-		return fmt.Errorf("StartController: %v", "empty GWConnections")
-	}
 
 	var addr string
 	if strings.HasPrefix(controller.Connector.ControllerAddr, ":") {
@@ -136,14 +133,14 @@ func (controller *Controller) StartController() error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Info("controller: start listen TLS", addr)
+			log.Info("Controller: start listen TLS", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("controller: start error:", err)
+				log.Error("Controller: start error:", err)
 			}
 		} else {
-			log.Info("controller: start listen", addr)
+			log.Info("Controller: start listen", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("controller: start error:", err)
+				log.Error("Controller: start error:", err)
 			}
 		}
 
@@ -178,9 +175,9 @@ func (controller *Controller) StopController() error {
 	// catching ctx.Done() timeout
 	select {
 	case <-ctx.Done():
-		log.Warn("controller: shutdown: timeout")
+		log.Warn("Controller: shutdown: timeout")
 	}
-	log.Warn("controller: exiting")
+	log.Warn("Controller: exiting")
 	controller.srv = nil
 	return nil
 }
