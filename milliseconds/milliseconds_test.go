@@ -1,4 +1,4 @@
-package subseconds
+package milliseconds
 
 import (
 	"reflect"

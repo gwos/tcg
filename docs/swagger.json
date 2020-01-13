@@ -464,6 +464,9 @@
                 "$ref": "#/definitions/config.GWConnection"
             }
         },
+        "milliseconds.MillisecondTimestamp": {
+            "type": "object"
+        },
         "services.AgentStats": {
             "type": "object",
             "properties": {
@@ -487,11 +490,11 @@
                 },
                 "lastInventoryRun": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
                 "lastMetricsRun": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
                 "messagesSent": {
                     "type": "integer"
@@ -501,7 +504,7 @@
                 },
                 "upSince": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 }
             }
         },
@@ -518,9 +521,6 @@
                     "type": "string"
                 }
             }
-        },
-        "subseconds.MillisecondTimestamp": {
-            "type": "object"
         }
     }
 }

@@ -16,6 +16,8 @@ definitions:
     items:
       $ref: '#/definitions/config.GWConnection'
     type: array
+  milliseconds.MillisecondTimestamp:
+    type: object
   services.AgentStats:
     properties:
       agentID:
@@ -31,17 +33,17 @@ definitions:
       lastError:
         type: string
       lastInventoryRun:
-        $ref: '#/definitions/subseconds.MillisecondTimestamp'
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
         type: object
       lastMetricsRun:
-        $ref: '#/definitions/subseconds.MillisecondTimestamp'
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
         type: object
       messagesSent:
         type: integer
       metricsSent:
         type: integer
       upSince:
-        $ref: '#/definitions/subseconds.MillisecondTimestamp'
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
         type: object
     type: object
   services.AgentStatus:
@@ -52,8 +54,6 @@ definitions:
         type: string
       transport:
         type: string
-    type: object
-  subseconds.MillisecondTimestamp:
     type: object
 host: localhost:8081
 info:

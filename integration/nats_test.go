@@ -8,7 +8,7 @@ import (
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
 	. "github.com/gwos/tng/config"
-	"github.com/gwos/tng/subseconds"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -217,7 +217,7 @@ func context() transit.TracerContext {
 		AppType:    TestAppType,
 		AgentID:    TestAgentID,
 		TraceToken: TestTraceToken,
-		TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
+		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 }
 
@@ -226,8 +226,8 @@ func resource() transit.MonitoredResource {
 		Name:          TestHostName,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Services:      []transit.MonitoredService{},
 	}
 }
@@ -237,15 +237,15 @@ func service(i int) transit.MonitoredService {
 		Name:          fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
 		Status:        transit.ServiceOk,
 		Owner:         TestHostName,
-		LastCheckTime: subseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: subseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,
