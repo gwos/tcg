@@ -2,7 +2,7 @@ package clients
 
 import (
 	"fmt"
-	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/config"
 	"gopkg.in/yaml.v3"
 	"net/http"
 	"net/url"
@@ -14,7 +14,7 @@ import (
 // DSOperations defines DalekServices operations interface
 type DSOperations interface {
 	Connect() error
-	GetGWConnections(agentID string) (setup.GWConnections, error)
+	GetGWConnections(agentID string) (config.GWConnections, error)
 	ValidateToken(appName, apiToken string) error
 }
 
@@ -28,7 +28,7 @@ const (
 // DSClient implements DSOperations interface
 type DSClient struct {
 	AppName string
-	*setup.DSConnection
+	*config.DSConnection
 	sync.Mutex
 	token string
 }
@@ -108,7 +108,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 }
 
 // GetGWConnections implements GWOperations.GetGWConnections.
-func (client *DSClient) GetGWConnections(agentID string) (setup.GWConnections, error) {
+func (client *DSClient) GetGWConnections(agentID string) (config.GWConnections, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -137,7 +137,7 @@ func (client *DSClient) GetGWConnections(agentID string) (setup.GWConnections, e
 		return nil, fmt.Errorf(string(byteResponse))
 	}
 
-	var res setup.GWConnections
+	var res config.GWConnections
 	if err := yaml.Unmarshal(byteResponse, &res); err != nil {
 		return nil, err
 	}

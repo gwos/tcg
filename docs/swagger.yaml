@@ -1,5 +1,21 @@
 basePath: /api/v1
 definitions:
+  config.GWConnection:
+    properties:
+      hostName:
+        description: |-
+          HostName accepts value for combined "host:port"
+          used as `url.URL{HostName}`
+        type: string
+      password:
+        type: string
+      userName:
+        type: string
+    type: object
+  config.GWConnections:
+    items:
+      $ref: '#/definitions/config.GWConnection'
+    type: array
   services.AgentStats:
     properties:
       agentID:
@@ -37,22 +53,6 @@ definitions:
       transport:
         type: string
     type: object
-  setup.GWConnection:
-    properties:
-      hostName:
-        description: |-
-          HostName accepts value for combined "host:port"
-          used as `url.URL{HostName}`
-        type: string
-      password:
-        type: string
-      userName:
-        type: string
-    type: object
-  setup.GWConnections:
-    items:
-      $ref: '#/definitions/setup.GWConnection'
-    type: array
   subseconds.MillisecondTimestamp:
     type: object
 host: localhost:8081
@@ -85,7 +85,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/setup.GWConnections'
+            $ref: '#/definitions/config.GWConnections'
         "401":
           description: Unauthorized
           schema:
@@ -118,7 +118,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/setup.GWConnections'
+            $ref: '#/definitions/config.GWConnections'
         "401":
           description: Unauthorized
           schema:

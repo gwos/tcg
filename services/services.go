@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/subseconds"
 	"sync"
 	"time"
@@ -54,7 +54,7 @@ type AgentServices interface {
 	StopController() error
 	StartNats() error
 	StopNats() error
-	StartTransport(...*setup.GWConnection) error
+	StartTransport(...*config.GWConnection) error
 	StopTransport() error
 	Stats() *AgentStats
 	Status() *AgentStatus
