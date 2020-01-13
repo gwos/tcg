@@ -7,20 +7,21 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 )
 
 // DSOperations defines DalekServices operations interface
 type DSOperations interface {
 	Connect() error
-	GetGWConnections() (setup.GWConnections, error)
+	GetGWConnections(agentID string) (setup.GWConnections, error)
 	ValidateToken(appName, apiToken string) error
 }
 
 // Define entrypoints for DSOperations
 const (
 	DSEntrypointConnect       = "/tng/login"
-	DSEntrypointGWConnections = "/tng/connection"
+	DSEntrypointGWConnections = "/tng/gw-connections/:agentID"
 	DSEntrypointValidateToken = "/tng/validate-token"
 )
 
@@ -107,7 +108,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 }
 
 // GetGWConnections implements GWOperations.GetGWConnections.
-func (client *DSClient) GetGWConnections() (setup.GWConnections, error) {
+func (client *DSClient) GetGWConnections(agentID string) (setup.GWConnections, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -118,7 +119,7 @@ func (client *DSClient) GetGWConnections() (setup.GWConnections, error) {
 	entrypoint := url.URL{
 		Scheme: "http",
 		Host:   client.DSConnection.HostName,
-		Path:   DSEntrypointGWConnections,
+		Path:   strings.ReplaceAll(DSEntrypointGWConnections, ":agentID", agentID),
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
 	if statusCode == 401 {
