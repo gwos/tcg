@@ -1,7 +1,7 @@
 package milliseconds
 
 import (
-	"fmt"
+	"bytes"
 	"strconv"
 	"time"
 )
@@ -76,7 +76,7 @@ type MillisecondTimestamp struct {
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
-	strInput := string(input)
+	strInput := string(bytes.Trim(input, "\""))
 
 	i, err := strconv.ParseInt(strInput, 10, 64)
 	if err != nil {
@@ -90,5 +90,10 @@ func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 
 // MarshalJSON implements json.Marshaler.
 func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
+	i := t.UnixNano()/int64(time.Millisecond)
+	buf := make([]byte, 0, 16)
+	buf = append(buf, '"')
+	buf = strconv.AppendInt(buf, i, 10)
+	buf = append(buf, '"')
+	return buf, nil
 }

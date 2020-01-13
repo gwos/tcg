@@ -1,7 +1,11 @@
 package milliseconds
 
 import (
+	"encoding/json"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -96,5 +100,56 @@ func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
 				t.Errorf("MillisecondTimestamp.MarshalJSON() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestStructMarshalJSON(t *testing.T) {
+	value := struct {
+		NamedField MillisecondTimestamp
+	}{
+		MillisecondTimestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+	}
+	output, err := json.Marshal(value)
+
+	assert.NoError(t, err)
+	assert.Equal(t, "{\"NamedField\":\"1609372800000\"}", string(output))
+}
+
+func TestStructUnmarshalJSON(t *testing.T) {
+	input := []byte("{\"NamedField\":\"1609372800000\"}")
+	value := struct {
+		NamedField MillisecondTimestamp
+	}{}
+	expected := struct {
+		NamedField MillisecondTimestamp
+	}{
+		MillisecondTimestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+	}
+
+	err := json.Unmarshal(input, &value)
+	assert.NoError(t, err)
+	assert.Equal(t, expected, value)
+}
+
+// BenchmarkMarshallerSprintf benchmarks Sprintf based marshaller
+func BenchmarkMarshallerSprintf(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		t1 := time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second)
+		i1 := t1.UnixNano() / int64(time.Millisecond)
+		buf := []byte(fmt.Sprintf("\"%d\"", i1))
+		assert.NotEmpty(b, buf)
+	}
+}
+
+// BenchmarkMarshallerAppend benchmarks slice append based marshaller
+func BenchmarkMarshallerAppend(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		t1 := time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second)
+		i1 := t1.UnixNano() / int64(time.Millisecond)
+		buf := make([]byte, 0, 16)
+		buf = append(buf, '"')
+		buf = strconv.AppendInt(buf, i1, 10)
+		buf = append(buf, '"')
+		assert.NotEmpty(b, buf)
 	}
 }
