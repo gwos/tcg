@@ -15,6 +15,7 @@ type AgentService struct {
 	*setup.Connector
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
+	dsClient    *clients.DSClient
 	gwClients   []*clients.GWClient
 	statsChanel chan statsCounter
 }
@@ -42,6 +43,10 @@ func GetAgentService() *AgentService {
 				Controller: Pending,
 				Nats:       Pending,
 				Transport:  Pending,
+			},
+			&clients.DSClient{
+				AppName:      agentConnector.AppName,
+				DSConnection: setup.GetConfig().DSConnection,
 			},
 			nil,
 			make(chan statsCounter),
@@ -101,16 +106,24 @@ func (service *AgentService) StopNats() error {
 }
 
 // StartTransport implements AgentServices.StartTransport interface
-func (service *AgentService) StartTransport() error {
-	gwCons := setup.GetConfig().GWConnections
-	if len(gwCons) == 0 {
-		return fmt.Errorf("StartTransport: %v", "empty GWConfigs")
+func (service *AgentService) StartTransport(cons ...*setup.GWConnection) error {
+	var err error
+	if len(cons) == 0 {
+		cons, err = service.dsClient.GetGWConnections(service.AgentID)
+		if err == nil {
+			setup.GetConfig().GWConnections = cons
+		} else {
+			cons = setup.GetConfig().GWConnections
+		}
 	}
-	gwClients := make([]*clients.GWClient, len(gwCons))
-	for i := range gwCons {
+	if len(cons) == 0 {
+		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
+	}
+	gwClients := make([]*clients.GWClient, len(cons))
+	for i := range cons {
 		gwClients[i] = &clients.GWClient{
 			AppName:      service.AppName,
-			GWConnection: gwCons[i],
+			GWConnection: cons[i],
 		}
 	}
 
@@ -173,7 +186,7 @@ func (service *AgentService) StartTransport() error {
 		)
 	}
 
-	err := nats.StartDispatcher(dispatcherOptions)
+	err = nats.StartDispatcher(dispatcherOptions);
 	if err == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running

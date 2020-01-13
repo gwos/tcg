@@ -15,6 +15,7 @@ package main
 import "C"
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/services"
 	"os"
 	"unsafe"
@@ -188,8 +189,10 @@ func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen 
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
-	if len(bytes) > int(bufLen) {
-		bufStr(errBuf, errBufLen, "Buffer too small")
+	cStrLen := len(bytes) + 1
+	if cStrLen > int(bufLen) {
+		errMsg := fmt.Sprintf("Buffer too small, need at least %d bytes", cStrLen)
+		bufStr(errBuf, errBufLen, errMsg)
 		return false
 	}
 	bufStr(buf, bufLen, string(bytes))
