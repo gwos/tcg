@@ -109,7 +109,7 @@ func (service *AgentService) StopNats() error {
 func (service *AgentService) StartTransport(cons ...*setup.GWConnection) error {
 	var err error
 	if len(cons) == 0 {
-		cons, err = service.dsClient.GetGWConnections()
+		cons, err = service.dsClient.GetGWConnections(service.AgentID)
 		if err == nil {
 			setup.GetConfig().GWConnections = cons
 		} else {
