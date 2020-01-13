@@ -5,7 +5,7 @@ import (
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/subseconds"
+	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
 )
@@ -231,9 +231,9 @@ func (service *AgentService) listenChanel() {
 			service.agentStats.MessagesSent++
 			switch res.subject {
 			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = subseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = subseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 		}
 	}
