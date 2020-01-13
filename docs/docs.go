@@ -58,7 +58,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/setup.GWConnections"
+                            "$ref": "#/definitions/config.GWConnections"
                         }
                     },
                     "401": {
@@ -106,7 +106,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/setup.GWConnections"
+                            "$ref": "#/definitions/config.GWConnections"
                         }
                     },
                     "401": {
@@ -460,6 +460,27 @@ var doc = `{
         }
     },
     "definitions": {
+        "config.GWConnection": {
+            "type": "object",
+            "properties": {
+                "hostName": {
+                    "description": "HostName accepts value for combined \"host:port\"\nused as ` + "`" + `url.URL{HostName}` + "`" + `",
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "userName": {
+                    "type": "string"
+                }
+            }
+        },
+        "config.GWConnections": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/config.GWConnection"
+            }
+        },
         "services.AgentStats": {
             "type": "object",
             "properties": {
@@ -513,27 +534,6 @@ var doc = `{
                 "transport": {
                     "type": "string"
                 }
-            }
-        },
-        "setup.GWConnection": {
-            "type": "object",
-            "properties": {
-                "hostName": {
-                    "description": "HostName accepts value for combined \"host:port\"\nused as ` + "`" + `url.URL{HostName}` + "`" + `",
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "userName": {
-                    "type": "string"
-                }
-            }
-        },
-        "setup.GWConnections": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/setup.GWConnection"
             }
         },
         "subseconds.MillisecondTimestamp": {

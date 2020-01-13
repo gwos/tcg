@@ -6,7 +6,7 @@ import (
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
-	. "github.com/gwos/tng/setup"
+	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/subseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"

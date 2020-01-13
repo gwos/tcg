@@ -1,4 +1,4 @@
-package setup
+package config
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ gwConnections:
     password: ""
 `)
 
-	tmpfile, err := ioutil.TempFile("", "setup")
+	tmpfile, err := ioutil.TempFile("", "config")
 	defer os.Remove(tmpfile.Name())
 	assert.NoError(t, err)
 	_, err = tmpfile.Write(configYAML)
