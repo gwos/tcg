@@ -187,7 +187,7 @@ func (controller *Controller) StopController() error {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} GWConnections
+// @Success 200 {object} setup.GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [get]
@@ -206,7 +206,7 @@ func (controller *Controller) listGWConnections(c *gin.Context) {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} GWConnections
+// @Success 200 {object} setup.GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [post]
