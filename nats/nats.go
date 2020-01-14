@@ -2,6 +2,7 @@ package nats
 
 import (
 	"fmt"
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/log"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
@@ -122,13 +123,17 @@ func StartDispatcher(options []DispatcherOption) error {
 		_, err = connDispatcher.Subscribe(
 			o.Subject,
 			func(msg *stan.Msg) {
-				if err := dispatcherFn(msg.Data); err != nil {
-					log.Info("Not delivered: " + msg.Subject + ", " + durableId)
-					log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
-				} else {
-					_ = msg.Ack()
-					log.Info("Delivered: " + msg.Subject + ", " + durableId)
-					log.Debug("Message:", msg)
+				_, isPresent := cache.NatsCache.Get(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10))
+				if !isPresent {
+					if err := dispatcherFn(msg.Data); err != nil {
+						log.Info("Not delivered: " + msg.Subject + ", " + durableId)
+						log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
+					} else {
+						_ = msg.Ack()
+						_ = cache.NatsCache.Add(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10), 0, 10*time.Minute)
+						log.Info("Delivered: " + msg.Subject + ", " + durableId)
+						log.Debug("Message:", msg)
+					}
 				}
 			},
 			stan.SetManualAckMode(),
