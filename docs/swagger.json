@@ -9,7 +9,105 @@
     "host": "localhost:8081",
     "basePath": "/api/v1",
     "paths": {
-        "/listMetrics": {
+        "/gw-connections": {
+            "get": {
+                "description": "The following API endpoint can be used to get list of GroundworkConnections from the server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/setup.GWConnections"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The following API endpoint can be used to update list of GroundworkConnections from the server.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Metrics"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/setup.GWConnections"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics": {
             "get": {
                 "description": "The following API endpoint can be used to get list of metrics from the server.",
                 "consumes": [
@@ -398,6 +496,27 @@
                 "transport": {
                     "type": "string"
                 }
+            }
+        },
+        "setup.GWConnection": {
+            "type": "object",
+            "properties": {
+                "hostName": {
+                    "description": "HostName accepts value for combined \"host:port\"\nused as `url.URL{HostName}`",
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "userName": {
+                    "type": "string"
+                }
+            }
+        },
+        "setup.GWConnections": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/setup.GWConnection"
             }
         },
         "subseconds.MillisecondTimestamp": {

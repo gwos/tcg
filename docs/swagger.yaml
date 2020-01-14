@@ -37,6 +37,22 @@ definitions:
       transport:
         type: string
     type: object
+  setup.GWConnection:
+    properties:
+      hostName:
+        description: |-
+          HostName accepts value for combined "host:port"
+          used as `url.URL{HostName}`
+        type: string
+      password:
+        type: string
+      userName:
+        type: string
+    type: object
+  setup.GWConnections:
+    items:
+      $ref: '#/definitions/setup.GWConnection'
+    type: array
   subseconds.MillisecondTimestamp:
     type: object
 host: localhost:8081
@@ -46,7 +62,74 @@ info:
   title: TNG API Documentation
   version: "1.0"
 paths:
-  /listMetrics:
+  /gw-connections:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get list of GroundworkConnections
+        from the server.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/setup.GWConnections'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - Metrics
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to update list of GroundworkConnections
+        from the server.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/setup.GWConnections'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - Metrics
+  /metrics:
     get:
       consumes:
       - application/json
