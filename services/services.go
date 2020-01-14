@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/gwos/tng/setup"
-	"github.com/gwos/tng/subseconds"
+	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
 )
@@ -31,11 +31,11 @@ type AgentStats struct {
 	BytesSent              int
 	MetricsSent            int
 	MessagesSent           int
-	LastInventoryRun       subseconds.MillisecondTimestamp
-	LastMetricsRun         subseconds.MillisecondTimestamp
+	LastInventoryRun       milliseconds.MillisecondTimestamp
+	LastMetricsRun         milliseconds.MillisecondTimestamp
 	ExecutionTimeInventory time.Duration
 	ExecutionTimeMetrics   time.Duration
-	UpSince                subseconds.MillisecondTimestamp
+	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
 	sync.Mutex
 }
@@ -54,7 +54,7 @@ type AgentServices interface {
 	StopController() error
 	StartNats() error
 	StopNats() error
-	StartTransport(...*setup.GWConnection) error
+	StartTransport(...*config.GWConnection) error
 	StopTransport() error
 	Stats() *AgentStats
 	Status() *AgentStatus

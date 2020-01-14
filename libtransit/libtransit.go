@@ -50,7 +50,7 @@ func bufStr(buf *C.char, bufLen C.size_t, str string) {
 // a manner that will be understood by the Go runtime.  We need it because the standard
 // C-language putenv() and setenv() routines do not alter the Go environment as intended,
 // due to issues with when os.Getenv() or related routines first get called.  To affect
-// the initial setup for the services managed by libtransit, calls to GoSetenv() must be
+// the initial config for the services managed by libtransit, calls to GoSetenv() must be
 // made *before* any call to one of the routines that might probe for or attempt to start,
 // stop, or otherwise interact with one of the services.
 //export GoSetenv

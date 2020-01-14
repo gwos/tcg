@@ -7,7 +7,7 @@ import (
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/serverconnector"
 	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/subseconds"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"os/exec"
 	"time"
@@ -71,7 +71,7 @@ func main() {
 		if err != nil {
 			log.Error(err.Error())
 		}
-		serverconnector.LastCheck = subseconds.MillisecondTimestamp{Time: time.Now()}
+		serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		time.Sleep(20 * time.Second)
 	}
 }
@@ -93,7 +93,7 @@ func sendInventoryResources(resource transit.InventoryResource) error {
 			AppType:    "VEMA",
 			AgentID:    "3939333393342",
 			TraceToken: "token-99e93",
-			TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Resources: []transit.InventoryResource{resource},
 		Groups:    []transit.ResourceGroup{
@@ -117,7 +117,7 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 			AppType:    "VEMA",				// TODO: need an appType for ServerConnector, Elastic
 			AgentID:    "3939333393342",
 			TraceToken: "token-99e93",
-			TimeStamp:  subseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Resources: []transit.MonitoredResource{resource},
 	}
@@ -126,20 +126,20 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 		MetricName: "timeSample",
 		SampleType: transit.Value,
 		Interval: &transit.TimeInterval{
-			EndTime:   subseconds.MillisecondTimestamp{Time: time.Now()},
-			StartTime: subseconds.MillisecondTimestamp{Time: time.Now()},
+			EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+			StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 		Value: &transit.TypedValue{
 			ValueType:    transit.TimeType,
-			TimeValue:    subseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeValue:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 	}
 	timeSampleService := transit.MonitoredService{
 		Name:             "timeSample",
 		Type:             transit.Service,
 		Status:           transit.ServiceOk,
-		LastCheckTime:    subseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    subseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		LastPlugInOutput: "test",
 		Owner:            request.Resources[0].Name, // set host
 		Metrics:          []transit.TimeSeries{timeSample},

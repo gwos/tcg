@@ -3,7 +3,7 @@ package clients
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/transit"
 	"net/http"
 	"net/url"
@@ -32,7 +32,7 @@ const (
 // GWClient implements GWOperations interface
 type GWClient struct {
 	AppName string
-	*setup.GWConnection
+	*config.GWConnection
 	sync.Mutex
 	token string
 }

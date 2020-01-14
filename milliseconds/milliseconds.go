@@ -1,20 +1,20 @@
-package subseconds
+package milliseconds
 
 import (
-	"fmt"
+	"bytes"
 	"strconv"
 	"time"
 )
 
 // MillisecondTimestamp refers to the JSON representation of timestamps, for
 // time-data interchange, as a single integer representing a modified version of
-// whole subseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
+// whole milliseconds since the UNIX epoch (00:00:00 UTC on January 1, 1970).
 // Individual languages (Go, C, Java) will typically implement this structure
 // using a more-complex construction in their respective contexts, containing even
 // finer granularity for local data storage, typically at the nanosecond level.
 //
 // The "modified version" comment reflects the following simplification.
-// Despite the already fine-grained representation as subseconds, this data
+// Despite the already fine-grained representation as milliseconds, this data
 // value takes no account of leap seconds; for all of our calculations, we
 // simply pretend they don't exist.  Individual feeders will typically map a
 // 00:00:60 value for a leap second, obtained as a string so the presence of the
@@ -26,7 +26,7 @@ import (
 // sub-second time differences might run into surprises, since the following
 // timestamps could appear in temporal order:
 //
-//         actual time   relative reported time in subseconds
+//         actual time   relative reported time in milliseconds
 //     A:  00:00:59.000  59000
 //     B:  00:00:60.000  60000
 //     C:  00:00:60.700  60700
@@ -64,7 +64,7 @@ import (
 //
 // Finally, note that the Go zero-value of the internal implementation object
 // we use in that language does not have a reasonable value when interpreted
-// as subseconds since the UNIX epoch.  For that reason, the general rule is
+// as milliseconds since the UNIX epoch.  For that reason, the general rule is
 // that the JSON representation of a zero-value for any field of this type, no
 // matter what the originating language, will be to simply omit it from the
 // JSON string.  That fact must be taken into account when marshalling and
@@ -76,7 +76,7 @@ type MillisecondTimestamp struct {
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
-	strInput := string(input)
+	strInput := string(bytes.Trim(input, "\""))
 
 	i, err := strconv.ParseInt(strInput, 10, 64)
 	if err != nil {
@@ -90,5 +90,10 @@ func (t *MillisecondTimestamp) UnmarshalJSON(input []byte) error {
 
 // MarshalJSON implements json.Marshaler.
 func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
-	return []byte(fmt.Sprintf("%d", t.UnixNano()/int64(time.Millisecond))), nil
+	i := t.UnixNano()/int64(time.Millisecond)
+	buf := make([]byte, 0, 16)
+	buf = append(buf, '"')
+	buf = strconv.AppendInt(buf, i, 10)
+	buf = append(buf, '"')
+	return buf, nil
 }

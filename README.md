@@ -180,7 +180,7 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
     $ go test ./integration/
 
-    $ go test -v ./setup
+    $ go test -v ./config
 
     $ ./docker_tests.sh milliseconds
 
@@ -205,4 +205,4 @@ The path to config file and any config option can be overridden with env vars:
     $ export TNG_CONFIG=/path/to/tng_config.yaml
     $ export TNG_CONNECTOR_NATSSTORETYPE=MEMORY
 
-For more info see package `setup` and tests.
+For more info see package `config` and tests.

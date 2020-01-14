@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/config"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
@@ -47,7 +47,7 @@ func GetController() *Controller {
 
 // ListGWConnections implements Controllers.ListGWConnections interface
 func (controller *Controller) ListGWConnections() ([]byte, error) {
-	return json.Marshal(setup.GetConfig().GWConnections)
+	return json.Marshal(config.GetConfig().GWConnections)
 }
 
 // ListMetrics implements Controllers.ListMetrics interface
@@ -80,11 +80,11 @@ func (controller *Controller) RemoveUpdateGWConnectionsHandler() {
 
 // UpdateGWConnections implements Controllers.UpdateGWConnections interface
 func (controller *Controller) UpdateGWConnections(bytes []byte) error {
-	var cons setup.GWConnections
+	var cons config.GWConnections
 	if err := json.Unmarshal(bytes, &cons); err != nil {
 		return err
 	}
-	setup.GetConfig().GWConnections = cons
+	config.GetConfig().GWConnections = cons
 	if controller.Status().Transport == Running {
 		controller.StopTransport()
 		controller.StartTransport(cons...)
@@ -187,7 +187,7 @@ func (controller *Controller) StopController() error {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} setup.GWConnections
+// @Success 200 {object} config.GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [get]
@@ -206,7 +206,7 @@ func (controller *Controller) listGWConnections(c *gin.Context) {
 // @Tags Metrics
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} setup.GWConnections
+// @Success 200 {object} config.GWConnections
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /gw-connections [post]
