@@ -24,7 +24,7 @@ import (
 const (
 	TestMessagesCount                  = 3
 	PerformanceServicesCount           = 1
-	PerformanceResourcesCount          = 800
+	PerformanceResourcesCount          = 1000
 	TestAppType                        = "VEMA"
 	TestAgentID                        = "3939333393342"
 	TestTraceToken                     = "token-99e93"
@@ -155,7 +155,7 @@ func TestNatsPerformance(t *testing.T) {
 		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(jsonBytes))
 	}
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent != PerformanceResourcesCount+1 {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
