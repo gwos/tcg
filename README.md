@@ -1,4 +1,8 @@
-# tng
+<p align="center">
+  <a href="http://www.gwos.com/" target="blank"><img src="https://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
+</p>
+
+# Tng
 
 The New Groundwork Transit connectors (feeders). TNG contains two sub-systems/packages:
 
