@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/setup"
+	"github.com/gwos/tng/config"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
@@ -9,9 +9,9 @@ import (
 )
 
 func init() {
-	setup.GetConfig().Connector.AppName = "test"
-	setup.GetConfig().Connector.NatsStoreType = "MEMORY"
-	setup.GetConfig().GWConnections = []*setup.GWConnection{
+	config.GetConfig().Connector.AppName = "test"
+	config.GetConfig().Connector.NatsStoreType = "MEMORY"
+	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
 			HostName: "test",
 			UserName: "test",

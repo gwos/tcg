@@ -18,12 +18,12 @@ CONVERT_GO_TO_C_BUILD_OBJECTS = \
 	gotocjson/_c_code/convert_go_to_c.h
 
 CONFIG_BUILD_OBJECTS = \
-	${BUILD_TARGET_DIRECTORY}/setup.c	\
-	${BUILD_TARGET_DIRECTORY}/setup.h
+	${BUILD_TARGET_DIRECTORY}/config.c	\
+	${BUILD_TARGET_DIRECTORY}/config.h
 
 MILLISECONDS_BUILD_OBJECTS = \
-	${BUILD_TARGET_DIRECTORY}/subseconds.c	\
-	${BUILD_TARGET_DIRECTORY}/subseconds.h
+	${BUILD_TARGET_DIRECTORY}/milliseconds.c	\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.h
 
 TRANSIT_BUILD_OBJECTS =	\
 	${BUILD_TARGET_DIRECTORY}/transit.c		\
@@ -31,8 +31,8 @@ TRANSIT_BUILD_OBJECTS =	\
 
 LIBTRANSITJSON_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	\
-	${BUILD_TARGET_DIRECTORY}/setup.o		\
-	${BUILD_TARGET_DIRECTORY}/subseconds.o	\
+	${BUILD_TARGET_DIRECTORY}/config.o		\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.o	\
 	${BUILD_TARGET_DIRECTORY}/transit.o
 
 LIBTRANSIT_DIRECTORY = libtransit
@@ -48,8 +48,8 @@ LIBTRANSITJSON_LIBRARY = ${BUILD_TARGET_DIRECTORY}/libtransitjson.so
 BUILD_HEADER_FILES = \
 	${LIBTRANSIT_HEADER}				\
 	gotocjson/_c_code/convert_go_to_c.h		\
-	${BUILD_TARGET_DIRECTORY}/setup.h		\
-	${BUILD_TARGET_DIRECTORY}/subseconds.h	\
+	${BUILD_TARGET_DIRECTORY}/config.h		\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.h	\
 	${BUILD_TARGET_DIRECTORY}/transit.h
 
 BUILD_DYNAMIC_LIBRARIES = \
@@ -115,11 +115,11 @@ ${INSTALL_BASE_DIRECTORY}/lib	:
 gotocjson/gotocjson	: gotocjson/gotocjson.go
 	cd gotocjson; make gotocjson
 
-${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson setup/config.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} setup/config.go
+${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson config/config.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
 
-${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson subseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} subseconds/milliseconds.go
+${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} milliseconds/milliseconds.go
 
 ${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} transit/transit.go
@@ -127,11 +127,11 @@ ${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARG
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
 	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@
 
-${BUILD_TARGET_DIRECTORY}/setup.o	: ${CONFIG_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/setup.c -o $@ -Igotocjson/_c_code
+${BUILD_TARGET_DIRECTORY}/config.o	: ${CONFIG_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/config.c -o $@ -Igotocjson/_c_code
 
-${BUILD_TARGET_DIRECTORY}/subseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/subseconds.c -o $@ -Igotocjson/_c_code
+${BUILD_TARGET_DIRECTORY}/milliseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/milliseconds.c -o $@ -Igotocjson/_c_code
 
 ${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS}
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code

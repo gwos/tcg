@@ -58,7 +58,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/setup.GWConnections"
+                            "$ref": "#/definitions/config.GWConnections"
                         }
                     },
                     "401": {
@@ -106,7 +106,7 @@ var doc = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/setup.GWConnections"
+                            "$ref": "#/definitions/config.GWConnections"
                         }
                     },
                     "401": {
@@ -460,6 +460,30 @@ var doc = `{
         }
     },
     "definitions": {
+        "config.GWConnection": {
+            "type": "object",
+            "properties": {
+                "hostName": {
+                    "description": "HostName accepts value for combined \"host:port\"\nused as ` + "`" + `url.URL{HostName}` + "`" + `",
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                },
+                "userName": {
+                    "type": "string"
+                }
+            }
+        },
+        "config.GWConnections": {
+            "type": "array",
+            "items": {
+                "$ref": "#/definitions/config.GWConnection"
+            }
+        },
+        "milliseconds.MillisecondTimestamp": {
+            "type": "object"
+        },
         "services.AgentStats": {
             "type": "object",
             "properties": {
@@ -483,11 +507,11 @@ var doc = `{
                 },
                 "lastInventoryRun": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
                 "lastMetricsRun": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
                 "messagesSent": {
                     "type": "integer"
@@ -497,7 +521,7 @@ var doc = `{
                 },
                 "upSince": {
                     "type": "object",
-                    "$ref": "#/definitions/subseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 }
             }
         },
@@ -514,30 +538,6 @@ var doc = `{
                     "type": "string"
                 }
             }
-        },
-        "setup.GWConnection": {
-            "type": "object",
-            "properties": {
-                "hostName": {
-                    "description": "HostName accepts value for combined \"host:port\"\nused as ` + "`" + `url.URL{HostName}` + "`" + `",
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "userName": {
-                    "type": "string"
-                }
-            }
-        },
-        "setup.GWConnections": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/setup.GWConnection"
-            }
-        },
-        "subseconds.MillisecondTimestamp": {
-            "type": "object"
         }
     }
 }`

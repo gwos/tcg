@@ -4,15 +4,15 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/nats"
-	"github.com/gwos/tng/setup"
-	"github.com/gwos/tng/subseconds"
+	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
 )
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*setup.Connector
+	*config.Connector
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
 	dsClient    *clients.DSClient
@@ -32,7 +32,7 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		agentConnector := setup.GetConfig().Connector
+		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
 			agentConnector,
 			&AgentStats{
@@ -46,7 +46,7 @@ func GetAgentService() *AgentService {
 			},
 			&clients.DSClient{
 				AppName:      agentConnector.AppName,
-				DSConnection: setup.GetConfig().DSConnection,
+				DSConnection: config.GetConfig().DSConnection,
 			},
 			nil,
 			make(chan statsCounter),
@@ -106,14 +106,14 @@ func (service *AgentService) StopNats() error {
 }
 
 // StartTransport implements AgentServices.StartTransport interface
-func (service *AgentService) StartTransport(cons ...*setup.GWConnection) error {
+func (service *AgentService) StartTransport(cons ...*config.GWConnection) error {
 	var err error
 	if len(cons) == 0 {
 		cons, err = service.dsClient.GetGWConnections(service.AgentID)
 		if err == nil {
-			setup.GetConfig().GWConnections = cons
+			config.GetConfig().GWConnections = cons
 		} else {
-			cons = setup.GetConfig().GWConnections
+			cons = config.GetConfig().GWConnections
 		}
 	}
 	if len(cons) == 0 {
@@ -231,9 +231,9 @@ func (service *AgentService) listenChanel() {
 			service.agentStats.MessagesSent++
 			switch res.subject {
 			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = subseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = subseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 		}
 	}
