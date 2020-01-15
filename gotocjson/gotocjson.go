@@ -1502,7 +1502,9 @@ var C_code_boilerplate = `//
 
 #include "convert_go_to_c.h"
 
-#include <stdlib.h>    // for the declaration of free(), at least
+#include <stdlib.h>	// for the declaration of free(), at least
+#include <inttypes.h>	// for PRId64
+#include <errno.h>	// for errno
 // #include <stdalign.h>  // Needed to supply alignof(), available starting with C11.
 // #include <stddef.h>
 // #include <string.h>
@@ -3006,6 +3008,7 @@ func generate_encode_PackageName_StructTypeName_ptr_tree(
 
 	var encode_routine_header_template = `
 json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_ptr) {
+    {{.ErrorObjectComment}}json_error_t error;
     char *failure = NULL;
     json_t *json;
     do  {
@@ -3036,28 +3039,43 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 		     )
 		);
 		if (json == NULL) {
-		    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n", error.text, error.source, error.line, error.column, error.position);
+		    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+			// error.text, error.source, error.line, error.column, error.position);
 		    failure = error.text;
 		    break;
 		}`
 	*/
 
 	var encode_routine_struct_timespec_body_format = `
-	// FIX QUICK:  Deal with the error scope issue (a text pointer from the error object may be
-	// assigned to the failure pointer and then used after the error object has gone out of scope).
-	json_error_t error;
+	// When generating this code, we must special-case the field packing in this routine, based on the "struct_timespec"
+	// field type.  Also, we must ensure that the numeric-to-string conversion handles a 64-bit number. 
+	//
+	// Logically, we would want Transit data structures to generate a number in the JSON representation
+	// of a milliseconds timestamp.  We use a string instead more or less for legacy reasons, to make it
+	// easier in other places in the code to transfer this data to similar Foundation REST API calls,
+	// without needing to look too closely at it.  From an implementation standpoint, the only difference
+	// is the presence or absence of the quoting characters, and the movement of the conversion between
+	// string-of-digits and an actual number between different layers of code.  So there's not any
+	// significant loss of efficiency involved.
 	size_t flags = 0;
-	// We special-case the field packing in this routine, based on the "struct_timespec" field type.
-	// The "I" conversion is used to handle a 64-bit number.
-	json = json_pack_ex(&error, flags, "I"
-	     // %[4]s %[3]s;  // go: time.Time
-	     , (json_int_t) (
-		 (%[1]s_%s_ptr->%s.tv_sec  * MILLISECONDS_PER_SECOND) +
-		 (%[1]s_%s_ptr->%s.tv_nsec / NANOSECONDS_PER_MILLISECOND)
-	     )
+	char string_milliseconds_timestamp[60];
+	if (%[1]s_%s_ptr) {
+	    // %[4]s %[3]s;  // go: time.Time
+	    int64_t numeric_millseconds_timestamp =
+		(%[1]s_%s_ptr->Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
+		(%[1]s_%s_ptr->Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND);
+	    // PRId64 is from C99 and <inttypes.h>, to automatically select the proper format for an int64_t 
+	    snprintf(string_milliseconds_timestamp, sizeof(string_milliseconds_timestamp), "%%"PRId64, numeric_millseconds_timestamp);
+	}
+	// As long as we are using a string representation, we encode a missing struct_timespec as a JSON null value.
+	// We might in some future revision also encode a zero value as a JSON null value here.  In the meantime, we
+	// depend on higher-level code to decide whether to even call this conversion in such cases.
+	json = json_pack_ex(&error, flags, "s?"
+	    , (%[1]s_%s_ptr ? string_milliseconds_timestamp : NULL)
 	);
 	if (json == NULL) {
-	    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    // printf(FILE_LINE
+		// "ERROR:  JSON packing failed:  text '%s', source '%s', line %d, column %d, position %d\n",
 		// error.text, error.source, error.line, error.column, error.position);
 	    failure = error.text;
 	    break;
@@ -3082,7 +3100,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	footer_template := template.Must(template.New("encode_routine_footer").Parse(encode_routine_footer_template))
 
 	type encode_routine_boilerplate_fields struct {
-		StructName string
+		StructName         string
+		ErrorObjectComment string
 	}
 
 	// Packing a JSON string is complicated by several factors:
@@ -3110,7 +3129,21 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 		}
 	}
 
-	boilerplate_variables := encode_routine_boilerplate_fields{StructName: package_name + "_" + struct_name}
+	error_object_comment := "// ";
+	// This is an awkward special case needed to get around the C compiler generating complaints
+	// about unused variables.  We're okay with having those warnings in place where we don't
+	// actually expect to have unused variables, but not in this situation where we might have
+	// them by design if we're not careful to only specify them when they are in fact used.
+	for _, field_name := range fields {
+		if struct_field_C_types[struct_name][field_name] == "struct_timespec" {
+			error_object_comment = "";
+			break
+		}
+	}
+	boilerplate_variables := encode_routine_boilerplate_fields{
+		StructName: package_name + "_" + struct_name,
+		ErrorObjectComment: error_object_comment,
+	}
 
 	var header_code bytes.Buffer
 	if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
@@ -3811,7 +3844,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 			// scalar from the JSON element, not the value of some format-determined type based
 			// on a key-string retrieval from a JSON hash object.
 			if field_C_type == "struct_timespec" {
-				unpack_format += "I"
+				unpack_format += "s"
 				unpack_terminator = ""
 			} else {
 				unpack_format += unpack_separator + "s" + optional + ":" + json_field_format
@@ -4134,7 +4167,9 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					var decode_condition string
 					if field_tag.json_omitempty {
 						if field_C_type == "struct_timespec" {
-							decode_condition = fmt.Sprintf("pure_milliseconds != 0")
+							decode_condition = fmt.Sprintf(
+							    "string_milliseconds_timestamp != NULL && string_milliseconds_timestamp[0] != '\\0'",
+							)
 						} else {
 							decode_condition = fmt.Sprintf("json_%s != NULL", field_name)
 						}
@@ -4142,8 +4177,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 						decode_condition = "1"
 					}
 					if field_C_type == "struct_timespec" {
-						field_objects += fmt.Sprintf("        json_int_t pure_milliseconds = 0;\n")
-						field_unpacks += fmt.Sprintf("            , &pure_milliseconds\n")
+						field_objects += fmt.Sprintf("        char *string_milliseconds_timestamp = NULL;\n")
+						field_unpacks += fmt.Sprintf("            , &string_milliseconds_timestamp\n")
 					} else {
 						// A NULL assignment is needed here as a fundamental means of telling us whether an optional JSON
 						// field representing a subobject actually was actually present in the input and got unpacked.
@@ -4185,11 +4220,31 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					field_values += fmt.Sprintf("            if (%s) {\n", decode_condition)
 
 					if field_C_type == "struct_timespec" {
-						// FIX MAJOR:  Decide if we want to fail this (and return a NULL pointer) if the pure_milliseconds value is zero.
+						// FIX MAJOR:  Decide if we want to fail this (and return a NULL pointer)
+						// if the string_milliseconds_timestamp value is NULL.
 						field_values += fmt.Sprintf(
-							`		%s_ptr->%s.tv_sec  = (time_t) (pure_milliseconds / MILLISECONDS_PER_SECOND);
-		%[1]s_ptr->%s.tv_nsec = (long) (pure_milliseconds %% MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
-`, struct_name, field_name)
+							`		char *endptr;
+		errno = 0;
+#if __WORDSIZE == 64
+		int64_t numeric_millseconds_timestamp = strtol(string_milliseconds_timestamp, &endptr, 10);
+#elif __GLIBC_HAVE_LONG_LONG
+		int64_t numeric_millseconds_timestamp = strtoll(string_milliseconds_timestamp, &endptr, 10);
+#else
+		#error "this compilation does not support the int64_t datatype"
+#endif
+		if (errno) {
+		    // We don't bother to try to diagnose the specific failure; it should suffice to print the
+		    // string value under consideration and allow a human to identify the likely problem.
+		    // FIX MAJOR:  Invoke proper logging for error conditions.
+		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, conversion of \"%%s\" to a number failed",
+			string_milliseconds_timestamp);
+		    failed = 1;
+		}
+		else {
+		    %[2]s_ptr->%s.tv_sec  = (time_t) (numeric_millseconds_timestamp / MILLISECONDS_PER_SECOND);
+		    %[2]s_ptr->%s.tv_nsec = (long)   (numeric_millseconds_timestamp %% MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
+		}
+`, package_name, struct_name, field_name)
 					} else {
 						field_values += fmt.Sprintf(
 							`		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);

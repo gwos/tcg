@@ -4,8 +4,8 @@
         {
             "sampleType": "Warning",
             "interval": {
-                "endTime": 1572955806397,
-                "startTime": 1572955806397
+                "endTime": "1572955806397",
+                "startTime": "1572955806397"
             },
             "value": {
                 "valueType": "IntegerType",

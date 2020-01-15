@@ -252,7 +252,7 @@ struct_timespec *JSON_as_struct_timespec(json_t *json) {
 	    }
 	    else {
 		timespec->tv_sec  = (time_t) (numeric_millseconds_timestamp / MILLISECONDS_PER_SECOND);
-		timespec->tv_nsec = (long) (numeric_millseconds_timestamp % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
+		timespec->tv_nsec = (long)   (numeric_millseconds_timestamp % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
 	    }
 	}
 	if (failed) {
