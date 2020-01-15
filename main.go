@@ -18,7 +18,7 @@ var transitService = services.GetTransitService()
 // @title TNG API Documentation
 // @version 1.0
 
-// @host localhost:8081
+// @host localhost:8099
 // @BasePath /api/v1
 func main() {
 	err := transitService.StartNats()

@@ -2,7 +2,7 @@ connector:
   agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
   appName: "tng"
   appType: "VEMA"
-  controllerAddr: ":8081"
+  controllerAddr: ":8099"
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "src/main/resources/datastore"
