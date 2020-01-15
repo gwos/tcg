@@ -16,7 +16,7 @@
         },
         "SampleTimeProperty": {
             "valueType": "TimeType",
-            "timeValue": 1572955806397
+            "timeValue": "1572955806397"
         },
         "SampleStringProperty": {
             "valueType": "StringType",
