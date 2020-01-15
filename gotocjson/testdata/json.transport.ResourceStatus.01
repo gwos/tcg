@@ -3,8 +3,8 @@
     "type": "TestType",
     "owner": "TestOwner",
     "status": "SERVICE_OK",
-    "lastCheckTime": 1572955806398,
-    "nextCheckTime": 1572955806398,
+    "lastCheckTime": "1572955806398",
+    "nextCheckTime": "1572955806398",
     "lastPlugInOutput": "Test plugin output",
     "properties": {
         "property": {
