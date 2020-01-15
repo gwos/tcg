@@ -14,7 +14,7 @@ connector:
   agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
   appName: "test-app"
   appType: "test"
-  controllerAddr: ":8081"
+  controllerAddr: ":8099"
   natsAckWait: 15
 dsConnection:
   hostName: "localhost:3001"
@@ -45,7 +45,7 @@ gwConnections:
 			AgentID:          "3dcd9a52-949d-4531-a3b0-b14622f7dd39",
 			AppName:          "test-app",
 			AppType:          "test",
-			ControllerAddr:   ":8081",
+			ControllerAddr:   ":8099",
 			LogLevel:         1,
 			NatsAckWait:      15,
 			NatsMaxInflight:  2147483647,

@@ -149,7 +149,7 @@ func GetConfig() *Config {
 		// set defaults
 		cfg = &Config{
 			Connector: &Connector{
-				ControllerAddr:   ":8081",
+				ControllerAddr:   ":8099",
 				LogLevel:         1,
 				NatsAckWait:      30,
 				NatsMaxInflight:  math.MaxInt32,

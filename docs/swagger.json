@@ -6,7 +6,7 @@
         "license": {},
         "version": "1.0"
     },
-    "host": "localhost:8081",
+    "host": "localhost:8099",
     "basePath": "/api/v1",
     "paths": {
         "/gw-connections": {
