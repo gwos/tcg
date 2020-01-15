@@ -68,6 +68,8 @@ INSTALL_DYNAMIC_LIBRARIES = $(addprefix ${INSTALL_BASE_DIRECTORY}/lib/,$(notdir 
 CFLAGS = -std=c11 -g -D_REENTRANT -D_GNU_SOURCE -fPIC -Wall
 CC = gcc ${CFLAGS}
 
+.PHONY	: all
+
 all	: ${LIBTRANSIT_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
 
 .PHONY	: install
@@ -100,20 +102,30 @@ get	:
 	go get github.com/nats-io/go-nats-streaming
 	go get github.com/nats-io/nats-streaming-server/server
 
-${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_SOURCE}
-	cd ${LIBTRANSIT_DIRECTORY}; make
+# For the ${LIBTRANSIT_HEADER} and ${LIBTRANSIT_LIBRARY} targets, there are many more
+# dependencies than we ought to be keeping track of here, and they are all tracked
+# instead in the subsidiary Makefile where those targets are actually built.  So instead
+# of just depending on ${LIBTRANSIT_SOURCE}, which is of course the principal source file
+# involved (but by no means the only one used to create the library), we simply force an
+# unconditional descent into the subdirectory and attempt to make there.  That will handle
+# all the details of build dependencies, at the cost of one unconditional recursive make.
+
+.PHONY	: ${LIBTRANSIT_DIRECTORY}
+
+${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_DIRECTORY}
+	make -C ${LIBTRANSIT_DIRECTORY}
 
 ${BUILD_TARGET_DIRECTORY}	:
-	mkdir -p ${BUILD_TARGET_DIRECTORY}
+	mkdir -p $@
 
 ${INSTALL_BASE_DIRECTORY}/include/tng	:
-	mkdir -p ${INSTALL_BASE_DIRECTORY}/include/tng
+	mkdir -p $@
 
 ${INSTALL_BASE_DIRECTORY}/lib	:
-	mkdir -p ${INSTALL_BASE_DIRECTORY}/lib
+	mkdir -p $@
 
 gotocjson/gotocjson	: gotocjson/gotocjson.go
-	cd gotocjson; make gotocjson
+	make -C gotocjson gotocjson
 
 ${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson config/config.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
@@ -143,16 +155,16 @@ ${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS}
 
 clean	:
 	rm -rf ${BUILD_TARGET_DIRECTORY}
-	cd gotocjson; make clean
+	make -C gotocjson clean
 
 .PHONY	: realclean
 
 realclean	:
 	rm -rf bin pkg src ../src
-	cd gotocjson; make realclean
+	make -C gotocjson realclean
 
 .PHONY	: distclean
 
 distclean	: realclean
 	rm -rf ${INSTALL_BASE_DIRECTORY}
-	cd gotocjson; make distclean
+	make -C gotocjson distclean

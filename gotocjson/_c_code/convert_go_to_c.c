@@ -2,6 +2,8 @@
 // data structures, but is not specific to any one generated package.
 
 #include <string.h>	// for strcmp()
+#include <inttypes.h>	// for PRId64
+#include <errno.h>	// for errno
 
 #include "convert_go_to_c.h"
 
@@ -14,9 +16,9 @@ int enumeration_value(const string const enum_string[], int enum_string_count, c
     // We don't bother to test against the value at index 0 because we treat that slot as a
     // universally-matching wildcard.  That provides a mechanism for designating an unknown value.
     for (enum_value = enum_string_count; --enum_value > 0; ) {
-        if (!strcmp(enum_value_as_string, enum_string[enum_value])) {
-            break;
-        }
+	if (!strcmp(enum_value_as_string, enum_string[enum_value])) {
+	    break;
+	}
     }
     return enum_value;
 }
@@ -25,14 +27,14 @@ char *typeof_json_item(const json_t *json) {
     if (json == NULL) { return "NULL pointer"; }
     int type = json_typeof(json);
     switch (type) {
-        case JSON_OBJECT : return "JSON_OBJECT";
-        case JSON_ARRAY  : return "JSON_ARRAY";
-        case JSON_STRING : return "JSON_STRING";
-        case JSON_INTEGER: return "JSON_INTEGER";
-        case JSON_REAL   : return "JSON_REAL";
-        case JSON_TRUE   : return "JSON_TRUE";
-        case JSON_FALSE  : return "JSON_FALSE";
-        case JSON_NULL   : return "JSON_NULL";
+	case JSON_OBJECT : return "JSON_OBJECT";
+	case JSON_ARRAY  : return "JSON_ARRAY";
+	case JSON_STRING : return "JSON_STRING";
+	case JSON_INTEGER: return "JSON_INTEGER";
+	case JSON_REAL   : return "JSON_REAL";
+	case JSON_TRUE   : return "JSON_TRUE";
+	case JSON_FALSE  : return "JSON_FALSE";
+	case JSON_NULL   : return "JSON_NULL";
     }
     static char buf[100];
     sprintf(buf, "UNKNOWN JSON TYPE %d", type);
@@ -49,19 +51,19 @@ char *typeof_json_item(const json_t *json) {
 string JSON_as_str(json_t *json, size_t flags) {
     char *result;
     if (!flags) {
-        // FIX MAJOR:  These settings are for initial development use.
-        // We probably want to change them for production use.
-        // flags = JSON_SORT_KEYS | JSON_INDENT(4) | JSON_ENSURE_ASCII;
-        flags = JSON_INDENT(4) | JSON_ENSURE_ASCII;
+	// FIX MAJOR:  These settings are for initial development use.
+	// We probably want to change them for production use.
+	// flags = JSON_SORT_KEYS | JSON_INDENT(4) | JSON_ENSURE_ASCII;
+	flags = JSON_INDENT(4) | JSON_ENSURE_ASCII;
     }
     if (json == NULL) {
-        // FIX MAJOR:  this message is just for development use, to track down the true source of failure
-        printf(FILE_LINE "in JSON_as_str, received a NULL pointer\n");
-        result = NULL;
+	// FIX MAJOR:  this message is just for development use, to track down the true source of failure
+	printf(FILE_LINE "in JSON_as_str, received a NULL pointer\n");
+	result = NULL;
     }
     else {
-        result = json_dumps(json, flags);
-        json_decref(json);
+	result = json_dumps(json, flags);
+	json_decref(json);
     }
     return result;
 }
@@ -85,10 +87,10 @@ string JSON_as_str(json_t *json, size_t flags) {
 // have in hand just a string-valued JSON object, and call either
 // "const string str_ptr = json_string_value(json);" or do this:
 /*
-        string string;
-        if (json_unpack(json, "s"
-            , &string
-        ) != 0) { 
+	string string;
+	if (json_unpack(json, "s"
+	    , &string
+	) != 0) { 
 	    ...
 	} else {
 	    ...
@@ -117,37 +119,37 @@ string *JSON_as_string_ptr(json_t *json) {
 
 bool is_bool_ptr_zero_value(const bool *bool_ptr) {
     return (
-        bool_ptr == NULL || *bool_ptr == false
+	bool_ptr == NULL || *bool_ptr == false
     );
 }
 
 bool is_int_ptr_zero_value(const int *int_ptr) {
     return (
-        int_ptr == NULL || *int_ptr == 0
+	int_ptr == NULL || *int_ptr == 0
     );
 }
 
 bool is_int32_ptr_zero_value(const int32 *int32_ptr) {
     return (
-        int32_ptr == NULL || *int32_ptr == 0
+	int32_ptr == NULL || *int32_ptr == 0
     );
 }
 
 bool is_int64_ptr_zero_value(const int64 *int64_ptr) {
     return (
-        int64_ptr == NULL || *int64_ptr == 0
+	int64_ptr == NULL || *int64_ptr == 0
     );
 }
 
 bool is_float64_ptr_zero_value(const float64 *float64_ptr) {
     return (
-        float64_ptr == NULL || *float64_ptr == 0.0
+	float64_ptr == NULL || *float64_ptr == 0.0
     );
 }
 
 bool is_string_ptr_zero_value(string const *string_ptr) {
     return (
-        string_ptr == NULL || *string_ptr == NULL || **string_ptr == '\0'
+	string_ptr == NULL || *string_ptr == NULL || **string_ptr == '\0'
     );
 }
 
@@ -168,43 +170,94 @@ struct_timespec timeval_to_timespec(struct timeval timeval_timestamp) {
     return timespec_timestamp;
 }
 
+// Logically, we would want Transit data structures to generate a number in the JSON representation of a milliseconds timestamp.
+// We use a string instead more or less for legacy reasons, to make it easier in other places in the code to transfer this data
+// to similar Foundation REST API calls, without needing to look too closely at it.  From an implementation standpoint, the only
+// difference is the presence or absence of the quoting characters, and the movement of the conversion between string-of-digits
+// and an actual number between different layers of code.  So there's not any significant loss of efficiency involved.
 json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *struct_timespec) {
     json_error_t error;
     size_t flags = 0;
     json_t *json;
-    // FIX MAJOR:  when generating this code, we must special-case the field packing in this routine, based on the "struct_timespec" field type
-    // FIX MAJOR:  make sure the "I" conversion can handle a 64-bit number
-    json = json_pack_ex(&error, flags, "I"
-	 , (json_int_t) (
-	     (struct_timespec->tv_sec  * MILLISECONDS_PER_SECOND) +
-	     (struct_timespec->tv_nsec / NANOSECONDS_PER_MILLISECOND)
-	 )
+    // When generating this code, we must special-case the field packing in this routine, based on the "struct_timespec"
+    // field type.  Also, we must ensure that the numeric-to-string conversion handles a 64-bit number.
+    char string_milliseconds_timestamp[60];
+    if (struct_timespec) {
+	int64_t numeric_millseconds_timestamp =
+	    (struct_timespec->tv_sec  * MILLISECONDS_PER_SECOND) +
+	    (struct_timespec->tv_nsec / NANOSECONDS_PER_MILLISECOND);
+	// PRId64 is from C99 and <inttypes.h>, to automatically select the proper format for an int64_t
+	snprintf(string_milliseconds_timestamp, sizeof(string_milliseconds_timestamp), "%"PRId64, numeric_millseconds_timestamp);
+    }
+    // As long as we are using a string representation, we encode a missing struct_timespec as a JSON null value.
+    // We might in some future revision also encode a zero value as a JSON null value here.  In the meantime, we
+    // depend on higher-level code to decide whether to even call this conversion in such cases.
+    json = json_pack_ex(&error, flags, "s?"
+	 , (struct_timespec ? string_milliseconds_timestamp : NULL) 
     );
     if (json == NULL) {
-	printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+	// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
+	fprintf(stderr,
+	    FILE_LINE "ERROR:  in struct_timespec_ptr_as_JSON_ptr, JSON packing failed:  text '%s', source '%s', line %d, column %d, position %d\n",
 	    error.text, error.source, error.line, error.column, error.position);
     }
     return json;
 }
 
+// See struct_timespec_ptr_as_JSON_ptr() for why we are converting from a string instead of from a number in the JSON
+// representation of the milliseconds timestamp.
 struct_timespec *JSON_as_struct_timespec(json_t *json) {
     struct_timespec *timespec = (struct_timespec *)malloc(sizeof(struct_timespec));
     if (!timespec) {
-	// FIX MAJOR:  invoke proper logging for error conditions
+	// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
 	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "malloc failed");
     } else {
-	// FIX MAJOR:  when generating this code, special-case the field unpacking in this routine, based on the "struct_timespec" field type
-	json_int_t pure_milliseconds;
-	if (json_unpack(json, "I"
-	    , &pure_milliseconds
+	int failed = 0;
+	json_error_t error;
+	size_t flags = 0;
+	// When generating this code, we must special-case the field unpacking in this routine, based on the "struct_timespec"
+	// field type.  Also, we must ensure that the string-to-numeric conversion handles a 64-bit number.
+	//
+	// We get back here a pointer to a read-only copy of the string inside the JSON data structures.
+	// That means we don't need to deal explicitly with freeing that string.
+	char *string_milliseconds_timestamp = NULL;
+	if (json_unpack_ex(json, &error, flags, "s"
+	    , &string_milliseconds_timestamp
 	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "JSON unpacking failed");
+	    // FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
+	    fprintf(stderr,
+		FILE_LINE "ERROR:  in JSON_as_struct_timespec, JSON unpacking failed:  text '%s', source '%s', line %d, column %d, position %d\n",
+		error.text, error.source, error.line, error.column, error.position);
+	    failed = 1;
+	} else if (string_milliseconds_timestamp == NULL) {
+	    // FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
+	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, found a non-string, so could not convert to a number");
+	    failed = 1;
+	} else {
+	    char *endptr;
+	    errno = 0;
+#if __WORDSIZE == 64
+	    int64_t numeric_millseconds_timestamp = strtol(string_milliseconds_timestamp, &endptr, 10);
+#elif __GLIBC_HAVE_LONG_LONG
+	    int64_t numeric_millseconds_timestamp = strtoll(string_milliseconds_timestamp, &endptr, 10);
+#else
+	    #error "this compilation does not support the int64_t datatype"
+#endif
+	    if (errno) {
+		// We don't bother to try to diagnose the specific failure; it should suffice to print the
+		// string value under consideration and allow a human to identify the likely problem.
+		// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
+		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, conversion of \"%s\" to a number failed", string_milliseconds_timestamp);
+		failed = 1;
+	    }
+	    else {
+		timespec->tv_sec  = (time_t) (numeric_millseconds_timestamp / MILLISECONDS_PER_SECOND);
+		timespec->tv_nsec = (long)   (numeric_millseconds_timestamp % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
+	    }
+	}
+	if (failed) {
 	    free(timespec);
 	    timespec = NULL;
-	} else {
-	    timespec->tv_sec  = (time_t) (pure_milliseconds / MILLISECONDS_PER_SECOND);
-	    timespec->tv_nsec = (long) (pure_milliseconds % MILLISECONDS_PER_SECOND) * NANOSECONDS_PER_MILLISECOND;
 	}
     }
     return timespec;
@@ -212,6 +265,6 @@ struct_timespec *JSON_as_struct_timespec(json_t *json) {
 
 void free_JSON(json_t *json) {
     if (json != NULL) {
-        json_decref(json);
+	json_decref(json);
     }
 }

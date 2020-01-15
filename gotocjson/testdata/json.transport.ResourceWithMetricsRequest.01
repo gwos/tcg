@@ -3,7 +3,7 @@
         "appType": "TestAppType",
         "agentID": "TestAgentID",
         "traceToken": "TestTraceToken",
-        "timeStamp": 1572955806398
+        "timeStamp": "1572955806398"
     },
     "resources": [
         {
@@ -12,8 +12,8 @@
                 "type": "TestType",
                 "owner": "TestOwner",
                 "status": "SERVICE_OK",
-                "lastCheckTime": 1572955806398,
-                "nextCheckTime": 1572955806398,
+                "lastCheckTime": "1572955806398",
+                "nextCheckTime": "1572955806398",
                 "lastPlugInOutput": "Test plugin output",
                 "properties": {
                     "property": {
@@ -29,8 +29,8 @@
                         {
                             "sampleType": "Warning",
                             "interval": {
-                                "endTime": 1572955806397,
-                                "startTime": 1572955806397
+                                "endTime": "1572955806397",
+                                "startTime": "1572955806397"
                             },
                             "value": {
                                 "valueType": "IntegerType",
