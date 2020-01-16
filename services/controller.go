@@ -8,8 +8,8 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
@@ -348,6 +348,12 @@ func (controller *Controller) status(c *gin.Context) {
 }
 
 func (controller *Controller) validateToken(c *gin.Context) {
+	// check local pin
+	pin := controller.Connector.ControllerPin
+	if len(pin) > 0 && pin == c.Request.Header.Get("X-PIN") {
+		return
+	}
+
 	credentials := cache.Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
