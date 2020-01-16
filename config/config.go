@@ -68,7 +68,9 @@ type Connector struct {
 	NatsStoreType string `yaml:"natsStoreType"`
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
-	NatsHost string   `yaml:"natsHost"`
+	NatsHost string `yaml:"natsHost"`
+	// LogFile accepts file path to log in addition to stdout
+	LogFile  string   `yaml:"logFile"`
 	LogLevel LogLevel `yaml:"logLevel"`
 }
 
@@ -185,7 +187,7 @@ func GetConfig() *Config {
 			log.Warn(err)
 		}
 
-		log.Config(int(cfg.Connector.LogLevel))
+		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
 	})
 	return cfg
 }

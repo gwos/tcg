@@ -3,6 +3,8 @@ package log
 import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/sirupsen/logrus"
+	"io"
+	"os"
 )
 
 var logger = logrus.New()
@@ -28,7 +30,14 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(level int) {
+func Config(filePath string, level int) {
+	if len(filePath) > 0 {
+		if logFile, err := os.OpenFile(filePath,
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+			logger.SetOutput(io.MultiWriter(os.Stdout, logFile))
+		}
+	}
+
 	logger.SetFormatter(&nested.Formatter{
 		TimestampFormat: "2006-01-02 15:04:05",
 		HideKeys:        true,
