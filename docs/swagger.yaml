@@ -55,7 +55,7 @@ definitions:
       transport:
         type: string
     type: object
-host: localhost:8081
+host: localhost:8099
 info:
   contact: {}
   license: {}
