@@ -52,6 +52,9 @@ type Connector struct {
 	ControllerAddr     string `yaml:"controllerAddr"`
 	ControllerCertFile string `yaml:"controllerCertFile"`
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
+	// ControllerPin accepts value from environment
+	// provides local access for debug
+	ControllerPin string `yaml:"-"`
 	// NatsAckWait accepts number of seconds
 	// should be greater then the GWClient request duration
 	NatsAckWait int64 `yaml:"natsAckWait"`
