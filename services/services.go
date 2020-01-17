@@ -11,6 +11,7 @@ import (
 const (
 	SubjSendResourceWithMetrics = "send-resource-with-metrics"
 	SubjSynchronizeInventory    = "synchronize-inventory"
+	SubjSendEvent               = "send-events"
 )
 
 // StatusEnum defines status value
@@ -33,6 +34,7 @@ type AgentStats struct {
 	MessagesSent           int
 	LastInventoryRun       milliseconds.MillisecondTimestamp
 	LastMetricsRun         milliseconds.MillisecondTimestamp
+	LastAlertRun           milliseconds.MillisecondTimestamp
 	ExecutionTimeInventory time.Duration
 	ExecutionTimeMetrics   time.Duration
 	UpSince                milliseconds.MillisecondTimestamp
@@ -81,4 +83,5 @@ type Controllers interface {
 	RemoveListMetricsHandler()
 	RemoveUpdateGWConnectionsHandler()
 	UpdateGWConnections([]byte) error
+	SendEvent([]byte) error
 }
