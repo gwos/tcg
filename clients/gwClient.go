@@ -27,6 +27,7 @@ const (
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
+	GWEntrypointSendAlert               = "/api/events"
 )
 
 // GWClient implements GWOperations interface
@@ -202,6 +203,54 @@ func (client *GWClient) SendResourcesWithMetrics(resources []byte) (*transit.Ope
 		headers["GWOS-API-TOKEN"] = client.token
 		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, resources)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if statusCode != 200 {
+		return nil, fmt.Errorf(string(byteResponse))
+	}
+
+	var operationResults transit.OperationResults
+
+	err = json.Unmarshal(byteResponse, &operationResults)
+	if err != nil {
+		return nil, err
+	}
+
+	return &operationResults, nil
+}
+
+func (client *GWClient) SendAlert(alert []byte) (*transit.OperationResults, error) {
+	headers := map[string]string{
+		"Accept":         "application/json",
+		"Content-Type":   "application/json",
+		"GWOS-API-TOKEN": client.token,
+		"GWOS-APP-NAME":  client.AppName,
+	}
+
+	entrypoint := url.URL{
+		Scheme: "http",
+		Host:   client.GWConnection.HostName,
+		Path:   GWEntrypointSendAlert,
+	}
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, alert)
+	if statusCode == 401 {
+		err = client.Connect()
+		if err != nil {
+			return nil, err
+		}
+		headers["GWOS-API-TOKEN"] = client.token
+		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, alert)
+	}
+	if statusCode == 401 {
+		err = client.Connect()
+		if err != nil {
+			return nil, err
+		}
+		headers["GWOS-API-TOKEN"] = client.token
+		statusCode, byteResponse, err = SendRequest(http.MethodPost, entrypoint.String(), headers, nil, alert)
+	}
+
 	if err != nil {
 		return nil, err
 	}
