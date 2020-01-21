@@ -169,11 +169,27 @@ func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, err
 		headers["GWOS-API-TOKEN"] = client.token
 		statusCode, byteResponse, err = SendRequest(http.MethodPost, reqURL, headers, nil, payload)
 	}
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"payload": payload,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: sendData")
+	}()
+
 	if err != nil {
+		logEntryLevel = log.ErrorLevel
 		return nil, err
 	}
 	if statusCode != 200 {
-		log.Error("GWClient: ", statusCode, string(byteResponse))
+		logEntryLevel = log.WarnLevel
 	}
 	return byteResponse, nil
 }
