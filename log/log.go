@@ -7,6 +7,17 @@ import (
 	"os"
 )
 
+// Fields Type to pass when we want to call WithFields for structured logging
+type Fields map[string]interface{}
+
+// Levels to pass when we want call Log on WithFields
+const (
+	ErrorLevel = logrus.ErrorLevel
+	WarnLevel  = logrus.WarnLevel
+	InfoLevel  = logrus.InfoLevel
+	DebugLevel = logrus.DebugLevel
+)
+
 var logger = logrus.New()
 
 // Info makes entries in the log on Info level
@@ -55,4 +66,36 @@ func Config(filePath string, level int) {
 	default:
 		logger.SetLevel(logrus.DebugLevel)
 	}
+}
+
+// Entry wraps logrus.Entry
+type Entry struct {
+	*logrus.Entry
+}
+
+// With adds a struct of fields to the log entry
+func With(fields Fields) *Entry {
+	return &Entry{
+		logger.WithFields(logrus.Fields(fields)),
+	}
+}
+
+// WithDebug adds a struct of fields to the log entry
+func (entry *Entry) WithDebug(fields Fields) *Entry {
+	if logger.IsLevelEnabled(DebugLevel) {
+		entry = &Entry{
+			entry.WithFields(logrus.Fields(fields)),
+		}
+	}
+	return entry
+}
+
+// WithInfo adds a struct of fields to the log entry
+func (entry *Entry) WithInfo(fields Fields) *Entry {
+	if logger.IsLevelEnabled(InfoLevel) {
+		entry = &Entry{
+			entry.WithFields(logrus.Fields(fields)),
+		}
+	}
+	return entry
 }
