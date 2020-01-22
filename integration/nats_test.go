@@ -43,7 +43,7 @@ func TestNatsQueue_1(t *testing.T) {
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConnections[0].HostName = GWInvalidHost
 
-	testMessage, err := parseJSON()
+	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
@@ -78,7 +78,7 @@ func TestNatsQueue_2(t *testing.T) {
 
 	defer cleanNats(t)
 
-	testMessage, err := parseJSON()
+	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
@@ -197,8 +197,8 @@ func cleanNats(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func parseJSON() ([]byte, error) {
-	jsonFile, err := os.Open("fixtures/sendResourceWithMetrics.json")
+func parseJSON(filePath string) ([]byte, error) {
+	jsonFile, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
