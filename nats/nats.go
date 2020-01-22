@@ -119,20 +119,29 @@ func StartDispatcher(options []DispatcherOption) error {
 
 	for _, o := range options {
 		dispatcherFn := o.Handler /* prevent loop override */
-		durableId := o.DurableID
+		durableID := o.DurableID
 		_, err = connDispatcher.Subscribe(
 			o.Subject,
 			func(msg *stan.Msg) {
 				_, isPresent := cache.NatsCache.Get(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10))
 				if !isPresent {
 					if err := dispatcherFn(msg.Data); err != nil {
-						log.Info("Not delivered: " + msg.Subject + ", " + durableId)
-						log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
+						log.With(log.Fields{
+							"nats.durableID": durableID,
+							"nats.subject": msg.Subject,
+						}).WithDebug(log.Fields{
+							"error": err,
+							"message": msg,
+						}).Log(log.InfoLevel, "NATS: Not delivered")
 					} else {
 						_ = msg.Ack()
 						_ = cache.NatsCache.Add(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10), 0, 10*time.Minute)
-						log.Info("Delivered: " + msg.Subject + ", " + durableId)
-						log.Debug("Message:", msg)
+						log.With(log.Fields{
+							"nats.durableID": durableID,
+							"nats.subject": msg.Subject,
+						}).WithDebug(log.Fields{
+							"message": msg,
+						}).Log(log.InfoLevel, "NATS: Delivered")
 					}
 				}
 			},
