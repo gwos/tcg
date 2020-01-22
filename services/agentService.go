@@ -188,7 +188,7 @@ func (service *AgentService) StartTransport(cons ...*config.GWConnection) error 
 				Subject:   SubjSendEvent,
 				Handler: func(b []byte) error {
 					// TODO: filter the message by rules per gwClient
-					_, err := gwClientCopy.SendAlert(b)
+					_, err := gwClientCopy.SendEvent(b)
 					if err == nil {
 						res := statsCounter{
 							subject:   SubjSendEvent,
