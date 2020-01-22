@@ -27,7 +27,7 @@ const (
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
-	GWEntrypointSendAlert               = "/api/events"
+	GWEntrypointSendEvent               = "/api/events"
 )
 
 // GWClient implements GWOperations interface
@@ -231,7 +231,7 @@ func (client *GWClient) SendAlert(alert []byte) (*transit.OperationResults, erro
 	entrypoint := url.URL{
 		Scheme: "http",
 		Host:   client.GWConnection.HostName,
-		Path:   GWEntrypointSendAlert,
+		Path:   GWEntrypointSendEvent,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, nil, alert)
 	if statusCode == 401 {
