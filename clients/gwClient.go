@@ -176,7 +176,7 @@ func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, err
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
 		"headers": headers,
-		"payload": payload,
+		"payload": string(payload),
 		"reqURL":  reqURL,
 	})
 	logEntryLevel := log.InfoLevel
