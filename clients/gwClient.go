@@ -15,7 +15,7 @@ type GWOperations interface {
 	Connect() error
 	Disconnect() error
 	ValidateToken(appName, apiToken string) error
-	SendAlert(payload []byte) ([]byte, error)
+	SendEvent(payload []byte) ([]byte, error)
 	SendResourcesWithMetrics(payload []byte) ([]byte, error)
 	SynchronizeInventory(payload []byte) ([]byte, error)
 }
@@ -150,8 +150,8 @@ func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error)
 	return client.sendData(GWEntrypointSendResourceWithMetrics, payload)
 }
 
-// SendAlert implements GWOperations.SendAlert.
-func (client *GWClient) SendAlert(payload []byte) ([]byte, error) {
+// SendEvent implements GWOperations.SendEvent.
+func (client *GWClient) SendEvent(payload []byte) ([]byte, error) {
 	return client.sendData(GWEntrypointSendEvent, payload)
 }
 
