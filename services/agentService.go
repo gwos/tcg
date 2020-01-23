@@ -6,6 +6,7 @@ import (
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
+	"gopkg.in/yaml.v3"
 	"sync"
 	"time"
 )
@@ -105,15 +106,19 @@ func (service *AgentService) StopNats() error {
 	return err
 }
 
-// StartTransport implements AgentServices.StartTransport interface
+// StartTransport implements AgentServices.StartTransport interface.
+// It's called by Controller with updated config or without args on startup.
+// So, if args empty it uses local config and tries update it with DSClient.
 func (service *AgentService) StartTransport(cons ...*config.GWConnection) error {
-	var err error
 	if len(cons) == 0 {
-		cons, err = service.dsClient.GetGWConnections(service.AgentID)
-		if err == nil {
-			config.GetConfig().GWConnections = cons
-		} else {
-			cons = config.GetConfig().GWConnections
+		cons = config.GetConfig().GWConnections
+		// Try fetch GWConnections with DSClient
+		var resCons config.GWConnections
+		if res, clErr := service.dsClient.FetchGWConnections(service.AgentID); clErr == nil {
+			if err := yaml.Unmarshal(res, &resCons); err == nil {
+				config.GetConfig().GWConnections = resCons
+				cons = resCons
+			}
 		}
 	}
 	if len(cons) == 0 {
@@ -210,13 +215,14 @@ func (service *AgentService) StartTransport(cons ...*config.GWConnection) error 
 		)
 	}
 
-	err = nats.StartDispatcher(dispatcherOptions)
-	if err == nil {
+	if sdErr := nats.StartDispatcher(dispatcherOptions); sdErr == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running
 		service.agentStatus.Unlock()
+	} else {
+		return sdErr
 	}
-	return err
+	return nil
 }
 
 // StopTransport implements AgentServices.StopTransport interface
