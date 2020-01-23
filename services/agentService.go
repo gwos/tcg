@@ -110,9 +110,10 @@ func (service *AgentService) StopNats() error {
 // It's called by Controller with updated config or without args on startup.
 // So, if args empty it uses local config and tries update it with DSClient.
 func (service *AgentService) StartTransport(cons ...*config.GWConnection) error {
+	/* Process connections */
 	if len(cons) == 0 {
 		cons = config.GetConfig().GWConnections
-		// Try fetch GWConnections with DSClient
+		/* Try fetch GWConnections with DSClient */
 		var resCons config.GWConnections
 		if res, clErr := service.dsClient.FetchGWConnections(service.AgentID); clErr == nil {
 			if err := yaml.Unmarshal(res, &resCons); err == nil {
@@ -124,6 +125,7 @@ func (service *AgentService) StartTransport(cons ...*config.GWConnection) error 
 	if len(cons) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
 	}
+	/* Process clients */
 	gwClients := make([]*clients.GWClient, len(cons))
 	for i := range cons {
 		gwClients[i] = &clients.GWClient{
@@ -131,91 +133,9 @@ func (service *AgentService) StartTransport(cons ...*config.GWConnection) error 
 			GWConnection: cons[i],
 		}
 	}
-
 	service.gwClients = gwClients
-
-	var dispatcherOptions []nats.DispatcherOption
-	for _, gwClient := range service.gwClients {
-		gwClientCopy := gwClient
-		durableID := fmt.Sprintf("%s", gwClient.HostName)
-		dispatcherOptions = append(
-			dispatcherOptions,
-			nats.DispatcherOption{
-				DurableID: durableID,
-				Subject:   SubjSendResourceWithMetrics,
-				Handler: func(b []byte) error {
-					// TODO: filter the message by rules per gwClient
-					_, err := gwClientCopy.SendResourcesWithMetrics(b)
-					if err == nil {
-						res := statsCounter{
-							subject:   SubjSendResourceWithMetrics,
-							bytesSent: len(b),
-							lastError: nil,
-						}
-						service.statsChanel <- res
-					} else {
-						res := statsCounter{
-							subject:   SubjSendResourceWithMetrics,
-							bytesSent: 0,
-							lastError: err,
-						}
-						service.statsChanel <- res
-					}
-					return err
-				},
-			},
-			nats.DispatcherOption{
-				DurableID: durableID,
-				Subject:   SubjSynchronizeInventory,
-				Handler: func(b []byte) error {
-					// TODO: filter the message by rules per gwClient
-					_, err := gwClientCopy.SynchronizeInventory(b)
-					if err == nil {
-						res := statsCounter{
-							subject:   SubjSynchronizeInventory,
-							bytesSent: len(b),
-							lastError: nil,
-						}
-						service.statsChanel <- res
-					} else {
-						res := statsCounter{
-							subject:   SubjSynchronizeInventory,
-							bytesSent: 0,
-							lastError: err,
-						}
-						service.statsChanel <- res
-					}
-					return err
-				},
-			},
-			nats.DispatcherOption{
-				DurableID: durableID,
-				Subject:   SubjSendEvent,
-				Handler: func(b []byte) error {
-					// TODO: filter the message by rules per gwClient
-					_, err := gwClientCopy.SendEvent(b)
-					if err == nil {
-						res := statsCounter{
-							subject:   SubjSendEvent,
-							bytesSent: len(b),
-							lastError: nil,
-						}
-						service.statsChanel <- res
-					} else {
-						res := statsCounter{
-							subject:   SubjSendEvent,
-							bytesSent: 0,
-							lastError: err,
-						}
-						service.statsChanel <- res
-					}
-					return nil
-				},
-			},
-		)
-	}
-
-	if sdErr := nats.StartDispatcher(dispatcherOptions); sdErr == nil {
+	/* Process dispatcher */
+	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running
 		service.agentStatus.Unlock()
@@ -269,5 +189,67 @@ func (service *AgentService) listenChanel() {
 			}
 
 		}
+	}
+}
+
+func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
+	var dispatcherOptions []nats.DispatcherOption
+	for _, gwClient := range service.gwClients {
+		// TODO: filter the message by rules per gwClient
+		gwClientRef := gwClient
+		durableID := fmt.Sprintf("%s", gwClient.HostName)
+		dispatcherOptions = append(
+			dispatcherOptions,
+			service.makeDispatcherOption(
+				durableID,
+				SubjSendEvent,
+				func(b []byte) error {
+					_, err := gwClientRef.SendEvent(b)
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				durableID,
+				SubjSendResourceWithMetrics,
+				func(b []byte) error {
+					_, err := gwClientRef.SendResourcesWithMetrics(b)
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				durableID,
+				SubjSynchronizeInventory,
+				func(b []byte) error {
+					_, err := gwClientRef.SynchronizeInventory(b)
+					return err
+				},
+			),
+		)
+	}
+	return dispatcherOptions
+}
+
+func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn func([]byte) error) nats.DispatcherOption {
+	return nats.DispatcherOption{
+		DurableID: durableID,
+		Subject:   subj,
+		Handler: func(b []byte) error {
+			// TODO: filter the message by rules per gwClient
+			err := subjFn(b)
+			if err == nil {
+				service.statsChanel <- statsCounter{
+					bytesSent: len(b),
+					lastError: nil,
+					subject:   subj,
+				}
+			} else {
+				service.statsChanel <- statsCounter{
+					bytesSent: 0,
+					lastError: err,
+					subject:   subj,
+				}
+			}
+			return err
+		},
 	}
 }
