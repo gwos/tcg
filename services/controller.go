@@ -10,6 +10,7 @@ import (
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
@@ -93,6 +94,10 @@ func (controller *Controller) UpdateGWConnections(bytes []byte) error {
 		return controller.updateGWConnectionsHandler(bytes)
 	}
 	return nil
+}
+
+func (controller *Controller) SendEvent(bytes []byte) error {
+	return nats.Publish(SubjSendEvent, bytes)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -385,6 +390,28 @@ func (controller *Controller) validateToken(c *gin.Context) {
 	}
 }
 
+//
+// @Description The following API endpoint can be used to send Alerts to Foundation.
+// @Tags Alerts
+// @Accept  json
+// @Produce  json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router /events [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
+func (controller *Controller) events(c *gin.Context) {
+	value, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+	}
+	err = controller.SendEvent(value)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
 func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
@@ -392,6 +419,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group := router.Group("/api/v1")
 	apiV1Group.Use(controller.validateToken)
 
+	apiV1Group.POST("/events", controller.events)
 	apiV1Group.GET("/gw-connections", controller.listGWConnections)
 	apiV1Group.POST("/gw-connections", controller.updateGWConnections)
 	apiV1Group.GET("/metrics", controller.listMetrics)

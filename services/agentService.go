@@ -3,9 +3,9 @@ package services
 import (
 	"fmt"
 	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/nats"
 	"sync"
 	"time"
 )
@@ -183,10 +183,34 @@ func (service *AgentService) StartTransport(cons ...*config.GWConnection) error 
 					return err
 				},
 			},
+			nats.DispatcherOption{
+				DurableID: durableID,
+				Subject:   SubjSendEvent,
+				Handler: func(b []byte) error {
+					// TODO: filter the message by rules per gwClient
+					_, err := gwClientCopy.SendEvent(b)
+					if err == nil {
+						res := statsCounter{
+							subject:   SubjSendEvent,
+							bytesSent: len(b),
+							lastError: nil,
+						}
+						service.statsChanel <- res
+					} else {
+						res := statsCounter{
+							subject:   SubjSendEvent,
+							bytesSent: 0,
+							lastError: err,
+						}
+						service.statsChanel <- res
+					}
+					return nil
+				},
+			},
 		)
 	}
 
-	err = nats.StartDispatcher(dispatcherOptions);
+	err = nats.StartDispatcher(dispatcherOptions)
 	if err == nil {
 		service.agentStatus.Lock()
 		service.agentStatus.Transport = Running
@@ -234,7 +258,10 @@ func (service *AgentService) listenChanel() {
 				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
 				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+			case SubjSendEvent:
+				service.agentStats.LastAlertRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
+
 		}
 	}
 }
