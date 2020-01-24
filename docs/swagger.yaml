@@ -1,21 +1,5 @@
 basePath: /api/v1
 definitions:
-  config.GWConnection:
-    properties:
-      hostName:
-        description: |-
-          HostName accepts value for combined "host:port"
-          used as `url.URL{HostName}`
-        type: string
-      password:
-        type: string
-      userName:
-        type: string
-    type: object
-  config.GWConnections:
-    items:
-      $ref: '#/definitions/config.GWConnection'
-    type: array
   milliseconds.MillisecondTimestamp:
     type: object
   services.AgentStats:
@@ -30,6 +14,9 @@ definitions:
         type: string
       executionTimeMetrics:
         type: string
+      lastAlertRun:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
       lastError:
         type: string
       lastInventoryRun:
@@ -62,45 +49,11 @@ info:
   title: TNG API Documentation
   version: "1.0"
 paths:
-  /gw-connections:
-    get:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to get list of GroundworkConnections
-        from the server.
-      parameters:
-      - description: Auth header
-        in: header
-        name: GWOS-APP-NAME
-        required: true
-        type: string
-      - description: Auth header
-        in: header
-        name: GWOS-API-TOKEN
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/config.GWConnections'
-        "401":
-          description: Unauthorized
-          schema:
-            type: string
-        "500":
-          description: Internal server error
-          schema:
-            type: string
-      tags:
-      - Metrics
+  /events:
     post:
       consumes:
       - application/json
-      description: The following API endpoint can be used to update list of GroundworkConnections
-        from the server.
+      description: The following API endpoint can be used to send Alerts to Foundation.
       parameters:
       - description: Auth header
         in: header
@@ -115,20 +68,13 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/config.GWConnections'
+        "200": {}
         "401":
           description: Unauthorized
           schema:
             type: string
-        "500":
-          description: Internal server error
-          schema:
-            type: string
       tags:
-      - Metrics
+      - Alerts
   /metrics:
     get:
       consumes:
@@ -295,6 +241,32 @@ paths:
             type: string
       tags:
       - NATS
+  /reload:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to reload the Connector.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Connector
   /stats:
     get:
       consumes:
