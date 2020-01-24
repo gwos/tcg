@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"sync"
 	"time"
@@ -52,11 +51,12 @@ type AgentStatus struct {
 
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
+	Reload() error
 	StartController() error
 	StopController() error
 	StartNats() error
 	StopNats() error
-	StartTransport(...*config.GWConnection) error
+	StartTransport() error
 	StopTransport() error
 	Stats() *AgentStats
 	Status() *AgentStatus
@@ -71,17 +71,10 @@ type TransitServices interface {
 // GetBytesHandlerType defines handler type
 type GetBytesHandlerType func() ([]byte, error)
 
-// SetBytesHandlerType defines handler type
-type SetBytesHandlerType func([]byte) error
-
 // Controllers defines TNG Agent controllers interface
 type Controllers interface {
-	ListGWConnections() ([]byte, error)
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(GetBytesHandlerType)
-	RegisterUpdateGWConnectionsHandler(SetBytesHandlerType)
 	RemoveListMetricsHandler()
-	RemoveUpdateGWConnectionsHandler()
-	UpdateGWConnections([]byte) error
 	SendEvent([]byte) error
 }

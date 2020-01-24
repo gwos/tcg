@@ -6,7 +6,6 @@ import (
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
-	"gopkg.in/yaml.v3"
 	"sync"
 	"time"
 )
@@ -53,8 +52,45 @@ func GetAgentService() *AgentService {
 			make(chan statsCounter),
 		}
 		go agentService.listenChanel()
+		agentService.Reload()
 	})
 	return agentService
+}
+
+// Reload implements AgentServices.Reload interface
+func (service *AgentService) Reload() error {
+	if res, clErr := service.dsClient.FetchConnector(service.AgentID); clErr == nil {
+		if err := config.GetConfig().LoadConnectorDTO(res); err != nil {
+			return err
+		}
+	} else {
+		return clErr
+	}
+
+	reloadFlags := struct {
+		Controller bool
+		Transport  bool
+		Nats       bool
+	}{
+		service.Status().Controller == Running,
+		service.Status().Transport == Running,
+		service.Status().Nats == Running,
+	}
+	// TODO: Handle errors
+	if reloadFlags.Controller {
+		service.StopController()
+		service.StartController()
+	}
+	if reloadFlags.Nats {
+		service.StopNats()
+		service.StartNats()
+	}
+	if reloadFlags.Transport {
+		// service.StopTransport() // stopped with Nats
+		service.StartTransport()
+	}
+
+	return nil
 }
 
 // StartController implements AgentServices.StartController interface
@@ -107,21 +143,8 @@ func (service *AgentService) StopNats() error {
 }
 
 // StartTransport implements AgentServices.StartTransport interface.
-// It's called by Controller with updated config or without args on startup.
-// So, if args empty it uses local config and tries update it with DSClient.
-func (service *AgentService) StartTransport(cons ...*config.GWConnection) error {
-	/* Process connections */
-	if len(cons) == 0 {
-		cons = config.GetConfig().GWConnections
-		/* Try fetch GWConnections with DSClient */
-		var resCons config.GWConnections
-		if res, clErr := service.dsClient.FetchGWConnections(service.AgentID); clErr == nil {
-			if err := yaml.Unmarshal(res, &resCons); err == nil {
-				config.GetConfig().GWConnections = resCons
-				cons = resCons
-			}
-		}
-	}
+func (service *AgentService) StartTransport() error {
+	cons := config.GetConfig().GWConnections
 	if len(cons) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
 	}

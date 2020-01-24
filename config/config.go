@@ -191,3 +191,10 @@ func GetConfig() *Config {
 	})
 	return cfg
 }
+
+// LoadConnectorDTO loads ConnectorDTO into Config
+func (cfg *Config) LoadConnectorDTO(dto []byte) error {
+	// TODO: merge local Connector settings
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+	return nil
+}
