@@ -1769,7 +1769,10 @@ func print_type_declarations(
 			iota := 0
 			if enum_typedefs[field_C_type] == "string" {
 				fmt.Fprintf(header_file, "    /* %d */ Unknown_%s_Value,\n", iota, field_C_type)
-				generated_C_code += fmt.Sprintf("    /* %d */ \"Unknown_%s_Value\",\n", iota, field_C_type)
+				// We generate an empty string for an unknown value, partly to allow proper recognition of an unknown
+				// (unset) value during JSON serialization of an omitempty field.  Since the downstream code would not
+				// recognize any other particular value we might otherwise choose here, this is the best we can do anyway.
+				generated_C_code += fmt.Sprintf("    /* %d */ \"\", /* Unknown_%s_Value */\n", iota, field_C_type)
 				iota++
 			}
 			for _, spec := range decl_node.Specs {
