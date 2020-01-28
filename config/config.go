@@ -1,10 +1,13 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
 	"math"
+	"net/url"
 	"os"
 	"path"
 	"sync"
@@ -74,13 +77,36 @@ type Connector struct {
 	LogLevel LogLevel `yaml:"logLevel"`
 }
 
+// ConnectorDTO defines TNG Connector configuration
+type ConnectorDTO struct {
+	AgentID       string        `json:"agentId"`
+	AppName       string        `json:"appName"`
+	AppType       string        `json:"appType"`
+	TngURL        string        `json:"tngUrl"`
+	LogLevel      LogLevel      `json:"logLevel"`
+	GWConnections GWConnections `json:"groundworkConnections"`
+	// GWConnections []GWConnection `json:"groundworkConnections"`
+	// TODO: extend LoadConnectorDTO to handle more fields
+	// MonitorConnection MonitorConnectionDto
+	// MetricsProfile    MetricsProfileDto
+}
+
 // GWConnection defines Groundwork Connection configuration
 type GWConnection struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
-	HostName string `yaml:"hostName"`
-	UserName string `yaml:"userName"`
-	Password string `yaml:"password"`
+	HostName            string `yaml:"hostName"`
+	UserName            string `yaml:"userName"`
+	Password            string `yaml:"password"`
+	Enabled             bool   `yaml:"enabled"`
+	IsChild             bool   `yaml:"isChild"`
+	DisplayName         string `yaml:"displayName"`
+	MergeHosts          bool   `yaml:"mergeHosts"`
+	LocalConnection     bool   `yaml:"localConnection"`
+	DeferOwnership      string `yaml:"deferOwnership"`
+	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
+	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
+	SendAllInventory    bool   `yaml:"sendAllInventory"`
 }
 
 // Decode implements envconfig.Decoder interface
@@ -98,6 +124,15 @@ func (con *GWConnection) Decode(value string) error {
 	}
 	if overrides.Password != "" {
 		con.Password = overrides.Password
+	}
+	if overrides.DisplayName != "" {
+		con.Password = overrides.DisplayName
+	}
+	if overrides.DeferOwnership != "" {
+		con.Password = overrides.DeferOwnership
+	}
+	if overrides.ResourceNamePrefix != "" {
+		con.Password = overrides.ResourceNamePrefix
 	}
 	return nil
 }
@@ -133,12 +168,31 @@ func (cons *GWConnections) Decode(value string) error {
 }
 
 // DSConnection defines DalekServices Connection configuration
-type DSConnection GWConnection
+type DSConnection struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName string `yaml:"hostName"`
+	UserName string `yaml:"userName"`
+	Password string `yaml:"password"`
+}
 
 // Decode implements envconfig.Decoder interface
 // merges incoming value with existed structure
 func (con *DSConnection) Decode(value string) error {
-	return (*GWConnection)(con).Decode(value)
+	var overrides GWConnection
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if overrides.HostName != "" {
+		con.HostName = overrides.HostName
+	}
+	if overrides.UserName != "" {
+		con.UserName = overrides.UserName
+	}
+	if overrides.Password != "" {
+		con.Password = overrides.Password
+	}
+	return nil
 }
 
 // Config defines TNG Agent configuration
@@ -193,8 +247,24 @@ func GetConfig() *Config {
 }
 
 // LoadConnectorDTO loads ConnectorDTO into Config
-func (cfg *Config) LoadConnectorDTO(dto []byte) error {
-	// TODO: merge local Connector settings
+func (cfg *Config) LoadConnectorDTO(data []byte) error {
+	var dto ConnectorDTO
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return err
+	}
+	if tngURL, err := url.Parse(dto.TngURL); err == nil {
+		// TODO: Improve addr setting
+		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
+	} else {
+		return err
+	}
+
+	cfg.Connector.AgentID = dto.AgentID
+	cfg.Connector.AppName = dto.AppName
+	cfg.Connector.AppType = dto.AppType
+	cfg.Connector.LogLevel = dto.LogLevel
+	cfg.GWConnections = dto.GWConnections
+
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
 	return nil
 }
