@@ -9,57 +9,9 @@
     "host": "localhost:8099",
     "basePath": "/api/v1",
     "paths": {
-        "/gw-connections": {
-            "get": {
-                "description": "The following API endpoint can be used to get list of GroundworkConnections from the server.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Metrics"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/config.GWConnections"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
+        "/events": {
             "post": {
-                "description": "The following API endpoint can be used to update list of GroundworkConnections from the server.",
+                "description": "The following API endpoint can be used to send Alerts to Foundation.",
                 "consumes": [
                     "application/json"
                 ],
@@ -67,7 +19,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Metrics"
+                    "Alerts"
                 ],
                 "parameters": [
                     {
@@ -86,20 +38,9 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/config.GWConnections"
-                        }
-                    },
+                    "200": {},
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
                         "schema": {
                             "type": "string"
                         }
@@ -353,6 +294,45 @@
                 }
             }
         },
+        "/reload": {
+            "post": {
+                "description": "The following API endpoint can be used to reload the Connector.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Connector"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/stats": {
             "get": {
                 "description": "The following API endpoint can be used to get TNG statistics.",
@@ -443,27 +423,6 @@
         }
     },
     "definitions": {
-        "config.GWConnection": {
-            "type": "object",
-            "properties": {
-                "hostName": {
-                    "description": "HostName accepts value for combined \"host:port\"\nused as `url.URL{HostName}`",
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                },
-                "userName": {
-                    "type": "string"
-                }
-            }
-        },
-        "config.GWConnections": {
-            "type": "array",
-            "items": {
-                "$ref": "#/definitions/config.GWConnection"
-            }
-        },
         "milliseconds.MillisecondTimestamp": {
             "type": "object"
         },
@@ -484,6 +443,10 @@
                 },
                 "executionTimeMetrics": {
                     "type": "string"
+                },
+                "lastAlertRun": {
+                    "type": "object",
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
                 "lastError": {
                     "type": "string"
