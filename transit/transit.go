@@ -5,6 +5,10 @@ import (
 	"github.com/gwos/tng/milliseconds"
 )
 
+const (
+	TransitModelVersion = "1.0.0"
+)
+
 // MetricKind defines the metric kind of the time series.
 type MetricKind string
 
@@ -51,12 +55,12 @@ type ComputeType string
 
 // CloudHub Compute Types
 const (
-	Query       ComputeType = "Query"
-	Regex                   = "Regex"
-	Synthetic               = "Synthetic"
-	Informational           = "Informational"
-	Performance             = "Performance"
-	Health                  = "Health"
+	Query         ComputeType = "Query"
+	Regex                     = "Regex"
+	Synthetic                 = "Synthetic"
+	Informational             = "Informational"
+	Performance               = "Performance"
+	Health                    = "Health"
 )
 
 // MonitorStatus represents Groundwork service monitor status
@@ -75,7 +79,7 @@ const (
 	HostPending                              = "HOST_PENDING"
 	HostScheduledDown                        = "HOST_SCHEDULED_DOWN"
 	HostUnreachable                          = "HOST_UNREACHABLE"
-	HostUnchanged							 = "HOST_UNCHANGED"
+	HostUnchanged                            = "HOST_UNCHANGED"
 )
 
 // ResourceType defines the resource type
@@ -111,9 +115,9 @@ type GroupType string
 
 // The group type uniquely defining corresponding foundation group type
 const (
-	HostGroup           GroupType = "HostGroup"
-	ServiceGroup        		  = "ServiceGroup"
-	CustomGroup        			  = "CustomGroup"
+	HostGroup    GroupType = "HostGroup"
+	ServiceGroup           = "ServiceGroup"
+	CustomGroup            = "CustomGroup"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -177,38 +181,21 @@ type TypedValue struct {
 	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
-// MetricSample defines a single data sample in a time series, which may represent
-// either a measurement at a single point in time or data aggregated over a
-// time duration.
-type MetricSample struct {
-	// SampleType: The kind of value this particular metric represents.
+type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
-
-	// Interval: The time interval to which the data sample applies. For
-	// GAUGE metrics, only the end time of the interval is used. For DELTA
-	// metrics, the start and end time should specify a non-zero interval,
-	// with subsequent samples specifying contiguous and non-overlapping
-	// intervals. For CUMULATIVE metrics, the start and end time should
-	// specify a non-zero interval, with subsequent samples specifying the
-	// same start time and increasing end times, until an event resets the
-	// cumulative value to zero and sets a new start time for the following
-	// samples.
-	Interval *TimeInterval `json:"interval,omitempty"`
-
-	// Value: The value of the metric sample.
-	Value *TypedValue `json:"value,omitempty"`
+	Label      string           `json:"label"`
+	Value      *TypedValue      `json:"value,omitempty"`
 }
 
-// TimeSeries defines a collection of data samples that describes the
-// time-varying values of a metric.
+// TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
 type TimeSeries struct {
 	MetricName string            `json:"metricName"`
-	SampleType MetricSampleType  `json:"sampleType"`
+	SampleType MetricSampleType  `json:"sampleType,omitEmpty"`
 	Interval   *TimeInterval     `json:"interval"`
 	Value      *TypedValue       `json:"value"`
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
-	//MetricSamples []*MetricSample   `json:"metricSamples"`
+	Thresholds *[]ThresholdValue `json:"value,omitempty"`
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -436,10 +423,11 @@ type MonitoredResourceRef struct {
 
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string                          `json:"appType"`
-	AgentID    string                          `json:"agentId"`
-	TraceToken string                          `json:"traceToken"`
+	AppType    string                            `json:"appType"`
+	AgentID    string                            `json:"agentId"`
+	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	Version    string							 `json:"version"`
 }
 
 // OperationResult defines API answer
@@ -464,10 +452,10 @@ type OperationResults struct {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName string					`json:"groupName,required"`
-	Type GroupType 						`json:"type,required"`
-	Description string 					`json:"description,omitempty"`
-	Resources []MonitoredResourceRef 	`json:"resources,required"`
+	GroupName   string                 `json:"groupName,required"`
+	Type        GroupType              `json:"type,required"`
+	Description string                 `json:"description,omitempty"`
+	Resources   []MonitoredResourceRef `json:"resources,required"`
 }
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
@@ -485,12 +473,12 @@ type InventoryRequest struct {
 
 // IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
-	IncidentID    string                          `json:"incidentId"`
-	ResourceName  string                          `json:"resourceName,required"`
-	Status        string                          `json:"status"`
+	IncidentID    string                            `json:"incidentId"`
+	ResourceName  string                            `json:"resourceName,required"`
+	Status        string                            `json:"status"`
 	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
 	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
-	ConditionName string                          `json:"conditionName"`
-	URL           string                          `json:"url,omitempty"`
-	Summary       string                          `json:"summary,omitempty"`
+	ConditionName string                            `json:"conditionName"`
+	URL           string                            `json:"url,omitempty"`
+	Summary       string                            `json:"summary,omitempty"`
 }
