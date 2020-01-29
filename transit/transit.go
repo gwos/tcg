@@ -5,8 +5,9 @@ import (
 	"github.com/gwos/tng/milliseconds"
 )
 
+type VersionString string
 const (
-	TransitModelVersion = "1.0.0"
+	TransitModelVersion VersionString = "1.0.0"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -436,7 +437,7 @@ type TracerContext struct {
 	AgentID    string                            `json:"agentId"`
 	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
-	Version    string							 `json:"version"`
+	Version    VersionString	 				 `json:"version"`
 }
 
 // OperationResult defines API answer
