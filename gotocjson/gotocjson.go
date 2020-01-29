@@ -214,6 +214,7 @@ func main() {
 		os.Exit(1)
 	}
 	final_type_order, err := topologically_sort_nodes(
+		package_name,
 		simple_typedefs, enum_typedefs, const_groups, struct_typedefs,
 		simple_typedef_nodes, enum_typedef_nodes, const_group_nodes, struct_typedef_nodes,
 	)
@@ -1213,6 +1214,7 @@ type declaration_kind struct {
 // That's why we pass in the *_nodes maps, to have access to the declaration position info.
 //
 func topologically_sort_nodes(
+	package_name string,
 	simple_typedefs map[string]string,
 	enum_typedefs map[string]string,
 	const_groups map[string]string,
@@ -1234,9 +1236,26 @@ func topologically_sort_nodes(
 	// map[type_name]type_dependency
 	dependency := map[string]type_dependency{}
 
-	// Output at this stage is only for initial development, to ensure that we have the expected
-	// kinds of data at this point.
+	package_object_Ptr_List := regexp.MustCompile(package_name + `_(.+)_Ptr_List$`)
+
+	// We can use diagnostic output to ensure that we have the expected kinds of data at this point,
+	// to establish that all actual datatype dependencies are factored into the topological sorting.
 	for typedef_name, typedef_type := range simple_typedefs {
+		// For a simple typedef that is not a simple change of name, but is instead some more-complicated
+		// expression such as deriving from "type FooBars []*FooBar", we need to extract the underlying
+		// datatype and use that instead of the simple_typedefs[typedef_name] string, which will be the
+		// name of the C-language datatype we will eventually emit a typedef for.  Here, we instead want
+		// the name of the base Go-language datatype being referenced.
+		//
+		// FIX LATER:  This code handles a _Ptr_List, because that is what we have encountered so far
+		// in the code we needed to convert.  If we ever need to process Go code that uses a _List or
+		// _Ptr or _List_Ptr here instead, we will need to extend this code to cover those cases as well.
+		// We would know that because we would find forward references in the generated C-code header,
+		// which would fail to compile.  That would be evidence that our topological sorting was failing,
+		// and that would be because of improper dependencies being recorded here.
+		if matches := package_object_Ptr_List.FindStringSubmatch(typedef_type); matches != nil {
+			typedef_type = matches[1]
+		}
 		if print_diagnostics {
 			fmt.Fprintf(diag_file, "simple typedef:  %s => %s\n", typedef_name, typedef_type)
 		}
@@ -1672,7 +1691,9 @@ func print_type_declarations(
 			//
 			// On the other hand, if type_name is defined as an enumeration in this package, for simplicity (for the
 			// time being) we just use the unqualified enumeration name, since that is how (at least for the time being)
-			// we are emitting the name of the enumeration.
+			// we are emitting the name of the enumeration.  (However, that branch is probably not taken here, since we
+			// likely switched this datatype to be handled as an enumeration, early on; see the "change of semantics"
+			// comment earlier in this program.)
 			if _, ok := struct_typedefs[type_name]; ok {
 				// FIX LATER:  Check C compilations to see if we need to declare arguments for these macro definitions
 				// so we can include some explicit typecasting.
