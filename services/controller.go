@@ -23,9 +23,8 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*AgentService
-	srv                        *http.Server
-	listMetricsHandler         GetBytesHandlerType
-	updateGWConnectionsHandler SetBytesHandlerType
+	srv                *http.Server
+	listMetricsHandler GetBytesHandlerType
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -38,7 +37,6 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetAgentService(),
-			nil,
 			nil,
 			nil,
 		}
@@ -64,38 +62,12 @@ func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType)
 	controller.listMetricsHandler = fn
 }
 
-// RegisterUpdateGWConnectionsHandler implements Controllers.RegisterUpdateGWConnectionsHandler interface
-func (controller *Controller) RegisterUpdateGWConnectionsHandler(fn SetBytesHandlerType) {
-	controller.updateGWConnectionsHandler = fn
-}
-
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
 	controller.listMetricsHandler = nil
 }
 
-// RemoveUpdateGWConnectionsHandler implements Controllers.RemoveUpdateGWConnectionsHandler interface
-func (controller *Controller) RemoveUpdateGWConnectionsHandler() {
-	controller.updateGWConnectionsHandler = nil
-}
-
-// UpdateGWConnections implements Controllers.UpdateGWConnections interface
-func (controller *Controller) UpdateGWConnections(bytes []byte) error {
-	var cons config.GWConnections
-	if err := json.Unmarshal(bytes, &cons); err != nil {
-		return err
-	}
-	config.GetConfig().GWConnections = cons
-	if controller.Status().Transport == Running {
-		controller.StopTransport()
-		controller.StartTransport(cons...)
-	}
-	if controller.updateGWConnectionsHandler != nil {
-		return controller.updateGWConnectionsHandler(bytes)
-	}
-	return nil
-}
-
+// SendEvent implements Controllers.SendEvent interface
 func (controller *Controller) SendEvent(bytes []byte) error {
 	return nats.Publish(SubjSendEvent, bytes)
 }
@@ -185,48 +157,6 @@ func (controller *Controller) StopController() error {
 	log.Warn("Controller: exiting")
 	controller.srv = nil
 	return nil
-}
-
-//
-// @Description The following API endpoint can be used to get list of GroundworkConnections from the server.
-// @Tags Metrics
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} config.GWConnections
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal server error"
-// @Router /gw-connections [get]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) listGWConnections(c *gin.Context) {
-	output, err := controller.ListGWConnections()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
-	}
-	c.Data(http.StatusOK, gin.MIMEJSON, output)
-}
-
-//
-// @Description The following API endpoint can be used to update list of GroundworkConnections from the server.
-// @Tags Metrics
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} config.GWConnections
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal server error"
-// @Router /gw-connections [post]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) updateGWConnections(c *gin.Context) {
-	value, err := c.GetRawData()
-	if err != nil {
-		c.JSON(http.StatusBadRequest, err.Error())
-	}
-	err = controller.UpdateGWConnections(value)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
-	}
-	c.JSON(http.StatusOK, nil)
 }
 
 //
@@ -412,6 +342,23 @@ func (controller *Controller) events(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
+//
+// @Description The following API endpoint can be used to reload the Connector.
+// @Tags Connector
+// @Accept  json
+// @Produce  json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router /reload [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
+func (controller *Controller) reload(c *gin.Context) {
+	if err := controller.Reload(); err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
 func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
@@ -420,13 +367,12 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.Use(controller.validateToken)
 
 	apiV1Group.POST("/events", controller.events)
-	apiV1Group.GET("/gw-connections", controller.listGWConnections)
-	apiV1Group.POST("/gw-connections", controller.updateGWConnections)
 	apiV1Group.GET("/metrics", controller.listMetrics)
 	apiV1Group.POST("/nats", controller.startNats)
 	apiV1Group.DELETE("/nats", controller.stopNats)
 	apiV1Group.POST("/nats/transport", controller.startTransport)
 	apiV1Group.DELETE("/nats/transport", controller.stopTransport)
+	apiV1Group.POST("/reload", controller.reload)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
 

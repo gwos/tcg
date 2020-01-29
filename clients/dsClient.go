@@ -3,7 +3,7 @@ package clients
 import (
 	"fmt"
 	"github.com/gwos/tng/config"
-	"gopkg.in/yaml.v3"
+	"github.com/gwos/tng/log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -14,14 +14,16 @@ import (
 // DSOperations defines DalekServices operations interface
 type DSOperations interface {
 	Connect() error
-	GetGWConnections(agentID string) (config.GWConnections, error)
+	FetchConnector(agentID string) ([]byte, error)
+	FetchGWConnections(agentID string) ([]byte, error)
 	ValidateToken(appName, apiToken string) error
 }
 
 // Define entrypoints for DSOperations
 const (
 	DSEntrypointConnect       = "/tng/login"
-	DSEntrypointGWConnections = "/tng/gw-connections/:agentID"
+	DSEntrypointConnector     = "/tng/connector/name/:agentID?deep=true"
+	DSEntrypointGWConnections = "/tng/connections/:agentID"
 	DSEntrypointValidateToken = "/tng/validate-token"
 )
 
@@ -107,39 +109,60 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	return err
 }
 
-// GetGWConnections implements GWOperations.GetGWConnections.
-func (client *DSClient) GetGWConnections(agentID string) (config.GWConnections, error) {
+// FetchGWConnections implements GWOperations.FetchGWConnections.
+func (client *DSClient) FetchGWConnections(agentID string) ([]byte, error) {
+	entrypoint := strings.ReplaceAll(DSEntrypointGWConnections, ":agentID", agentID)
+	return client.fetchData(entrypoint)
+}
+
+// FetchConnector implements GWOperations.FetchConnector
+func (client *DSClient) FetchConnector(agentID string) ([]byte, error) {
+	entrypoint := strings.ReplaceAll(DSEntrypointConnector, ":agentID", agentID)
+	return client.fetchData(entrypoint)
+}
+
+func (client *DSClient) fetchData(entrypoint string) ([]byte, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
-		"GWOS-API-TOKEN": client.DSConnection.Password,
 		"GWOS-APP-NAME":  client.AppName,
+		"GWOS-API-TOKEN": client.token,
 	}
-
-	entrypoint := url.URL{
+	reqURL := (&url.URL{
 		Scheme: "http",
 		Host:   client.DSConnection.HostName,
-		Path:   strings.ReplaceAll(DSEntrypointGWConnections, ":agentID", agentID),
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
+		Path:   entrypoint,
+	}).String()
+
+	statusCode, byteResponse, err := SendRequest(http.MethodGet, reqURL, headers, nil, nil)
 	if statusCode == 401 {
 		err = client.Connect()
 		if err != nil {
 			return nil, err
 		}
 		headers["GWOS-API-TOKEN"] = client.token
-		statusCode, byteResponse, err = SendRequest(http.MethodGet, entrypoint.String(), headers, nil, nil)
+		statusCode, byteResponse, err = SendRequest(http.MethodGet, reqURL, headers, nil, nil)
 	}
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "DSClient: fetchData")
+	}()
+
 	if err != nil {
+		logEntryLevel = log.ErrorLevel
 		return nil, err
 	}
 	if statusCode != 200 {
-		return nil, fmt.Errorf(string(byteResponse))
+		logEntryLevel = log.WarnLevel
 	}
-
-	var res config.GWConnections
-	if err := yaml.Unmarshal(byteResponse, &res); err != nil {
-		return nil, err
-	}
-	return res, nil
+	return byteResponse, nil
 }
