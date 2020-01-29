@@ -218,6 +218,7 @@ func context() transit.TracerContext {
 		AgentID:    TestAgentID,
 		TraceToken: TestTraceToken,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		Version:    transit.TransitModelVersion,
 	}
 }
 

@@ -7,7 +7,6 @@ require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/antonfisher/nested-logrus-formatter v1.0.2
 	github.com/boj/redistore v0.0.0-20160128113310-fc113767cd6b // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/garyburd/redigo v1.6.0 // indirect
 	github.com/gin-gonic/contrib v0.0.0-20190923054218-35076c1b2bea
 	github.com/gin-gonic/gin v1.4.0

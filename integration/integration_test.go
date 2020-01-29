@@ -102,6 +102,7 @@ func buildInventoryRequest(t *testing.T) []byte {
 			AgentID:    TestAgentID,
 			TraceToken: TestTraceToken,
 			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+			Version:    transit.TransitModelVersion,
 		},
 		Resources: []transit.InventoryResource{inventoryResource},
 		Groups:    nil,
@@ -152,6 +153,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 			AgentID:    TestAgentID,
 			TraceToken: TestTraceToken,
 			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+			Version:    transit.TransitModelVersion,
 		},
 		Resources: []transit.MonitoredResource{monitoredResource},
 	}
