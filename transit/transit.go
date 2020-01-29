@@ -204,7 +204,7 @@ type TimeSeries struct {
 	Value      *TypedValue       `json:"value"`
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
-	Thresholds *[]ThresholdValue `json:"value,omitempty"`
+	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
 }
 
 // MetricDescriptor defines a metric type and its schema
