@@ -178,19 +178,28 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
 	Label      string           `json:"label"`
-	Value      *TypedValue      `json:"value,omitempty"`
+	Value      *TypedValue      `json:"value"`
 }
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
 type TimeSeries struct {
 	MetricName string            `json:"metricName"`
 	SampleType MetricSampleType  `json:"sampleType,omitEmpty"`
+	// Interval: The time interval to which the data sample applies. For
+	// GAUGE metrics, only the end time of the interval is used. For DELTA
+	// metrics, the start and end time should specify a non-zero interval,
+	// with subsequent samples specifying contiguous and non-overlapping
+	// intervals. For CUMULATIVE metrics, the start and end time should
+	// specify a non-zero interval, with subsequent samples specifying the
+	// same start time and increasing end times, until an event resets the
+	// cumulative value to zero and sets a new start time for the following
+	// samples.
 	Interval   *TimeInterval     `json:"interval"`
 	Value      *TypedValue       `json:"value"`
 	Tags       map[string]string `json:"tags,omitempty"`

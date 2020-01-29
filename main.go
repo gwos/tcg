@@ -134,7 +134,7 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 		},
 		Value: &transit.TypedValue{
 			ValueType: transit.TimeType,
-			TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()},
+			TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 		},
 	}
 	timeSampleService := transit.MonitoredService{
@@ -192,10 +192,10 @@ func example() {
 			"PerformanceData": {StringValue: "007-321 RAD"},
 			"ExecutionTime":   {DoubleValue: 3.0},
 			"CurrentAttempt":  {IntegerValue: 2},
-			"InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+			"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 		Metrics: []transit.TimeSeries{sampleValue},
-	} // Example Monitored Resource of type Host
+	}
 
 	geneva := transit.MonitoredResource{
 		Name:             "geneva",
@@ -210,7 +210,7 @@ func example() {
 			"PerformanceData": {StringValue: "007-321 RAD"},
 			"ExecutionTime":   {DoubleValue: 3.0},
 			"CurrentAttempt":  {IntegerValue: 2},
-			"InceptionTime":   {TimeValue: milliseconds.MillisecondTimestamp{Time: time.Now()}},
+			"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
 		},
 		Services: []transit.MonitoredService{localLoadService},
 	}
