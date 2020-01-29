@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
+	"math"
 	"sync"
 	"time"
 )
@@ -17,7 +19,15 @@ type AgentService struct {
 	agentStatus *AgentStatus
 	dsClient    *clients.DSClient
 	gwClients   []*clients.GWClient
-	statsChanel chan statsCounter
+	ctrlIdx     uint8
+	ctrlChan    chan Ctrl
+	statsChan   chan statsCounter
+}
+
+// Ctrl defines queued controll command
+type Ctrl struct {
+	Subj ctrlSubj
+	Idx  uint8
 }
 
 type statsCounter struct {
@@ -25,6 +35,15 @@ type statsCounter struct {
 	bytesSent int
 	lastError error
 }
+
+type ctrlSubj string
+
+const (
+	ctrlSubjStart ctrlSubj = "start"
+	ctrlSubjStop           = "stop"
+)
+
+const ctrlLimit = 3
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -49,9 +68,12 @@ func GetAgentService() *AgentService {
 				DSConnection: config.GetConfig().DSConnection,
 			},
 			nil,
+			0,
+			make(chan Ctrl, ctrlLimit),
 			make(chan statsCounter),
 		}
-		go agentService.listenChanel()
+		go agentService.listenCtrlChan()
+		go agentService.listenStatsChan()
 		agentService.Reload()
 	})
 	return agentService
@@ -59,6 +81,17 @@ func GetAgentService() *AgentService {
 
 // Reload implements AgentServices.Reload interface
 func (service *AgentService) Reload() error {
+	// TODO: cleanup
+	for i := 0; i < 9; i++ {
+		ctrl, err := service.ctrlPush(ctrlSubjStart)
+		log.With(log.Fields{
+			"i":    i,
+			"ctrl": ctrl,
+			"err":  err,
+		}).Log(log.DebugLevel, "ctrlPush")
+		time.Sleep(200 * time.Millisecond)
+	}
+
 	if res, clErr := service.dsClient.FetchConnector(service.AgentID); clErr == nil {
 		if err := config.GetConfig().LoadConnectorDTO(res); err != nil {
 			return err
@@ -193,9 +226,43 @@ func (service *AgentService) Status() *AgentStatus {
 	return service.agentStatus
 }
 
-func (service *AgentService) listenChanel() {
+// StartAsync implements AgentServices.StartAsync interface
+func (service *AgentService) StartAsync() (Ctrl, error) {
+	return service.ctrlPush(ctrlSubjStart)
+}
+
+// StopAsync implements AgentServices.StopAsync interface
+func (service *AgentService) StopAsync() (Ctrl, error) {
+	return service.ctrlPush(ctrlSubjStop)
+}
+
+func (service *AgentService) ctrlPush(subj ctrlSubj) (Ctrl, error) {
+	ctrl := Ctrl{subj, service.ctrlIdx + 1}
+	select {
+	case service.ctrlChan <- ctrl:
+		service.ctrlIdx++
+		if service.ctrlIdx > math.MaxUint8-1 {
+			service.ctrlIdx = 0
+		}
+		return ctrl, nil
+	default:
+		return Ctrl{}, fmt.Errorf("limit reached: %v", ctrlLimit)
+	}
+}
+
+func (service *AgentService) listenCtrlChan() {
 	for {
-		res := <-service.statsChanel
+		ctrl := <-service.ctrlChan
+		// process(ctrl)
+		// TODO: cleanup
+		fmt.Println("##", ctrl)
+		time.Sleep(1000 * time.Millisecond)
+	}
+}
+
+func (service *AgentService) listenStatsChan() {
+	for {
+		res := <-service.statsChan
 
 		if res.lastError != nil {
 			service.agentStats.LastError = res.lastError.Error()
@@ -260,13 +327,13 @@ func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn
 			// TODO: filter the message by rules per gwClient
 			err := subjFn(b)
 			if err == nil {
-				service.statsChanel <- statsCounter{
+				service.statsChan <- statsCounter{
 					bytesSent: len(b),
 					lastError: nil,
 					subject:   subj,
 				}
 			} else {
-				service.statsChanel <- statsCounter{
+				service.statsChan <- statsCounter{
 					bytesSent: 0,
 					lastError: err,
 					subject:   subj,
