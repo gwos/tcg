@@ -32,12 +32,14 @@ For more info see package `config`
 */
 
 /* define handlers for general libtransit functions */
-bool (*getConnectorConfig)(char *buf, size_t bufLen, char *errBuf, size_t errBufLen) = NULL;
+bool (*getConnectorConfig)(char *buf, size_t bufLen, char *errBuf,
+                           size_t errBufLen) = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
-bool (*sendResourcesWithMetrics)(char *requestJSON, char *errBuf,
+bool (*sendEvent)(char *payloadJSON, char *errBuf, size_t errBufLen) = NULL;
+bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
                                  size_t errBufLen) = NULL;
-bool (*synchronizeInventory)(char *requestJSON, char *errBuf,
+bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
                              size_t errBufLen) = NULL;
 /* define handlers for other libtransit functions */
 bool (*isControllerRunning)() = NULL;
@@ -93,6 +95,7 @@ void load_libtransit() {
   getConnectorConfig = find_symbol("GetConnectorConfig");
   goSetenv = find_symbol("GoSetenv");
   registerListMetricsHandler = find_symbol("RegisterListMetricsHandler");
+  sendEvent = find_symbol("SendEvent");
   sendResourcesWithMetrics = find_symbol("SendResourcesWithMetrics");
   isControllerRunning = find_symbol("IsControllerRunning");
   isNatsRunning = find_symbol("IsNatsRunning");
@@ -124,8 +127,8 @@ void test_libtransit_control() {
   // and re-run.
   char *nats_stor_type = getenv("TNG_CONNECTOR_NATSSTORETYPE");
   if (!nats_stor_type) {
-    res = goSetenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY", errBuf,
-                   ERR_BUF_LEN);
+    res =
+        goSetenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY", errBuf, ERR_BUF_LEN);
     if (!res) {
       fail(errBuf);
     }
@@ -285,12 +288,12 @@ void test_libtransit_control() {
 
 void test_SendResourcesWithMetrics() {
   /* TODO: should be serialized ResourceWithMetricsRequest */
-  char *requestJSON =
+  char *payloadJSON =
       "{\"name\": \"the-unique-name-of-the-instance-01\", \"status\": "
       "\"HOST_UP\", \"type\": \"gce_instance\"}";
 
   char errBuf[ERR_BUF_LEN] = "";
-  bool res = sendResourcesWithMetrics(requestJSON, errBuf, ERR_BUF_LEN);
+  bool res = sendResourcesWithMetrics(payloadJSON, errBuf, ERR_BUF_LEN);
   if (!res) {
     fail(errBuf);
   }

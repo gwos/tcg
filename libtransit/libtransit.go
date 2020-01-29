@@ -63,11 +63,22 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
+// SendEvent is a C API for services.GetController().SendEvent
+//export SendEvent
+func SendEvent(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetController().
+		SendEvent([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
 // SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
+func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
-		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
+		SendResourceWithMetrics([]byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -76,9 +87,9 @@ func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errBuf *C.char, e
 
 // SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
-func SynchronizeInventory(inventoryRequestJSON, errBuf *C.char, errBufLen C.size_t) bool {
+func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
-		SynchronizeInventory([]byte(C.GoString(inventoryRequestJSON))); err != nil {
+		SynchronizeInventory([]byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
