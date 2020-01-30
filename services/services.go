@@ -49,6 +49,22 @@ type AgentStatus struct {
 	sync.Mutex
 }
 
+// ConnectorStatusDTO describes status
+type ConnectorStatusDTO struct {
+	Status statusSubj `json:"connectorStatus"`
+	JobID  uint8      `json:"jobId,omitempty"`
+}
+
+type statusSubj string
+
+const (
+	statusSubjProcessing statusSubj = "processing"
+	statusSubjRunning               = "running"
+	statusSubjStopped               = "stopped"
+	// statusSubjTimeout               = "timeout"
+	// statusSubjUnknown               = "unknown"
+)
+
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
 	Reload() error
