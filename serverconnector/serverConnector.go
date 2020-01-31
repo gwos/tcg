@@ -123,7 +123,7 @@ func getTotalDiskUsageService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalDiskUsage",
@@ -154,7 +154,7 @@ func getDiskUsedService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: VLAD - NEXT SHOULD NOT EQUAL LAST	EEEE
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskUsed",
@@ -186,7 +186,7 @@ func getDiskFreeService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "diskFree",
@@ -217,7 +217,7 @@ func getTotalMemoryUsageService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "totalMemoryUsage",
@@ -247,7 +247,7 @@ func getMemoryUsedService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryUsed",
@@ -278,7 +278,7 @@ func getMemoryFreeService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "memoryFree",
@@ -309,7 +309,7 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "processesNumber",
@@ -333,7 +333,7 @@ func getTotalCpuUsage() *transit.MonitoredService {
 		Status:        transit.ServiceOk,
 		Owner:         hostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Minute * time.Duration(5))},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "cpuUsageTotal",

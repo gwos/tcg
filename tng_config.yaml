@@ -10,7 +10,7 @@ connector:
   natsHost: ":4222"
   logLevel: 2
 dsConnection:
-  hostName: "localhost:3001"
+  hostName: "localhost:80"
   userName: "RESTAPIACCESS"
   password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
 gwConnections:
@@ -18,7 +18,7 @@ gwConnections:
     hostName: "localhost:80"
     userName: "RESTAPIACCESS"
     password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
-  -
-    hostName: "localhost:88"
-    userName: "RESTAPIACCESS"
-    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
+#  -
+#    hostName: "localhost:88"
+#    userName: "RESTAPIACCESS"
+#    password: "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"

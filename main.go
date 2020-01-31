@@ -65,15 +65,18 @@ func main() {
 		}
 	}()
 
-	err = sendInventoryResources(*serverconnector.Synchronize())
-
 	for {
-		err := sendMonitoredResources(*serverconnector.CollectMetrics())
-		if err != nil {
-			log.Error(err.Error())
+		fmt.Println("sending inventory ...")
+		err = sendInventoryResources(*serverconnector.Synchronize())
+		for i := 0; i < 30; i++ {
+			fmt.Println("monitoring resources ...")
+			err := sendMonitoredResources(*serverconnector.CollectMetrics())
+			if err != nil {
+				log.Error(err.Error())
+			}
+			serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
+			time.Sleep(30 * time.Second)
 		}
-		serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		time.Sleep(20 * time.Second)
 	}
 }
 
