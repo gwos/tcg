@@ -65,10 +65,9 @@ func (controller *Controller) SendEvent(bytes []byte) error {
 	return nats.Publish(SubjSendEvent, bytes)
 }
 
-// StartController implements AgentServices.StartController interface
-// overrides AgentService implementation
 // starts the http server
-func (controller *Controller) StartController() error {
+// overrides AgentService implementation
+func (controller *Controller) startController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("StartController: already started")
 	}
@@ -97,9 +96,7 @@ func (controller *Controller) StartController() error {
 	}
 
 	go func() {
-		controller.agentStatus.Lock()
 		controller.agentStatus.Controller = Running
-		controller.agentStatus.Unlock()
 
 		var err error
 		if certFile != "" && keyFile != "" {
@@ -114,9 +111,7 @@ func (controller *Controller) StartController() error {
 			}
 		}
 
-		controller.agentStatus.Lock()
 		controller.agentStatus.Controller = Stopped
-		controller.agentStatus.Unlock()
 	}()
 	// TODO: ensure signal processing in case of linked library
 	// // Wait for interrupt signal to gracefully shutdown the server
@@ -131,10 +126,9 @@ func (controller *Controller) StartController() error {
 	return nil
 }
 
-// StopController implements AgentServices.StopController interface
-// overrides AgentService implementation
 // gracefully shutdowns the http server
-func (controller *Controller) StopController() error {
+// overrides AgentService implementation
+func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
 	log.Info("Controller: shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
@@ -184,11 +178,11 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) startAsync(c *gin.Context) {
 	// TODO: fix route naming
-	ctrl, err := controller.StartAsync()
+	ctrl, err := controller.StartTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{statusSubjProcessing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 //
@@ -204,11 +198,11 @@ func (controller *Controller) startAsync(c *gin.Context) {
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) stopAsync(c *gin.Context) {
 	// TODO: fix route naming
-	ctrl, err := controller.StopAsync()
+	ctrl, err := controller.StopTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{statusSubjProcessing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 //
@@ -236,8 +230,12 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
-	// TODO: return services.ConnectorStatusDTO
-	c.JSON(http.StatusOK, controller.Status())
+	status := controller.Status()
+	statusDTO := ConnectorStatusDTO{status.Transport, 0}
+	if status.Ctrl != nil {
+		statusDTO = ConnectorStatusDTO{Processing, status.Ctrl.Idx}
+	}
+	c.JSON(http.StatusOK, statusDTO)
 }
 
 func (controller *Controller) validateToken(c *gin.Context) {
@@ -310,11 +308,12 @@ func (controller *Controller) events(c *gin.Context) {
 // @Router /connector [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) reload(c *gin.Context) {
-	if err := controller.Reload(); err != nil {
+func (controller *Controller) reloadAsync(c *gin.Context) {
+	ctrl, err := controller.ReloadAsync(nil)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, nil)
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
@@ -328,7 +327,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.GET("/metrics", controller.listMetrics)
 	apiV1Group.POST("/nats", controller.startAsync)
 	apiV1Group.DELETE("/nats", controller.stopAsync)
-	apiV1Group.POST("/connector", controller.reload)
+	apiV1Group.POST("/connector", controller.reloadAsync)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
 

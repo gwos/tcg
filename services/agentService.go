@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"math"
@@ -20,14 +19,15 @@ type AgentService struct {
 	dsClient    *clients.DSClient
 	gwClients   []*clients.GWClient
 	ctrlIdx     uint8
-	ctrlChan    chan Ctrl
+	ctrlChan    chan *CtrlAction
 	statsChan   chan statsCounter
 }
 
-// Ctrl defines queued controll command
-type Ctrl struct {
-	Subj ctrlSubj
-	Idx  uint8
+// CtrlAction defines queued controll action
+type CtrlAction struct {
+	Idx      uint8
+	Subj     ctrlSubj
+	SyncChan chan error
 }
 
 type statsCounter struct {
@@ -39,11 +39,16 @@ type statsCounter struct {
 type ctrlSubj string
 
 const (
-	ctrlSubjStart ctrlSubj = "start"
-	ctrlSubjStop           = "stop"
+	ctrlSubjReload          ctrlSubj = "reload"
+	ctrlSubjStartController          = "startController"
+	ctrlSubjStopController           = "stopController"
+	ctrlSubjStartNats                = "startNats"
+	ctrlSubjStopNats                 = "stopNats"
+	ctrlSubjStartTransport           = "startTransport"
+	ctrlSubjStopTransport            = "stopTransport"
 )
 
-const ctrlLimit = 3
+const ctrlLimit = 9
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -59,9 +64,9 @@ func GetAgentService() *AgentService {
 				AppType: agentConnector.AppType,
 			},
 			&AgentStatus{
-				Controller: Pending,
-				Nats:       Pending,
-				Transport:  Pending,
+				Controller: Stopped,
+				Nats:       Stopped,
+				Transport:  Stopped,
 			},
 			&clients.DSClient{
 				AppName:      agentConnector.AppName,
@@ -69,7 +74,7 @@ func GetAgentService() *AgentService {
 			},
 			nil,
 			0,
-			make(chan Ctrl, ctrlLimit),
+			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 		}
 		go agentService.listenCtrlChan()
@@ -79,184 +84,134 @@ func GetAgentService() *AgentService {
 	return agentService
 }
 
+// ReloadAsync implements AgentServices.ReloadAsync interface
+func (service *AgentService) ReloadAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjReload, syncChan)
+}
+
+// StartControllerAsync implements AgentServices.StartControllerAsync interface
+func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStartController, syncChan)
+}
+
+// StopControllerAsync implements AgentServices.StopControllerAsync interface
+func (service *AgentService) StopControllerAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStopController, syncChan)
+}
+
+// StartNatsAsync implements AgentServices.StartNatsAsync interface
+func (service *AgentService) StartNatsAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStartNats, syncChan)
+}
+
+// StopNatsAsync implements AgentServices.StopNatsAsync interface
+func (service *AgentService) StopNatsAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStopNats, syncChan)
+}
+
+// StartTransportAsync implements AgentServices.StartTransportAsync interface.
+func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStartTransport, syncChan)
+}
+
+// StopTransportAsync implements AgentServices.StopTransportAsync interface
+func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(ctrlSubjStopTransport, syncChan)
+}
+
 // Reload implements AgentServices.Reload interface
 func (service *AgentService) Reload() error {
-	// TODO: cleanup
-	for i := 0; i < 9; i++ {
-		ctrl, err := service.ctrlPush(ctrlSubjStart)
-		log.With(log.Fields{
-			"i":    i,
-			"ctrl": ctrl,
-			"err":  err,
-		}).Log(log.DebugLevel, "ctrlPush")
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	if res, clErr := service.dsClient.FetchConnector(service.AgentID); clErr == nil {
-		if err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
-		}
-	} else {
-		return clErr
-	}
-
-	reloadFlags := struct {
-		Controller bool
-		Transport  bool
-		Nats       bool
-	}{
-		service.Status().Controller == Running,
-		service.Status().Transport == Running,
-		service.Status().Nats == Running,
-	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		service.StopController()
-		service.StartController()
-	}
-	if reloadFlags.Nats {
-		service.StopNats()
-		service.StartNats()
-	}
-	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
-		service.StartTransport()
-	}
-
-	return nil
+	return service.ctrlPushSync(ctrlSubjReload)
 }
 
 // StartController implements AgentServices.StartController interface
 func (service *AgentService) StartController() error {
-	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	return GetController().StartController()
+	return service.ctrlPushSync(ctrlSubjStartController)
 }
 
 // StopController implements AgentServices.StopController interface
 func (service *AgentService) StopController() error {
-	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	if service.agentStatus.Controller == Stopped || service.agentStatus.Controller == Pending {
-		return nil
-	}
-	return GetController().StopController()
+	return service.ctrlPushSync(ctrlSubjStopController)
 }
 
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
-	err := nats.StartServer(nats.Config{
-		DispatcherAckWait:     time.Second * time.Duration(service.Connector.NatsAckWait),
-		DispatcherMaxInflight: service.Connector.NatsMaxInflight,
-		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
-		FilestoreDir:          service.Connector.NatsFilestoreDir,
-		StoreType:             service.Connector.NatsStoreType,
-		NatsHost:              service.Connector.NatsHost,
-	})
-	if err == nil {
-		service.agentStatus.Lock()
-		service.agentStatus.Nats = Running
-		service.agentStatus.Unlock()
-	}
-	return err
+	return service.ctrlPushSync(ctrlSubjStartNats)
 }
 
 // StopNats implements AgentServices.StopNats interface
 func (service *AgentService) StopNats() error {
-	if service.agentStatus.Nats == Stopped || service.agentStatus.Nats == Pending {
-		return nil
-	}
-
-	// StopTransport as dependency
-	err := service.StopTransport()
-	// skip StopTransport error checking
-	nats.StopServer()
-	service.agentStatus.Lock()
-	service.agentStatus.Nats = Stopped
-	service.agentStatus.Unlock()
-	return err
+	return service.ctrlPushSync(ctrlSubjStopNats)
 }
 
 // StartTransport implements AgentServices.StartTransport interface.
 func (service *AgentService) StartTransport() error {
-	cons := config.GetConfig().GWConnections
-	if len(cons) == 0 {
-		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
-	}
-	/* Process clients */
-	gwClients := make([]*clients.GWClient, len(cons))
-	for i := range cons {
-		gwClients[i] = &clients.GWClient{
-			AppName:      service.AppName,
-			GWConnection: cons[i],
-		}
-	}
-	service.gwClients = gwClients
-	/* Process dispatcher */
-	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
-		service.agentStatus.Lock()
-		service.agentStatus.Transport = Running
-		service.agentStatus.Unlock()
-	} else {
-		return sdErr
-	}
-	return nil
+	return service.ctrlPushSync(ctrlSubjStartTransport)
 }
 
 // StopTransport implements AgentServices.StopTransport interface
 func (service *AgentService) StopTransport() error {
-	if service.agentStatus.Transport == Stopped || service.agentStatus.Transport == Pending {
-		return nil
-	}
-
-	err := nats.StopDispatcher()
-	if err == nil {
-		service.agentStatus.Lock()
-		service.agentStatus.Transport = Stopped
-		service.agentStatus.Unlock()
-	}
-	return err
+	return service.ctrlPushSync(ctrlSubjStopTransport)
 }
 
 // Stats implements AgentServices.Stats interface
-func (service *AgentService) Stats() *AgentStats {
-	return service.agentStats
+func (service *AgentService) Stats() AgentStats {
+	return *service.agentStats
 }
 
 // Status implements AgentServices.Status interface
-func (service *AgentService) Status() *AgentStatus {
-	return service.agentStatus
+func (service *AgentService) Status() AgentStatus {
+	return *service.agentStatus
 }
 
-// StartAsync implements AgentServices.StartAsync interface
-func (service *AgentService) StartAsync() (Ctrl, error) {
-	return service.ctrlPush(ctrlSubjStart)
-}
-
-// StopAsync implements AgentServices.StopAsync interface
-func (service *AgentService) StopAsync() (Ctrl, error) {
-	return service.ctrlPush(ctrlSubjStop)
-}
-
-func (service *AgentService) ctrlPush(subj ctrlSubj) (Ctrl, error) {
-	ctrl := Ctrl{subj, service.ctrlIdx + 1}
+func (service *AgentService) ctrlPushAsync(subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
+	ctrl := &CtrlAction{service.ctrlIdx + 1, subj, syncChan}
 	select {
 	case service.ctrlChan <- ctrl:
-		service.ctrlIdx++
-		if service.ctrlIdx > math.MaxUint8-1 {
+		service.ctrlIdx = ctrl.Idx
+		if service.ctrlIdx > (math.MaxUint8 - 1) {
 			service.ctrlIdx = 0
 		}
 		return ctrl, nil
 	default:
-		return Ctrl{}, fmt.Errorf("limit reached: %v", ctrlLimit)
+		return nil, fmt.Errorf("Ctrl limit reached: %v", ctrlLimit)
 	}
+}
+
+func (service *AgentService) ctrlPushSync(subj ctrlSubj) error {
+	syncChan := make(chan error)
+	if _, err := service.ctrlPushAsync(subj, syncChan); err != nil {
+		return err
+	}
+	return <-syncChan
 }
 
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
-		// process(ctrl)
-		// TODO: cleanup
-		fmt.Println("##", ctrl)
-		time.Sleep(1000 * time.Millisecond)
+		service.agentStatus.Ctrl = ctrl
+		var err error
+		switch ctrl.Subj {
+		case ctrlSubjReload:
+			err = service.reload()
+		case ctrlSubjStartController:
+			err = service.startController()
+		case ctrlSubjStopController:
+			err = service.stopController()
+		case ctrlSubjStartNats:
+			err = service.startNats()
+		case ctrlSubjStopNats:
+			err = service.stopNats()
+		case ctrlSubjStartTransport:
+			err = service.startTransport()
+		case ctrlSubjStopTransport:
+			err = service.stopTransport()
+		}
+		// TODO: provide timeout
+		if ctrl.SyncChan != nil {
+			ctrl.SyncChan <- err
+		}
+		service.agentStatus.Ctrl = nil
 	}
 }
 
@@ -342,4 +297,115 @@ func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn
 			return err
 		},
 	}
+}
+
+func (service *AgentService) reload() error {
+	if res, clErr := service.dsClient.FetchConnector(service.AgentID); clErr == nil {
+		if err := config.GetConfig().LoadConnectorDTO(res); err != nil {
+			return err
+		}
+	} else {
+		return clErr
+	}
+
+	reloadFlags := struct {
+		Controller bool
+		Transport  bool
+		Nats       bool
+	}{
+		service.Status().Controller == Running,
+		service.Status().Transport == Running,
+		service.Status().Nats == Running,
+	}
+	// TODO: Handle errors
+	if reloadFlags.Controller {
+		service.stopController()
+		service.startController()
+	}
+	if reloadFlags.Nats {
+		service.stopNats()
+		service.startNats()
+	}
+	if reloadFlags.Transport {
+		// service.StopTransport() // stopped with Nats
+		service.startTransport()
+	}
+
+	return nil
+}
+
+func (service *AgentService) startController() error {
+	// NOTE: the service.agentStatus.Controller will be updated by controller itself
+	return GetController().startController()
+}
+
+func (service *AgentService) stopController() error {
+	// NOTE: the service.agentStatus.Controller will be updated by controller itself
+	if service.agentStatus.Controller == Stopped {
+		return nil
+	}
+	return GetController().stopController()
+}
+
+func (service *AgentService) startNats() error {
+	err := nats.StartServer(nats.Config{
+		DispatcherAckWait:     time.Second * time.Duration(service.Connector.NatsAckWait),
+		DispatcherMaxInflight: service.Connector.NatsMaxInflight,
+		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
+		FilestoreDir:          service.Connector.NatsFilestoreDir,
+		StoreType:             service.Connector.NatsStoreType,
+		NatsHost:              service.Connector.NatsHost,
+	})
+	if err == nil {
+		service.agentStatus.Nats = Running
+	}
+	return err
+}
+
+func (service *AgentService) stopNats() error {
+	if service.agentStatus.Nats == Stopped {
+		return nil
+	}
+
+	// Stop Transport as dependency
+	err := service.stopTransport()
+	// skip Stop Transport error checking
+	nats.StopServer()
+	service.agentStatus.Nats = Stopped
+	return err
+}
+
+func (service *AgentService) startTransport() error {
+	cons := config.GetConfig().GWConnections
+	if len(cons) == 0 {
+		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
+	}
+	/* Process clients */
+	gwClients := make([]*clients.GWClient, len(cons))
+	for i := range cons {
+		gwClients[i] = &clients.GWClient{
+			AppName:      service.AppName,
+			GWConnection: cons[i],
+		}
+	}
+	service.gwClients = gwClients
+	/* Process dispatcher */
+	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
+		service.agentStatus.Transport = Running
+	} else {
+		return sdErr
+	}
+	return nil
+}
+
+func (service *AgentService) stopTransport() error {
+	if service.agentStatus.Transport == Stopped {
+		return nil
+	}
+
+	err := nats.StopDispatcher()
+	if err == nil {
+		service.agentStatus.Transport = Stopped
+	}
+	return err
 }

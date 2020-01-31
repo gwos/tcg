@@ -379,6 +379,10 @@
                 "controller": {
                     "type": "string"
                 },
+                "ctrl": {
+                    "type": "object",
+                    "$ref": "#/definitions/services.CtrlAction"
+                },
                 "nats": {
                     "type": "string"
                 },

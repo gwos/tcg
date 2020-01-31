@@ -37,6 +37,9 @@ definitions:
     properties:
       controller:
         type: string
+      ctrl:
+        $ref: '#/definitions/services.CtrlAction'
+        type: object
       nats:
         type: string
       transport:
