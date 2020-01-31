@@ -22,7 +22,7 @@ type DSOperations interface {
 // Define entrypoints for DSOperations
 const (
 	DSEntrypointConnect       = "/tng/login"
-	DSEntrypointConnector     = "/tng/connector/name/:agentID?deep=true"
+	DSEntrypointConnector     = "/tng/connectors/name/:agentID?deep=true"
 	DSEntrypointGWConnections = "/tng/connections/:agentID"
 	DSEntrypointValidateToken = "/tng/validate-token"
 )
@@ -163,6 +163,7 @@ func (client *DSClient) fetchData(entrypoint string) ([]byte, error) {
 	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
+		return nil, err
 	}
 	return byteResponse, nil
 }
