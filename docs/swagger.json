@@ -9,6 +9,45 @@
     "host": "localhost:8099",
     "basePath": "/api/v1",
     "paths": {
+        "/connector": {
+            "post": {
+                "description": "The following API endpoint can be used to reload the Connector.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Connector"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/events": {
             "post": {
                 "description": "The following API endpoint can be used to send Alerts to Foundation.",
@@ -130,7 +169,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
+                            "$ref": "#/definitions/services.ConnectorStatusDTO"
                         }
                     },
                     "401": {
@@ -178,7 +217,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
+                            "$ref": "#/definitions/services.ConnectorStatusDTO"
                         }
                     },
                     "401": {
@@ -189,143 +228,6 @@
                     },
                     "500": {
                         "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/nats/transport": {
-            "post": {
-                "description": "The following API endpoint can be used to start NATS transport(this means that messages will begin to be sent).",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "NATS"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "description": "The following API endpoint can be used to stop NATS transport.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "NATS"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/reload": {
-            "post": {
-                "description": "The following API endpoint can be used to reload the Connector.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Connector"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {},
-                    "401": {
-                        "description": "Unauthorized",
                         "schema": {
                             "type": "string"
                         }
@@ -409,7 +311,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
+                            "$ref": "#/definitions/services.ConnectorStatusDTO"
                         }
                     },
                     "401": {
@@ -477,11 +379,26 @@
                 "controller": {
                     "type": "string"
                 },
+                "ctrl": {
+                    "type": "object",
+                    "$ref": "#/definitions/services.CtrlAction"
+                },
                 "nats": {
                     "type": "string"
                 },
                 "transport": {
                     "type": "string"
+                }
+            }
+        },
+        "services.ConnectorStatusDTO": {
+            "type": "object",
+            "properties": {
+                "connectorStatus": {
+                    "type": "string"
+                },
+                "jobId": {
+                    "type": "integer"
                 }
             }
         }
