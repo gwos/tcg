@@ -2,7 +2,6 @@ package services
 
 import (
 	"github.com/gwos/tng/milliseconds"
-	"sync"
 	"time"
 )
 
@@ -13,15 +12,15 @@ const (
 	SubjSendEvent               = "send-events"
 )
 
-// StatusEnum defines status value
-type StatusEnum string
+// Status defines status value
+type Status string
 
 // Status
 const (
-	Pending StatusEnum = "Pending"
-	Running            = "Running"
-	Stopped            = "Stopped"
-	Unknown            = "Unknown"
+	Processing Status = "processing"
+	Running           = "running"
+	Stopped           = "stopped"
+	Unknown           = "unknown"
 )
 
 // AgentStats defines TNG Agent statistics
@@ -38,19 +37,31 @@ type AgentStats struct {
 	ExecutionTimeMetrics   time.Duration
 	UpSince                milliseconds.MillisecondTimestamp
 	LastError              string
-	sync.Mutex
 }
 
 // AgentStatus defines TNG Agent status
 type AgentStatus struct {
-	Controller StatusEnum
-	Nats       StatusEnum
-	Transport  StatusEnum
-	sync.Mutex
+	Ctrl       *CtrlAction
+	Controller Status
+	Nats       Status
+	Transport  Status
+}
+
+// ConnectorStatusDTO describes status
+type ConnectorStatusDTO struct {
+	Status Status `json:"connectorStatus"`
+	JobID  uint8  `json:"jobId,omitempty"`
 }
 
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
+	ReloadAsync(chan error) (*CtrlAction, error)
+	StartControllerAsync(chan error) (*CtrlAction, error)
+	StopControllerAsync(chan error) (*CtrlAction, error)
+	StartNatsAsync(chan error) (*CtrlAction, error)
+	StopNatsAsync(chan error) (*CtrlAction, error)
+	StartTransportAsync(chan error) (*CtrlAction, error)
+	StopTransportAsync(chan error) (*CtrlAction, error)
 	Reload() error
 	StartController() error
 	StopController() error
@@ -58,8 +69,8 @@ type AgentServices interface {
 	StopNats() error
 	StartTransport() error
 	StopTransport() error
-	Stats() *AgentStats
-	Status() *AgentStatus
+	Stats() AgentStats
+	Status() AgentStatus
 }
 
 // TransitServices defines TNG Agent services interface

@@ -37,10 +37,20 @@ definitions:
     properties:
       controller:
         type: string
+      ctrl:
+        $ref: '#/definitions/services.CtrlAction'
+        type: object
       nats:
         type: string
       transport:
         type: string
+    type: object
+  services.ConnectorStatusDTO:
+    properties:
+      connectorStatus:
+        type: string
+      jobId:
+        type: integer
     type: object
 host: localhost:8099
 info:
@@ -49,6 +59,32 @@ info:
   title: TNG API Documentation
   version: "1.0"
 paths:
+  /connector:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to reload the Connector.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Connector
   /events:
     post:
       consumes:
@@ -131,7 +167,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentStatus'
+            $ref: '#/definitions/services.ConnectorStatusDTO'
         "401":
           description: Unauthorized
           schema:
@@ -164,7 +200,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentStatus'
+            $ref: '#/definitions/services.ConnectorStatusDTO'
         "401":
           description: Unauthorized
           schema:
@@ -175,98 +211,6 @@ paths:
             type: string
       tags:
       - NATS
-  /nats/transport:
-    delete:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to stop NATS transport.
-      parameters:
-      - description: Auth header
-        in: header
-        name: GWOS-APP-NAME
-        required: true
-        type: string
-      - description: Auth header
-        in: header
-        name: GWOS-API-TOKEN
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/services.AgentStatus'
-        "401":
-          description: Unauthorized
-          schema:
-            type: string
-        "500":
-          description: Internal server error
-          schema:
-            type: string
-      tags:
-      - NATS
-    post:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to start NATS transport(this
-        means that messages will begin to be sent).
-      parameters:
-      - description: Auth header
-        in: header
-        name: GWOS-APP-NAME
-        required: true
-        type: string
-      - description: Auth header
-        in: header
-        name: GWOS-API-TOKEN
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/services.AgentStatus'
-        "401":
-          description: Unauthorized
-          schema:
-            type: string
-        "500":
-          description: Internal server error
-          schema:
-            type: string
-      tags:
-      - NATS
-  /reload:
-    post:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to reload the Connector.
-      parameters:
-      - description: Auth header
-        in: header
-        name: GWOS-APP-NAME
-        required: true
-        type: string
-      - description: Auth header
-        in: header
-        name: GWOS-API-TOKEN
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200": {}
-        "401":
-          description: Unauthorized
-          schema:
-            type: string
-      tags:
-      - Connector
   /stats:
     get:
       consumes:
@@ -318,7 +262,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentStatus'
+            $ref: '#/definitions/services.ConnectorStatusDTO'
         "401":
           description: Unauthorized
           schema:

@@ -2,13 +2,11 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -44,11 +42,6 @@ func GetController() *Controller {
 	return controller
 }
 
-// ListGWConnections implements Controllers.ListGWConnections interface
-func (controller *Controller) ListGWConnections() ([]byte, error) {
-	return json.Marshal(config.GetConfig().GWConnections)
-}
-
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
 	if controller.listMetricsHandler != nil {
@@ -72,10 +65,9 @@ func (controller *Controller) SendEvent(bytes []byte) error {
 	return nats.Publish(SubjSendEvent, bytes)
 }
 
-// StartController implements AgentServices.StartController interface
-// overrides AgentService implementation
 // starts the http server
-func (controller *Controller) StartController() error {
+// overrides AgentService implementation
+func (controller *Controller) startController() error {
 	if controller.srv != nil {
 		return fmt.Errorf("StartController: already started")
 	}
@@ -104,9 +96,7 @@ func (controller *Controller) StartController() error {
 	}
 
 	go func() {
-		controller.agentStatus.Lock()
 		controller.agentStatus.Controller = Running
-		controller.agentStatus.Unlock()
 
 		var err error
 		if certFile != "" && keyFile != "" {
@@ -121,9 +111,7 @@ func (controller *Controller) StartController() error {
 			}
 		}
 
-		controller.agentStatus.Lock()
 		controller.agentStatus.Controller = Stopped
-		controller.agentStatus.Unlock()
 	}()
 	// TODO: ensure signal processing in case of linked library
 	// // Wait for interrupt signal to gracefully shutdown the server
@@ -138,10 +126,9 @@ func (controller *Controller) StartController() error {
 	return nil
 }
 
-// StopController implements AgentServices.StopController interface
-// overrides AgentService implementation
 // gracefully shutdowns the http server
-func (controller *Controller) StopController() error {
+// overrides AgentService implementation
+func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
 	log.Info("Controller: shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
@@ -183,18 +170,19 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Tags NATS
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} services.AgentStatus
+// @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /nats [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) startNats(c *gin.Context) {
-	err := controller.StartNats()
+func (controller *Controller) startAsync(c *gin.Context) {
+	// TODO: fix route naming
+	ctrl, err := controller.StartTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, controller.Status())
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 //
@@ -202,56 +190,19 @@ func (controller *Controller) startNats(c *gin.Context) {
 // @Tags NATS
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} services.AgentStatus
+// @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router /nats [delete]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) stopNats(c *gin.Context) {
-	err := controller.StopNats()
+func (controller *Controller) stopAsync(c *gin.Context) {
+	// TODO: fix route naming
+	ctrl, err := controller.StopTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, controller.Status())
-}
-
-//
-// @Description The following API endpoint can be used to start NATS transport(this means that messages will begin to be sent).
-// @Tags NATS
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} services.AgentStatus
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal server error"
-// @Router /nats/transport [post]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) startTransport(c *gin.Context) {
-	err := controller.StartTransport()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
-	}
-	c.JSON(http.StatusOK, controller.Status())
-}
-
-//
-// @Description The following API endpoint can be used to stop NATS transport.
-// @Tags NATS
-// @Accept  json
-// @Produce  json
-// @Success 200 {object} services.AgentStatus
-// @Failure 401 {string} string "Unauthorized"
-// @Failure 500 {string} string "Internal server error"
-// @Router /nats/transport [delete]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) stopTransport(c *gin.Context) {
-	err := controller.StopTransport()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
-	}
-	c.JSON(http.StatusOK, controller.Status())
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 //
@@ -273,13 +224,18 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Tags Server
 // @Accept  json
 // @Produce  json
-// @Success 200 {object} services.AgentStatus
+// @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Router /status [get]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
-	c.JSON(http.StatusOK, controller.Status())
+	status := controller.Status()
+	statusDTO := ConnectorStatusDTO{status.Transport, 0}
+	if status.Ctrl != nil {
+		statusDTO = ConnectorStatusDTO{Processing, status.Ctrl.Idx}
+	}
+	c.JSON(http.StatusOK, statusDTO)
 }
 
 func (controller *Controller) validateToken(c *gin.Context) {
@@ -349,14 +305,15 @@ func (controller *Controller) events(c *gin.Context) {
 // @Produce  json
 // @Success 200
 // @Failure 401 {string} string "Unauthorized"
-// @Router /reload [post]
+// @Router /connector [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN    header    string     true        "Auth header"
-func (controller *Controller) reload(c *gin.Context) {
-	if err := controller.Reload(); err != nil {
+func (controller *Controller) reloadAsync(c *gin.Context) {
+	ctrl, err := controller.ReloadAsync(nil)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 	}
-	c.JSON(http.StatusOK, nil)
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
 
 func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
@@ -368,11 +325,9 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.GET("/metrics", controller.listMetrics)
-	apiV1Group.POST("/nats", controller.startNats)
-	apiV1Group.DELETE("/nats", controller.stopNats)
-	apiV1Group.POST("/nats/transport", controller.startTransport)
-	apiV1Group.DELETE("/nats/transport", controller.stopTransport)
-	apiV1Group.POST("/reload", controller.reload)
+	apiV1Group.POST("/nats", controller.startAsync)
+	apiV1Group.DELETE("/nats", controller.stopAsync)
+	apiV1Group.POST("/connector", controller.reloadAsync)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
 
