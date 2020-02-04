@@ -1810,7 +1810,7 @@ func print_type_declarations(
 							generated_C_code += fmt.Sprintf("    /* %d */ %s,\n", iota, value.(*ast.BasicLit).Value)
 						}
 					} else {
-						// Logically we don't need to specify the value if the expression is just "iota", but we're
+						// Logically, we don't need to specify the value if the expression is just "iota", but we're
 						// preparing here for eventual possible evaluation of more complex expressions like "1 << iota".
 						// Also, it allows the generated header file to document whatever numeric values we might see
 						// in non-JSON data structures we might need to debug.
@@ -4487,7 +4487,7 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 			//
 			// We can't use a fixed loop-index name like "index" to iterate over the list items, because this code
 			// might be invoked recursively and it would be a mistake for an inner generated loop to re-use the same
-			// loop-index name as an outer generated loop.  So we must manufacture an index-veriable name that we
+			// loop-index name as an outer generated loop.  So we must manufacture an index-variable name that we
 			// know won't be re-used during recursion.  For that purpose, we will use the line-indentation length as
 			// a proxy for the process_item() nesting level.
 			index_name := "index_" + strconv.Itoa(len(line_prefix)/len(indent))
@@ -4503,9 +4503,21 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 		} else if matches := trailing_Ptr.FindStringSubmatch(item_type); matches != nil {
 			// We have a pointer to some other item.
 			base_type := matches[1]
-			// function_code += fmt.Sprintf("%s// process pointer:  %s %s%s%s\n", line_prefix, item_type, item_prefix, member_op, item_name)
 			function_code += fmt.Sprintf("%s// pointer field:  %s %s%s%s\n", line_prefix, item_type, item_prefix, member_op, item_name)
-			function_code += fmt.Sprintf("%sif (1) {\n", line_prefix)
+			// FIX LATER:  Logically, we would like to test the field tags to see if the pointer represents an omitalways
+			// or omitempty field, instead of just testing a fixed true value.  That would require reference to the
+			// struct_field_tags map, along with tracking exactly where in the likely nesting of structures this particular
+			// pointer resides and whether that specific member field did logically have omitalways or omitempty applied,
+			// within the recursive processing we are doing here.  But the current organization of this recursion is not
+			// tracking the structure/field names as we descend into the structure nesting carefully enough to do that.
+			// And it shouldn't do any harm to test for a NULL pointer even in cases where we expect that one should never
+			// occur, and not segfault the program as a result.  So for the time being, we take a lax approach here and
+			// accept some unexpected NULL pointers if they do occur, without generating any kind of error message.
+			if true {
+				function_code += fmt.Sprintf("%sif (%s_%s%s%s != NULL) {\n", line_prefix, package_name, item_prefix, member_op, item_name)
+			} else {
+				function_code += fmt.Sprintf("%sif (1) {\n", line_prefix)
+			}
 			process_item(line_prefix+indent, base_type, item_prefix+member_op+item_name, "->", "")
 			function_code += fmt.Sprintf("%sfree(%s_%s%s%s);\n", line_prefix+indent, package_name, item_prefix, member_op, item_name)
 			function_code += fmt.Sprintf("%s}\n", line_prefix)
