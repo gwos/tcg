@@ -21,10 +21,10 @@ type DSOperations interface {
 
 // Define entrypoints for DSOperations
 const (
-	DSEntrypointConnect       = "/tng/login"
-	DSEntrypointConnector     = "/tng/connectors/name/:agentID?deep=true"
-	DSEntrypointGWConnections = "/tng/connections/:agentID"
-	DSEntrypointValidateToken = "/tng/validate-token"
+	DSEntrypointConnect       = "/dalekservices/tng/login"
+	DSEntrypointConnector     = "/dalekservices/tng/connectors/name/:agentID?deep=true"
+	DSEntrypointGWConnections = "/dalekservices/tng/connections/:agentID"
+	DSEntrypointValidateToken = "/dalekservices/tng/validate-token"
 )
 
 // DSClient implements DSOperations interface
@@ -96,7 +96,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 
 	if err == nil {
-		if statusCode == 200 {
+		if statusCode == 201 {
 			b, _ := strconv.ParseBool(string(byteResponse))
 			if b {
 				return nil
