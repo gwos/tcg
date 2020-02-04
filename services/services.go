@@ -25,18 +25,19 @@ const (
 
 // AgentStats defines TNG Agent statistics
 type AgentStats struct {
-	AgentID                string
-	AppType                string
-	BytesSent              int
-	MetricsSent            int
-	MessagesSent           int
-	LastInventoryRun       milliseconds.MillisecondTimestamp
-	LastMetricsRun         milliseconds.MillisecondTimestamp
-	LastAlertRun           milliseconds.MillisecondTimestamp
-	ExecutionTimeInventory time.Duration
-	ExecutionTimeMetrics   time.Duration
-	UpSince                milliseconds.MillisecondTimestamp
-	LastError              string
+	// The json blocks ensure the json response keys are  // specified and lowercase
+	AgentID                string `json:"agentID"`
+	AppType                string `json:"appType"`
+	BytesSent              int `json:"bytesSent"`
+	MetricsSent            int `json:"metricsSent"`
+	MessagesSent           int `json:"messagesSent"`
+	LastInventoryRun       milliseconds.MillisecondTimestamp `json:"lastInventoryRun"`
+	LastMetricsRun         milliseconds.MillisecondTimestamp `json:"lastMetricsRun"`
+	LastAlertRun           milliseconds.MillisecondTimestamp `json:"lastAlertRun"`
+	ExecutionTimeInventory time.Duration `json:"executionTimeInventory"`
+	ExecutionTimeMetrics   time.Duration `json:"executionTimeMetrics"`
+	UpSince                milliseconds.MillisecondTimestamp `json:"upSince"`
+	LastError              string `json:"lastError"`
 }
 
 // AgentStatus defines TNG Agent status
