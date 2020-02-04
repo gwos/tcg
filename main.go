@@ -66,13 +66,19 @@ func main() {
 	}()
 
 	for {
-		fmt.Println("sending inventory ...")
-		err = sendInventoryResources(*serverconnector.Synchronize())
-		for i := 0; i < 30; i++ {
-			fmt.Println("monitoring resources ...")
-			err := sendMonitoredResources(*serverconnector.CollectMetrics())
-			if err != nil {
-				log.Error(err.Error())
+		if (transitService.Status().Transport != services.Stopped) {
+			fmt.Println("TNG ServerConnector: sending inventory ...")
+			err = sendInventoryResources(*serverconnector.Synchronize())
+		} else {
+			fmt.Println("TNG ServerConnector is stopped ...")
+		}
+		for i := 0; i < 10; i++ {
+			if (transitService.Status().Transport != services.Stopped) {
+				fmt.Println("TNG ServerConnector: monitoring resources ...")
+				err := sendMonitoredResources(*serverconnector.CollectMetrics())
+				if err != nil {
+					log.Error(err.Error())
+				}
 			}
 			serverconnector.LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			time.Sleep(30 * time.Second)
