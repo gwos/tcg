@@ -9,45 +9,6 @@
     "host": "localhost:8099",
     "basePath": "/api/v1",
     "paths": {
-        "/connector": {
-            "post": {
-                "description": "The following API endpoint can be used to reload the Connector.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Connector"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {},
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/events": {
             "post": {
                 "description": "The following API endpoint can be used to send Alerts to Foundation.",
@@ -137,9 +98,9 @@
                 }
             }
         },
-        "/nats": {
+        "/reload": {
             "post": {
-                "description": "The following API endpoint can be used to start NATS streaming server.",
+                "description": "The following API endpoint can be used to reload the configuration.",
                 "consumes": [
                     "application/json"
                 ],
@@ -147,7 +108,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "NATS"
+                    "Server"
                 ],
                 "parameters": [
                     {
@@ -166,28 +127,19 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/services.ConnectorStatusDTO"
-                        }
-                    },
+                    "200": {},
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "type": "string"
                         }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "type": "string"
-                        }
                     }
                 }
-            },
-            "delete": {
-                "description": "The following API endpoint can be used to stop NATS streaming server.",
+            }
+        },
+        "/start": {
+            "post": {
+                "description": "The following API endpoint can be used to start NATS dispatcher.",
                 "consumes": [
                     "application/json"
                 ],
@@ -195,7 +147,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "NATS"
+                    "Server"
                 ],
                 "parameters": [
                     {
@@ -258,7 +210,7 @@
                     {
                         "type": "string",
                         "description": "Auth header",
-                        "name": "gwos-api-token",
+                        "name": "GWOS-API-TOKEN",
                         "in": "header",
                         "required": true
                     }
@@ -316,6 +268,56 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/stop": {
+            "delete": {
+                "description": "The following API endpoint can be used to stop NATS dispatcher.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Server"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ConnectorStatusDTO"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "type": "string"
                         }
