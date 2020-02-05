@@ -160,10 +160,12 @@ func (controller *Controller) events(c *gin.Context) {
 	value, err := c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
+		return
 	}
 	err = controller.SendEvent(value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 	c.JSON(http.StatusOK, nil)
 }
@@ -183,6 +185,7 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 	metrics, err := controller.ListMetrics()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 	c.Data(http.StatusOK, gin.MIMEJSON, metrics)
 }
@@ -201,6 +204,7 @@ func (controller *Controller) reload(c *gin.Context) {
 	ctrl, err := controller.ReloadAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
@@ -217,9 +221,15 @@ func (controller *Controller) reload(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
+	status := controller.Status()
+	if status.Transport == Running && status.Ctrl == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{Running, 0})
+		return
+	}
 	ctrl, err := controller.StartTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
@@ -232,13 +242,19 @@ func (controller *Controller) start(c *gin.Context) {
 // @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /stop [delete]
+// @Router /stop [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
+	status := controller.Status()
+	if status.Transport == Stopped && status.Ctrl == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{Stopped, 0})
+		return
+	}
 	ctrl, err := controller.StopTransportAsync(nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
 	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
 }
@@ -300,15 +316,13 @@ func (controller *Controller) validateToken(c *gin.Context) {
 	if !isCached {
 		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
 		}
 
 		err = cache.AuthCache.Add(key, credentials, 8*time.Hour)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 	}

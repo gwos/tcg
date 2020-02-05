@@ -5,6 +5,8 @@ definitions:
   services.AgentStats:
     properties:
       agentID:
+        description: The json blocks ensure the json response keys are  // specified
+          and lowercase
         type: string
       appType:
         type: string
@@ -237,7 +239,7 @@ paths:
       tags:
       - Server
   /stop:
-    delete:
+    post:
       consumes:
       - application/json
       description: The following API endpoint can be used to stop NATS dispatcher.

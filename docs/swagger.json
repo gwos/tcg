@@ -276,7 +276,7 @@
             }
         },
         "/stop": {
-            "delete": {
+            "post": {
                 "description": "The following API endpoint can be used to stop NATS dispatcher.",
                 "consumes": [
                     "application/json"
@@ -334,6 +334,7 @@
             "type": "object",
             "properties": {
                 "agentID": {
+                    "description": "The json blocks ensure the json response keys are  // specified and lowercase",
                     "type": "string"
                 },
                 "appType": {
