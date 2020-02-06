@@ -21,10 +21,10 @@ type DSOperations interface {
 
 // Define entrypoints for DSOperations
 const (
-	DSEntrypointConnect       = "/dalekservices/tng/login"
-	DSEntrypointConnector     = "/dalekservices/tng/connectors/name/:agentID?deep=true"
-	DSEntrypointGWConnections = "/dalekservices/tng/connections/:agentID"
-	DSEntrypointValidateToken = "/dalekservices/tng/validate-token"
+	DSEntrypointConnect       = "/dalekservices/login"
+	DSEntrypointConnector     = "/dalekservices/connectors/name/:agentID?deep=true"
+	DSEntrypointGWConnections = "/dalekservices/connections/:agentID"
+	DSEntrypointValidateToken = "/dalekservices/validate-token"
 )
 
 // DSClient implements DSOperations interface
