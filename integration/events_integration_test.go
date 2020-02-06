@@ -12,7 +12,7 @@ func TestEvents(t *testing.T) {
 	testMessage, err := parseJSON("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
-	assert.NoError(t, configNats(t, 5))
+	configNats(t, 5)
 	defer cleanNats(t)
 
 	assert.NoError(t, nats.Publish(services.SubjSendEvent, testMessage))
