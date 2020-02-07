@@ -100,14 +100,14 @@ func (controller *Controller) startController() error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Info("Controller: start listen TLS", addr)
+			log.Info("Controller: start listen TLS: ", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error:", err)
+				log.Error("Controller: start error: ", err)
 			}
 		} else {
-			log.Info("Controller: start listen", addr)
+			log.Info("Controller: start listen: ", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error:", err)
+				log.Error("Controller: start error: ", err)
 			}
 		}
 

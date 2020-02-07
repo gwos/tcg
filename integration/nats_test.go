@@ -3,12 +3,13 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/clients"
+	. "github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/services"
-	. "github.com/gwos/tng/config"
-	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -38,10 +39,13 @@ const (
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
 func TestNatsQueue_1(t *testing.T) {
-	assert.NoError(t, configNats(t, 5))
 	defer cleanNats(t)
+	configNats(t, 5)
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConnections[0].HostName = GWInvalidHost
+	assert.NoError(t, services.GetTransitService().StopTransport())
+	m0 := services.GetTransitService().Stats().MessagesSent
+	assert.NoError(t, services.GetTransitService().StartTransport())
 
 	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
@@ -51,32 +55,35 @@ func TestNatsQueue_1(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}
 
-	if services.GetTransitService().Stats().MessagesSent != 0 {
+	if services.GetTransitService().Stats().MessagesSent-m0 != 0 {
 		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
-			services.GetTransitService().Stats().MessagesSent, 0)
+			services.GetTransitService().Stats().MessagesSent-m0, 0)
 		return
 	}
 
 	GetConfig().GWConnections[0].HostName = GWValidHost
 	log.Info("Invalid path was changed to valid one")
+	assert.NoError(t, services.GetTransitService().StopTransport())
+	assert.NoError(t, services.GetTransitService().StartTransport())
 
 	time.Sleep(TestMessagesCount * 2 * time.Second)
 
-	if services.GetTransitService().Stats().MessagesSent == 0 {
+	if services.GetTransitService().Stats().MessagesSent-m0 == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
-			services.GetTransitService().Stats().MessagesSent, "'>0'")
+			services.GetTransitService().Stats().MessagesSent-m0, "'>0'")
 	}
 }
 
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
 func TestNatsQueue_2(t *testing.T) {
-	assert.NoError(t, configNats(t, 5))
-
+	defer cleanNats(t)
+	configNats(t, 30)
 	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
 	GetConfig().GWConnections[0].HostName = GWInvalidHost
-
-	defer cleanNats(t)
+	assert.NoError(t, services.GetTransitService().StopTransport())
+	m0 := services.GetTransitService().Stats().MessagesSent
+	assert.NoError(t, services.GetTransitService().StartTransport())
 
 	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
@@ -86,9 +93,9 @@ func TestNatsQueue_2(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}
 
-	if services.GetTransitService().Stats().MessagesSent != 0 {
+	if services.GetTransitService().Stats().MessagesSent-m0 != 0 {
 		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
-			services.GetTransitService().Stats().MessagesSent, 0)
+			services.GetTransitService().Stats().MessagesSent-m0, 0)
 		return
 	}
 
@@ -106,16 +113,17 @@ func TestNatsQueue_2(t *testing.T) {
 	log.Info("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 1 * time.Second)
 
-	if services.GetTransitService().Stats().MessagesSent == 0 {
+	if services.GetTransitService().Stats().MessagesSent-m0 == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
-			services.GetTransitService().Stats().MessagesSent, "'>0'")
+			services.GetTransitService().Stats().MessagesSent-m0, "'>0'")
 	}
 }
 
 //Test NATS performance
 func TestNatsPerformance(t *testing.T) {
-	assert.NoError(t, configNats(t, 30))
 	defer cleanNats(t)
+	configNats(t, 30)
+	m0 := services.GetTransitService().Stats().MessagesSent
 
 	var resources []transit.MonitoredResource
 
@@ -157,17 +165,16 @@ func TestNatsPerformance(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 
-	if services.GetTransitService().Stats().MessagesSent != PerformanceResourcesCount+1 {
+	if services.GetTransitService().Stats().MessagesSent-m0 != PerformanceResourcesCount+1 {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
-			services.GetTransitService().Stats().MessagesSent, PerformanceResourcesCount+1)
+			services.GetTransitService().Stats().MessagesSent-m0, PerformanceResourcesCount+1)
 	}
 
 	defer removeHost(t)
 }
 
-func configNats(t *testing.T, natsAckWait int64) error {
+func configNats(t *testing.T, natsAckWait int64) {
 	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
-
 	GetConfig().GWConnections = []*GWConnection{
 		{
 			HostName: GWValidHost,
@@ -177,24 +184,21 @@ func configNats(t *testing.T, natsAckWait int64) error {
 	}
 
 	service := services.GetTransitService()
-
 	service.Connector.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
 	service.Connector.NatsAckWait = natsAckWait
 
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
-
-	return nil
+	log.Info("#configNats status: ", service.Status())
 }
 
 func cleanNats(t *testing.T) {
-	services.GetTransitService().Stats().MessagesSent = 0
-
 	assert.NoError(t, services.GetTransitService().StopNats())
-
-	cmd := exec.Command("rm", "-rf", "test_datastore")
+	cmd := exec.Command("rm", "-rf", TestTngAgentConfigNatsFileStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
+	cache.NatsCache.Flush()
+	log.Info("#cleanNats status: ", services.GetTransitService().Status())
 }
 
 func parseJSON(filePath string) ([]byte, error) {

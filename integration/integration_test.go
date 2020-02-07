@@ -36,7 +36,7 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	assert.NoError(t, configNats(t, 5))
+	configNats(t, 5)
 	headers, err = config(t)
 	defer cleanNats(t)
 	defer clean(headers)
