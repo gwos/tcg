@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/transit"
 	"time"
 )
 
@@ -56,6 +57,7 @@ type ConnectorStatusDTO struct {
 
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
+	MakeTracerContext() (transit.TracerContext, error)
 	ReloadAsync(chan error) (*CtrlAction, error)
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)

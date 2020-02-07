@@ -14,6 +14,7 @@ package main
 //}
 import "C"
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/services"
@@ -46,6 +47,28 @@ func bufStr(buf *C.char, bufLen C.size_t, str string) {
 	}
 }
 
+// addTracerContext adds `context` field if absent
+func addTracerContext(payloadJSON []byte) ([]byte, error) {
+	if !bytes.Contains(payloadJSON, []byte("\"context\":")) {
+		ctx, err := services.GetTransitService().MakeTracerContext()
+		if err != nil {
+			return nil, err
+		}
+		ctxJSON, err := json.Marshal(ctx)
+		if err != nil {
+			return nil, err
+		}
+		l := bytes.LastIndexByte(payloadJSON, byte('}'))
+		var buf bytes.Buffer
+		buf.Write(payloadJSON[:l])
+		buf.Write([]byte(",\"context\":"))
+		buf.Write(ctxJSON)
+		buf.Write([]byte("}"))
+		return buf.Bytes(), nil
+	}
+	return payloadJSON, nil
+}
+
 // GoSetenv is for use by a calling application to alter environment variables in
 // a manner that will be understood by the Go runtime.  We need it because the standard
 // C-language putenv() and setenv() routines do not alter the Go environment as intended,
@@ -66,8 +89,13 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 // SendEvent is a C API for services.GetController().SendEvent
 //export SendEvent
 func SendEvent(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	payload, err := addTracerContext([]byte(C.GoString(payloadJSON)))
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
 	if err := services.GetController().
-		SendEvent([]byte(C.GoString(payloadJSON))); err != nil {
+		SendEvent(payload); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -77,8 +105,13 @@ func SendEvent(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 // SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	payload, err := addTracerContext([]byte(C.GoString(payloadJSON)))
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
 	if err := services.GetTransitService().
-		SendResourceWithMetrics([]byte(C.GoString(payloadJSON))); err != nil {
+		SendResourceWithMetrics(payload); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -88,8 +121,13 @@ func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) b
 // SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
 func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	payload, err := addTracerContext([]byte(C.GoString(payloadJSON)))
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
 	if err := services.GetTransitService().
-		SynchronizeInventory([]byte(C.GoString(payloadJSON))); err != nil {
+		SynchronizeInventory(payload); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
