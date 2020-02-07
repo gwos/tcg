@@ -180,9 +180,9 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
 	services.GetController().RegisterListMetricsHandler(func() ([]byte, error) {
 		textPtr := C.invokeGetTextHandler(fn)
-		bytes := []byte(C.GoString(textPtr))
+		res := []byte(C.GoString(textPtr))
 		C.free(unsafe.Pointer(textPtr))
-		return bytes, nil
+		return res, nil
 	})
 }
 
@@ -195,17 +195,17 @@ func RemoveListMetricsHandler() {
 // GetConnectorConfig is a C API for getting services.GetTransitService().Connector
 //export GetConnectorConfig
 func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
-	bytes, err := json.Marshal(services.GetTransitService().Connector)
+	res, err := json.Marshal(services.GetTransitService().Connector)
 	if err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
-	cStrLen := len(bytes) + 1
+	cStrLen := len(res) + 1
 	if cStrLen > int(bufLen) {
 		errMsg := fmt.Sprintf("Buffer too small, need at least %d bytes", cStrLen)
 		bufStr(errBuf, errBufLen, errMsg)
 		return false
 	}
-	bufStr(buf, bufLen, string(bytes))
+	bufStr(buf, bufLen, string(res))
 	return true
 }
