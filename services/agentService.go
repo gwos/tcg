@@ -6,6 +6,8 @@ import (
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
+	"github.com/gwos/tng/transit"
+	"github.com/hashicorp/go-uuid"
 	"math"
 	"sync"
 	"time"
@@ -82,6 +84,21 @@ func GetAgentService() *AgentService {
 		agentService.Reload()
 	})
 	return agentService
+}
+
+// MakeTracerContext implements AgentServices.MakeTracerContext interface
+func (service *AgentService) MakeTracerContext() (transit.TracerContext, error) {
+	traceToken, err := uuid.GenerateUUID()
+	if err != nil {
+		return transit.TracerContext{}, err
+	}
+	return transit.TracerContext{
+		AgentID:    service.Connector.AgentID,
+		AppType:    service.Connector.AppType,
+		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		TraceToken: traceToken,
+		Version:    transit.TransitModelVersion,
+	}, nil
 }
 
 // ReloadAsync implements AgentServices.ReloadAsync interface
