@@ -61,8 +61,8 @@ func (controller *Controller) RemoveListMetricsHandler() {
 }
 
 // SendEvent implements Controllers.SendEvent interface
-func (controller *Controller) SendEvent(bytes []byte) error {
-	return nats.Publish(SubjSendEvent, bytes)
+func (controller *Controller) SendEvent(payload []byte) error {
+	return nats.Publish(SubjSendEvent, payload)
 }
 
 // starts the http server

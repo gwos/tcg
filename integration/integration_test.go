@@ -97,13 +97,7 @@ func buildInventoryRequest(t *testing.T) []byte {
 	}
 
 	inventoryRequest := transit.InventoryRequest{
-		Context: transit.TracerContext{
-			AppType:    TestAppType,
-			AgentID:    TestAgentID,
-			TraceToken: TestTraceToken,
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-			Version:    transit.TransitModelVersion,
-		},
+		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: []transit.InventoryResource{inventoryResource},
 		Groups:    nil,
 	}
@@ -148,13 +142,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 	}
 
 	request := transit.ResourcesWithServicesRequest{
-		Context: transit.TracerContext{
-			AppType:    TestAppType,
-			AgentID:    TestAgentID,
-			TraceToken: TestTraceToken,
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-			Version:    transit.TransitModelVersion,
-		},
+		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: []transit.MonitoredResource{monitoredResource},
 	}
 
