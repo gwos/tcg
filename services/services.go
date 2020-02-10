@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/transit"
 	"time"
 )
 
@@ -26,18 +27,18 @@ const (
 // AgentStats defines TNG Agent statistics
 type AgentStats struct {
 	// The json blocks ensure the json response keys are  // specified and lowercase
-	AgentID                string `json:"agentID"`
-	AppType                string `json:"appType"`
-	BytesSent              int `json:"bytesSent"`
-	MetricsSent            int `json:"metricsSent"`
-	MessagesSent           int `json:"messagesSent"`
+	AgentID                string                            `json:"agentID"`
+	AppType                string                            `json:"appType"`
+	BytesSent              int                               `json:"bytesSent"`
+	MetricsSent            int                               `json:"metricsSent"`
+	MessagesSent           int                               `json:"messagesSent"`
 	LastInventoryRun       milliseconds.MillisecondTimestamp `json:"lastInventoryRun"`
 	LastMetricsRun         milliseconds.MillisecondTimestamp `json:"lastMetricsRun"`
 	LastAlertRun           milliseconds.MillisecondTimestamp `json:"lastAlertRun"`
-	ExecutionTimeInventory time.Duration `json:"executionTimeInventory"`
-	ExecutionTimeMetrics   time.Duration `json:"executionTimeMetrics"`
+	ExecutionTimeInventory time.Duration                     `json:"executionTimeInventory"`
+	ExecutionTimeMetrics   time.Duration                     `json:"executionTimeMetrics"`
 	UpSince                milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastError              string `json:"lastError"`
+	LastError              string                            `json:"lastError"`
 }
 
 // AgentStatus defines TNG Agent status
@@ -56,6 +57,7 @@ type ConnectorStatusDTO struct {
 
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
+	MakeTracerContext() *transit.TracerContext
 	ReloadAsync(chan error) (*CtrlAction, error)
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)

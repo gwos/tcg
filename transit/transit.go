@@ -6,6 +6,7 @@ import (
 )
 
 type VersionString string
+
 const (
 	TransitModelVersion VersionString = "1.0.0"
 )
@@ -190,8 +191,8 @@ type ThresholdValue struct {
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
 type TimeSeries struct {
-	MetricName string            `json:"metricName"`
-	SampleType MetricSampleType  `json:"sampleType,omitEmpty"`
+	MetricName string           `json:"metricName"`
+	SampleType MetricSampleType `json:"sampleType,omitEmpty"`
 	// Interval: The time interval to which the data sample applies. For
 	// GAUGE metrics, only the end time of the interval is used. For DELTA
 	// metrics, the start and end time should specify a non-zero interval,
@@ -437,7 +438,7 @@ type TracerContext struct {
 	AgentID    string                            `json:"agentId"`
 	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
-	Version    VersionString	 				 `json:"version"`
+	Version    VersionString                     `json:"version"`
 }
 
 // OperationResult defines API answer
@@ -470,13 +471,13 @@ type ResourceGroup struct {
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   TracerContext       `json:"context"`
+	Context   *TracerContext      `json:"context"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   TracerContext       `json:"context"`
+	Context   *TracerContext      `json:"context"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }

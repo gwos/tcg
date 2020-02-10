@@ -134,7 +134,7 @@ func TestNatsPerformance(t *testing.T) {
 	}
 
 	request := transit.InventoryRequest{
-		Context:   context(),
+		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: []transit.InventoryResource{inventoryRes},
 	}
 	jsonBytes, err := json.Marshal(request)
@@ -155,7 +155,7 @@ func TestNatsPerformance(t *testing.T) {
 
 	for _, res := range resources {
 		request := transit.ResourcesWithServicesRequest{
-			Context:   context(),
+			Context:   services.GetTransitService().MakeTracerContext(),
 			Resources: []transit.MonitoredResource{res},
 		}
 		jsonBytes, err := json.Marshal(request)
@@ -214,16 +214,6 @@ func parseJSON(filePath string) ([]byte, error) {
 	}
 
 	return byteValue, nil
-}
-
-func context() transit.TracerContext {
-	return transit.TracerContext{
-		AppType:    TestAppType,
-		AgentID:    TestAgentID,
-		TraceToken: TestTraceToken,
-		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-		Version:    transit.TransitModelVersion,
-	}
 }
 
 func resource() transit.MonitoredResource {

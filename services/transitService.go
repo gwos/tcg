@@ -22,11 +22,19 @@ func GetTransitService() *TransitService {
 }
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
-func (service *TransitService) SendResourceWithMetrics(request []byte) error {
-	return nats.Publish(SubjSendResourceWithMetrics, request)
+func (service *TransitService) SendResourceWithMetrics(payload []byte) error {
+	res, err := service.mixTracerContext(payload)
+	if err != nil {
+		return err
+	}
+	return nats.Publish(SubjSendResourceWithMetrics, res)
 }
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
-func (service *TransitService) SynchronizeInventory(request []byte) error {
-	return nats.Publish(SubjSynchronizeInventory, request)
+func (service *TransitService) SynchronizeInventory(payload []byte) error {
+	res, err := service.mixTracerContext(payload)
+	if err != nil {
+		return err
+	}
+	return nats.Publish(SubjSynchronizeInventory, res)
 }
