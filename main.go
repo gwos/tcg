@@ -66,14 +66,14 @@ func main() {
 	}()
 
 	for {
-		if (transitService.Status().Transport != services.Stopped) {
+		if transitService.Status().Transport != services.Stopped {
 			fmt.Println("TNG ServerConnector: sending inventory ...")
 			err = sendInventoryResources(*serverconnector.Synchronize())
 		} else {
 			fmt.Println("TNG ServerConnector is stopped ...")
 		}
 		for i := 0; i < 10; i++ {
-			if (transitService.Status().Transport != services.Stopped) {
+			if transitService.Status().Transport != services.Stopped {
 				fmt.Println("TNG ServerConnector: monitoring resources ...")
 				err := sendMonitoredResources(*serverconnector.CollectMetrics())
 				if err != nil {
@@ -99,13 +99,7 @@ func sendInventoryResources(resource transit.InventoryResource) error {
 		Resources: []transit.MonitoredResourceRef{monitoredResourceRef},
 	}
 	inventoryRequest := transit.InventoryRequest{
-		Context: transit.TracerContext{
-			AppType:    "VEMA",
-			AgentID:    "3939333393342",
-			TraceToken: "token-99e93",
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-			Version:    transit.TransitModelVersion,
-		},
+		Context:   transitService.MakeTracerContext(),
 		Resources: []transit.InventoryResource{resource},
 		Groups: []transit.ResourceGroup{
 			resourceGroup,
@@ -124,13 +118,7 @@ func sendInventoryResources(resource transit.InventoryResource) error {
 
 func sendMonitoredResources(resource transit.MonitoredResource) error {
 	request := transit.ResourcesWithServicesRequest{
-		Context: transit.TracerContext{
-			AppType:    "VEMA", // TODO: need an appType for ServerConnector, Elastic
-			AgentID:    "3939333393342",
-			TraceToken: "token-99e93",
-			TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
-			Version:    transit.TransitModelVersion,
-		},
+		Context:   transitService.MakeTracerContext(),
 		Resources: []transit.MonitoredResource{resource},
 	}
 	// Test a Time type sample

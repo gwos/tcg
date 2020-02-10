@@ -1,6 +1,9 @@
 package services
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
@@ -87,18 +90,21 @@ func GetAgentService() *AgentService {
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
-func (service *AgentService) MakeTracerContext() (transit.TracerContext, error) {
+func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	traceToken, err := uuid.GenerateUUID()
 	if err != nil {
-		return transit.TracerContext{}, err
+		/* fallback with multiplied timestamp */
+		buf := make([]byte, binary.MaxVarintLen64)
+		binary.PutVarint(buf, time.Now().UnixNano())
+		traceToken, _ = uuid.FormatUUID(bytes.Repeat(buf, 2)[:16])
 	}
-	return transit.TracerContext{
+	return &transit.TracerContext{
 		AgentID:    service.Connector.AgentID,
 		AppType:    service.Connector.AppType,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
 		Version:    transit.TransitModelVersion,
-	}, nil
+	}
 }
 
 // ReloadAsync implements AgentServices.ReloadAsync interface
@@ -425,4 +431,23 @@ func (service *AgentService) stopTransport() error {
 		service.agentStatus.Transport = Stopped
 	}
 	return err
+}
+
+// mixTracerContext adds `context` field if absent
+func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
+	if !bytes.Contains(payloadJSON, []byte("\"context\":")) ||
+		!bytes.Contains(payloadJSON, []byte("\"traceToken\":")) {
+		ctxJSON, err := json.Marshal(service.MakeTracerContext())
+		if err != nil {
+			return nil, err
+		}
+		l := bytes.LastIndexByte(payloadJSON, byte('}'))
+		var buf bytes.Buffer
+		buf.Write(payloadJSON[:l])
+		buf.Write([]byte(",\"context\":"))
+		buf.Write(ctxJSON)
+		buf.Write([]byte("}"))
+		return buf.Bytes(), nil
+	}
+	return payloadJSON, nil
 }
