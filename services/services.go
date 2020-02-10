@@ -26,7 +26,6 @@ const (
 
 // AgentStats defines TNG Agent statistics
 type AgentStats struct {
-	// The json blocks ensure the json response keys are  // specified and lowercase
 	AgentID                string                            `json:"agentID"`
 	AppType                string                            `json:"appType"`
 	BytesSent              int                               `json:"bytesSent"`

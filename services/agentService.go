@@ -67,6 +67,7 @@ func GetAgentService() *AgentService {
 			&AgentStats{
 				AgentID: agentConnector.AgentID,
 				AppType: agentConnector.AppType,
+				UpSince: milliseconds.MillisecondTimestamp{time.Now()}
 			},
 			&AgentStatus{
 				Controller: Stopped,
