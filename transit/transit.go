@@ -1,10 +1,14 @@
 package transit
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
+)
+
+type VersionString string
+
+const (
+	TransitModelVersion VersionString = "1.0.0"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -15,10 +19,10 @@ type MetricKind string
 // Delta - The change in a value during a time interval.
 // Cumulative - A value accumulated over a time interval. Cumulative
 const (
-	Gauge                 MetricKind = "GAUGE"
+	MetricKindUnspecified MetricKind = "METRIC_KIND_UNSPECIFIED"
+	Gauge                            = "GAUGE"
 	Delta                            = "DELTA"
 	Cumulative                       = "CUMULATIVE"
-	MetricKindUnspecified            = "METRIC_KIND_UNSPECIFIED"
 )
 
 // ValueType defines the data type of the value of a metric
@@ -30,7 +34,7 @@ const (
 	DoubleType                = "DoubleType"
 	StringType                = "StringType"
 	BooleanType               = "BooleanType"
-	DateType                  = "DateType"
+	TimeType                  = "TimeType"
 	UnspecifiedType           = "UnspecifiedType"
 )
 
@@ -53,12 +57,12 @@ type ComputeType string
 
 // CloudHub Compute Types
 const (
-	Query       ComputeType = "Query"
-	Regex                   = "Regex"
-	Synthetic               = "Synthetic"
-	Info                    = "Info"
-	Performance             = "Performance"
-	Health                  = "Health"
+	Query         ComputeType = "Query"
+	Regex                     = "Regex"
+	Synthetic                 = "Synthetic"
+	Informational             = "Informational"
+	Performance               = "Performance"
+	Health                    = "Health"
 )
 
 // MonitorStatus represents Groundwork service monitor status
@@ -77,15 +81,16 @@ const (
 	HostPending                              = "HOST_PENDING"
 	HostScheduledDown                        = "HOST_SCHEDULED_DOWN"
 	HostUnreachable                          = "HOST_UNREACHABLE"
+	HostUnchanged                            = "HOST_UNCHANGED"
 )
 
 // ResourceType defines the resource type
 type ResourceType string
 
 // The resource type uniquely defining the resource type
-// General Nagios Types are host and service, where as CloudHub can be more rich
+// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
-	Host           ResourceType = "HOST"
+	Host           ResourceType = "host"
 	Hypervisor                  = "hypervisor"
 	Instance                    = "instance"
 	VirtualMachine              = "virtual-machine"
@@ -105,6 +110,16 @@ type ServiceType string
 // Possible Types
 const (
 	Service ServiceType = "SERVICE"
+)
+
+// GroupType defines the foundation group type
+type GroupType string
+
+// The group type uniquely defining corresponding foundation group type
+const (
+	HostGroup    GroupType = "HostGroup"
+	ServiceGroup           = "ServiceGroup"
+	CustomGroup            = "CustomGroup"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -165,64 +180,19 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	DateValue milliseconds.MillisecondTimestamp `json:"dateValue,omitempty"`
+	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
-// MarshalJSON implements json.Marshaler.
-func (t TypedValue) MarshalJSON() ([]byte, error) {
-	switch t.ValueType {
-	case BooleanType:
-		return json.Marshal(&struct {
-			ValueType ValueType `json:"valueType"`
-			BoolValue bool      `json:"boolValue"`
-		}{
-			ValueType: t.ValueType,
-			BoolValue: t.BoolValue,
-		})
-	case DoubleType:
-		return json.Marshal(&struct {
-			ValueType   ValueType `json:"valueType"`
-			DoubleValue float64   `json:"doubleValue"`
-		}{
-			ValueType:   t.ValueType,
-			DoubleValue: t.DoubleValue,
-		})
-	case IntegerType:
-		return json.Marshal(&struct {
-			ValueType    ValueType `json:"valueType"`
-			IntegerValue int64     `json:"integerValue"`
-		}{
-			ValueType:    t.ValueType,
-			IntegerValue: t.IntegerValue,
-		})
-	case StringType:
-		return json.Marshal(&struct {
-			ValueType   ValueType `json:"valueType"`
-			StringValue string    `json:"stringValue"`
-		}{
-			ValueType:   t.ValueType,
-			StringValue: t.StringValue,
-		})
-	case DateType:
-		return json.Marshal(&struct {
-			ValueType ValueType                         `json:"valueType"`
-			DateValue milliseconds.MillisecondTimestamp `json:"dateValue"`
-		}{
-			ValueType: t.ValueType,
-			DateValue: t.DateValue,
-		})
-	}
-
-	return nil, errors.New("Couldn't parse 'ValueType' field\n")
-}
-
-// MetricSample defines a single data sample in a time series, which may represent
-// either a measurement at a single point in time or data aggregated over a
-// time duration.
-type MetricSample struct {
-	// SampleType: The kind of value this particular metric represents.
+type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
+	Label      string           `json:"label"`
+	Value      *TypedValue      `json:"value"`
+}
 
+// TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
+type TimeSeries struct {
+	MetricName string           `json:"metricName"`
+	SampleType MetricSampleType `json:"sampleType,omitEmpty"`
 	// Interval: The time interval to which the data sample applies. For
 	// GAUGE metrics, only the end time of the interval is used. For DELTA
 	// metrics, the start and end time should specify a non-zero interval,
@@ -232,22 +202,11 @@ type MetricSample struct {
 	// same start time and increasing end times, until an event resets the
 	// cumulative value to zero and sets a new start time for the following
 	// samples.
-	Interval *TimeInterval `json:"interval,omitempty"`
-
-	// Value: The value of the metric sample.
-	Value *TypedValue `json:"value,omitempty"`
-}
-
-// TimeSeries defines a collection of data samples that describes the
-// time-varying values of a metric.
-type TimeSeries struct {
-	MetricName string            `json:"metricName"`
-	SampleType MetricSampleType  `json:"sampleType"`
 	Interval   *TimeInterval     `json:"interval"`
 	Value      *TypedValue       `json:"value"`
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
-	//MetricSamples []*MetricSample   `json:"metricSamples"`
+	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -365,7 +324,7 @@ type InventoryResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, where as CloudHub can be more rich
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -416,7 +375,7 @@ type MonitoredResource struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type
-	// General Nagios Types are hosts, where as CloudHub can be more rich
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -444,7 +403,7 @@ type MonitoredService struct {
 	// The unique name of the service
 	Name string `json:"name,required"`
 	// Type: Required. The service type uniquely defining the service type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type ServiceType `json:"type,required"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
@@ -466,9 +425,9 @@ type MonitoredService struct {
 type MonitoredResourceRef struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
-	// Type: Required. The resource type uniquely defining the resource type
-	// General Nagios Types are host and service, where as CloudHub can be more rich
-	Type string `json:"type,resquired"`
+	// Type: Optional. The resource type uniquely defining the resource type
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,omitempty"`
 	// Owner relationship for associations like host->service
 	Owner string `json:"owner,omitempty"`
 }
@@ -479,6 +438,7 @@ type TracerContext struct {
 	AgentID    string                            `json:"agentId"`
 	TraceToken string                            `json:"traceToken"`
 	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	Version    VersionString                     `json:"version"`
 }
 
 // OperationResult defines API answer
@@ -503,19 +463,21 @@ type OperationResults struct {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName string                 `json:"groupName"`
-	Resources []MonitoredResourceRef `json:"resources"`
+	GroupName   string                 `json:"groupName,required"`
+	Type        GroupType              `json:"type,required"`
+	Description string                 `json:"description,omitempty"`
+	Resources   []MonitoredResourceRef `json:"resources,required"`
 }
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   TracerContext       `json:"context"`
+	Context   *TracerContext      `json:"context"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   TracerContext       `json:"context"`
+	Context   *TracerContext      `json:"context"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
@@ -530,4 +492,29 @@ type IncidentAlert struct {
 	ConditionName string                            `json:"conditionName"`
 	URL           string                            `json:"url,omitempty"`
 	Summary       string                            `json:"summary,omitempty"`
+}
+
+type GroundworkEvent struct {
+	Device              string                            `json:"device,omitempty"`
+	Host                string                            `json:"host,required"`
+	Service             string                            `json:"service,omitempty"`
+	OperationStatus     string                            `json:"operationStatus,omitempty"`
+	MonitorStatus       string                            `json:"monitorStatus,required"`
+	Severity            string                            `json:"severity,omitempty"`
+	ApplicationSeverity string                            `json:"applicationSeverity:omitempty"`
+	Component           string                            `json:"component:omitempty"`
+	SubComponent        string                            `json:"subComponent:omitempty"`
+	Priority            string                            `json:"priority:omitempty"`
+	TypeRule            string                            `json:"typeRule:omitempty"`
+	TextMessage         string                            `json:"textMessage:omitempty"`
+	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
+	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
+	AppType             string                            `json:"appType,required"`
+	// Update level attributes (update only)
+	MonitorServer     string                              `json:"monitorServer:omitempty"`
+	ConsolidationName string                              `json:"consolidationName:omitempty"`
+	LogType           string                              `json:"logType:omitempty"`
+	ErrorType         string                              `json:"errorType:omitempty"`
+	LoggerName        string                              `json:"loggerName:omitempty"`
+	ApplicationName   string                              `json:"applicationName:omitempty"`
 }

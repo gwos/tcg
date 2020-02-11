@@ -3,14 +3,88 @@
 # export GOPATH := $(realpath .)
 export GOPATH := $(realpath ..):$(realpath .)
 
-# Here, we do not assume that the jansson library is available from an
-# OS-provided package.  That's because such a package is likely to be out
-# of date.  Instead, we download and install an appropriate package here.
+# The current definition here is a placeholder for whatever we actually
+# want to use according to some sort of project-standard file tree.
+BUILD_TARGET_DIRECTORY = build
 
-JANSSON_VERSION = 2.12
+# We need a place to store header files as a final result of our code
+# construction, where we can specify some parent directory for header
+# files that is not either "build" (which is totally non-descriptive)
+# or "include" (which also is not specific to this package).
+INSTALL_BASE_DIRECTORY = install
 
-# all	: local/lib/libjansson.so libtransit/libtransit.h
-all	: local/lib/libjansson.so
+CONVERT_GO_TO_C_BUILD_OBJECTS = \
+	gotocjson/_c_code/convert_go_to_c.c	\
+	gotocjson/_c_code/convert_go_to_c.h
+
+CONFIG_BUILD_OBJECTS = \
+	${BUILD_TARGET_DIRECTORY}/config.c	\
+	${BUILD_TARGET_DIRECTORY}/config.h
+
+MILLISECONDS_BUILD_OBJECTS = \
+	${BUILD_TARGET_DIRECTORY}/milliseconds.c	\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.h
+
+TRANSIT_BUILD_OBJECTS =	\
+	${BUILD_TARGET_DIRECTORY}/transit.c		\
+	${BUILD_TARGET_DIRECTORY}/transit.h
+
+LIBTRANSITJSON_OBJECTS = \
+	${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	\
+	${BUILD_TARGET_DIRECTORY}/config.o		\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.o	\
+	${BUILD_TARGET_DIRECTORY}/transit.o
+
+LIBTRANSIT_DIRECTORY = libtransit
+
+LIBTRANSIT_SOURCE = ${LIBTRANSIT_DIRECTORY}/libtransit.go
+
+LIBTRANSIT_HEADER = ${LIBTRANSIT_DIRECTORY}/libtransit.h
+
+LIBTRANSIT_LIBRARY = ${LIBTRANSIT_DIRECTORY}/libtransit.so
+
+LIBTRANSITJSON_LIBRARY = ${BUILD_TARGET_DIRECTORY}/libtransitjson.so
+
+BUILD_HEADER_FILES = \
+	${LIBTRANSIT_HEADER}				\
+	gotocjson/_c_code/convert_go_to_c.h		\
+	${BUILD_TARGET_DIRECTORY}/config.h		\
+	${BUILD_TARGET_DIRECTORY}/milliseconds.h	\
+	${BUILD_TARGET_DIRECTORY}/transit.h
+
+BUILD_DYNAMIC_LIBRARIES = \
+	${LIBTRANSIT_LIBRARY}		\
+	${LIBTRANSITJSON_LIBRARY}
+
+INSTALL_DIRECTORIES = \
+	${INSTALL_BASE_DIRECTORY}/include/tng	\
+	${INSTALL_BASE_DIRECTORY}/lib
+
+INSTALL_HEADER_FILES = $(addprefix ${INSTALL_BASE_DIRECTORY}/include/tng/,$(notdir ${BUILD_HEADER_FILES}))
+
+INSTALL_DYNAMIC_LIBRARIES = $(addprefix ${INSTALL_BASE_DIRECTORY}/lib/,$(notdir ${BUILD_DYNAMIC_LIBRARIES}))
+
+# We currently specify "-g" to assist in debugging and possibly also in memory-leak detection.
+CFLAGS = -std=c11 -g -D_REENTRANT -D_GNU_SOURCE -fPIC -Wall
+CC = gcc ${CFLAGS}
+
+.PHONY	: all
+
+all	: ${LIBTRANSIT_LIBRARY} ${LIBTRANSITJSON_LIBRARY}
+
+.PHONY	: install
+
+install	: ${INSTALL_HEADER_FILES} ${INSTALL_DYNAMIC_LIBRARIES} | ${INSTALL_DIRECTORIES}
+
+# called with arguments:  install directory, build-file path
+define INSTALLED_FILE_template =
+$(1)/$(notdir $(2))	: $(2) | $(1)
+	cp -p $$< $$@
+endef
+
+$(foreach path,${BUILD_HEADER_FILES},$(eval $(call INSTALLED_FILE_template,${INSTALL_BASE_DIRECTORY}/include/tng,$(path))))
+
+$(foreach path,${BUILD_DYNAMIC_LIBRARIES},$(eval $(call INSTALLED_FILE_template,${INSTALL_BASE_DIRECTORY}/lib,$(path))))
 
 # Fetch all third-party Go packages needed either directly or indirectly
 # by the TNG software.
@@ -28,31 +102,69 @@ get	:
 	go get github.com/nats-io/go-nats-streaming
 	go get github.com/nats-io/nats-streaming-server/server
 
-# For no good reason, the upstream code does not follow the universal
-# standard for naming the release tarball after the top-level directory
-# that contains it.  So we must play a game here to clean that up.
-jansson-${JANSSON_VERSION}.tar.gz	:
-	wget https://github.com/akheron/jansson/archive/v${JANSSON_VERSION}.tar.gz
-	mv v${JANSSON_VERSION}.tar.gz jansson-${JANSSON_VERSION}.tar.gz
+# For the ${LIBTRANSIT_HEADER} and ${LIBTRANSIT_LIBRARY} targets, there are many more
+# dependencies than we ought to be keeping track of here, and they are all tracked
+# instead in the subsidiary Makefile where those targets are actually built.  So instead
+# of just depending on ${LIBTRANSIT_SOURCE}, which is of course the principal source file
+# involved (but by no means the only one used to create the library), we simply force an
+# unconditional descent into the subdirectory and attempt to make there.  That will handle
+# all the details of build dependencies, at the cost of one unconditional recursive make.
 
-jansson-${JANSSON_VERSION}/configure	: jansson-${JANSSON_VERSION}.tar.gz
-	rm -rf jansson-${JANSSON_VERSION}
-	tar xfz jansson-${JANSSON_VERSION}.tar.gz
-	cd jansson-${JANSSON_VERSION}; autoreconf -i
+.PHONY	: ${LIBTRANSIT_DIRECTORY}
 
-local/lib/libjansson.so	: jansson-${JANSSON_VERSION}/configure
-	cd jansson-${JANSSON_VERSION}; ./configure --prefix=${PWD}/local
-	cd jansson-${JANSSON_VERSION}; make
-	cd jansson-${JANSSON_VERSION}; make install
+${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_DIRECTORY}
+	make -C ${LIBTRANSIT_DIRECTORY}
 
-libtransit/libtransit.h	:
-	cd libtransit ; make
+${BUILD_TARGET_DIRECTORY}	:
+	mkdir -p $@
+
+${INSTALL_BASE_DIRECTORY}/include/tng	:
+	mkdir -p $@
+
+${INSTALL_BASE_DIRECTORY}/lib	:
+	mkdir -p $@
+
+gotocjson/gotocjson	: gotocjson/gotocjson.go
+	make -C gotocjson gotocjson
+
+${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson config/config.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
+
+${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} milliseconds/milliseconds.go
+
+${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} transit/transit.go
+
+${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
+	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@
+
+${BUILD_TARGET_DIRECTORY}/config.o	: ${CONFIG_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/config.c -o $@ -Igotocjson/_c_code
+
+${BUILD_TARGET_DIRECTORY}/milliseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/milliseconds.c -o $@ -Igotocjson/_c_code
+
+${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code
+
+${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS}
+	${LINK.c} -shared -o $@ -fPIC ${LIBTRANSITJSON_OBJECTS} -ljansson
+
+.PHONY	: clean
 
 clean	:
-	rm -rf jansson-${JANSSON_VERSION}
+	rm -rf ${BUILD_TARGET_DIRECTORY}
+	make -C gotocjson clean
+
+.PHONY	: realclean
 
 realclean	:
 	rm -rf bin pkg src ../src
+	make -C gotocjson realclean
 
-distclean	: clean
-	rm -rf local v${JANSSON_VERSION}.tar.gz jansson-${JANSSON_VERSION}.tar.gz 
+.PHONY	: distclean
+
+distclean	: realclean
+	rm -rf ${INSTALL_BASE_DIRECTORY}
+	make -C gotocjson distclean

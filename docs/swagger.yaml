@@ -1,0 +1,274 @@
+basePath: /api/v1
+definitions:
+  milliseconds.MillisecondTimestamp:
+    type: object
+  services.AgentStats:
+    properties:
+      agentID:
+        description: The json blocks ensure the json response keys are  // specified
+          and lowercase
+        type: string
+      appType:
+        type: string
+      bytesSent:
+        type: integer
+      executionTimeInventory:
+        type: string
+      executionTimeMetrics:
+        type: string
+      lastAlertRun:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
+      lastError:
+        type: string
+      lastInventoryRun:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
+      lastMetricsRun:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
+      messagesSent:
+        type: integer
+      metricsSent:
+        type: integer
+      upSince:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
+    type: object
+  services.AgentStatus:
+    properties:
+      controller:
+        type: string
+      ctrl:
+        $ref: '#/definitions/services.CtrlAction'
+        type: object
+      nats:
+        type: string
+      transport:
+        type: string
+    type: object
+  services.ConnectorStatusDTO:
+    properties:
+      connectorStatus:
+        type: string
+      jobId:
+        type: integer
+    type: object
+host: localhost:8099
+info:
+  contact: {}
+  license: {}
+  title: TNG API Documentation
+  version: "1.0"
+paths:
+  /events:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Alerts to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Alerts
+  /metrics:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get list of metrics from
+        the server.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.AgentStatus'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - Metrics
+  /reload:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to reload the configuration.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Server
+  /start:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to start NATS dispatcher.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ConnectorStatusDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - Server
+  /stats:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get TNG statistics.
+      parameters:
+      - description: Auth header
+        in: header
+        name: gwos-app-name
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.AgentStats'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Agent
+  /status:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get TNG status.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ConnectorStatusDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - Server
+  /stop:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to stop NATS dispatcher.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ConnectorStatusDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - Server
+swagger: "2.0"

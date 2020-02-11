@@ -2,6 +2,7 @@ package nats
 
 import (
 	"fmt"
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/log"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
@@ -13,33 +14,38 @@ import (
 
 // Define NATS IDs
 const (
-	ClusterID            = "tng-cluster"
-	DispatcherClientID   = "tng-dispatcher"
-	DispatcherDurableID  = "tng-store-dispatcher"
-	DispatcherQueueGroup = "tng-queue-dispatcher"
-	PublisherID          = "tng-publisher"
+	ClusterID    = "tng-cluster"
+	DispatcherID = "tng-dispatcher"
+	PublisherID  = "tng-publisher"
 )
 
 var (
 	cfg            Config
-	dispatcherConn stan.Conn
+	connDispatcher stan.Conn
+	connPublisher  stan.Conn
 	stanServer     *stand.StanServer
 	natsURL        string
 )
 
 // Config defines NATS configurable options
 type Config struct {
-	DispatcherAckWait time.Duration
-	FilestoreDir      string
-	StoreType         string
-	NatsHost          string
+	DispatcherAckWait     time.Duration
+	DispatcherMaxInflight int
+	MaxPubAcksInflight    int
+	FilestoreDir          string
+	StoreType             string
+	NatsHost              string
 }
 
 // DispatcherFn defines message processor
 type DispatcherFn func([]byte) error
 
-// DispatcherMap maps subject-processor
-type DispatcherMap map[string]DispatcherFn
+// DispatcherOption defines subscription
+type DispatcherOption struct {
+	DurableID string
+	Subject   string
+	Handler   DispatcherFn
+}
 
 // Connect returns connection
 func Connect(clientID string) (stan.Conn, error) {
@@ -87,16 +93,23 @@ func StartServer(config Config) error {
 
 // StopServer shutdowns NATS
 func StopServer() {
+	if connPublisher != nil {
+		connPublisher.Close()
+		connPublisher = nil
+	}
 	stanServer.Shutdown()
 }
 
 // StartDispatcher subscribes processors by subject
-func StartDispatcher(dispatcherMap *DispatcherMap) error {
-	var err error
-	if dispatcherConn == nil {
-		dispatcherConn, err = stan.Connect(
+func StartDispatcher(options []DispatcherOption) error {
+	err := StopDispatcher()
+	if err != nil {
+		return err
+	}
+	if connDispatcher == nil {
+		connDispatcher, err = stan.Connect(
 			ClusterID,
-			DispatcherClientID,
+			DispatcherID,
 			stan.NatsURL(natsURL),
 		)
 	}
@@ -104,24 +117,38 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 		return err
 	}
 
-	for subject, fn := range *dispatcherMap {
-		dispatcherFn := fn /* prevent loop override */
-		_, err = dispatcherConn.QueueSubscribe(
-			subject,
-			DispatcherQueueGroup,
+	for _, o := range options {
+		dispatcherFn := o.Handler /* prevent loop override */
+		durableID := o.DurableID
+		_, err = connDispatcher.Subscribe(
+			o.Subject,
 			func(msg *stan.Msg) {
-				if err := dispatcherFn(msg.Data); err != nil {
-					log.Info("Not delivered")
-					log.Debug("Error: ", err.Error(), "\nMessage: ", msg)
-				} else {
-					_ = msg.Ack()
-					log.Info("Delivered")
-					log.Debug("Message:", msg)
+				_, isPresent := cache.NatsCache.Get(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10))
+				if !isPresent {
+					if err := dispatcherFn(msg.Data); err != nil {
+						log.With(log.Fields{
+							"nats.durableID": durableID,
+							"nats.subject": msg.Subject,
+						}).WithDebug(log.Fields{
+							"error": err,
+							"message": msg,
+						}).Log(log.InfoLevel, "NATS: Not delivered")
+					} else {
+						_ = msg.Ack()
+						_ = cache.NatsCache.Add(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10), 0, 10*time.Minute)
+						log.With(log.Fields{
+							"nats.durableID": durableID,
+							"nats.subject": msg.Subject,
+						}).WithDebug(log.Fields{
+							"message": msg,
+						}).Log(log.InfoLevel, "NATS: Delivered")
+					}
 				}
 			},
 			stan.SetManualAckMode(),
 			stan.AckWait(cfg.DispatcherAckWait),
-			stan.DurableName(DispatcherDurableID),
+			stan.MaxInflight(cfg.DispatcherMaxInflight),
+			stan.DurableName(fmt.Sprintf("%s-%s", DispatcherID, o.DurableID)),
 			stan.StartWithLastReceived(),
 		)
 		if err != nil {
@@ -133,9 +160,9 @@ func StartDispatcher(dispatcherMap *DispatcherMap) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	if dispatcherConn != nil {
-		err := dispatcherConn.Close()
-		dispatcherConn = nil
+	if connDispatcher != nil {
+		err := connDispatcher.Close()
+		connDispatcher = nil
 		return err
 	}
 	return nil
@@ -143,20 +170,19 @@ func StopDispatcher() error {
 
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
-	connection, err := stan.Connect(
-		ClusterID,
-		PublisherID,
-		stan.NatsURL(natsURL),
-	)
+	var err error
+	if connPublisher == nil {
+		connPublisher, err = stan.Connect(
+			ClusterID,
+			PublisherID,
+			stan.NatsURL(natsURL),
+			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
+		)
+	}
 	if err != nil {
 		return err
 	}
 
-	err = connection.Publish(subject, msg)
-	if err != nil {
-		return err
-	}
-
-	err = connection.Close()
+	err = connPublisher.Publish(subject, msg)
 	return err
 }

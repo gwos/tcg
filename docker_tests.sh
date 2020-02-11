@@ -7,21 +7,21 @@ __grab_jar () {
     fpath=/src/groundwork/gw-server/target/lib/
     dc_id=$(docker create groundworkdevelopment/groundwork:master)
     docker cp "${dc_id}":${fpath}${fname} gw-transit/lib/
-    docker rm -v "$dc_id"
+    docker rm -v "$dc_id" > /dev/null
 }
 
 cd $(dirname "$0")
 
-PACKAGES=$@
+ARGS=$@
 
-if [ -z "$PACKAGES" ]; then
+if [ -z "$ARGS" ]; then
     echo "$(basename "$0"): packages not specified"
     echo "imply testing all packages"
-    PACKAGES=./...
+    ARGS='-v ./...'
 fi
 
-case "$PACKAGES" in
+case "$ARGS" in
     *"integration"*|*"./..."*) __grab_jar ;;
 esac
 
-docker run -it --rm --network host -v "${PWD}":/src groundworkdevelopment/tng ./docker_cmd.sh $PACKAGES
+docker run -it --rm --network host -v "${PWD}":/src groundworkdevelopment/tng ./docker_cmd.sh $ARGS

@@ -1,7 +1,7 @@
 package main
 
+//#include <stddef.h>
 //#include <stdlib.h>
-//#define ERROR_LEN 250 /* buffer for error message */
 //
 ///* getTextHandlerType defines a function type that returns an allocated string.
 // * It should be safe to call `C.free` on it. */
@@ -14,146 +14,198 @@ package main
 //}
 import "C"
 import (
-	"github.com/gwos/tng/log"
+	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/services"
+	"os"
 	"unsafe"
 )
-
-var controller = services.GetController()
-var transitService = services.GetTransitService()
-
-func init() {
-	if transitService.AgentConfig.StartController {
-		if err := transitService.StartController(); err != nil {
-			log.Error(err.Error())
-		}
-	}
-	if transitService.AgentConfig.StartNats {
-		if err := transitService.StartNats(); err != nil {
-			log.Error(err.Error())
-		}
-	}
-	// NOTE: the transitService.AgentConfig.StartTransport
-	// processed by transitService.StartNats itself
-	log.Info("libtransit:", transitService.Status())
-}
 
 func main() {
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
+func min(args ...int) int {
+	m := args[0]
+	for _, arg := range args[1:] {
+		if m > arg {
+			m = arg
+		}
 	}
-	return b
+	return m
 }
 
-func putError(errorBuf *C.char, err error) {
-	buf := (*[int(C.ERROR_LEN)]byte)(unsafe.Pointer(errorBuf))
-	buf[min(copy(buf[:], err.Error()), C.ERROR_LEN-1)] = 0
+// bufStr puts Go string into C buffer
+func bufStr(buf *C.char, bufLen C.size_t, str string) {
+	NulTermLen := 1
+	if bufLen > 0 {
+		/* cast the buf as big enough then use with length respect */
+		b := (*[4096]byte)(unsafe.Pointer(buf))
+		m := min(4096-NulTermLen, int(bufLen)-NulTermLen, len(str))
+		n := copy(b[:], str[:m])
+		b[n] = 0 /* set nul termination */
+	}
 }
 
+// GoSetenv is for use by a calling application to alter environment variables in
+// a manner that will be understood by the Go runtime.  We need it because the standard
+// C-language putenv() and setenv() routines do not alter the Go environment as intended,
+// due to issues with when os.Getenv() or related routines first get called.  To affect
+// the initial config for the services managed by libtransit, calls to GoSetenv() must be
+// made *before* any call to one of the routines that might probe for or attempt to start,
+// stop, or otherwise interact with one of the services.
+//export GoSetenv
+func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
+	err := os.Setenv(C.GoString(key), C.GoString(value))
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// SendEvent is a C API for services.GetController().SendEvent
+//export SendEvent
+func SendEvent(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetController().
+		SendEvent([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(resourcesWithMetricsRequestJSON, errorBuf *C.char) bool {
-	if err := transitService.
-		SendResourceWithMetrics([]byte(C.GoString(resourcesWithMetricsRequestJSON))); err != nil {
-		putError(errorBuf, err)
+func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().
+		SendResourceWithMetrics([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //export SynchronizeInventory
-func SynchronizeInventory(sendInventoryRequestJSON, errorBuf *C.char) bool {
-	if err := transitService.
-		SynchronizeInventory([]byte(C.GoString(sendInventoryRequestJSON))); err != nil {
-		putError(errorBuf, err)
+func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().
+		SynchronizeInventory([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StartController is a C API for services.GetTransitService().StartController
 //export StartController
-func StartController(errorBuf *C.char) bool {
-	if err := transitService.StartController(); err != nil {
-		putError(errorBuf, err)
+func StartController(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StartController(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StopController is a C API for services.GetTransitService().StopController
 //export StopController
-func StopController(errorBuf *C.char) bool {
-	if err := transitService.StopController(); err != nil {
-		putError(errorBuf, err)
+func StopController(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StopController(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StartNats is a C API for services.GetTransitService().StartNats
 //export StartNats
-func StartNats(errorBuf *C.char) bool {
-	if err := transitService.StartNats(); err != nil {
-		putError(errorBuf, err)
+func StartNats(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StartNats(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StopNats is a C API for services.GetTransitService().StopNats
 //export StopNats
-func StopNats(errorBuf *C.char) bool {
-	if err := transitService.StopNats(); err != nil {
-		putError(errorBuf, err)
+func StopNats(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StopNats(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StartTransport is a C API for services.GetTransitService().StartTransport
 //export StartTransport
-func StartTransport(errorBuf *C.char) bool {
-	if err := transitService.StartTransport(); err != nil {
-		putError(errorBuf, err)
+func StartTransport(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StartTransport(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// StopTransport is a C API for services.GetTransitService().StopTransport
 //export StopTransport
-func StopTransport(errorBuf *C.char) bool {
-	if err := transitService.StopTransport(); err != nil {
-		putError(errorBuf, err)
+func StopTransport(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().StopTransport(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	return true
 }
 
+// IsControllerRunning is a C API for services.GetTransitService().Status().Controller
 //export IsControllerRunning
 func IsControllerRunning() bool {
-	return transitService.Status().Controller == services.Running
+	return services.GetTransitService().Status().Controller == services.Running
 }
 
+// IsNatsRunning is a C API for services.GetTransitService().Status().Nats
 //export IsNatsRunning
 func IsNatsRunning() bool {
-	return transitService.Status().Nats == services.Running
+	return services.GetTransitService().Status().Nats == services.Running
 }
 
+// IsTransportRunning is a C API for services.GetTransitService().Status().Transport
 //export IsTransportRunning
 func IsTransportRunning() bool {
-	return transitService.Status().Transport == services.Running
+	return services.GetTransitService().Status().Transport == services.Running
 }
 
+// RegisterListMetricsHandler is a C API for services.GetController().RegisterListMetricsHandler
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
-	controller.RegisterListMetricsHandler(func() ([]byte, error) {
+	services.GetController().RegisterListMetricsHandler(func() ([]byte, error) {
 		textPtr := C.invokeGetTextHandler(fn)
-		bytes := []byte(C.GoString(textPtr))
+		res := []byte(C.GoString(textPtr))
 		C.free(unsafe.Pointer(textPtr))
-		return bytes, nil
+		return res, nil
 	})
 }
 
+// RemoveListMetricsHandler is a C API for services.GetController().RemoveListMetricsHandler
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
-	controller.RemoveListMetricsHandler()
+	services.GetController().RemoveListMetricsHandler()
+}
+
+// GetConnectorConfig is a C API for getting services.GetTransitService().Connector
+//export GetConnectorConfig
+func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
+	res, err := json.Marshal(services.GetTransitService().Connector)
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	cStrLen := len(res) + 1
+	if cStrLen > int(bufLen) {
+		errMsg := fmt.Sprintf("Buffer too small, need at least %d bytes", cStrLen)
+		bufStr(errBuf, errBufLen, errMsg)
+		return false
+	}
+	bufStr(buf, bufLen, string(res))
+	return true
 }

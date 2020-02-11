@@ -72,4 +72,4 @@ subtly wrong, and corrections have been made in the gotocjson/unittest.c code.
 
 >AgentStats
 
-    {"AgentID":"TestAgentId","AppType":"TestAgentType","BytesSent":1567,"MetricsSent":12,"MessagesSent":4,"LastInventoryRun":1572958409541,"LastMetricsRun":1572958409541,"ExecutionTimeInventory":133,"ExecutionTimeMetrics":234,"UpSince":1572958409541,"LastError":"Test last error"}
+    {"AgentID":"TestAgentID","AppType":"TestAgentType","BytesSent":1567,"MetricsSent":12,"MessagesSent":4,"LastInventoryRun":1572958409541,"LastMetricsRun":1572958409541,"ExecutionTimeInventory":133,"ExecutionTimeMetrics":234,"UpSince":1572958409541,"LastError":"Test last error"}

@@ -11,12 +11,14 @@ package enum
 type MetricKindEnum int
 
 const (
-	GAUGE                   MetricKindEnum = iota
+	METRIC_KIND_UNSPECIFIED MetricKindEnum = iota
+	GAUGE
 	DELTA                                  
 	CUMULATIVE                             
-	METRIC_KIND_UNSPECIFIED                
 )
 
+/*
+// This is here for future testing of complex iota-based expressions.
 type IntegerFlags int
 
 const (
@@ -25,6 +27,7 @@ const (
 	third
 	fourth
 )
+*/
 
 type ValueTypeEnum string
 
@@ -37,18 +40,23 @@ const (
 	UnspecifiedType               = "UnspecifiedType"
 )
 
+type TestConversions struct {
+	NumericValue MetricKindEnum `json:"metric_kind_enum,omitempty"`
+	StringValue ValueTypeEnum `json:"value_type_enum,omitempty"`
+}
+
 type Inner struct {
-    X int `json:"x"`
-    Y int `json:"y"`
+	X int `json:"x"`
+	Y int `json:"y"`
 }
 
 type Outer struct {
-    Inner `json:"inner"`
-    *Inner `json:"ptr_inner"`
+	Inner `json:"inner"`
+	*Inner `json:"ptr_inner"`
 }
 
 // doc for the dummy function
 // more doc, too
-func standin(int a) int {
-    return a
+func standin(a int) int {
+	return a
 }
