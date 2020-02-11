@@ -493,3 +493,28 @@ type IncidentAlert struct {
 	URL           string                            `json:"url,omitempty"`
 	Summary       string                            `json:"summary,omitempty"`
 }
+
+type GroundworkEvent struct {
+	Device              string                            `json:"device,omitempty"`
+	Host                string                            `json:"host,required"`
+	Service             string                            `json:"service,omitempty"`
+	OperationStatus     string                            `json:"operationStatus,omitempty"`
+	MonitorStatus       string                            `json:"monitorStatus,required"`
+	Severity            string                            `json:"severity,omitempty"`
+	ApplicationSeverity string                            `json:"applicationSeverity:omitempty"`
+	Component           string                            `json:"component:omitempty"`
+	SubComponent        string                            `json:"subComponent:omitempty"`
+	Priority            string                            `json:"priority:omitempty"`
+	TypeRule            string                            `json:"typeRule:omitempty"`
+	TextMessage         string                            `json:"textMessage:omitempty"`
+	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
+	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
+	AppType             string                            `json:"appType,required"`
+	// Update level attributes (update only)
+	MonitorServer     string                              `json:"monitorServer:omitempty"`
+	ConsolidationName string                              `json:"consolidationName:omitempty"`
+	LogType           string                              `json:"logType:omitempty"`
+	ErrorType         string                              `json:"errorType:omitempty"`
+	LoggerName        string                              `json:"loggerName:omitempty"`
+	ApplicationName   string                              `json:"applicationName:omitempty"`
+}
