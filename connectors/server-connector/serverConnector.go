@@ -1,4 +1,4 @@
-package serverconnector
+package main
 
 import (
 	"github.com/gwos/tng/log"
