@@ -123,7 +123,7 @@ func TestLoadConnectorDTO(t *testing.T) {
   }]
 }`)
 
-	err := cfg.LoadConnectorDTO(dto)
+	_, err := cfg.LoadConnectorDTO(dto)
 	assert.NoError(t, err)
 
 	expected = &Config{

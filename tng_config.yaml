@@ -10,9 +10,9 @@ connector:
   natsHost: ":4222"
   logLevel: 2
 dsConnection:
-  hostName: "localhost:80"
-  userName: "RESTAPIACCESS"
-  password: "***REMOVED***"
+  hostName: "localhost"
+  userName: "***REMOVED***"
+  password: "frugfri328y49rgfbriegfbri" #change to valid one to test
 gwConnections:
   -
     hostName: "localhost:80"

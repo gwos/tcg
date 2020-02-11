@@ -247,16 +247,16 @@ func GetConfig() *Config {
 }
 
 // LoadConnectorDTO loads ConnectorDTO into Config
-func (cfg *Config) LoadConnectorDTO(data []byte) error {
+func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
 	if err := json.Unmarshal(data, &dto); err != nil {
-		return err
+		return nil, err
 	}
 	if tngURL, err := url.Parse(dto.TngURL); err == nil {
 		// TODO: Improve addr setting
 		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
 	} else {
-		return err
+		return nil, err
 	}
 
 	cfg.Connector.AgentID = dto.AgentID
@@ -266,5 +266,5 @@ func (cfg *Config) LoadConnectorDTO(data []byte) error {
 	cfg.GWConnections = dto.GWConnections
 
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
-	return nil
+	return &dto, nil
 }
