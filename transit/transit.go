@@ -471,13 +471,13 @@ type ResourceGroup struct {
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   *TracerContext      `json:"context"`
+	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   *TracerContext      `json:"context"`
+	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
