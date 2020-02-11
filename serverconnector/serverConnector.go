@@ -98,8 +98,8 @@ func Synchronize() *transit.InventoryResource {
 				Owner: hostName,
 			},
 			{
-				Name:  TotalCpuUsageServiceName,
-				Type:  transit.NetworkDevice,
+				Name:  "cpu.usage.total",
+				Type:  "network-device",
 				Owner: hostName,
 			},
 		},

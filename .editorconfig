@@ -1,0 +1,8 @@
+root = true
+
+# gofmt produces one tab character per indent level, which is ugly to see
+# at the standard 8-spaces-per-tab setting.  So we override that setting,
+# only for Go source code.
+[*.go]
+indent_style = tab
+indent_size = 4

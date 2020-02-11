@@ -4,19 +4,20 @@
             "ControllerAddr": ":http",
             "ControllerCertFile": "/path/to/controller/certfile",
             "ControllerKeyFile": "/path/to/controller/keyfile",
-            "NATSFilestoreDir": "/nats/filestore",
-            "NATSStoreType": "MEMORY",
-            "StartController": true,
-            "StartNATS": false,
-            "StartTransport": false
+            "NatsAckWait": 15,
+            "NatsFilestoreDir": "/nats/filestore",
+            "NatsStoreType": "MEMORY",
+            "NatsHost": ":4220",
+            "LogLevel": 2
         },
-        "GroundworkConfig": {
-            "Host": "host_name",
-            "Account": "account_name",
-            "Password": "config_password",
-            "Token": "config_token",
-            "AppName": "config_app_name"
-        },
+        "GWConfigs": [
+            {
+                "Host": "host_name",
+                "Account": "account_name",
+                "Password": "config_password",
+                "AppName": "config_app_name"
+            }
+        ],
         "GroundworkActions": {
             "Connect": {
                 "Entrypoint": "connect_entry_point"
@@ -29,9 +30,6 @@
             },
             "SendResourceWithMetrics": {
                 "Entrypoint": "send_resource_with_metrics_entry_point"
-            },
-            "ValidateToken": {
-                "Entrypoint": "validate_token_entry_point"
             }
         }
     }

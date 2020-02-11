@@ -1,9 +1,13 @@
 package config
 
 import (
+	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
+	"math"
+	"net/url"
 	"os"
 	"path"
 	"sync"
@@ -12,11 +16,17 @@ import (
 var once sync.Once
 var cfg *Config
 
-// ConfigEnv defines environment variable for config file path
+// ConfigStringConstant defines string constant type
+type ConfigStringConstant string
+
+// ConfigEnv defines environment variable for config file path, overrides the ConfigName
+// ConfigName defines default filename for look in work directory if ConfigEnv is empty
+// EnvConfigPrefix defines name prefix for environment variables
+//   for example: TNG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv       = "TNG_CONFIG"
-	ConfigName      = "config.yml"
-	EnvConfigPrefix = "TNG"
+	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
+	ConfigName                           = "tng_config.yaml"
+	EnvConfigPrefix                      = "TNG"
 )
 
 // LogLevel defines levels for logrus
@@ -34,51 +44,182 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// GWConfig defines Groundwork Connection configuration
-type GWConfig struct {
-	// Host accepts value for combined "host:port"
-	// used as `url.URL{Host}`
-	Host     string
-	Account  string
-	Password string
-	AppName  string `yaml:"appName"`
-}
-
-// AgentConfig defines TNG Transit Agent configuration
-type AgentConfig struct {
+// Connector defines TNG Connector configuration
+// see GetConfig() for defaults
+type Connector struct {
+	AgentID string `yaml:"agentId"`
+	AppName string `yaml:"appName"`
+	AppType string `yaml:"appType"`
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
 	ControllerCertFile string `yaml:"controllerCertFile"`
 	ControllerKeyFile  string `yaml:"controllerKeyFile"`
+	// ControllerPin accepts value from environment
+	// provides local access for debug
+	ControllerPin string `yaml:"-"`
 	// NatsAckWait accepts number of seconds
 	// should be greater then the GWClient request duration
-	NatsAckWait      int64  `yaml:"natsAckWait"`
+	NatsAckWait int64 `yaml:"natsAckWait"`
+	// NatsMaxInflight accepts number of unacknowledged messages
+	// that a publisher may have in-flight at any given time.
+	// When this maximum is reached, further async publish calls will block
+	// until the number of unacknowledged messages falls below the specified limit
+	NatsMaxInflight  int    `yaml:"natsMaxInflight"`
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
-	NatsHost        string `yaml:"natsHost"`
-	StartController bool   `yaml:"startController"`
-	StartNats       bool   `yaml:"startNats"`
-	// StartTransport defines that NATS starts with Transport
-	StartTransport bool     `yaml:"startTransport"`
-	LogLevel       LogLevel `yaml:"logLevel"`
+	NatsHost string `yaml:"natsHost"`
+	// LogFile accepts file path to log in addition to stdout
+	LogFile  string   `yaml:"logFile"`
+	LogLevel LogLevel `yaml:"logLevel"`
+}
+
+// ConnectorDTO defines TNG Connector configuration
+type ConnectorDTO struct {
+	AgentID       string        `json:"agentId"`
+	AppName       string        `json:"appName"`
+	AppType       string        `json:"appType"`
+	TngURL        string        `json:"tngUrl"`
+	LogLevel      LogLevel      `json:"logLevel"`
+	GWConnections GWConnections `json:"groundworkConnections"`
+	// GWConnections []GWConnection `json:"groundworkConnections"`
+	// TODO: extend LoadConnectorDTO to handle more fields
+	// MonitorConnection MonitorConnectionDto
+	// MetricsProfile    MetricsProfileDto
+}
+
+// GWConnection defines Groundwork Connection configuration
+type GWConnection struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName            string `yaml:"hostName"`
+	UserName            string `yaml:"userName"`
+	Password            string `yaml:"password"`
+	Enabled             bool   `yaml:"enabled"`
+	IsChild             bool   `yaml:"isChild"`
+	DisplayName         string `yaml:"displayName"`
+	MergeHosts          bool   `yaml:"mergeHosts"`
+	LocalConnection     bool   `yaml:"localConnection"`
+	DeferOwnership      string `yaml:"deferOwnership"`
+	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
+	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
+	SendAllInventory    bool   `yaml:"sendAllInventory"`
+}
+
+// Decode implements envconfig.Decoder interface
+// merges incoming value with existed structure
+func (con *GWConnection) Decode(value string) error {
+	var overrides GWConnection
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if overrides.HostName != "" {
+		con.HostName = overrides.HostName
+	}
+	if overrides.UserName != "" {
+		con.UserName = overrides.UserName
+	}
+	if overrides.Password != "" {
+		con.Password = overrides.Password
+	}
+	if overrides.DisplayName != "" {
+		con.Password = overrides.DisplayName
+	}
+	if overrides.DeferOwnership != "" {
+		con.Password = overrides.DeferOwnership
+	}
+	if overrides.ResourceNamePrefix != "" {
+		con.Password = overrides.ResourceNamePrefix
+	}
+	return nil
+}
+
+// GWConnections defines a set of configurations
+type GWConnections []*GWConnection
+
+// Decode implements envconfig.Decoder interface
+// merges incoming value with existing structure
+func (cons *GWConnections) Decode(value string) error {
+	var overrides GWConnections
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if len(overrides) > len(*cons) {
+		buf := GWConnections(make([]*GWConnection, len(overrides)))
+		copy(buf, overrides)
+		copy(buf, *cons)
+		*cons = *(&buf)
+	}
+	for i, v := range overrides {
+		if v.HostName != "" {
+			(*cons)[i].HostName = v.HostName
+		}
+		if v.UserName != "" {
+			(*cons)[i].UserName = v.UserName
+		}
+		if v.Password != "" {
+			(*cons)[i].Password = v.Password
+		}
+	}
+	return nil
+}
+
+// DSConnection defines DalekServices Connection configuration
+type DSConnection struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName string `yaml:"hostName"`
+	UserName string `yaml:"userName"`
+	Password string `yaml:"password"`
+}
+
+// Decode implements envconfig.Decoder interface
+// merges incoming value with existed structure
+func (con *DSConnection) Decode(value string) error {
+	var overrides GWConnection
+	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
+		return err
+	}
+	if overrides.HostName != "" {
+		con.HostName = overrides.HostName
+	}
+	if overrides.UserName != "" {
+		con.UserName = overrides.UserName
+	}
+	if overrides.Password != "" {
+		con.Password = overrides.Password
+	}
+	return nil
 }
 
 // Config defines TNG Agent configuration
 type Config struct {
-	AgentConfig AgentConfig `yaml:"agentConfig"`
-	GWConfig    GWConfig    `yaml:"gwConfig"`
+	Connector     *Connector    `yaml:"connector"`
+	DSConnection  *DSConnection `yaml:"dsConnection"`
+	GWConnections GWConnections `yaml:"gwConnections"`
 }
 
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
-		cfg = &Config{}
+		// set defaults
+		cfg = &Config{
+			Connector: &Connector{
+				ControllerAddr:   ":8099",
+				LogLevel:         1,
+				NatsAckWait:      30,
+				NatsMaxInflight:  math.MaxInt32,
+				NatsFilestoreDir: "natsstore",
+				NatsStoreType:    "FILE",
+				NatsHost:         ":4222",
+			},
+			DSConnection: &DSConnection{},
+		}
 
-		configPath := os.Getenv(ConfigEnv)
+		configPath := os.Getenv(string(ConfigEnv))
 		if configPath == "" {
 			wd, err := os.Getwd()
 			if err != nil {
@@ -100,7 +241,30 @@ func GetConfig() *Config {
 			log.Warn(err)
 		}
 
-		log.Config(int(cfg.AgentConfig.LogLevel))
+		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
 	})
 	return cfg
+}
+
+// LoadConnectorDTO loads ConnectorDTO into Config
+func (cfg *Config) LoadConnectorDTO(data []byte) error {
+	var dto ConnectorDTO
+	if err := json.Unmarshal(data, &dto); err != nil {
+		return err
+	}
+	if tngURL, err := url.Parse(dto.TngURL); err == nil {
+		// TODO: Improve addr setting
+		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
+	} else {
+		return err
+	}
+
+	cfg.Connector.AgentID = dto.AgentID
+	cfg.Connector.AppName = dto.AppName
+	cfg.Connector.AppType = dto.AppType
+	cfg.Connector.LogLevel = dto.LogLevel
+	cfg.GWConnections = dto.GWConnections
+
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+	return nil
 }
