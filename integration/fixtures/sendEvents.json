@@ -1,24 +1,27 @@
 {
   "events": [
     {
-      "id": 1935,
-      "host": "host",
+      "host": "host1",
       "device": "new_device",
       "service": "http_alive",
-      "operationStatus": "OPEN",
       "monitorStatus": "UP",
       "severity": "SERIOUS",
-      "applicationSeverity": "SERIOUS",
-      "component": "SERIOUS",
-      "priority": "Lowest Priority in a scale from 1 -10",
-      "typeRule": "UNDEFINED",
       "textMessage": "This is a serious Nagios Message on Device 127.0.0.1 - 0",
-      "firstInsertDate": 1370195732000,
       "lastInsertDate": 1370195732000,
       "reportDate": 1579703726166,
-      "msgCount": 9,
       "appType": "NAGIOS",
-      "stateChanged": false,
+      "monitorServer":"localhost"
+    },
+    {
+      "host": "host2",
+      "device": "127.0.0.1",
+      "service": "test",
+      "monitorStatus": "UP",
+      "severity": "SERIOUS",
+      "textMessage": "This is a serious Nagios Message on Device 127.0.0.1 - 0",
+      "lastInsertDate": 1370195732000,
+      "reportDate": 1579703726166,
+      "appType": "NAGIOS",
       "monitorServer":"localhost"
     }
   ]
