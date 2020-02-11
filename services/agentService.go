@@ -21,7 +21,7 @@ type AgentService struct {
 	*config.Connector
 	agentStats  *AgentStats
 	agentStatus *AgentStatus
-	dsClient    *clients.DSClient
+	DSClient    *clients.DSClient
 	gwClients   []*clients.GWClient
 	ctrlIdx     uint8
 	ctrlChan    chan *CtrlAction
@@ -67,7 +67,7 @@ func GetAgentService() *AgentService {
 			&AgentStats{
 				AgentID: agentConnector.AgentID,
 				AppType: agentConnector.AppType,
-				UpSince: milliseconds.MillisecondTimestamp{time.Now()}
+				UpSince: milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
 			&AgentStatus{
 				Controller: Stopped,
@@ -85,7 +85,7 @@ func GetAgentService() *AgentService {
 		}
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-		agentService.Reload()
+		_ = agentService.Reload()
 	})
 	return agentService
 }
@@ -198,7 +198,7 @@ func (service *AgentService) ctrlPushAsync(subj ctrlSubj, syncChan chan error) (
 		}
 		return ctrl, nil
 	default:
-		return nil, fmt.Errorf("Ctrl limit reached: %v", ctrlLimit)
+		return nil, fmt.Errorf("Ctrl limit reached: %v ", ctrlLimit)
 	}
 }
 
@@ -324,8 +324,8 @@ func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn
 }
 
 func (service *AgentService) reload() error {
-	if res, clErr := service.dsClient.FetchConnector(service.AgentID); clErr == nil {
-		if err := config.GetConfig().LoadConnectorDTO(res); err != nil {
+	if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
+		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
 			return err
 		}
 	} else {
@@ -343,16 +343,16 @@ func (service *AgentService) reload() error {
 	}
 	// TODO: Handle errors
 	if reloadFlags.Controller {
-		service.stopController()
-		service.startController()
+		_ = service.stopController()
+		_ = service.startController()
 	}
 	if reloadFlags.Nats {
-		service.stopNats()
-		service.startNats()
+		_ = service.stopNats()
+		_ = service.startNats()
 	}
 	if reloadFlags.Transport {
 		// service.StopTransport() // stopped with Nats
-		service.startTransport()
+		_ = service.startTransport()
 	}
 
 	return nil
