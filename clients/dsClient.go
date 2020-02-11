@@ -67,7 +67,7 @@ func (client *DSClient) Connect() error {
 		return err
 	}
 
-	if statusCode == 200 {
+	if statusCode == 201 {
 		client.token = string(byteResponse)
 		return nil
 	}
@@ -128,11 +128,8 @@ func (client *DSClient) fetchData(entrypoint string) ([]byte, error) {
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	reqURL := (&url.URL{
-		Scheme: "http",
-		Host:   client.DSConnection.HostName,
-		Path:   entrypoint,
-	}).String()
+
+	reqURL := fmt.Sprintf("http://%s%s", client.DSConnection.HostName, entrypoint)
 
 	statusCode, byteResponse, err := SendRequest(http.MethodGet, reqURL, headers, nil, nil)
 	if statusCode == 401 {
@@ -163,7 +160,7 @@ func (client *DSClient) fetchData(entrypoint string) ([]byte, error) {
 	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
-		return nil, err
+		return nil, fmt.Errorf(string(byteResponse))
 	}
 	return byteResponse, nil
 }

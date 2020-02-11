@@ -197,7 +197,7 @@ func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, err
 	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
-		return nil, err
+		return nil, fmt.Errorf(string(byteResponse))
 	}
 	return byteResponse, nil
 }
