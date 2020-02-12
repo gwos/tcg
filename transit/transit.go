@@ -518,3 +518,14 @@ type GroundworkEvent struct {
 	LoggerName        string                              `json:"loggerName:omitempty"`
 	ApplicationName   string                              `json:"applicationName:omitempty"`
 }
+
+type MonitorConnection struct {
+	Id          int                    `json:"id"`
+	Server      string                 `json:"server"`
+	UserName    string                 `json:"userName"`
+	Password    string                 `json:"password"`
+	SslEnabled  bool                   `json:"sslEnabled"`
+	Url         string                 `json:"url"`
+	Extensions  map[string]interface{} `json:"extensions"`
+	ConnectorId int                    `json:"connectorId"`
+}
