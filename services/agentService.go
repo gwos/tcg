@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/milliseconds"
@@ -26,6 +27,7 @@ type AgentService struct {
 	ctrlIdx     uint8
 	ctrlChan    chan *CtrlAction
 	statsChan   chan statsCounter
+	tracerToken []byte
 }
 
 // CtrlAction defines queued controll action
@@ -54,6 +56,7 @@ const (
 )
 
 const ctrlLimit = 9
+const ckTraceToken = "ckTraceToken"
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -61,6 +64,17 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
+		/* prepare random tracerToken */
+		tracerToken := []byte("aaaabbbbccccdddd")
+		if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
+			copy(tracerToken, randBuf)
+		} else {
+			/* fallback with multiplied timestamp */
+			binary.PutVarint(tracerToken, time.Now().UnixNano())
+			binary.PutVarint(tracerToken[6:], time.Now().UnixNano())
+		}
+		cache.TraceTokenCache.Set(ckTraceToken, uint64(1), -1)
+
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
 			agentConnector,
@@ -82,7 +96,9 @@ func GetAgentService() *AgentService {
 			0,
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
+			tracerToken,
 		}
+
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
 		_ = agentService.Reload()
@@ -92,13 +108,17 @@ func GetAgentService() *AgentService {
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
 func (service *AgentService) MakeTracerContext() *transit.TracerContext {
-	traceToken, err := uuid.GenerateUUID()
-	if err != nil {
-		/* fallback with multiplied timestamp */
-		buf := make([]byte, binary.MaxVarintLen64)
-		binary.PutVarint(buf, time.Now().UnixNano())
-		traceToken, _ = uuid.FormatUUID(bytes.Repeat(buf, 2)[:16])
+	/* combine TraceToken from fixed and incremental parts */
+	tokenBuf := make([]byte, 16)
+	copy(tokenBuf, service.tracerToken)
+	if tokenInc, err := cache.TraceTokenCache.IncrementUint64(ckTraceToken, 1); err == nil {
+		binary.PutUvarint(tokenBuf, tokenInc)
+	} else {
+		/* fallback with timestamp */
+		binary.PutVarint(tokenBuf, time.Now().UnixNano())
 	}
+	traceToken, _ := uuid.FormatUUID(tokenBuf)
+
 	return &transit.TracerContext{
 		AgentID:    service.Connector.AgentID,
 		AppType:    service.Connector.AppType,
