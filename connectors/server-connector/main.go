@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/gwos/tng/config"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -56,23 +55,29 @@ func main() {
 		}
 	}()
 
+	processes, timer, err := getConfig()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
 	for {
 		if transitService.Status().Transport != services.Stopped {
 			log.Info("TNG ServerConnector: sending inventory ...")
-			err = sendInventoryResources(*Synchronize())
+			err = sendInventoryResources(*Synchronize(processes))
 		} else {
 			log.Info("TNG ServerConnector is stopped ...")
 		}
 		for i := 0; i < 10; i++ {
 			if transitService.Status().Transport != services.Stopped {
 				log.Info("TNG ServerConnector: monitoring resources ...")
-				err := sendMonitoredResources(*CollectMetrics())
+				err := sendMonitoredResources(*CollectMetrics(processes))
 				if err != nil {
 					log.Error(err.Error())
 				}
 			}
 			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			time.Sleep(30 * time.Second)
+			time.Sleep(time.Duration(int64(timer) * int64(time.Second)))
 		}
 	}
 }
@@ -144,20 +149,29 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 	return transitService.SendResourceWithMetrics(b)
 }
 
-//////////////////////////////////////////////////////////
-
-func getConfig() error {
+func getConfig() ([]string, int, error) {
 	if res, clErr := transitService.DSClient.FetchConnector(transitService.AgentID); clErr == nil {
-		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
-		} else {
-			return nil
+		var connector = struct {
+			Connection transit.MonitorConnection `json:"monitorConnection"`
+		}{}
+		err := json.Unmarshal(res, &connector)
+		if err != nil {
+			return []string{}, -1, err
 		}
+		timer := connector.Connection.Extensions["timer"].(float64)
+		processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+		var processes []string
+		for _, process := range processesInterface {
+			processes = append(processes, process.(string))
+		}
+
+		return processes, int(timer), err
 	} else {
-		return clErr
+		return []string{}, -1, clErr
 	}
 }
 
+//////////////////////////////////////////////////////////
 func example() {
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
