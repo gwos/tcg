@@ -148,7 +148,7 @@ func CollectMetrics(processes []string) *transit.MonitoredResource {
 	processesMap := collectProcesses(processes)
 
 	for processName, processCpu := range processesMap {
-		monitoredResource.Services = append(monitoredResource.Services, transit.MonitoredService{
+		monitoredService := transit.MonitoredService{
 			Name:          processName,
 			Type:          transit.Service,
 			Status:        transit.ServiceOk,
@@ -196,7 +196,11 @@ func CollectMetrics(processes []string) *transit.MonitoredResource {
 					Unit: transit.PercentCPU,
 				},
 			},
-		})
+		}
+		if processCpu == -1 {
+			monitoredService.Status = transit.ServicePending
+		}
+		monitoredResource.Services = append(monitoredResource.Services, monitoredService)
 	}
 
 	return &monitoredResource
@@ -727,6 +731,8 @@ func collectProcesses(procs []string) map[string]float64 {
 		_, exists := m[processName]
 		if exists {
 			processesMap[processName] = m[processName]
+		} else {
+			processesMap[processName] = -1
 		}
 	}
 
