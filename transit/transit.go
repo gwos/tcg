@@ -494,6 +494,10 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+type GroundworkEventsRequest struct {
+	events				[]GroundworkEvent  				`json:"events"`
+}
+
 type GroundworkEvent struct {
 	Device              string                            `json:"device,omitempty"`
 	Host                string                            `json:"host,required"`
