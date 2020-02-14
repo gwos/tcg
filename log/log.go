@@ -6,7 +6,9 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"io"
+	"io/ioutil"
 	"os"
+	"sort"
 	"time"
 )
 
@@ -20,6 +22,8 @@ const (
 	InfoLevel  = logrus.InfoLevel
 	DebugLevel = logrus.DebugLevel
 )
+
+const timestampFormat = "2006-01-02 15:04:05"
 
 var logger = logrus.New()
 
@@ -45,7 +49,11 @@ func Error(args ...interface{}) {
 
 // Config configures logger
 func Config(filePath string, level int) {
-	cw := cachedWriter{
+	// cw := cachedWriter{
+	// 	cache.New(10*time.Minute, 10*time.Second),
+	// 	os.Stdout,
+	// }
+	ch := ckHook{
 		cache.New(10*time.Minute, 10*time.Second),
 		os.Stdout,
 	}
@@ -53,15 +61,19 @@ func Config(filePath string, level int) {
 	if len(filePath) > 0 {
 		if logFile, err := os.OpenFile(filePath,
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			cw.writer = io.MultiWriter(os.Stdout, logFile)
+			// cw.writer = io.MultiWriter(os.Stdout, logFile)
+			ch.writer = io.MultiWriter(os.Stdout, logFile)
 		}
 	}
 
-	cw.cache.OnEvicted(fnOnEvicted(cw.writer))
-	logger.SetOutput(cw)
+	// cw.cache.OnEvicted(fnOnEvicted(cw.writer))
+	// logger.SetOutput(cw)
+	ch.cache.OnEvicted(fnOnEvicted(ch.writer))
+	logger.SetOutput(ioutil.Discard)
+	logger.AddHook(&ch)
 
 	logger.SetFormatter(&nested.Formatter{
-		TimestampFormat: "2006-01-02 15:04:05",
+		TimestampFormat: timestampFormat,
 		HideKeys:        true,
 		ShowFullLevel:   true,
 		FieldsOrder:     []string{"component", "category"},
@@ -148,7 +160,46 @@ func fnOnEvicted(w io.Writer) func(string, interface{}) {
 	return func(ck string, i interface{}) {
 		v := i.(uint16)
 		if v > 0 {
-			fmt.Fprintf(w, "%s[consolidate: %d more entries last 60 seconds]\n", ck, v)
+			fmt.Fprintf(w, "%s [consolidate: %d more entries last 60 seconds] %s\n",
+				time.Now().Format(timestampFormat),
+				v, ck)
 		}
 	}
+}
+
+type ckHook struct {
+	cache  *cache.Cache
+	writer io.Writer
+}
+
+// Levels implements logrus.Hook.Level interface
+func (*ckHook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+// Fire implements logrus.Hook.Fire interface
+func (h *ckHook) Fire(entry *logrus.Entry) error {
+	/* define cache key */
+	var dataKeys []string
+	for k := range entry.Data {
+		dataKeys = append(dataKeys, k)
+	}
+	sort.Strings(dataKeys)
+	ck := fmt.Sprintf("[%s] %s ", entry.Level, entry.Message)
+	for _, k := range dataKeys {
+		ck = fmt.Sprintf("%s#%s", ck, k)
+	}
+	/* workaround on https://github.com/patrickmn/go-cache/issues/48 */
+	h.cache.DeleteExpired()
+	/* inc hits if cached */
+	if _, ok := h.cache.Get(ck); ok {
+		h.cache.Increment(ck, 1)
+	} else {
+		h.cache.Add(ck, uint16(0), 60*time.Second)
+		output, _ := entry.Logger.Formatter.Format(entry)
+		h.writer.Write(output)
+	}
+	/* debug hits */
+	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
+	return nil
 }
