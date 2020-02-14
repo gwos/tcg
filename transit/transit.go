@@ -495,7 +495,7 @@ type IncidentAlert struct {
 }
 
 type GroundworkEventsRequest struct {
-	events				[]GroundworkEvent  				`json:"events"`
+	Events				[]GroundworkEvent  				`json:"events"`
 }
 
 type GroundworkEvent struct {
