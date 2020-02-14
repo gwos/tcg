@@ -49,10 +49,6 @@ func Error(args ...interface{}) {
 
 // Config configures logger
 func Config(filePath string, level int) {
-	// cw := cachedWriter{
-	// 	cache.New(10*time.Minute, 10*time.Second),
-	// 	os.Stdout,
-	// }
 	ch := ckHook{
 		cache.New(10*time.Minute, 10*time.Second),
 		os.Stdout,
@@ -61,13 +57,10 @@ func Config(filePath string, level int) {
 	if len(filePath) > 0 {
 		if logFile, err := os.OpenFile(filePath,
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			// cw.writer = io.MultiWriter(os.Stdout, logFile)
 			ch.writer = io.MultiWriter(os.Stdout, logFile)
 		}
 	}
 
-	// cw.cache.OnEvicted(fnOnEvicted(cw.writer))
-	// logger.SetOutput(cw)
 	ch.cache.OnEvicted(fnOnEvicted(ch.writer))
 	logger.SetOutput(ioutil.Discard)
 	logger.AddHook(&ch)
@@ -121,39 +114,6 @@ func (entry *Entry) WithInfo(fields Fields) *Entry {
 		}
 	}
 	return entry
-}
-
-type cachedWriter struct {
-	cache  *cache.Cache
-	writer io.Writer
-}
-
-func (cw cachedWriter) Write(p []byte) (n int, err error) {
-	// fmt.Println("##", string(p[:60]), "...") // debug hit
-	/* define cache key */
-	s := string(p)
-	ck := s
-	for k := range cw.cache.Items() {
-		if isSimilar(k, s) {
-			ck = k
-			break
-		}
-	}
-	/* skip output if cached */
-	if _, ok := cw.cache.Get(ck); ok {
-		if err := cw.cache.Increment(ck, 1); err != nil {
-			return cw.writer.Write(p)
-		}
-	} else {
-		cw.cache.Add(ck, uint16(0), 60*time.Second)
-		return cw.writer.Write(p)
-	}
-
-	return 0, nil
-}
-
-func isSimilar(s1, s2 string) bool {
-	return len(s1) == len(s2)
 }
 
 func fnOnEvicted(w io.Writer) func(string, interface{}) {
