@@ -15,7 +15,7 @@ type GWOperations interface {
 	Connect() error
 	Disconnect() error
 	ValidateToken(appName, apiToken string) error
-	SendEvent(payload []byte) ([]byte, error)
+	SendEvents(payload []byte) ([]byte, error)
 	SendResourcesWithMetrics(payload []byte) ([]byte, error)
 	SynchronizeInventory(payload []byte) ([]byte, error)
 }
@@ -24,7 +24,7 @@ type GWOperations interface {
 const (
 	GWEntrypointConnect                 = "/api/auth/login"
 	GWEntrypointDisconnect              = "/api/auth/logout"
-	GWEntrypointSendEvent               = "/api/events"
+	GWEntrypointSendEvents              = "/api/events"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
@@ -150,9 +150,9 @@ func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error)
 	return client.sendData(GWEntrypointSendResourceWithMetrics, payload)
 }
 
-// SendEvent implements GWOperations.SendEvent.
-func (client *GWClient) SendEvent(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSendEvent, payload)
+// SendEvents implements GWOperations.SendEvents.
+func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
+	return client.sendData(GWEntrypointSendEvents, payload)
 }
 
 func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, error) {

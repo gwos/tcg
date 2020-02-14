@@ -63,11 +63,11 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
-// SendEvent is a C API for services.GetController().SendEvent
-//export SendEvent
-func SendEvent(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+// SendEvents is a C API for services.GetController().SendEvents
+//export SendEvents
+func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetController().
-		SendEvent([]byte(C.GoString(payloadJSON))); err != nil {
+		SendEvents([]byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}

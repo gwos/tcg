@@ -10,7 +10,7 @@ import (
 const (
 	SubjSendResourceWithMetrics = "send-resource-with-metrics"
 	SubjSynchronizeInventory    = "synchronize-inventory"
-	SubjSendEvent               = "send-events"
+	SubjSendEvents              = "send-events"
 )
 
 // Status defines status value
@@ -89,5 +89,5 @@ type Controllers interface {
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(GetBytesHandlerType)
 	RemoveListMetricsHandler()
-	SendEvent([]byte) error
+	SendEvents([]byte) error
 }
