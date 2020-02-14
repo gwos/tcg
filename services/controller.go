@@ -60,9 +60,9 @@ func (controller *Controller) RemoveListMetricsHandler() {
 	controller.listMetricsHandler = nil
 }
 
-// SendEvent implements Controllers.SendEvent interface
-func (controller *Controller) SendEvent(payload []byte) error {
-	return nats.Publish(SubjSendEvent, payload)
+// SendEvents implements Controllers.SendEvents interface
+func (controller *Controller) SendEvents(payload []byte) error {
+	return nats.Publish(SubjSendEvents, payload)
 }
 
 // starts the http server
@@ -162,7 +162,7 @@ func (controller *Controller) events(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = controller.SendEvent(value)
+	err = controller.SendEvents(value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
