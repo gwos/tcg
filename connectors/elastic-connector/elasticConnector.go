@@ -1,0 +1,348 @@
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/gwos/tng/milliseconds"
+	_ "github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tng/transit"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+const (
+	KibanaApiSavedObjectsPath = "http://localhost:5601/kibana/api/saved_objects/"
+)
+
+func CollectMetrics() []transit.MonitoredResource {
+	storedQueries, _ := RetrieveStoredQueries(nil)
+
+	// TODO: these should come from environment variables
+	cfg := elasticsearch.Config{
+		Addresses: []string{ // TODO: multiple load balanced elastic search
+			"http://localhost:9200",
+			// "http://localhost:9201",
+		},
+	}
+	esClient, _ := elasticsearch.NewClient(cfg)
+
+	monitoredResources := make(map[string]transit.MonitoredResource)
+
+	indexPatterns := make(map[string]IndexPattern)
+
+	for _, storedQuery := range storedQueries {
+		indexSet := make(map[string]struct{})
+		query := make(map[string]interface{})
+		queryBool := make(map[string]interface{})
+		var must []interface{}
+		//var mustNot []interface{}
+		var should []interface{}
+		for _, filter := range storedQuery.Filters {
+			index := RetrieveIndexPattern(filter.Index)
+			indexPatterns[index.Id] = index
+			indexSet[index.Title] = struct{}{}
+			if filter.Body["query"] != nil {
+				body := filter.Body["query"].(map[string]interface{})
+				if body["match"] != nil {
+					bodyMatch := body["match"].(map[string]interface{})
+					for key, _ := range bodyMatch {
+						value := bodyMatch[key].(map[string]interface{})
+						must = append(must, map[string]interface{}{
+							"match": map[string]interface{}{
+								key: value["query"].(string),
+							}})
+					}
+				}
+				//if body["bool"] != nil {
+				//	bodyBool := body["bool"].(map[string]interface{})
+				//	if bodyBool["should"] != nil {
+				//		bodyBoolShould := bodyBool["should"].([]interface{})
+				//		for _, bbs := range bodyBoolShould {
+				//			sh := bbs.(map[string]interface{})
+				//			if sh["match_phrase"] != nil {
+				//				shouldMatches := sh["match_phrase"].(map[string]interface{})
+				//				for key, value := range shouldMatches {
+				//					should = append(should, map[string]interface{}{
+				//						"match": map[string]interface{}{
+				//							key: value,
+				//						}})
+				//				}
+				//			}
+				//		}
+				//	}
+				//	if bodyBool["minimum_should_match"] != nil {
+				//		queryBool["minimum_should_match"] = bodyBool["minimum_should_match"]
+				//	}
+				//}
+			}
+			if filter.Body["range"] != nil {
+				// TODO
+			}
+			if filter.Body["exists"] != nil {
+				// TODO
+			}
+			// TODO
+		}
+		queryBool["must"] = must
+		queryBool["should"] = should
+		query["bool"] = queryBool
+		queryBody := map[string]interface{}{
+			"query": query,
+		}
+
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(queryBody); err != nil {
+			log.Fatalf("Error encoding query: %s", err)
+		}
+
+		var indexes []string
+		for index := range indexSet {
+			indexes = append(indexes, index)
+		}
+
+		res, err := esClient.Search(
+			esClient.Search.WithContext(context.Background()),
+			esClient.Search.WithIndex(indexes...),
+			esClient.Search.WithBody(&buf),
+			esClient.Search.WithTrackTotalHits(true),
+			esClient.Search.WithPretty(),
+		)
+		if err != nil {
+			log.Fatalf("Error getting response: %s", err)
+		}
+
+		if res.IsError() {
+			var e map[string]interface{}
+			if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
+				log.Fatalf("Error parsing the response body: %s", err)
+			} else {
+				// Print the response status and error information.
+				log.Fatalf("[%s] %s: %s",
+					res.Status(),
+					e["error"].(map[string]interface{})["type"],
+					e["error"].(map[string]interface{})["reason"],
+				)
+			}
+		}
+
+		responseBody, err := ioutil.ReadAll(res.Body)
+		var result map[string]interface{}
+		json.Unmarshal(responseBody, &result)
+		took := result["took"].(float64)
+		hits := result["hits"].(map[string]interface{})["total"].(map[string]interface{})["value"].(float64)
+
+		log.Print(storedQuery.Name)
+		log.Print(fmt.Sprintf("%f", took))
+		log.Print(fmt.Sprintf("%f", hits))
+
+		hitsValue := &transit.TypedValue{
+			ValueType:    "", // TODO
+			BoolValue:    false,
+			DoubleValue:  hits,
+			IntegerValue: int64(hits),
+			StringValue:  fmt.Sprintf("%f", hits),
+			TimeValue:    nil, // TODO
+		}
+
+		var hitsMetric = transit.TimeSeries{
+			MetricName: "hits", // TODO
+			SampleType: "",     // TODO
+			Interval:   nil,    // TODO
+			Value:      hitsValue,
+			Tags:       nil, // TODO
+			Unit:       "",  // TODO
+			Thresholds: nil, // TODO
+		}
+
+		var tookValue = &transit.TypedValue{
+			ValueType:    "", // TODO
+			BoolValue:    false,
+			DoubleValue:  took,
+			IntegerValue: int64(took),
+			StringValue:  fmt.Sprintf("%f", took),
+			TimeValue:    nil, // TODO
+		}
+
+		var tookMetric = transit.TimeSeries{
+			MetricName: "execution_time", // TODO
+			SampleType: "",               // TODO
+			Interval:   nil,              // TODO
+			Value:      tookValue,
+			Tags:       nil,  // TODO
+			Unit:       "ms", // TODO
+			Thresholds: nil,  // TODO
+		}
+
+		var metrics = []transit.TimeSeries{tookMetric, hitsMetric}
+
+		var service = transit.MonitoredService{
+			Name:             storedQuery.Name,
+			Type:             transit.Service,                     // TODO
+			Owner:            "",                                  // TODO
+			Status:           "",                                  // TODO
+			LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+			NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+			LastPlugInOutput: "",                                  // TODO
+			Properties:       nil,                                 // TODO
+			Metrics:          metrics,
+		}
+
+		var services = []transit.MonitoredService{service}
+		for _, index := range indexPatterns {
+			hostName := index.Id // TODO tag!!!!!
+			if host, exists := monitoredResources[hostName]; exists {
+				existingServices := host.Services
+				existingServices = append(existingServices, service)
+				host.Services = existingServices
+				monitoredResources[hostName] = host
+			} else {
+				var monitoredResource = transit.MonitoredResource{
+					Name:             hostName,
+					Type:             transit.Host,
+					Owner:            "",                                  // TODO
+					Status:           "",                                  // TODO
+					LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+					NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+					LastPlugInOutput: "",                                  // TODO
+					Properties:       nil,                                 // TODO
+					Services:         services,
+				}
+				monitoredResources[hostName] = monitoredResource
+			}
+		}
+	}
+
+	result := make([]transit.MonitoredResource, len(monitoredResources))
+	i := 0
+	for _, value := range monitoredResources {
+		result[i] = value
+		i++
+	}
+	return result
+}
+
+func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := http.Client{Transport: tr}
+	var request *http.Request
+	var response *http.Response
+	var err error
+
+	var search string
+	if ids != nil {
+		search = "&search_fields=title&search="
+		for index, id := range ids {
+			search = search + id
+			if index != len(ids) {
+				search = search + "|"
+			}
+		}
+	}
+
+	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"_find?type=query"+search, nil)
+	if err != nil {
+		log.Fatalf("Error getting response: %s", err)
+	}
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("kbn-xsrf", "true")
+
+	response, err = client.Do(request)
+	if response.StatusCode == 400 {
+		log.Fatalf("Not Found!")
+	}
+	responseBody, err := ioutil.ReadAll(response.Body)
+	response.Body.Close()
+
+	var result map[string]interface{}
+	json.Unmarshal(responseBody, &result)
+	savedObjects := result["saved_objects"].([]interface{})
+	var storedQueries []StoredQuery
+	for _, so := range savedObjects {
+		savedObject := so.(map[string]interface{})
+
+		id := savedObject["id"].(string)
+		name := savedObject["attributes"].(map[string]interface{})["title"].(string)
+		description := savedObject["attributes"].(map[string]interface{})["description"].(string)
+
+		filtersAttribute := savedObject["attributes"].(map[string]interface{})["filters"].([]interface{})
+		var filters []Filter
+		for _, f := range filtersAttribute {
+			filter := f.(map[string]interface{})
+			index := filter["meta"].(map[string]interface{})["index"].(string)
+			var filterBody map[string]interface{}
+			if filter["query"] != nil {
+				filterBody = map[string]interface{}{"query": filter["query"].(map[string]interface{})}
+			}
+			if filter["range"] != nil {
+				filterBody = map[string]interface{}{"range": filter["range"].(map[string]interface{})}
+			}
+			if filter["exists"] != nil {
+				filterBody = map[string]interface{}{"exists": filter["exists"].(map[string]interface{})}
+			}
+			filters = append(filters, Filter{index, filterBody})
+		}
+		storedQueries = append(storedQueries, StoredQuery{id, name, description, filters})
+	}
+
+	return storedQueries, len(storedQueries)
+}
+
+func RetrieveIndexPattern(id string) IndexPattern {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := http.Client{Transport: tr}
+	var request *http.Request
+	var response *http.Response
+	var err error
+
+	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"index-pattern/"+id, nil)
+	if err != nil {
+		log.Fatalf("Error getting response: %s", err)
+	}
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("kbn-xsrf", "true")
+
+	response, err = client.Do(request)
+	if response.StatusCode == 400 {
+		log.Fatalf("Not Found!")
+	}
+	responseBody, err := ioutil.ReadAll(response.Body)
+	response.Body.Close()
+
+	var result map[string]interface{}
+	json.Unmarshal(responseBody, &result)
+
+	title := result["attributes"].(map[string]interface{})["title"].(string)
+
+	// TODO tags
+
+	return IndexPattern{id, title}
+}
+
+type StoredQuery struct {
+	Id          string
+	Name        string
+	Description string
+	Filters     []Filter
+}
+
+type Filter struct {
+	Index string
+	Body  map[string]interface{}
+}
+
+type IndexPattern struct {
+	Id    string
+	Title string
+	// TODO tags
+}
