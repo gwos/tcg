@@ -47,7 +47,7 @@ var hostName string // TODO: Vlad why use global? - Because we need to set owner
 
 var LastCheck milliseconds.MillisecondTimestamp
 
-func Synchronize() *transit.InventoryResource {
+func Synchronize(processes []string) *transit.InventoryResource {
 	hostStat, err := host.Info()
 	if err != nil {
 		log.Error(err)
@@ -98,14 +98,14 @@ func Synchronize() *transit.InventoryResource {
 				Owner: hostName,
 			},
 			{
-				Name:  "cpu.usage.total",
-				Type:  "network-device",
+				Name:  TotalCpuUsageServiceName,
+				Type:  transit.NetworkDevice,
 				Owner: hostName,
 			},
 		},
 	}
 
-	processesMap := collectProcesses()
+	processesMap := collectProcesses(processes)
 
 	for processName, _ := range processesMap {
 		inventoryResource.Services = append(inventoryResource.Services, transit.InventoryService{
@@ -118,7 +118,7 @@ func Synchronize() *transit.InventoryResource {
 	return &inventoryResource
 }
 
-func CollectMetrics() *transit.MonitoredResource {
+func CollectMetrics(processes []string) *transit.MonitoredResource {
 	hostStat, err := host.Info()
 	if err != nil {
 		log.Error(err)
@@ -141,14 +141,14 @@ func CollectMetrics() *transit.MonitoredResource {
 			*getTotalMemoryUsageService(),
 			*getMemoryUsedService(),
 			*getNumberOfProcessesService(),
-			*getTotalCpuUsage(),
+			*getTotalCpuUsage(processes),
 		},
 	}
 
-	processesMap := collectProcesses()
+	processesMap := collectProcesses(processes)
 
 	for processName, processCpu := range processesMap {
-		monitoredResource.Services = append(monitoredResource.Services, transit.MonitoredService{
+		monitoredService := transit.MonitoredService{
 			Name:          processName,
 			Type:          transit.Service,
 			Status:        transit.ServiceOk,
@@ -196,7 +196,11 @@ func CollectMetrics() *transit.MonitoredResource {
 					Unit: transit.PercentCPU,
 				},
 			},
-		})
+		}
+		if processCpu == -1 {
+			monitoredService.Status = transit.ServicePending
+		}
+		monitoredResource.Services = append(monitoredResource.Services, monitoredService)
 	}
 
 	return &monitoredResource
@@ -608,7 +612,7 @@ func getNumberOfProcessesService() *transit.MonitoredService {
 	}
 }
 
-func getTotalCpuUsage() *transit.MonitoredService {
+func getTotalCpuUsage(processes []string) *transit.MonitoredService {
 	interval := time.Now()
 
 	service := transit.MonitoredService{
@@ -662,24 +666,24 @@ func getTotalCpuUsage() *transit.MonitoredService {
 		},
 	}
 
-	//processesMap := collectProcesses()
-	//
-	//for processName, processCpu := range processesMap {
-	//	service.Metrics = append(service.Metrics, transit.TimeSeries{
-	//		MetricName: processName,
-	//		SampleType: transit.Value,
-	//		Interval: &transit.TimeInterval{
-	//			EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
-	//			StartTime: milliseconds.MillisecondTimestamp{Time: interval},
-	//		},
-	//		Value: &transit.TypedValue{
-	//			ValueType:   transit.DoubleType,
-	//			DoubleValue: processCpu,
-	//		},
-	//		Unit: transit.PercentCPU,
-	//	})
-	//	break
-	//}
+	processesMap := collectProcesses(processes)
+
+	for processName, processCpu := range processesMap {
+		service.Metrics = append(service.Metrics, transit.TimeSeries{
+			MetricName: processName,
+			SampleType: transit.Value,
+			Interval: &transit.TimeInterval{
+				EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
+				StartTime: milliseconds.MillisecondTimestamp{Time: interval},
+			},
+			Value: &transit.TypedValue{
+				ValueType:   transit.DoubleType,
+				DoubleValue: processCpu,
+			},
+			Unit: transit.PercentCPU,
+		})
+		break
+	}
 
 	return &service
 }
@@ -694,12 +698,11 @@ type Process struct {
 	cpu  float64
 }
 
-func collectProcesses() map[string]float64 {
+func collectProcesses(procs []string) map[string]float64 {
 	pr, _ := process.Processes()
 
 	processes := make([]*Process, 0)
 	for _, proc := range pr {
-
 		cpuUsed, err := proc.CPUPercent()
 		if err != nil {
 			log.Error(err)
@@ -711,7 +714,6 @@ func collectProcesses() map[string]float64 {
 		}
 
 		processes = append(processes, &Process{name, cpuUsed})
-
 	}
 
 	m := make(map[string]float64)
@@ -724,5 +726,15 @@ func collectProcesses() map[string]float64 {
 		}
 	}
 
-	return m
+	processesMap := make(map[string]float64)
+	for _, processName := range procs {
+		_, exists := m[processName]
+		if exists {
+			processesMap[processName] = m[processName]
+		} else {
+			processesMap[processName] = -1
+		}
+	}
+
+	return processesMap
 }
