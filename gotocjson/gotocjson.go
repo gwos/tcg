@@ -3532,7 +3532,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 					// --------------------------------------------------------------------------------------------------------------------------------
 				} else if strings.HasSuffix(field_C_type, "_Ptr") {
 					if field_tag.json_omitempty {
-						include_condition = fmt.Sprintf("%s_%s_%s != NULL", package_name, struct_name, field_name)
+						include_condition = fmt.Sprintf("%s_%s_ptr->%s != NULL", package_name, struct_name, field_name)
 					} else {
 						include_condition = "1"
 					}
@@ -3559,10 +3559,10 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 						have_encode_routine_normal_body_format = true
 					}
 					function_code += fmt.Sprintf(`
-	json_t *%[3]s_%s_%s = %[6]s_ptr_as_JSON_ptr(%[3]s_%s_ptr->%s);
 	if (%[1]s) {
+	    json_t *%[3]s_%s_%s = %[6]s_ptr_as_JSON_ptr(%[3]s_%s_ptr->%s);
 	    // %[3]s_%s_ptr->%s object value
-	    if (json_object_set_new(json, "%[2]s", %[3]s_%s_%s) != 0) {
+	    if (%[3]s_%s_%s == NULL || json_object_set_new(json, "%[2]s", %[3]s_%s_%s) != 0) {
 		failure = "cannot set %[3]s_%s_ptr->%s %s subobject value into object";
 		break;
 	    }
