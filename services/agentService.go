@@ -273,7 +273,8 @@ func (service *AgentService) listenStatsChan() {
 				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
 				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			case SubjSendEvent:
+			case SubjSendEvents:
+				// TODO: handle events acks, unacks
 				service.agentStats.LastAlertRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 
@@ -291,9 +292,16 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 			dispatcherOptions,
 			service.makeDispatcherOption(
 				durableID,
-				SubjSendEvent,
+				SubjSendEvents,
 				func(b []byte) error {
-					_, err := gwClientRef.SendEvent(b)
+					var err error
+					if bytes.HasSuffix(b, []byte(eventsAckSuffix)) {
+						_, err = gwClientRef.SendEventsAck(bytes.TrimSuffix(b, []byte(eventsAckSuffix)))
+					} else if bytes.HasSuffix(b, []byte(eventsUnackSuffix)) {
+						_, err = gwClientRef.SendEventsUnack(bytes.TrimSuffix(b, []byte(eventsUnackSuffix)))
+					} else {
+						_, err = gwClientRef.SendEvents(b)
+					}
 					return err
 				},
 			),
