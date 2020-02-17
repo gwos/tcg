@@ -14,6 +14,11 @@ import (
 
 var transitService = services.GetTransitService()
 
+const (
+	DefaultHostGroupName = "LocalServer"
+	DefaultTimer         = 120
+)
+
 // @title TNG API Documentation
 // @version 1.0
 
@@ -154,6 +159,12 @@ func getConfig() ([]string, []transit.ResourceGroup, int, error) {
 		err := json.Unmarshal(res, &connector)
 		if err != nil {
 			return []string{}, []transit.ResourceGroup{}, -1, err
+		}
+		if len(connector.Connection.Extensions) == 0 {
+			return []string{}, []transit.ResourceGroup{{
+				GroupName: DefaultHostGroupName,
+				Type:      transit.HostGroup,
+			}}, DefaultTimer, err
 		}
 		timer := connector.Connection.Extensions["timer"].(float64)
 		processesInterface := connector.Connection.Extensions["processes"].([]interface{})
