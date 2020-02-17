@@ -15,7 +15,7 @@ func TestEvents(t *testing.T) {
 	configNats(t, 5)
 	defer cleanNats(t)
 
-	assert.NoError(t, nats.Publish(services.SubjSendEvent, testMessage))
+	assert.NoError(t, nats.Publish(services.SubjSendEvents, testMessage))
 
 	time.Sleep(1 * time.Second)
 
