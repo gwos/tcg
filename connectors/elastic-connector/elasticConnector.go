@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/gwos/tng/milliseconds"
 	_ "github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"io/ioutil"
@@ -40,56 +39,81 @@ func CollectMetrics() []transit.MonitoredResource {
 		query := make(map[string]interface{})
 		queryBool := make(map[string]interface{})
 		var must []interface{}
-		//var mustNot []interface{}
+		var mustNot []interface{}
 		var should []interface{}
 		for _, filter := range storedQuery.Filters {
-			index := RetrieveIndexPattern(filter.Index)
-			indexPatterns[index.Id] = index
-			indexSet[index.Title] = struct{}{}
-			if filter.Body["query"] != nil {
-				body := filter.Body["query"].(map[string]interface{})
-				if body["match"] != nil {
-					bodyMatch := body["match"].(map[string]interface{})
-					for key, _ := range bodyMatch {
-						value := bodyMatch[key].(map[string]interface{})
-						must = append(must, map[string]interface{}{
+			index := filter["index"].(string)
+			queryType := filter["type"].(string)
+			negate := filter["negate"].(bool)
+			key := filter["key"].(string)
+
+			indexPattern := RetrieveIndexPattern(index)
+			indexPatterns[indexPattern.Id] = indexPattern
+			indexSet[indexPattern.Title] = struct{}{}
+			switch queryType {
+			case TypePhrase:
+				q := map[string]interface{}{
+					"match": map[string]interface{}{
+						filter["key"].(string): filter["value"].(string),
+					}}
+				if !negate {
+					must = append(must, q)
+				} else {
+					mustNot = append(mustNot, q)
+				}
+				break
+			case TypePhrases:
+				params := filter["params"].([]interface{})
+				for _, param := range params {
+					param := param.(string)
+					if !negate {
+						should = append(should, map[string]interface{}{
 							"match": map[string]interface{}{
-								key: value["query"].(string),
+								key: param,
+							}})
+					} else {
+						should = append(should, map[string]interface{}{
+							"bool": map[string]interface{}{
+								"must_not": map[string]interface{}{
+									"match": map[string]interface{}{
+										key: param,
+									},
+								},
 							}})
 					}
 				}
-				//if body["bool"] != nil {
-				//	bodyBool := body["bool"].(map[string]interface{})
-				//	if bodyBool["should"] != nil {
-				//		bodyBoolShould := bodyBool["should"].([]interface{})
-				//		for _, bbs := range bodyBoolShould {
-				//			sh := bbs.(map[string]interface{})
-				//			if sh["match_phrase"] != nil {
-				//				shouldMatches := sh["match_phrase"].(map[string]interface{})
-				//				for key, value := range shouldMatches {
-				//					should = append(should, map[string]interface{}{
-				//						"match": map[string]interface{}{
-				//							key: value,
-				//						}})
-				//				}
-				//			}
-				//		}
-				//	}
-				//	if bodyBool["minimum_should_match"] != nil {
-				//		queryBool["minimum_should_match"] = bodyBool["minimum_should_match"]
-				//	}
-				//}
+				break
+			case TypeRange:
+				params := filter["params"].(map[string]interface{})
+				r := map[string]interface{}{
+					"range": map[string]interface{}{
+						key: params,
+					}}
+				if !negate {
+					must = append(must, r)
+				} else {
+					mustNot = append(mustNot, r)
+				}
+				break
+			case TypeExists:
+				q := map[string]interface{}{
+					"exists": map[string]interface{}{
+						"field": filter["key"].(string),
+					}}
+				if !negate {
+					must = append(must, q)
+				} else {
+					mustNot = append(mustNot, q)
+				}
+				break
 			}
-			if filter.Body["range"] != nil {
-				// TODO
-			}
-			if filter.Body["exists"] != nil {
-				// TODO
-			}
-			// TODO
 		}
 		queryBool["must"] = must
+		queryBool["must_not"] = mustNot
 		queryBool["should"] = should
+		if should != nil {
+			queryBool["minimum_should_match"] = 1
+		}
 		query["bool"] = queryBool
 		queryBody := map[string]interface{}{
 			"query": query,
@@ -140,81 +164,81 @@ func CollectMetrics() []transit.MonitoredResource {
 		log.Print(fmt.Sprintf("%f", took))
 		log.Print(fmt.Sprintf("%f", hits))
 
-		hitsValue := &transit.TypedValue{
-			ValueType:    "", // TODO
-			BoolValue:    false,
-			DoubleValue:  hits,
-			IntegerValue: int64(hits),
-			StringValue:  fmt.Sprintf("%f", hits),
-			TimeValue:    nil, // TODO
-		}
-
-		var hitsMetric = transit.TimeSeries{
-			MetricName: "hits", // TODO
-			SampleType: "",     // TODO
-			Interval:   nil,    // TODO
-			Value:      hitsValue,
-			Tags:       nil, // TODO
-			Unit:       "",  // TODO
-			Thresholds: nil, // TODO
-		}
-
-		var tookValue = &transit.TypedValue{
-			ValueType:    "", // TODO
-			BoolValue:    false,
-			DoubleValue:  took,
-			IntegerValue: int64(took),
-			StringValue:  fmt.Sprintf("%f", took),
-			TimeValue:    nil, // TODO
-		}
-
-		var tookMetric = transit.TimeSeries{
-			MetricName: "execution_time", // TODO
-			SampleType: "",               // TODO
-			Interval:   nil,              // TODO
-			Value:      tookValue,
-			Tags:       nil,  // TODO
-			Unit:       "ms", // TODO
-			Thresholds: nil,  // TODO
-		}
-
-		var metrics = []transit.TimeSeries{tookMetric, hitsMetric}
-
-		var service = transit.MonitoredService{
-			Name:             storedQuery.Name,
-			Type:             transit.Service,                     // TODO
-			Owner:            "",                                  // TODO
-			Status:           "",                                  // TODO
-			LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-			NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-			LastPlugInOutput: "",                                  // TODO
-			Properties:       nil,                                 // TODO
-			Metrics:          metrics,
-		}
-
-		var services = []transit.MonitoredService{service}
-		for _, index := range indexPatterns {
-			hostName := index.Id // TODO tag!!!!!
-			if host, exists := monitoredResources[hostName]; exists {
-				existingServices := host.Services
-				existingServices = append(existingServices, service)
-				host.Services = existingServices
-				monitoredResources[hostName] = host
-			} else {
-				var monitoredResource = transit.MonitoredResource{
-					Name:             hostName,
-					Type:             transit.Host,
-					Owner:            "",                                  // TODO
-					Status:           "",                                  // TODO
-					LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-					NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-					LastPlugInOutput: "",                                  // TODO
-					Properties:       nil,                                 // TODO
-					Services:         services,
-				}
-				monitoredResources[hostName] = monitoredResource
-			}
-		}
+		//hitsValue := &transit.TypedValue{
+		//	ValueType:    "", // TODO
+		//	BoolValue:    false,
+		//	DoubleValue:  hits,
+		//	IntegerValue: int64(hits),
+		//	StringValue:  fmt.Sprintf("%f", hits),
+		//	TimeValue:    nil, // TODO
+		//}
+		//
+		//var hitsMetric = transit.TimeSeries{
+		//	MetricName: "hits", // TODO
+		//	SampleType: "",     // TODO
+		//	Interval:   nil,    // TODO
+		//	Value:      hitsValue,
+		//	Tags:       nil, // TODO
+		//	Unit:       "",  // TODO
+		//	Thresholds: nil, // TODO
+		//}
+		//
+		//var tookValue = &transit.TypedValue{
+		//	ValueType:    "", // TODO
+		//	BoolValue:    false,
+		//	DoubleValue:  took,
+		//	IntegerValue: int64(took),
+		//	StringValue:  fmt.Sprintf("%f", took),
+		//	TimeValue:    nil, // TODO
+		//}
+		//
+		//var tookMetric = transit.TimeSeries{
+		//	MetricName: "execution_time", // TODO
+		//	SampleType: "",               // TODO
+		//	Interval:   nil,              // TODO
+		//	Value:      tookValue,
+		//	Tags:       nil,  // TODO
+		//	Unit:       "ms", // TODO
+		//	Thresholds: nil,  // TODO
+		//}
+		//
+		//var metrics = []transit.TimeSeries{tookMetric, hitsMetric}
+		//
+		//var service = transit.MonitoredService{
+		//	Name:             storedQuery.Name,
+		//	Type:             transit.Service,                     // TODO
+		//	Owner:            "",                                  // TODO
+		//	Status:           "",                                  // TODO
+		//	LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+		//	NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+		//	LastPlugInOutput: "",                                  // TODO
+		//	Properties:       nil,                                 // TODO
+		//	Metrics:          metrics,
+		//}
+		//
+		//var services = []transit.MonitoredService{service}
+		//for _, indexPattern := range indexPatterns {
+		//	hostName := indexPattern.Id // TODO tag!!!!!
+		//	if host, exists := monitoredResources[hostName]; exists {
+		//		existingServices := host.Services
+		//		existingServices = append(existingServices, service)
+		//		host.Services = existingServices
+		//		monitoredResources[hostName] = host
+		//	} else {
+		//		var monitoredResource = transit.MonitoredResource{
+		//			Name:             hostName,
+		//			Type:             transit.Host,
+		//			Owner:            "",                                  // TODO
+		//			Status:           "",                                  // TODO
+		//			LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+		//			NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+		//			LastPlugInOutput: "",                                  // TODO
+		//			Properties:       nil,                                 // TODO
+		//			Services:         services,
+		//		}
+		//		monitoredResources[hostName] = monitoredResource
+		//	}
+		//}
 	}
 
 	result := make([]transit.MonitoredResource, len(monitoredResources))
@@ -273,21 +297,14 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 		description := savedObject["attributes"].(map[string]interface{})["description"].(string)
 
 		filtersAttribute := savedObject["attributes"].(map[string]interface{})["filters"].([]interface{})
-		var filters []Filter
+		var filters []map[string]interface{}
 		for _, f := range filtersAttribute {
 			filter := f.(map[string]interface{})
-			index := filter["meta"].(map[string]interface{})["index"].(string)
-			var filterBody map[string]interface{}
-			if filter["query"] != nil {
-				filterBody = map[string]interface{}{"query": filter["query"].(map[string]interface{})}
+			disabled := filter["meta"].(map[string]interface{})["disabled"].(bool)
+			if disabled {
+				continue
 			}
-			if filter["range"] != nil {
-				filterBody = map[string]interface{}{"range": filter["range"].(map[string]interface{})}
-			}
-			if filter["exists"] != nil {
-				filterBody = map[string]interface{}{"exists": filter["exists"].(map[string]interface{})}
-			}
-			filters = append(filters, Filter{index, filterBody})
+			filters = append(filters, filter["meta"].(map[string]interface{}))
 		}
 		storedQueries = append(storedQueries, StoredQuery{id, name, description, filters})
 	}
@@ -323,9 +340,6 @@ func RetrieveIndexPattern(id string) IndexPattern {
 	json.Unmarshal(responseBody, &result)
 
 	title := result["attributes"].(map[string]interface{})["title"].(string)
-
-	// TODO tags
-
 	return IndexPattern{id, title}
 }
 
@@ -333,16 +347,17 @@ type StoredQuery struct {
 	Id          string
 	Name        string
 	Description string
-	Filters     []Filter
-}
-
-type Filter struct {
-	Index string
-	Body  map[string]interface{}
+	Filters     []map[string]interface{}
 }
 
 type IndexPattern struct {
 	Id    string
 	Title string
-	// TODO tags
 }
+
+const (
+	TypePhrase  = "phrase"
+	TypePhrases = "phrases"
+	TypeRange   = "range"
+	TypeExists  = "exists"
+)
