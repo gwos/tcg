@@ -13,6 +13,11 @@ const (
 	SubjSendEvents              = "send-events"
 )
 
+// use one queue for events, events acks and unacks
+// as try to keep the processing order
+const eventsAckSuffix = "#ack"
+const eventsUnackSuffix = "#unack"
+
 // Status defines status value
 type Status string
 
@@ -90,4 +95,6 @@ type Controllers interface {
 	RegisterListMetricsHandler(GetBytesHandlerType)
 	RemoveListMetricsHandler()
 	SendEvents([]byte) error
+	SendEventsAck([]byte) error
+	SendEventsUnack([]byte) error
 }

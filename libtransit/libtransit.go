@@ -74,6 +74,28 @@ func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
+// SendEventsAck is a C API for services.GetController().SendEventsAck
+//export SendEventsAck
+func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetController().
+		SendEventsAck([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// SendEventsUnack is a C API for services.GetController().SendEventsUnack
+//export SendEventsUnack
+func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetController().
+		SendEventsUnack([]byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
 // SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {

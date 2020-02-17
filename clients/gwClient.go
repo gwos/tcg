@@ -16,6 +16,8 @@ type GWOperations interface {
 	Disconnect() error
 	ValidateToken(appName, apiToken string) error
 	SendEvents(payload []byte) ([]byte, error)
+	SendEventsAck(payload []byte) ([]byte, error)
+	SendEventsUnack(payload []byte) ([]byte, error)
 	SendResourcesWithMetrics(payload []byte) ([]byte, error)
 	SynchronizeInventory(payload []byte) ([]byte, error)
 }
@@ -25,6 +27,8 @@ const (
 	GWEntrypointConnect                 = "/api/auth/login"
 	GWEntrypointDisconnect              = "/api/auth/logout"
 	GWEntrypointSendEvents              = "/api/events"
+	GWEntrypointSendEventsAck           = "/api/events/ack"
+	GWEntrypointSendEventsUnack         = "/api/events/unack"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
@@ -153,6 +157,16 @@ func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error)
 // SendEvents implements GWOperations.SendEvents.
 func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
 	return client.sendData(GWEntrypointSendEvents, payload)
+}
+
+// SendEventsAck implements GWOperations.SendEventsAck.
+func (client *GWClient) SendEventsAck(payload []byte) ([]byte, error) {
+	return client.sendData(GWEntrypointSendEventsAck, payload)
+}
+
+// SendEventsUnack implements GWOperations.SendEventsUnack.
+func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
+	return client.sendData(GWEntrypointSendEventsUnack, payload)
 }
 
 func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, error) {
