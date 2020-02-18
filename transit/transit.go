@@ -535,7 +535,7 @@ type MonitorConnection struct {
 }
 
 type GroundworkEventsAckRequest struct {
-	Acks			GroundworkEventAck						`json:"acks"`
+	Acks			[]GroundworkEventAck					`json:"acks"`
 }
 
 type GroundworkEventAck struct {
