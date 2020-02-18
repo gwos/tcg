@@ -36,7 +36,7 @@ bool (*getConnectorConfig)(char *buf, size_t bufLen, char *errBuf,
                            size_t errBufLen) = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
-bool (*sendEvent)(char *payloadJSON, char *errBuf, size_t errBufLen) = NULL;
+bool (*sendEvents)(char *payloadJSON, char *errBuf, size_t errBufLen) = NULL;
 bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
                                  size_t errBufLen) = NULL;
 bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
@@ -95,7 +95,7 @@ void load_libtransit() {
   getConnectorConfig = find_symbol("GetConnectorConfig");
   goSetenv = find_symbol("GoSetenv");
   registerListMetricsHandler = find_symbol("RegisterListMetricsHandler");
-  sendEvent = find_symbol("SendEvent");
+  sendEvents = find_symbol("SendEvents");
   sendResourcesWithMetrics = find_symbol("SendResourcesWithMetrics");
   isControllerRunning = find_symbol("IsControllerRunning");
   isNatsRunning = find_symbol("IsNatsRunning");

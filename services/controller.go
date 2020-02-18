@@ -60,9 +60,19 @@ func (controller *Controller) RemoveListMetricsHandler() {
 	controller.listMetricsHandler = nil
 }
 
-// SendEvent implements Controllers.SendEvent interface
-func (controller *Controller) SendEvent(payload []byte) error {
-	return nats.Publish(SubjSendEvent, payload)
+// SendEvents implements Controllers.SendEvents interface
+func (controller *Controller) SendEvents(payload []byte) error {
+	return nats.Publish(SubjSendEvents, payload)
+}
+
+// SendEventsAck implements Controllers.SendEventsAck interface
+func (controller *Controller) SendEventsAck(payload []byte) error {
+	return nats.Publish(SubjSendEvents, append(payload, []byte(eventsAckSuffix)...))
+}
+
+// SendEventsUnack implements Controllers.SendEventsUnack interface
+func (controller *Controller) SendEventsUnack(payload []byte) error {
+	return nats.Publish(SubjSendEvents, append(payload, []byte(eventsUnackSuffix)...))
 }
 
 // starts the http server
@@ -162,7 +172,55 @@ func (controller *Controller) events(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = controller.SendEvent(value)
+	err = controller.SendEvents(value)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+//
+// @Description The following API endpoint can be used to send Alerts to Foundation.
+// @Tags Alerts
+// @Accept  json
+// @Produce  json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router /events-ack [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) eventsAck(c *gin.Context) {
+	value, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.SendEventsAck(value)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+//
+// @Description The following API endpoint can be used to send Alerts to Foundation.
+// @Tags Alerts
+// @Accept  json
+// @Produce  json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router /events-unack [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) eventsUnack(c *gin.Context) {
+	value, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.SendEventsUnack(value)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
@@ -336,6 +394,8 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.Use(controller.validateToken)
 
 	apiV1Group.POST("/events", controller.events)
+	apiV1Group.POST("/events-ack", controller.eventsAck)
+	apiV1Group.POST("/events-unack", controller.eventsUnack)
 	apiV1Group.GET("/metrics", controller.listMetrics)
 	apiV1Group.POST("/reload", controller.reload)
 	apiV1Group.POST("/start", controller.start)
