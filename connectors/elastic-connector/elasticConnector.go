@@ -7,11 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/milliseconds"
 	_ "github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"io/ioutil"
-	"log"
 	"net/http"
+	"time"
 )
 
 const (
@@ -36,11 +38,13 @@ func CollectMetrics() []transit.MonitoredResource {
 
 	for _, storedQuery := range storedQueries {
 		indexSet := make(map[string]struct{})
+
 		query := make(map[string]interface{})
 		queryBool := make(map[string]interface{})
 		var must []interface{}
 		var mustNot []interface{}
 		var should []interface{}
+
 		for _, filter := range storedQuery.Filters {
 			index := filter["index"].(string)
 			queryType := filter["type"].(string)
@@ -121,7 +125,7 @@ func CollectMetrics() []transit.MonitoredResource {
 
 		var buf bytes.Buffer
 		if err := json.NewEncoder(&buf).Encode(queryBody); err != nil {
-			log.Fatalf("Error encoding query: %s", err)
+			log.Error("Error encoding query: %s", err)
 		}
 
 		var indexes []string
@@ -137,16 +141,16 @@ func CollectMetrics() []transit.MonitoredResource {
 			esClient.Search.WithPretty(),
 		)
 		if err != nil {
-			log.Fatalf("Error getting response: %s", err)
+			log.Error("Error getting response: %s", err)
 		}
 
 		if res.IsError() {
 			var e map[string]interface{}
 			if err := json.NewDecoder(res.Body).Decode(&e); err != nil {
-				log.Fatalf("Error parsing the response body: %s", err)
+				log.Error("Error parsing the response body: %s", err)
 			} else {
 				// Print the response status and error information.
-				log.Fatalf("[%s] %s: %s",
+				log.Error("[%s] %s: %s",
 					res.Status(),
 					e["error"].(map[string]interface{})["type"],
 					e["error"].(map[string]interface{})["reason"],
@@ -157,88 +161,157 @@ func CollectMetrics() []transit.MonitoredResource {
 		responseBody, err := ioutil.ReadAll(res.Body)
 		var result map[string]interface{}
 		json.Unmarshal(responseBody, &result)
-		took := result["took"].(float64)
-		hits := result["hits"].(map[string]interface{})["total"].(map[string]interface{})["value"].(float64)
 
-		log.Print(storedQuery.Name)
-		log.Print(fmt.Sprintf("%f", took))
-		log.Print(fmt.Sprintf("%f", hits))
+		hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
+		for _, h := range hits {
+			hit := h.(map[string]interface{})
+			if hit["_source"].(map[string]interface{})["container"] != nil {
+				container := hit["_source"].(map[string]interface{})["container"].(map[string]interface{})
+				hostName := container["name"].(string)
+				// TODO
+				//var hostGroup string
+				//if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
+				//	hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
+				//}
+				if host, hostExists := monitoredResources[hostName]; hostExists {
+					updServices := host.Services
 
-		//hitsValue := &transit.TypedValue{
-		//	ValueType:    "", // TODO
-		//	BoolValue:    false,
-		//	DoubleValue:  hits,
-		//	IntegerValue: int64(hits),
-		//	StringValue:  fmt.Sprintf("%f", hits),
-		//	TimeValue:    nil, // TODO
-		//}
-		//
-		//var hitsMetric = transit.TimeSeries{
-		//	MetricName: "hits", // TODO
-		//	SampleType: "",     // TODO
-		//	Interval:   nil,    // TODO
-		//	Value:      hitsValue,
-		//	Tags:       nil, // TODO
-		//	Unit:       "",  // TODO
-		//	Thresholds: nil, // TODO
-		//}
-		//
-		//var tookValue = &transit.TypedValue{
-		//	ValueType:    "", // TODO
-		//	BoolValue:    false,
-		//	DoubleValue:  took,
-		//	IntegerValue: int64(took),
-		//	StringValue:  fmt.Sprintf("%f", took),
-		//	TimeValue:    nil, // TODO
-		//}
-		//
-		//var tookMetric = transit.TimeSeries{
-		//	MetricName: "execution_time", // TODO
-		//	SampleType: "",               // TODO
-		//	Interval:   nil,              // TODO
-		//	Value:      tookValue,
-		//	Tags:       nil,  // TODO
-		//	Unit:       "ms", // TODO
-		//	Thresholds: nil,  // TODO
-		//}
-		//
-		//var metrics = []transit.TimeSeries{tookMetric, hitsMetric}
-		//
-		//var service = transit.MonitoredService{
-		//	Name:             storedQuery.Name,
-		//	Type:             transit.Service,                     // TODO
-		//	Owner:            "",                                  // TODO
-		//	Status:           "",                                  // TODO
-		//	LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-		//	NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-		//	LastPlugInOutput: "",                                  // TODO
-		//	Properties:       nil,                                 // TODO
-		//	Metrics:          metrics,
-		//}
-		//
-		//var services = []transit.MonitoredService{service}
-		//for _, indexPattern := range indexPatterns {
-		//	hostName := indexPattern.Id // TODO tag!!!!!
-		//	if host, exists := monitoredResources[hostName]; exists {
-		//		existingServices := host.Services
-		//		existingServices = append(existingServices, service)
-		//		host.Services = existingServices
-		//		monitoredResources[hostName] = host
-		//	} else {
-		//		var monitoredResource = transit.MonitoredResource{
-		//			Name:             hostName,
-		//			Type:             transit.Host,
-		//			Owner:            "",                                  // TODO
-		//			Status:           "",                                  // TODO
-		//			LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-		//			NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-		//			LastPlugInOutput: "",                                  // TODO
-		//			Properties:       nil,                                 // TODO
-		//			Services:         services,
-		//		}
-		//		monitoredResources[hostName] = monitoredResource
-		//	}
-		//}
+					var serviceFound = false
+					for _, updService := range updServices {
+						if updService.Name == storedQuery.Name {
+							updMetric := updService.Metrics[0]
+							updValue := updMetric.Value
+
+							doubleValue := updValue.DoubleValue + 1
+							integerValue := updValue.IntegerValue + 1
+
+							updValue.DoubleValue = doubleValue
+							updValue.IntegerValue = integerValue
+							updValue.StringValue = fmt.Sprintf("%d", integerValue)
+
+							updMetric.Value = updValue
+							updService.Metrics = []transit.TimeSeries{updMetric}
+
+							serviceFound = true
+							break
+						}
+					}
+					if !serviceFound {
+						hitsValue := &transit.TypedValue{
+							ValueType:    transit.IntegerType,
+							BoolValue:    false,
+							DoubleValue:  1,
+							IntegerValue: 1,
+							StringValue:  "1",
+							TimeValue:    nil,
+						}
+
+						var timeInterval = &transit.TimeInterval{}
+						if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
+							layout := "2006-01-02T15:04:05.000Z"
+							startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
+							if err != nil {
+								log.Error(err)
+							}
+							endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
+							if err != nil {
+								log.Error(err)
+							}
+							timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
+							timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
+						}
+
+						var hitsMetric = transit.TimeSeries{
+							MetricName: "hits",
+							SampleType: transit.Value,
+							Interval:   timeInterval,
+							Value:      hitsValue,
+							Tags:       nil, // TODO
+							Unit:       transit.UnitCounter,
+							Thresholds: nil, // TODO
+						}
+
+						var metrics = []transit.TimeSeries{hitsMetric}
+
+						var service = transit.MonitoredService{
+							Name:             storedQuery.Name,
+							Type:             transit.Service,
+							Owner:            "",                                  // TODO
+							Status:           "",                                  // TODO
+							LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+							NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+							LastPlugInOutput: "",                                  // TODO
+							Properties:       nil,                                 // TODO
+							Metrics:          metrics,
+						}
+
+						updServices = append(updServices, service)
+						host.Services = updServices
+					}
+					monitoredResources[hostName] = host
+				} else {
+					hitsValue := &transit.TypedValue{
+						ValueType:    transit.IntegerType,
+						BoolValue:    false,
+						DoubleValue:  1,
+						IntegerValue: 1,
+						StringValue:  "1",
+						TimeValue:    nil,
+					}
+
+					var timeInterval = &transit.TimeInterval{}
+					if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
+						layout := "2006-01-02T15:04:05.000Z"
+						startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
+						if err != nil {
+							log.Error(err)
+						}
+						endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
+						if err != nil {
+							log.Error(err)
+						}
+						timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
+						timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
+					}
+
+					var hitsMetric = transit.TimeSeries{
+						MetricName: "hits",
+						SampleType: transit.Value,
+						Interval:   timeInterval,
+						Value:      hitsValue,
+						Tags:       nil, // TODO
+						Unit:       transit.UnitCounter,
+						Thresholds: nil, // TODO
+					}
+					var metrics = []transit.TimeSeries{hitsMetric}
+					var service = transit.MonitoredService{
+						Name:             storedQuery.Name,
+						Type:             transit.Service,
+						Owner:            "",                                  // TODO
+						Status:           "",                                  // TODO
+						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+						LastPlugInOutput: "",                                  // TODO
+						Properties:       nil,                                 // TODO
+						Metrics:          metrics,
+					}
+					var services = []transit.MonitoredService{service}
+					var monitoredResource = transit.MonitoredResource{
+						Name:             hostName,
+						Type:             transit.Host,
+						Owner:            "",                                  // TODO
+						Status:           "",                                  // TODO
+						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
+						LastPlugInOutput: "",                                  // TODO
+						Properties:       nil,                                 // TODO
+						Services:         services,
+					}
+					// TODO host group?
+					monitoredResources[hostName] = monitoredResource
+				}
+			}
+		}
 	}
 
 	result := make([]transit.MonitoredResource, len(monitoredResources))
@@ -273,14 +346,14 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 
 	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"_find?type=query"+search, nil)
 	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
+		log.Error("Error getting response: %s", err)
 	}
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("kbn-xsrf", "true")
 
 	response, err = client.Do(request)
 	if response.StatusCode == 400 {
-		log.Fatalf("Not Found!")
+		log.Error("Not Found!")
 	}
 	responseBody, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
@@ -306,7 +379,15 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 			}
 			filters = append(filters, filter["meta"].(map[string]interface{}))
 		}
-		storedQueries = append(storedQueries, StoredQuery{id, name, description, filters})
+		var timeFilterFrom string
+		var timeFilterTo string
+		if savedObject["attributes"].(map[string]interface{})["timefilter"] != nil {
+			timeFilter := savedObject["attributes"].(map[string]interface{})["timefilter"].(map[string]interface{})
+			timeFilterFrom = timeFilter["from"].(string)
+			timeFilterTo = timeFilter["to"].(string)
+		}
+		storedQueries = append(storedQueries, StoredQuery{id, name, description,
+			timeFilterFrom, timeFilterTo, filters})
 	}
 
 	return storedQueries, len(storedQueries)
@@ -324,30 +405,32 @@ func RetrieveIndexPattern(id string) IndexPattern {
 
 	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"index-pattern/"+id, nil)
 	if err != nil {
-		log.Fatalf("Error getting response: %s", err)
+		log.Error("Error getting response: %s", err)
 	}
 	request.Header.Add("Content-Type", "application/json")
 	request.Header.Add("kbn-xsrf", "true")
 
 	response, err = client.Do(request)
 	if response.StatusCode == 400 {
-		log.Fatalf("Not Found!")
+		log.Error("Not Found!")
 	}
 	responseBody, err := ioutil.ReadAll(response.Body)
 	response.Body.Close()
 
 	var result map[string]interface{}
-	json.Unmarshal(responseBody, &result)
+	_ = json.Unmarshal(responseBody, &result)
 
 	title := result["attributes"].(map[string]interface{})["title"].(string)
 	return IndexPattern{id, title}
 }
 
 type StoredQuery struct {
-	Id          string
-	Name        string
-	Description string
-	Filters     []map[string]interface{}
+	Id             string
+	Name           string
+	Description    string
+	TimeFilterFrom string
+	TimeFilterTo   string
+	Filters        []map[string]interface{}
 }
 
 type IndexPattern struct {
