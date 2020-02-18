@@ -42,7 +42,7 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastError              string                             `json:"lastError"`
+	LastErrors             []string                           `json:"lastErrors"`
 }
 
 // AgentStatus defines TNG Agent status

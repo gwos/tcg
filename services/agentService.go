@@ -57,6 +57,7 @@ const (
 
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
+const statsLastErrorsLim = 10
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -264,7 +265,11 @@ func (service *AgentService) listenStatsChan() {
 		res := <-service.statsChan
 
 		if res.lastError != nil {
-			service.agentStats.LastError = res.lastError.Error()
+			service.agentStats.LastErrors = append(service.agentStats.LastErrors, res.lastError.Error())
+			statsLastErrorsLen := len(service.agentStats.LastErrors)
+			if statsLastErrorsLen > statsLastErrorsLim {
+				service.agentStats.LastErrors = service.agentStats.LastErrors[(statsLastErrorsLen - statsLastErrorsLim):]
+			}
 		} else {
 			service.agentStats.BytesSent += res.bytesSent
 			service.agentStats.MessagesSent++
