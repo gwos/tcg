@@ -57,6 +57,7 @@ const (
 
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
+const statsLastErrorsLim = 10
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -81,7 +82,7 @@ func GetAgentService() *AgentService {
 			&AgentStats{
 				AgentID: agentConnector.AgentID,
 				AppType: agentConnector.AppType,
-				UpSince: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
 			&AgentStatus{
 				Controller: Stopped,
@@ -264,18 +265,22 @@ func (service *AgentService) listenStatsChan() {
 		res := <-service.statsChan
 
 		if res.lastError != nil {
-			service.agentStats.LastError = res.lastError.Error()
+			service.agentStats.LastErrors = append(service.agentStats.LastErrors, res.lastError.Error())
+			statsLastErrorsLen := len(service.agentStats.LastErrors)
+			if statsLastErrorsLen > statsLastErrorsLim {
+				service.agentStats.LastErrors = service.agentStats.LastErrors[(statsLastErrorsLen - statsLastErrorsLim):]
+			}
 		} else {
 			service.agentStats.BytesSent += res.bytesSent
 			service.agentStats.MessagesSent++
 			switch res.subject {
 			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendEvents:
 				// TODO: handle events acks, unacks
-				service.agentStats.LastAlertRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 
 		}
