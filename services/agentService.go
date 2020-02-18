@@ -81,7 +81,7 @@ func GetAgentService() *AgentService {
 			&AgentStats{
 				AgentID: agentConnector.AgentID,
 				AppType: agentConnector.AppType,
-				UpSince: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
 			&AgentStatus{
 				Controller: Stopped,
@@ -270,12 +270,12 @@ func (service *AgentService) listenStatsChan() {
 			service.agentStats.MessagesSent++
 			switch res.subject {
 			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendEvents:
 				// TODO: handle events acks, unacks
-				service.agentStats.LastAlertRun = milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			}
 
 		}
