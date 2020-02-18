@@ -541,7 +541,7 @@ type GroundworkEventsAckRequest struct {
 type GroundworkEventAck struct {
 	AppType            string `json:"appType,required"`
 	Host               string `json:"host,required"`
-	Service            string `json:"host,omitempty"`
+	Service            string `json:"service,omitempty"`
 	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
