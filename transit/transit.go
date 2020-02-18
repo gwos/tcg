@@ -533,3 +533,15 @@ type MonitorConnection struct {
 	Extensions  map[string]interface{} `json:"extensions"`
 	ConnectorId int                    `json:"connectorId"`
 }
+
+type GroundworkEventsAckRequest struct {
+	Acks			GroundworkEventAck						`json:"acks"`
+}
+
+type GroundworkEventAck struct {
+	AppType            string `json:"appType,required"`
+	Host               string `json:"host,required"`
+	Service            string `json:"host,omitempty"`
+	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
+	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
+}
