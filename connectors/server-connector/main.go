@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/gwos/tng/config"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -14,6 +13,12 @@ import (
 )
 
 var transitService = services.GetTransitService()
+
+// Default values for 'Group' and loop 'Timer'
+const (
+	DefaultHostGroupName = "LocalServer"
+	DefaultTimer         = 120
+)
 
 // @title TNG API Documentation
 // @version 1.0
@@ -56,45 +61,48 @@ func main() {
 		}
 	}()
 
+	processes, groups, timer, err := getConfig()
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
 	for {
 		if transitService.Status().Transport != services.Stopped {
 			log.Info("TNG ServerConnector: sending inventory ...")
-			err = sendInventoryResources(*Synchronize())
+			err = sendInventoryResources(*Synchronize(processes), groups)
 		} else {
 			log.Info("TNG ServerConnector is stopped ...")
 		}
 		for i := 0; i < 10; i++ {
 			if transitService.Status().Transport != services.Stopped {
 				log.Info("TNG ServerConnector: monitoring resources ...")
-				err := sendMonitoredResources(*CollectMetrics())
+				err := sendMonitoredResources(*CollectMetrics(processes))
 				if err != nil {
 					log.Error(err.Error())
 				}
 			}
 			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			time.Sleep(30 * time.Second)
+			time.Sleep(time.Duration(int64(timer) * int64(time.Second)))
 		}
 	}
 }
 
-func sendInventoryResources(resource transit.InventoryResource) error {
+func sendInventoryResources(resource transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
 
 	monitoredResourceRef := transit.MonitoredResourceRef{
 		Name: resource.Name,
 		Type: transit.Host,
 	}
 
-	resourceGroup := transit.ResourceGroup{
-		GroupName: "LocalServer",
-		Type:      transit.HostGroup,
-		Resources: []transit.MonitoredResourceRef{monitoredResourceRef},
+	for i := range resourceGroups {
+		resourceGroups[i].Resources = append(resourceGroups[i].Resources, monitoredResourceRef)
 	}
+
 	inventoryRequest := transit.InventoryRequest{
 		Context:   transitService.MakeTracerContext(),
 		Resources: []transit.InventoryResource{resource},
-		Groups: []transit.ResourceGroup{
-			resourceGroup,
-		},
+		Groups:    resourceGroups,
 	}
 
 	b, err := json.Marshal(inventoryRequest)
@@ -144,20 +152,44 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 	return transitService.SendResourceWithMetrics(b)
 }
 
-//////////////////////////////////////////////////////////
-
-func getConfig() error {
+func getConfig() ([]string, []transit.ResourceGroup, int, error) {
 	if res, clErr := transitService.DSClient.FetchConnector(transitService.AgentID); clErr == nil {
-		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
-		} else {
-			return nil
+		var connector = struct {
+			Connection transit.MonitorConnection `json:"monitorConnection"`
+		}{}
+		err := json.Unmarshal(res, &connector)
+		if err != nil {
+			return []string{}, []transit.ResourceGroup{}, -1, err
 		}
+		timer := float64(DefaultTimer)
+		if _, present := connector.Connection.Extensions["timer"]; present {
+			timer = connector.Connection.Extensions["timer"].(float64)
+		}
+		var processes []string
+		if _, present := connector.Connection.Extensions["processes"]; present {
+			processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+			for _, process := range processesInterface {
+				processes = append(processes, process.(string))
+			}
+		}
+		var groups []transit.ResourceGroup
+		if _, present := connector.Connection.Extensions["groups"]; present {
+			groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
+			for _, gr := range groupsInterface {
+				groupMap := gr.(map[string]interface{})
+				groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+			}
+		} else {
+			groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
+		}
+
+		return processes, groups, int(timer), nil
 	} else {
-		return clErr
+		return []string{}, []transit.ResourceGroup{}, -1, clErr
 	}
 }
 
+//////////////////////////////////////////////////////////
 func example() {
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
