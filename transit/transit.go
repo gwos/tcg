@@ -471,13 +471,13 @@ type ResourceGroup struct {
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   *TracerContext      `json:"context"`
+	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   *TracerContext      `json:"context"`
+	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
@@ -494,6 +494,10 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+type GroundworkEventsRequest struct {
+	Events				[]GroundworkEvent  				`json:"events"`
+}
+
 type GroundworkEvent struct {
 	Device              string                            `json:"device,omitempty"`
 	Host                string                            `json:"host,required"`
@@ -501,22 +505,22 @@ type GroundworkEvent struct {
 	OperationStatus     string                            `json:"operationStatus,omitempty"`
 	MonitorStatus       string                            `json:"monitorStatus,required"`
 	Severity            string                            `json:"severity,omitempty"`
-	ApplicationSeverity string                            `json:"applicationSeverity:omitempty"`
-	Component           string                            `json:"component:omitempty"`
-	SubComponent        string                            `json:"subComponent:omitempty"`
-	Priority            string                            `json:"priority:omitempty"`
-	TypeRule            string                            `json:"typeRule:omitempty"`
-	TextMessage         string                            `json:"textMessage:omitempty"`
+	ApplicationSeverity string                            `json:"applicationSeverity,omitempty"`
+	Component           string                            `json:"component,omitempty"`
+	SubComponent        string                            `json:"subComponent,omitempty"`
+	Priority            string                            `json:"priority,omitempty"`
+	TypeRule            string                            `json:"typeRule,omitempty"`
+	TextMessage         string                            `json:"textMessage,omitempty"`
 	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
 	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
 	AppType             string                            `json:"appType,required"`
 	// Update level attributes (update only)
-	MonitorServer     string                              `json:"monitorServer:omitempty"`
-	ConsolidationName string                              `json:"consolidationName:omitempty"`
-	LogType           string                              `json:"logType:omitempty"`
-	ErrorType         string                              `json:"errorType:omitempty"`
-	LoggerName        string                              `json:"loggerName:omitempty"`
-	ApplicationName   string                              `json:"applicationName:omitempty"`
+	MonitorServer     string                              `json:"monitorServer,omitempty"`
+	ConsolidationName string                              `json:"consolidationName,omitempty"`
+	LogType           string                              `json:"logType,omitempty"`
+	ErrorType         string                              `json:"errorType,omitempty"`
+	LoggerName        string                              `json:"loggerName,omitempty"`
+	ApplicationName   string                              `json:"applicationName,omitempty"`
 }
 
 type MonitorConnection struct {

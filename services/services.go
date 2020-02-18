@@ -10,8 +10,13 @@ import (
 const (
 	SubjSendResourceWithMetrics = "send-resource-with-metrics"
 	SubjSynchronizeInventory    = "synchronize-inventory"
-	SubjSendEvent               = "send-events"
+	SubjSendEvents              = "send-events"
 )
+
+// use one queue for events, events acks and unacks
+// as try to keep the processing order
+const eventsAckSuffix = "#ack"
+const eventsUnackSuffix = "#unack"
 
 // Status defines status value
 type Status string
@@ -89,5 +94,7 @@ type Controllers interface {
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(GetBytesHandlerType)
 	RemoveListMetricsHandler()
-	SendEvent([]byte) error
+	SendEvents([]byte) error
+	SendEventsAck([]byte) error
+	SendEventsUnack([]byte) error
 }
