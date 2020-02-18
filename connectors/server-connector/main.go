@@ -14,6 +14,7 @@ import (
 
 var transitService = services.GetTransitService()
 
+// Default values for 'Group' and loop 'Timer'
 const (
 	DefaultHostGroupName = "LocalServer"
 	DefaultTimer         = 120
@@ -160,26 +161,29 @@ func getConfig() ([]string, []transit.ResourceGroup, int, error) {
 		if err != nil {
 			return []string{}, []transit.ResourceGroup{}, -1, err
 		}
-		if len(connector.Connection.Extensions) == 0 {
-			return []string{}, []transit.ResourceGroup{{
-				GroupName: DefaultHostGroupName,
-				Type:      transit.HostGroup,
-			}}, DefaultTimer, err
+		timer := float64(DefaultTimer)
+		if _, present := connector.Connection.Extensions["timer"]; present {
+			timer = connector.Connection.Extensions["timer"].(float64)
 		}
-		timer := connector.Connection.Extensions["timer"].(float64)
-		processesInterface := connector.Connection.Extensions["processes"].([]interface{})
-		groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
 		var processes []string
-		for _, process := range processesInterface {
-			processes = append(processes, process.(string))
+		if _, present := connector.Connection.Extensions["processes"]; present {
+			processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+			for _, process := range processesInterface {
+				processes = append(processes, process.(string))
+			}
 		}
 		var groups []transit.ResourceGroup
-		for _, gr := range groupsInterface {
-			groupMap := gr.(map[string]interface{})
-			groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+		if _, present := connector.Connection.Extensions["groups"]; present {
+			groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
+			for _, gr := range groupsInterface {
+				groupMap := gr.(map[string]interface{})
+				groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+			}
+		} else {
+			groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
 		}
 
-		return processes, groups, int(timer), err
+		return processes, groups, int(timer), nil
 	} else {
 		return []string{}, []transit.ResourceGroup{}, -1, clErr
 	}
