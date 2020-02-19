@@ -31,18 +31,18 @@ const (
 
 // AgentStats defines TNG Agent statistics
 type AgentStats struct {
-	AgentID                string                            `json:"agentID"`
-	AppType                string                            `json:"appType"`
-	BytesSent              int                               `json:"bytesSent"`
-	MetricsSent            int                               `json:"metricsSent"`
-	MessagesSent           int                               `json:"messagesSent"`
-	LastInventoryRun       milliseconds.MillisecondTimestamp `json:"lastInventoryRun"`
-	LastMetricsRun         milliseconds.MillisecondTimestamp `json:"lastMetricsRun"`
-	LastAlertRun           milliseconds.MillisecondTimestamp `json:"lastAlertRun"`
-	ExecutionTimeInventory time.Duration                     `json:"executionTimeInventory"`
-	ExecutionTimeMetrics   time.Duration                     `json:"executionTimeMetrics"`
-	UpSince                milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastError              string                            `json:"lastError"`
+	AgentID                string                             `json:"agentID"`
+	AppType                string                             `json:"appType"`
+	BytesSent              int                                `json:"bytesSent"`
+	MetricsSent            int                                `json:"metricsSent"`
+	MessagesSent           int                                `json:"messagesSent"`
+	LastInventoryRun       *milliseconds.MillisecondTimestamp `json:"lastInventoryRun,omitempty"`
+	LastMetricsRun         *milliseconds.MillisecondTimestamp `json:"lastMetricsRun,omitempty"`
+	LastAlertRun           *milliseconds.MillisecondTimestamp `json:"lastAlertRun,omitempty"`
+	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
+	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
+	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
+	LastErrors             []string                           `json:"lastErrors"`
 }
 
 // AgentStatus defines TNG Agent status
