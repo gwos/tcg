@@ -20,7 +20,7 @@ const (
 	KibanaApiSavedObjectsPath = "http://localhost:5601/kibana/api/saved_objects/"
 )
 
-func CollectMetrics() []transit.MonitoredResource {
+func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	storedQueries, _ := RetrieveStoredQueries(nil)
 
 	// TODO: these should come from environment variables
@@ -33,6 +33,8 @@ func CollectMetrics() []transit.MonitoredResource {
 	esClient, _ := elasticsearch.NewClient(cfg)
 
 	monitoredResources := make(map[string]transit.MonitoredResource)
+	inventoryResources := make(map[string]transit.InventoryResource)
+	resourceGroups := make(map[string]transit.ResourceGroup)
 
 	indexPatterns := make(map[string]IndexPattern)
 
@@ -160,7 +162,10 @@ func CollectMetrics() []transit.MonitoredResource {
 
 		responseBody, err := ioutil.ReadAll(res.Body)
 		var result map[string]interface{}
-		json.Unmarshal(responseBody, &result)
+		err = json.Unmarshal(responseBody, &result)
+		if err != nil {
+			log.Error(err.Error())
+		}
 
 		hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
 		for _, h := range hits {
@@ -168,15 +173,10 @@ func CollectMetrics() []transit.MonitoredResource {
 			if hit["_source"].(map[string]interface{})["container"] != nil {
 				container := hit["_source"].(map[string]interface{})["container"].(map[string]interface{})
 				hostName := container["name"].(string)
-				// TODO
-				//var hostGroup string
-				//if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
-				//	hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
-				//}
-				if host, hostExists := monitoredResources[hostName]; hostExists {
-					updServices := host.Services
 
-					var serviceFound = false
+				if monitoredResource, exists := monitoredResources[hostName]; exists {
+					updServices := monitoredResource.Services
+					var found = false
 					for _, updService := range updServices {
 						if updService.Name == storedQuery.Name {
 							updMetric := updService.Metrics[0]
@@ -192,11 +192,11 @@ func CollectMetrics() []transit.MonitoredResource {
 							updMetric.Value = updValue
 							updService.Metrics = []transit.TimeSeries{updMetric}
 
-							serviceFound = true
+							found = true
 							break
 						}
 					}
-					if !serviceFound {
+					if !found {
 						hitsValue := &transit.TypedValue{
 							ValueType:    transit.IntegerType,
 							BoolValue:    false,
@@ -236,19 +236,19 @@ func CollectMetrics() []transit.MonitoredResource {
 						var service = transit.MonitoredService{
 							Name:             storedQuery.Name,
 							Type:             transit.Service,
-							Owner:            "",                                  // TODO
-							Status:           "",                                  // TODO
-							LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-							NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-							LastPlugInOutput: "",                                  // TODO
-							Properties:       nil,                                 // TODO
+							Owner:            "",                                                  // TODO
+							Status:           transit.ServiceOk,                                   // TODO
+							LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+							NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+							LastPlugInOutput: "",                                                  // TODO
+							Properties:       nil,                                                 // TODO
 							Metrics:          metrics,
 						}
 
 						updServices = append(updServices, service)
-						host.Services = updServices
+						monitoredResource.Services = updServices
 					}
-					monitoredResources[hostName] = host
+					monitoredResources[hostName] = monitoredResource
 				} else {
 					hitsValue := &transit.TypedValue{
 						ValueType:    transit.IntegerType,
@@ -258,7 +258,6 @@ func CollectMetrics() []transit.MonitoredResource {
 						StringValue:  "1",
 						TimeValue:    nil,
 					}
-
 					var timeInterval = &transit.TimeInterval{}
 					if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
 						layout := "2006-01-02T15:04:05.000Z"
@@ -273,7 +272,6 @@ func CollectMetrics() []transit.MonitoredResource {
 						timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
 						timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
 					}
-
 					var hitsMetric = transit.TimeSeries{
 						MetricName: "hits",
 						SampleType: transit.Value,
@@ -283,44 +281,113 @@ func CollectMetrics() []transit.MonitoredResource {
 						Unit:       transit.UnitCounter,
 						Thresholds: nil, // TODO
 					}
-					var metrics = []transit.TimeSeries{hitsMetric}
 					var service = transit.MonitoredService{
 						Name:             storedQuery.Name,
 						Type:             transit.Service,
-						Owner:            "",                                  // TODO
-						Status:           "",                                  // TODO
+						Owner:            hostName,
+						Status:           transit.ServiceOk,                   // TODO
 						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
 						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
 						LastPlugInOutput: "",                                  // TODO
 						Properties:       nil,                                 // TODO
-						Metrics:          metrics,
+						Metrics:          []transit.TimeSeries{hitsMetric},
 					}
-					var services = []transit.MonitoredService{service}
 					var monitoredResource = transit.MonitoredResource{
 						Name:             hostName,
 						Type:             transit.Host,
 						Owner:            "",                                  // TODO
-						Status:           "",                                  // TODO
+						Status:           transit.HostUp,                      // TODO
 						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
 						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
 						LastPlugInOutput: "",                                  // TODO
 						Properties:       nil,                                 // TODO
-						Services:         services,
+						Services:         []transit.MonitoredService{service},
 					}
-					// TODO host group?
 					monitoredResources[hostName] = monitoredResource
+				}
+
+				inventoryService := transit.InventoryService{
+					Name:        storedQuery.Name,
+					Type:        transit.Service,
+					Owner:       hostName,
+					Category:    "",  //TODO
+					Description: "",  //TODO
+					Properties:  nil, //TODO
+				}
+				if inventoryResource, hostExists := inventoryResources[hostName]; hostExists {
+					inventoryServices := inventoryResource.Services
+					var serviceExists = false
+					for _, service := range inventoryServices {
+						if service.Name == inventoryService.Name {
+							serviceExists = true
+							break
+						}
+					}
+					if !serviceExists {
+						inventoryServices = append(inventoryServices, inventoryService)
+						inventoryResource.Services = inventoryServices
+						inventoryResources[hostName] = inventoryResource
+					}
+				} else {
+					inventoryResource := transit.InventoryResource{
+						Name:        hostName,
+						Type:        transit.Host,
+						Owner:       "",  // TODO
+						Category:    "",  // TODO
+						Description: "",  // TODO
+						Device:      "",  // TODO
+						Properties:  nil, // TODO
+						Services:    []transit.InventoryService{inventoryService},
+					}
+					inventoryResources[hostName] = inventoryResource
+				}
+
+				resourceRef := transit.MonitoredResourceRef{
+					Name:  hostName,
+					Type:  transit.Host,
+					Owner: "", //TODO
+				}
+				var hostGroup string
+				if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
+					hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
+				}
+				if group, groupExists := resourceGroups[hostGroup]; groupExists {
+					resources := group.Resources
+					resources = append(resources, resourceRef)
+					group.Resources = resources
+					resourceGroups[hostGroup] = group
+				} else {
+					group := transit.ResourceGroup{
+						GroupName:   hostGroup,
+						Type:        transit.HostGroup,
+						Description: hostGroup,
+						Resources:   []transit.MonitoredResourceRef{resourceRef},
+					}
+					resourceGroups[hostGroup] = group
 				}
 			}
 		}
 	}
 
-	result := make([]transit.MonitoredResource, len(monitoredResources))
+	mrs := make([]transit.MonitoredResource, len(monitoredResources))
 	i := 0
 	for _, value := range monitoredResources {
-		result[i] = value
+		mrs[i] = value
 		i++
 	}
-	return result
+	irs := make([]transit.InventoryResource, len(inventoryResources))
+	j := 0
+	for _, value := range inventoryResources {
+		irs[j] = value
+		j++
+	}
+	rgs := make([]transit.ResourceGroup, len(resourceGroups))
+	k := 0
+	for _, value := range resourceGroups {
+		rgs[k] = value
+		k++
+	}
+	return mrs, irs, rgs
 }
 
 func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
