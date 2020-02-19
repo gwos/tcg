@@ -553,3 +553,15 @@ type GroundworkEventAck struct {
 	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
+
+// GroundworkEventsUnackRequest describes request payload
+type GroundworkEventsUnackRequest struct {
+	Unacks []GroundworkEventUnack `json:"unacks"`
+}
+
+// GroundworkEventUnack describes event ack
+type GroundworkEventUnack struct {
+	AppType            string `json:"appType,required"`
+	Host               string `json:"host,required"`
+	Service            string `json:"service,omitempty"`
+}
