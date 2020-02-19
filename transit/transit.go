@@ -5,8 +5,10 @@ import (
 	"github.com/gwos/tng/milliseconds"
 )
 
+// VersionString defines type of constant
 type VersionString string
 
+// TransitModelVersion defines versioning
 const (
 	TransitModelVersion VersionString = "1.0.0"
 )
@@ -183,6 +185,7 @@ type TypedValue struct {
 	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
+// ThresholdValue describes threshold
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
 	Label      string           `json:"label"`
@@ -494,10 +497,12 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+// GroundworkEventsRequest describes request payload
 type GroundworkEventsRequest struct {
-	Events				[]GroundworkEvent  				`json:"events"`
+	Events []GroundworkEvent `json:"events"`
 }
 
+// GroundworkEvent describes event
 type GroundworkEvent struct {
 	Device              string                            `json:"device,omitempty"`
 	Host                string                            `json:"host,required"`
@@ -515,21 +520,36 @@ type GroundworkEvent struct {
 	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
 	AppType             string                            `json:"appType,required"`
 	// Update level attributes (update only)
-	MonitorServer     string                              `json:"monitorServer,omitempty"`
-	ConsolidationName string                              `json:"consolidationName,omitempty"`
-	LogType           string                              `json:"logType,omitempty"`
-	ErrorType         string                              `json:"errorType,omitempty"`
-	LoggerName        string                              `json:"loggerName,omitempty"`
-	ApplicationName   string                              `json:"applicationName,omitempty"`
+	MonitorServer     string `json:"monitorServer,omitempty"`
+	ConsolidationName string `json:"consolidationName,omitempty"`
+	LogType           string `json:"logType,omitempty"`
+	ErrorType         string `json:"errorType,omitempty"`
+	LoggerName        string `json:"loggerName,omitempty"`
+	ApplicationName   string `json:"applicationName,omitempty"`
 }
 
+// MonitorConnection describes the connection to the monitored system
 type MonitorConnection struct {
-	Id          int                    `json:"id"`
+	ID          int                    `json:"id"`
 	Server      string                 `json:"server"`
 	UserName    string                 `json:"userName"`
 	Password    string                 `json:"password"`
 	SslEnabled  bool                   `json:"sslEnabled"`
-	Url         string                 `json:"url"`
+	URL         string                 `json:"url"`
 	Extensions  map[string]interface{} `json:"extensions"`
-	ConnectorId int                    `json:"connectorId"`
+	ConnectorID int                    `json:"connectorId"`
+}
+
+// GroundworkEventsAckRequest describes request payload
+type GroundworkEventsAckRequest struct {
+	Acks []GroundworkEventAck `json:"acks"`
+}
+
+// GroundworkEventAck describes event ack
+type GroundworkEventAck struct {
+	AppType            string `json:"appType,required"`
+	Host               string `json:"host,required"`
+	Service            string `json:"service,omitempty"`
+	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
+	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }

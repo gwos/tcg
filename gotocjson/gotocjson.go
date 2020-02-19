@@ -646,6 +646,12 @@ node_loop:
 								if print_diagnostics {
 									// fmt.Fprintf(diag_file, "    --- field name:  %#v\n", name)
 								}
+								if name.Name != "" && !unicode.IsUpper([]rune(name.Name)[0]) {
+									if print_diagnostics {
+										fmt.Fprintf(diag_file, "    --- skipping uncapitalized struct field name:  %#v\n", name.Name)
+									}
+									continue
+								}
 								var field_type_name string
 								if type_ident, ok := field.Type.(*ast.Ident); ok {
 									field_type_name = type_ident.Name
@@ -773,6 +779,7 @@ node_loop:
 								} else if type_map, ok := field.Type.(*ast.MapType); ok {
 									var key_type_ident *ast.Ident
 									var value_type_ident *ast.Ident
+									var value_type_interface *ast.InterfaceType
 									var ok bool
 									if key_type_ident, ok = type_map.Key.(*ast.Ident); ok {
 										if print_diagnostics {
@@ -790,6 +797,29 @@ node_loop:
 										if print_diagnostics {
 											// fmt.Fprintf(diag_file, "    --- map Value Ident %#v\n", value_type_ident)
 										}
+										field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
+									} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
+										if print_diagnostics {
+											// Suppress Go's "unused variable" noisyness, when the following printed output is commented out.
+											value_type_interface = value_type_interface
+											// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
+										}
+										// Logically, we would want to declare the field type name to refer to some sort of
+										// generic interface object, and then generate code to handle all the various types of
+										// objects (floats, slices, deep maps, slices of deep maps, etc.) one might encounter as
+										// instances of such an interface.  But that is far too complex for present needs.  Those
+										// needs currently are just to handle a structure in the Go code that has an interface
+										// as the value of one of its declared map values, in a structure that currently has no
+										// business being transferred between Go code and C code in the first place.  So instead,
+										// we punt; we just abort this iteration of the loop, which suppresses recognition of the
+										// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
+										// CONTINUE" below), which we handle there in a similar manner, by simply skipping further
+										// processing of that loop iteration as well.  The net effect is that said field will not
+										// appear in the C structure at all, and it will be neither serialized nor deserialized.
+										// But that won't matter, because we don't expect to ever exchange that structure with
+										// any Go code anyway.  This is just a workaround to avoid having to make larger changes.
+										// field_type_name = "map[" + key_type_ident.Name + "]" + "interface"
+										continue
 									} else {
 										if print_diagnostics {
 											fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
@@ -803,7 +833,6 @@ node_loop:
 									if print_diagnostics {
 										// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
 									}
-									field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
 									if print_diagnostics {
 										fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
 									}
@@ -1947,6 +1976,12 @@ func print_type_declarations(
 						fmt.Fprintf(diag_file, "struct %s field tag:  %s\n", decl_kind.type_name, field_tag)
 					}
 					for _, name := range field.Names {
+						if name.Name != "" && !unicode.IsUpper([]rune(name.Name)[0]) {
+							if print_diagnostics {
+								fmt.Fprintf(diag_file, "in print_type_declarations(), skipping uncapitalized struct field name:  %#v\n", name.Name)
+							}
+							continue
+						}
 						switch field.Type.(type) {
 						case *ast.Ident:
 							type_name := field.Type.(*ast.Ident).Name
@@ -2115,6 +2150,16 @@ func print_type_declarations(
 							field_type := go_type
 							key_value_types := map_key_value_types.FindStringSubmatch(field_type)
 							if key_value_types == nil {
+								// COMPENSATORY CONTINUE:
+								// Logically, we would like to call panic() here, as shown, to indicate a failure of
+								// earlier processing to correctly analyze a particular mapping -- i.e., a bug in this
+								// conversion program.  However, we are now using the absence of key/value types to
+								// indicate that this entire mapping ought to be suppressed, as a means of handling a
+								// "map[string]interface{}" struct field type in the original Go code.  Which is to say,
+								// we will neither serialize nor desarialize such a field; it simply won't exist in our
+								// C-code structures.
+								continue
+								// Curiously, Go does not object to the following statement as being unreachable.
 								panic(fmt.Sprintf("found incomprehensible map construction '%s'", field_type))
 							}
 							key_type := key_value_types[1]
