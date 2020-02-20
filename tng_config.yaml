@@ -1,5 +1,5 @@
 connector:
-  agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
+  agentId: "***REMOVED***"
   appName: "tng"
   appType: "VEMA"
   controllerAddr: ":8099"
