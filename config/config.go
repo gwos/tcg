@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"strings"
 )
 
 var once sync.Once
@@ -249,10 +250,18 @@ func GetConfig() *Config {
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
+	var tempUrlString string
+
 	if err := json.Unmarshal(data, &dto); err != nil {
 		return nil, err
 	}
-	if tngURL, err := url.Parse(dto.TngURL); err == nil {
+
+	tempUrlString = dto.TngURL
+	if !strings.HasPrefix(tempUrlString, "http://") && !strings.HasPrefix(tempUrlString, "https://") {
+
+		tempUrlString = "https://" + tempUrlString
+	}
+	if tngURL, err := url.Parse(tempUrlString); err == nil {
 		// TODO: Improve addr setting
 		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
 	} else {
