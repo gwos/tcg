@@ -206,7 +206,11 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 							TimeValue:    nil,
 						}
 
-						var timeInterval = &transit.TimeInterval{}
+						var timeInterval = &transit.TimeInterval{
+							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+						}
+
 						if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
 							layout := "2006-01-02T15:04:05.000Z"
 							startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
@@ -258,7 +262,10 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						StringValue:  "1",
 						TimeValue:    nil,
 					}
-					var timeInterval = &transit.TimeInterval{}
+					var timeInterval = &transit.TimeInterval{
+						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+					}
 					if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
 						layout := "2006-01-02T15:04:05.000Z"
 						startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
@@ -285,22 +292,22 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						Name:             storedQuery.Name,
 						Type:             transit.Service,
 						Owner:            hostName,
-						Status:           transit.ServiceOk,                   // TODO
-						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-						LastPlugInOutput: "",                                  // TODO
-						Properties:       nil,                                 // TODO
+						Status:           transit.ServiceOk,                                   // TODO
+						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+						LastPlugInOutput: "",                                                  // TODO
+						Properties:       nil,                                                 // TODO
 						Metrics:          []transit.TimeSeries{hitsMetric},
 					}
 					var monitoredResource = transit.MonitoredResource{
 						Name:             hostName,
 						Type:             transit.Host,
-						Owner:            "",                                  // TODO
-						Status:           transit.HostUp,                      // TODO
-						LastCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-						NextCheckTime:    milliseconds.MillisecondTimestamp{}, // TODO
-						LastPlugInOutput: "",                                  // TODO
-						Properties:       nil,                                 // TODO
+						Owner:            "",                                                  // TODO
+						Status:           transit.HostUp,                                      // TODO
+						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
+						LastPlugInOutput: "",                                                  // TODO
+						Properties:       nil,                                                 // TODO
 						Services:         []transit.MonitoredService{service},
 					}
 					monitoredResources[hostName] = monitoredResource
