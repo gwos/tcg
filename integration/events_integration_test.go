@@ -25,9 +25,9 @@ func TestEvents(t *testing.T) {
 		return
 	}
 
-	if services.GetTransitService().Stats().LastError != "" {
-		t.Errorf("Erorr should be empty. lastError = %s, want = %s",
-			services.GetTransitService().Stats().LastError, "\"empty string\"")
+	if len(services.GetTransitService().Stats().LastErrors) != 0 {
+		t.Errorf("LastErrors should be empty. lastError = %s",
+			services.GetTransitService().Stats().LastErrors)
 		return
 	}
 }
