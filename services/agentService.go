@@ -289,10 +289,10 @@ func (service *AgentService) listenStatsChan() {
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	var dispatcherOptions []nats.DispatcherOption
-	for _, gwClient := range service.gwClients {
+	for idx, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
 		gwClientRef := gwClient
-		durableID := fmt.Sprintf("%s", gwClient.HostName)
+		durableID := fmt.Sprintf("#%d#%s#", idx, gwClient.HostName)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
