@@ -5,16 +5,18 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"math"
+	"sync"
+	"time"
+
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/nats"
 	"github.com/gwos/tng/transit"
 	"github.com/hashicorp/go-uuid"
-	"math"
-	"sync"
-	"time"
 )
 
 // AgentService implements AgentServices interface
@@ -32,6 +34,7 @@ type AgentService struct {
 
 // CtrlAction defines queued controll action
 type CtrlAction struct {
+	Data     []byte
 	Idx      uint8
 	Subj     ctrlSubj
 	SyncChan chan error
@@ -46,7 +49,8 @@ type statsCounter struct {
 type ctrlSubj string
 
 const (
-	ctrlSubjReload          ctrlSubj = "reload"
+	ctrlSubjConfig          ctrlSubj = "config"
+	ctrlSubjReload                   = "reload"
 	ctrlSubjStartController          = "startController"
 	ctrlSubjStopController           = "stopController"
 	ctrlSubjStartNats                = "startNats"
@@ -102,7 +106,6 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-		_ = agentService.Reload()
 	})
 	return agentService
 }
@@ -131,72 +134,72 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 
 // ReloadAsync implements AgentServices.ReloadAsync interface
 func (service *AgentService) ReloadAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjReload, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjReload, syncChan)
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
 func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStartController, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStartController, syncChan)
 }
 
 // StopControllerAsync implements AgentServices.StopControllerAsync interface
 func (service *AgentService) StopControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStopController, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStopController, syncChan)
 }
 
 // StartNatsAsync implements AgentServices.StartNatsAsync interface
 func (service *AgentService) StartNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStartNats, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStartNats, syncChan)
 }
 
 // StopNatsAsync implements AgentServices.StopNatsAsync interface
 func (service *AgentService) StopNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStopNats, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStopNats, syncChan)
 }
 
 // StartTransportAsync implements AgentServices.StartTransportAsync interface.
 func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStartTransport, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStartTransport, syncChan)
 }
 
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(ctrlSubjStopTransport, syncChan)
+	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
 }
 
 // Reload implements AgentServices.Reload interface
 func (service *AgentService) Reload() error {
-	return service.ctrlPushSync(ctrlSubjReload)
+	return service.ctrlPushSync(nil, ctrlSubjReload)
 }
 
 // StartController implements AgentServices.StartController interface
 func (service *AgentService) StartController() error {
-	return service.ctrlPushSync(ctrlSubjStartController)
+	return service.ctrlPushSync(nil, ctrlSubjStartController)
 }
 
 // StopController implements AgentServices.StopController interface
 func (service *AgentService) StopController() error {
-	return service.ctrlPushSync(ctrlSubjStopController)
+	return service.ctrlPushSync(nil, ctrlSubjStopController)
 }
 
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
-	return service.ctrlPushSync(ctrlSubjStartNats)
+	return service.ctrlPushSync(nil, ctrlSubjStartNats)
 }
 
 // StopNats implements AgentServices.StopNats interface
 func (service *AgentService) StopNats() error {
-	return service.ctrlPushSync(ctrlSubjStopNats)
+	return service.ctrlPushSync(nil, ctrlSubjStopNats)
 }
 
 // StartTransport implements AgentServices.StartTransport interface.
 func (service *AgentService) StartTransport() error {
-	return service.ctrlPushSync(ctrlSubjStartTransport)
+	return service.ctrlPushSync(nil, ctrlSubjStartTransport)
 }
 
 // StopTransport implements AgentServices.StopTransport interface
 func (service *AgentService) StopTransport() error {
-	return service.ctrlPushSync(ctrlSubjStopTransport)
+	return service.ctrlPushSync(nil, ctrlSubjStopTransport)
 }
 
 // Stats implements AgentServices.Stats interface
@@ -209,8 +212,8 @@ func (service *AgentService) Status() AgentStatus {
 	return *service.agentStatus
 }
 
-func (service *AgentService) ctrlPushAsync(subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
-	ctrl := &CtrlAction{service.ctrlIdx + 1, subj, syncChan}
+func (service *AgentService) ctrlPushAsync(data []byte, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
+	ctrl := &CtrlAction{data, service.ctrlIdx + 1, subj, syncChan}
 	select {
 	case service.ctrlChan <- ctrl:
 		service.ctrlIdx = ctrl.Idx
@@ -223,9 +226,9 @@ func (service *AgentService) ctrlPushAsync(subj ctrlSubj, syncChan chan error) (
 	}
 }
 
-func (service *AgentService) ctrlPushSync(subj ctrlSubj) error {
+func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 	syncChan := make(chan error)
-	if _, err := service.ctrlPushAsync(subj, syncChan); err != nil {
+	if _, err := service.ctrlPushAsync(data, subj, syncChan); err != nil {
 		return err
 	}
 	return <-syncChan
@@ -237,6 +240,8 @@ func (service *AgentService) listenCtrlChan() {
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
+		case ctrlSubjConfig:
+			err = service.config(ctrl.Data)
 		case ctrlSubjReload:
 			err = service.reload()
 		case ctrlSubjStartController:
@@ -356,7 +361,39 @@ func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn
 	}
 }
 
+func (service *AgentService) config(data []byte) error {
+	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
+		return err
+	}
+
+	reloadFlags := struct {
+		Controller bool
+		Transport  bool
+		Nats       bool
+	}{
+		service.Status().Controller == Running,
+		service.Status().Transport == Running,
+		service.Status().Nats == Running,
+	}
+	// TODO: Handle errors
+	if reloadFlags.Controller {
+		_ = service.stopController()
+		_ = service.startController()
+	}
+	if reloadFlags.Nats {
+		_ = service.stopNats()
+		_ = service.startNats()
+	}
+	if reloadFlags.Transport {
+		// service.StopTransport() // stopped with Nats
+		_ = service.startTransport()
+	}
+
+	return nil
+}
+
 func (service *AgentService) reload() error {
+	log.Warn("DEPRECATED RELOAD API")
 	if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
 		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
 			return err
