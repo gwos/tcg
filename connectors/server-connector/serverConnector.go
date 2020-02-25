@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
@@ -135,12 +136,14 @@ func CollectMetrics(processes []string, timerSeconds time.Duration) *transit.Mon
 
 	hostName = hostStat.Hostname
 
+	LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
+
 	monitoredResource := transit.MonitoredResource{
 		Name:          hostStat.Hostname,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
 		LastCheckTime: LastCheck,
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: LastCheck.Local().Add(time.Second * timerSeconds)},
 		Services: []transit.MonitoredService{
 			*getDiskFreeService(timerSeconds),
 			*getTotalDiskUsageService(timerSeconds),
@@ -173,7 +176,7 @@ func CollectMetrics(processes []string, timerSeconds time.Duration) *transit.Mon
 		monitoredService := transit.MonitoredService{
 			Name:          processName,
 			Type:          transit.Service,
-			Status:        calculateState(value, warningValue, criticalValue),
+			Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 			Owner:         hostName,
 			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -224,7 +227,7 @@ func getTotalDiskUsageService(timerSeconds time.Duration) *transit.MonitoredServ
 	return &transit.MonitoredService{
 		Name:             TotalDiskAllocatedServiceName,
 		Type:             transit.Service,
-		Status:           calculateState(value, warningValue, criticalValue),
+		Status:           connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:            hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -269,7 +272,7 @@ func getDiskUsedService(timerSeconds time.Duration) *transit.MonitoredService {
 	return &transit.MonitoredService{
 		Name:          DiskUsedServiceName,
 		Type:          transit.Service,
-		Status:        calculateState(value, warningValue, criticalValue),
+		Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:         hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -313,7 +316,7 @@ func getDiskFreeService(timerSeconds time.Duration) *transit.MonitoredService {
 	return &transit.MonitoredService{
 		Name:          DiskFreeServiceName,
 		Type:          transit.Service,
-		Status:        calculateState(value, warningValue, criticalValue),
+		Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:         hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -357,7 +360,7 @@ func getTotalMemoryUsageService(timerSeconds time.Duration) *transit.MonitoredSe
 	return &transit.MonitoredService{
 		Name:             TotalMemoryUsageAllocatedName,
 		Type:             transit.Service,
-		Status:           calculateState(value, warningValue, criticalValue),
+		Status:           connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:            hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -401,7 +404,7 @@ func getMemoryUsedService(timerSeconds time.Duration) *transit.MonitoredService 
 	return &transit.MonitoredService{
 		Name:          MemoryUsedServiceName,
 		Type:          transit.Service,
-		Status:        calculateState(value, warningValue, criticalValue),
+		Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:         hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -445,7 +448,7 @@ func getMemoryFreeService(timerSeconds time.Duration) *transit.MonitoredService 
 	return &transit.MonitoredService{
 		Name:          MemoryFreeServiceName,
 		Type:          transit.Service,
-		Status:        calculateState(value, warningValue, criticalValue),
+		Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:         hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -489,7 +492,7 @@ func getNumberOfProcessesService(timerSeconds time.Duration) *transit.MonitoredS
 	return &transit.MonitoredService{
 		Name:          ProcessesNumberServiceName,
 		Type:          transit.Service,
-		Status:        calculateState(value, warningValue, criticalValue),
+		Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:         hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -528,7 +531,7 @@ func getTotalCPUUsage(processes []string, timerSeconds time.Duration) *transit.M
 	service := transit.MonitoredService{
 		Name:             TotalCPUUsageServiceName,
 		Type:             transit.Service,
-		Status:           calculateState(value, warningValue, criticalValue),
+		Status:           connectors.CalculateStatus(&value, &warningValue, &criticalValue),
 		Owner:            hostName,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: interval},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -590,53 +593,3 @@ func collectProcesses(monitoredProcesses []string) map[string]float64 {
 	return processMap
 }
 
-// TODO: move to common
-func calculateState(value transit.TypedValue, warning transit.TypedValue, critical transit.TypedValue) transit.MonitorStatus {
-	switch value.ValueType {
-	case transit.IntegerType:
-		if value.IntegerValue == -1 {
-			return transit.ServiceOk
-		}
-		// is it a reverse comparison (low to high)
-		if warning.IntegerValue > critical.IntegerValue {
-			if value.IntegerValue <= critical.IntegerValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.IntegerValue <= warning.IntegerValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		} else {
-			if value.IntegerValue >= critical.IntegerValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.IntegerValue >= warning.IntegerValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-	case transit.DoubleType:
-		if value.DoubleValue == -1 {
-			return transit.ServiceOk
-		}
-		// is it a reverse comparison (low to high)
-		if warning.DoubleValue > critical.DoubleValue {
-			if value.DoubleValue <= critical.DoubleValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.DoubleValue <= warning.DoubleValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		} else {
-			if value.DoubleValue >= critical.DoubleValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.DoubleValue >= warning.DoubleValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-	}
-	return transit.ServiceOk
-}

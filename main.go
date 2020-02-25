@@ -2,16 +2,87 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
 	"math/rand"
 	"time"
 )
 
-func main() {}
+//////////////////////////////////////////////////////////
+// Examples of High Level API functions
+//////////////////////////////////////////////////////////
+
+var enableTransit = false
+
+func main() {
+
+	//////////////////////////////////////////////////////////////////////////////////////////
+	// Inventory Examples
+	//////////////////////////////////////////////////////////////////////////////////////////
+	iServices := []transit.InventoryService{}
+	is1 := connectors.CreateInventoryService("myservice1", "myhost1")
+	is2 := connectors.CreateInventoryService("myservice2", "myhost1")
+	iServices = append(iServices, is1, is2)
+	iResource1 := connectors.CreateInventoryResource("myhost1", iServices)
+	println(iResource1.Services[0].Description)
+	println(iResource1.Description)
+	//if (enableTransit) {
+	//	connectors.SendInventory()
+	//}
+
+	//////////////////////////////////////////////////////////////////////////////////////////
+	// Metrics Examples
+	//////////////////////////////////////////////////////////////////////////////////////////
+	// Create Integer Metric with Thresholds
+	metric1, _ := connectors.CreateMetric("cpu", 75)
+	warning1, _ := connectors.CreateWarningThreshold("cpu_warning", 60)
+	critical1, _ := connectors.CreateCriticalThreshold("cpu_critical", 90)
+	metric1.Thresholds = &[]transit.ThresholdValue{*warning1, *critical1}
+	// Create Double Metric with Thresholds and Unit Type
+	metric2, _ := connectors.CreateMetric("percentFree", 99.82, transit.PercentCPU)
+	warning2, _ := connectors.CreateWarningThreshold("cpu_warning", 80.5)
+	critical2, _ := connectors.CreateCriticalThreshold("cpu_critical", 90.8)
+	metric2.Thresholds = &[]transit.ThresholdValue{*warning2, *critical2}
+	// create with interval
+	now := time.Now()
+	interval := &transit.TimeInterval{
+		EndTime:   milliseconds.MillisecondTimestamp{Time: now},
+		StartTime: milliseconds.MillisecondTimestamp{Time: now},
+	}
+	metric3, _ := connectors.CreateMetric("percentFree", 65.82, transit.GB, interval)
+	// add tags
+	metric3.CreateTag("myTag1", "myTagValue1")
+	metric3.CreateTag("myTag2", "myTagValue2")
+
+	// display ...
+	fmt.Printf("metric 1 created with thresholds: %+v\n", metric1)
+	fmt.Printf("metric 2 created with thresholds: %+v\n", metric2)
+	fmt.Printf("metric 3 created with thresholds: %+v\n", metric3)
+
+	// Create a Service and add metrics ...
+	service1, _ := connectors.CreateService("myservice1", "myhost1", []transit.TimeSeries{*metric1, *metric2, *metric3})
+	fmt.Printf("service 1 created with metrics: %+v\n", service1)
+	service2, _ := connectors.CreateService("myservice2", "myhost2", []transit.TimeSeries{*metric1})
+	fmt.Printf("service 1 created with metrics: %+v\n", service2)
+
+	// Create a Monitored Resource and Add Service
+	resource1, _ := connectors.CreateResource("myhost1", []transit.MonitoredService{*service1})
+	fmt.Printf("resource 1 created with services: %+v\n", resource1)
+	resource2, _ := connectors.CreateResource("myhost2", []transit.MonitoredService{*service2})
+	fmt.Printf("resource 2 created with services: %+v\n", resource2)
+
+	if (enableTransit) {
+		connectors.SendMetrics([]transit.MonitoredResource{*resource1, *resource2})
+	}
+}
 
 //////////////////////////////////////////////////////////
-func example() {
+// Examples of Low Level API functions
+//////////////////////////////////////////////////////////
+
+func LowLevelExamples() {
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
 		Label:      "local_load_5_wn",
