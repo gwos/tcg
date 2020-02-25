@@ -22,14 +22,15 @@ import (
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*config.Connector
-	agentStats  *AgentStats
-	agentStatus *AgentStatus
-	DSClient    *clients.DSClient
-	gwClients   []*clients.GWClient
-	ctrlIdx     uint8
-	ctrlChan    chan *CtrlAction
-	statsChan   chan statsCounter
-	tracerToken []byte
+	agentStats    *AgentStats
+	agentStatus   *AgentStatus
+	DSClient      *clients.DSClient
+	gwClients     []*clients.GWClient
+	ctrlIdx       uint8
+	ctrlChan      chan *CtrlAction
+	statsChan     chan statsCounter
+	tracerToken   []byte
+	ConfigHandler func([]byte)
 }
 
 // CtrlAction defines queued controll action
@@ -102,6 +103,7 @@ func GetAgentService() *AgentService {
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 			tracerToken,
+			nil,
 		}
 
 		go agentService.listenCtrlChan()
@@ -364,6 +366,9 @@ func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn
 func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
+	}
+	if service.ConfigHandler != nil {
+		service.ConfigHandler(data)
 	}
 
 	reloadFlags := struct {
