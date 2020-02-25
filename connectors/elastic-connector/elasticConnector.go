@@ -11,8 +11,10 @@ import (
 	"github.com/gwos/tng/milliseconds"
 	_ "github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -46,6 +48,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 		var must []interface{}
 		var mustNot []interface{}
 		var should []interface{}
+		var filter []interface{}
 
 		for _, filter := range storedQuery.Filters {
 			index := filter["index"].(string)
@@ -114,9 +117,26 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 				break
 			}
 		}
+		var gte = storedQuery.TimeFilter.From
+		var lte = storedQuery.TimeFilter.To
+		if strings.Contains(gte, "$interval") {
+			gte = strings.ReplaceAll(gte, "$interval", "5d")
+		}
+		if strings.Contains(lte, "$interval") {
+			lte = strings.ReplaceAll(lte, "$interval", "5d")
+		}
+		filter = append(filter, map[string]interface{}{
+			"range": map[string]interface{}{
+				"@timestamp": map[string]interface{}{
+					"gte": gte,
+					"lt":  lte,
+				},
+			},
+		})
 		queryBool["must"] = must
 		queryBool["must_not"] = mustNot
 		queryBool["should"] = should
+		queryBool["filter"] = filter
 		if should != nil {
 			queryBool["minimum_should_match"] = 1
 		}
@@ -178,7 +198,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 					updServices := monitoredResource.Services
 					var found = false
 					for _, updService := range updServices {
-						if updService.Name == storedQuery.Name {
+						if updService.Name == storedQuery.Title {
 							updMetric := updService.Metrics[0]
 							updValue := updMetric.Value
 
@@ -211,19 +231,19 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 						}
 
-						if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
-							layout := "2006-01-02T15:04:05.000Z"
-							startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
-							if err != nil {
-								log.Error(err)
-							}
-							endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
-							if err != nil {
-								log.Error(err)
-							}
-							timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
-							timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
-						}
+						//if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
+						//	layout := "2006-01-02T15:04:05.000Z"
+						//	startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
+						//	if err != nil {
+						//		log.Error(err)
+						//	}
+						//	endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
+						//	if err != nil {
+						//		log.Error(err)
+						//	}
+						//	timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
+						//	timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
+						//}
 
 						var hitsMetric = transit.TimeSeries{
 							MetricName: "hits",
@@ -238,7 +258,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						var metrics = []transit.TimeSeries{hitsMetric}
 
 						var service = transit.MonitoredService{
-							Name:             storedQuery.Name,
+							Name:             storedQuery.Title,
 							Type:             transit.Service,
 							Owner:            "",                                                  // TODO
 							Status:           transit.ServiceOk,                                   // TODO
@@ -266,19 +286,19 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 					}
-					if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
-						layout := "2006-01-02T15:04:05.000Z"
-						startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
-						if err != nil {
-							log.Error(err)
-						}
-						endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
-						if err != nil {
-							log.Error(err)
-						}
-						timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
-						timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
-					}
+					//if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
+					//	layout := "2006-01-02T15:04:05.000Z"
+					//	startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
+					//	if err != nil {
+					//		log.Error(err)
+					//	}
+					//	endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
+					//	if err != nil {
+					//		log.Error(err)
+					//	}
+					//	timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
+					//	timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
+					//}
 					var hitsMetric = transit.TimeSeries{
 						MetricName: "hits",
 						SampleType: transit.Value,
@@ -289,7 +309,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						Thresholds: nil, // TODO
 					}
 					var service = transit.MonitoredService{
-						Name:             storedQuery.Name,
+						Name:             storedQuery.Title,
 						Type:             transit.Service,
 						Owner:            hostName,
 						Status:           transit.ServiceOk,                                   // TODO
@@ -314,7 +334,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 				}
 
 				inventoryService := transit.InventoryService{
-					Name:        storedQuery.Name,
+					Name:        storedQuery.Title,
 					Type:        transit.Service,
 					Owner:       hostName,
 					Category:    "",  //TODO
@@ -398,15 +418,6 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 }
 
 func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := http.Client{Transport: tr}
-	var request *http.Request
-	var response *http.Response
-	var err error
-
 	var search string
 	if ids != nil {
 		search = "&search_fields=title&search="
@@ -418,22 +429,7 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 		}
 	}
 
-	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"_find?type=query"+search, nil)
-	if err != nil {
-		log.Error("Error getting response: %s", err)
-	}
-	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("kbn-xsrf", "true")
-
-	response, err = client.Do(request)
-	if response.StatusCode == 400 {
-		log.Error("Not Found!")
-	}
-	responseBody, err := ioutil.ReadAll(response.Body)
-	response.Body.Close()
-
-	var result map[string]interface{}
-	json.Unmarshal(responseBody, &result)
+	var result = RetrieveSavedObjects("_find?type=query"+search, nil)
 	savedObjects := result["saved_objects"].([]interface{})
 	var storedQueries []StoredQuery
 	for _, so := range savedObjects {
@@ -453,21 +449,29 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 			}
 			filters = append(filters, filter["meta"].(map[string]interface{}))
 		}
-		var timeFilterFrom string
-		var timeFilterTo string
+		var tFilter TimeFilter
 		if savedObject["attributes"].(map[string]interface{})["timefilter"] != nil {
 			timeFilter := savedObject["attributes"].(map[string]interface{})["timefilter"].(map[string]interface{})
-			timeFilterFrom = timeFilter["from"].(string)
-			timeFilterTo = timeFilter["to"].(string)
+			tFilter.From = timeFilter["from"].(string)
+			tFilter.To = timeFilter["to"].(string)
+		} else {
+			tFilter.From = "now-$interval"
+			tFilter.To = "now"
 		}
 		storedQueries = append(storedQueries, StoredQuery{id, name, description,
-			timeFilterFrom, timeFilterTo, filters})
+			tFilter, filters})
 	}
 
 	return storedQueries, len(storedQueries)
 }
 
 func RetrieveIndexPattern(id string) IndexPattern {
+	var result = RetrieveSavedObjects("index-pattern/"+id, nil)
+	title := result["attributes"].(map[string]interface{})["title"].(string)
+	return IndexPattern{id, title}
+}
+
+func RetrieveSavedObjects(path string, body io.Reader) map[string]interface{} {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -477,7 +481,7 @@ func RetrieveIndexPattern(id string) IndexPattern {
 	var response *http.Response
 	var err error
 
-	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+"index-pattern/"+id, nil)
+	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+path, body)
 	if err != nil {
 		log.Error("Error getting response: %s", err)
 	}
@@ -485,26 +489,43 @@ func RetrieveIndexPattern(id string) IndexPattern {
 	request.Header.Add("kbn-xsrf", "true")
 
 	response, err = client.Do(request)
+	if err != nil {
+		log.Error("Error getting response: %s", err)
+	}
+	if response == nil {
+		log.Error("Error getting response: response is nil")
+	}
 	if response.StatusCode == 400 {
 		log.Error("Not Found!")
 	}
 	responseBody, err := ioutil.ReadAll(response.Body)
-	response.Body.Close()
+	if err != nil {
+		log.Error("Error reading response: %s", err)
+	}
+	err = response.Body.Close()
+	if err != nil {
+		log.Error("Error processing response: %s", err)
+	}
 
 	var result map[string]interface{}
-	_ = json.Unmarshal(responseBody, &result)
-
-	title := result["attributes"].(map[string]interface{})["title"].(string)
-	return IndexPattern{id, title}
+	err = json.Unmarshal(responseBody, &result)
+	if err != nil {
+		log.Error("Error parsing response: %s", err)
+	}
+	return result
 }
 
 type StoredQuery struct {
-	Id             string
-	Name           string
-	Description    string
-	TimeFilterFrom string
-	TimeFilterTo   string
-	Filters        []map[string]interface{}
+	Id          string
+	Title       string
+	Description string
+	TimeFilter  TimeFilter
+	Filters     []map[string]interface{}
+}
+
+type TimeFilter struct {
+	From string
+	To   string
 }
 
 type IndexPattern struct {
