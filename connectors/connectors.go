@@ -41,24 +41,36 @@ func SendInventory(resource []transit.InventoryResource, resourceGroups []transi
 // Inventory Constructors
 func CreateInventoryService(name string, owner string) transit.InventoryService {
 	return transit.InventoryService{
-		Name:        "service1",
-		Type:        transit.Service,
-		Owner:       owner,
+		Name:  name,
+		Type:  transit.Service,
+		Owner: owner,
 	}
 }
 
+// modifies without making a copy, modifies services
 func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
 	resource := transit.InventoryResource{
-		Name:        name,
-		Type:        transit.Host,
-		// Services:	 *services,
+		Name:     name,
+		Type:     transit.Host,
+		Services: services,
 	}
 	resource.Services = make([]transit.InventoryService, len(services))
-	for i, s := range services {
-		//resource.Services = append(resource.Services, s)
-		resource.Services[i] = s
-		// TODO: trying to figure out how to modify without making a copy in a function, no luck
-		//resource.Services[i].Description = "modif"
+	for i, _ := range services {
+		services[i].Description = "modif"
+	}
+	resource.Description = "modified"
+	return resource
+}
+
+// makes and modifies a copy, doesn't modify services
+func CreateInventoryResource2(name string, services []transit.InventoryService) transit.InventoryResource {
+	resource := transit.InventoryResource{
+		Name: name,
+		Type: transit.Host,
+	}
+	for _, s := range services {
+		s.Description = "modif"
+		resource.Services = append(resource.Services, s)
 	}
 	resource.Description = "modified"
 	return resource
@@ -94,7 +106,7 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		}
 	case float64:
 		typedValue = transit.TypedValue{
-			ValueType:    transit.DoubleType,
+			ValueType:   transit.DoubleType,
 			DoubleValue: value.(float64),
 		}
 	default:
@@ -103,7 +115,7 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	metric := transit.TimeSeries{
 		MetricName: name,
 		SampleType: transit.Value,
-		Value: &typedValue,
+		Value:      &typedValue,
 	}
 	// optional argument processing
 	// var arguments []interface{} = make([]interface{}, len(args))
@@ -158,7 +170,7 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 		}
 	case float64:
 		typedValue = transit.TypedValue{
-			ValueType:    transit.DoubleType,
+			ValueType:   transit.DoubleType,
 			DoubleValue: value.(float64),
 		}
 	default:
@@ -178,12 +190,12 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
 	service := transit.MonitoredService{
-		Name:             name,
-		Type:             transit.Service,
-		Owner:            owner,
-		Status:           transit.ServiceOk,
+		Name:   name,
+		Type:   transit.Service,
+		Owner:  owner,
+		Status: transit.ServiceOk,
 	}
-	for _, arg := range args	 {
+	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.TimeSeries:
 			service.Metrics = arg.([]transit.TimeSeries)
@@ -202,13 +214,13 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 // optional params: services
 func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
 	resource := transit.MonitoredResource{
-		Name:             name,
-		Type:             transit.Host,
-		Status:           transit.HostUp,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{},
+		Name:          name,
+		Type:          transit.Host,
+		Status:        transit.HostUp,
+		LastCheckTime: milliseconds.MillisecondTimestamp{},
+		NextCheckTime: milliseconds.MillisecondTimestamp{},
 	}
-	for _, arg := range args	 {
+	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.MonitoredService:
 			resource.Services = arg.([]transit.MonitoredService)
@@ -246,11 +258,11 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 
 // Weight of Monitor Status for multi-state comparison
 var monitorStatusWeightService = map[transit.MonitorStatus]int{
-	transit.ServiceOk: 0,
-	transit.ServicePending: 10,
-	transit.ServiceUnknown: 20,
-	transit.ServiceWarning: 30,
-	transit.ServiceScheduledCritical: 50,
+	transit.ServiceOk:                  0,
+	transit.ServicePending:             10,
+	transit.ServiceUnknown:             20,
+	transit.ServiceWarning:             30,
+	transit.ServiceScheduledCritical:   50,
 	transit.ServiceUnscheduledCritical: 100,
 }
 
@@ -306,7 +318,7 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if warning.DoubleValue == -1  || critical.DoubleValue == -1 {
+		if warning.DoubleValue == -1 || critical.DoubleValue == -1 {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
