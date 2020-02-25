@@ -8,6 +8,7 @@
 *.iml
 tng
 test_libtransit
+connectors/server-connector/server-connector
 
 # Temporary files
 ,*
