@@ -26,6 +26,10 @@ const (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	transitService.ConfigHandler = func(data []byte) {
+		log.Debug("#ConfigHandler: ", string(data))
+	}
+
 	err := transitService.StartNats()
 	if err != nil {
 		log.Error(err.Error())
