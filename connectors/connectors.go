@@ -34,7 +34,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 }
 
 func SendInventory(resource []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
-	// TODO: implement from ServerConnectorQ
+	// TODO: implement from ServerConnector
 	return nil
 }
 
@@ -47,32 +47,15 @@ func CreateInventoryService(name string, owner string) transit.InventoryService 
 	}
 }
 
-// modifies without making a copy, modifies services
-func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
-	resource := transit.InventoryResource{
-		Name:     name,
-		Type:     transit.Host,
-		Services: services,
-	}
-	resource.Services = make([]transit.InventoryService, len(services))
-	for i, _ := range services {
-		services[i].Description = "modif"
-	}
-	resource.Description = "modified"
-	return resource
-}
-
 // makes and modifies a copy, doesn't modify services
-func CreateInventoryResource2(name string, services []transit.InventoryService) transit.InventoryResource {
+func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
 	resource := transit.InventoryResource{
 		Name: name,
 		Type: transit.Host,
 	}
 	for _, s := range services {
-		s.Description = "modif"
 		resource.Services = append(resource.Services, s)
 	}
-	resource.Description = "modified"
 	return resource
 }
 
