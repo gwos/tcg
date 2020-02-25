@@ -197,9 +197,12 @@ func (value TypedValue) String() string {
 	case BooleanType:
 		return strconv.FormatBool(value.BoolValue)
 	case TimeType:
+		// TODO:
 	}
 	return ""
 }
+
+// TODO: implement String() methods for all major types, see TypedValue as example
 
 // ThresholdValue describes threshold
 type ThresholdValue struct {
@@ -366,6 +369,8 @@ type InventoryResource struct {
 	Services []InventoryService `json:"services"`
 }
 
+// TODO: func (metric *InventoryResource) CreateProperty(name string, value TypedValue) {
+
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
 // metric variation represented as as single metric time series. During inventory scans, TNG does not gather metric samples.
@@ -385,6 +390,8 @@ type InventoryService struct {
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
+
+// TODO: func (metric *InventoryService) CreateProperty(name string, value TypedValue) {
 
 // A MonitoredResource defines the current status and services of a resource during a metrics scan.
 // Examples include:
@@ -419,6 +426,9 @@ type MonitoredResource struct {
 	Services []MonitoredService `json:"services"`
 }
 
+// TODO: func (metric *MonitoredResource) CreateProperty(name string, value TypedValue) {
+
+
 // A MonitoredService represents a Groundwork Service creating during a metrics scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
 // metric variation represented as as single metric time series.
@@ -446,6 +456,8 @@ type MonitoredService struct {
 	// metrics
 	Metrics []TimeSeries `json:"metrics"`
 }
+
+// TODO: func (metric *MonitoredService) CreateProperty(name string, value TypedValue) {
 
 // MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {

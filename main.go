@@ -16,16 +16,31 @@ import (
 
 var enableTransit = false
 
+
+const (
+	Resource1 = "tng-host-1"
+	Resource2 = "tng-host-1"
+	Service1 = "tng-server-1"
+	Service2 = "tng-server-2"
+	CpuMetric = "tng-cpu"
+	CpuMetricWarning = "tng-cpu-warning"
+	CpuMetricCritical = "tng-cpu-critical"
+	PercentFreeMetric = "tng-percent-free"
+	PercentFreeMetricWarning = "tng-percent-free-warning"
+	PercentFreeMetricCritical = "tng-percent-free-critical"
+	DiskUsed = "tng-memory-used"
+)
+
 func main() {
 
 	//////////////////////////////////////////////////////////////////////////////////////////
 	// Inventory Examples
 	//////////////////////////////////////////////////////////////////////////////////////////
 	iServices := []transit.InventoryService{}
-	is1 := connectors.CreateInventoryService("myservice1", "myhost1")
-	is2 := connectors.CreateInventoryService("myservice2", "myhost1")
+	is1 := connectors.CreateInventoryService(Service1, Resource1)
+	is2 := connectors.CreateInventoryService(Service2, Resource1)
 	iServices = append(iServices, is1, is2)
-	iResource1 := connectors.CreateInventoryResource("myhost1", iServices)
+	iResource1 := connectors.CreateInventoryResource(Resource1, iServices)
 	println(iResource1.Services[0].Description)
 	println(iResource1.Description)
 	//if (enableTransit) {
@@ -36,14 +51,14 @@ func main() {
 	// Metrics Examples
 	//////////////////////////////////////////////////////////////////////////////////////////
 	// Create Integer Metric with Thresholds
-	metric1, _ := connectors.CreateMetric("cpu", 75)
-	warning1, _ := connectors.CreateWarningThreshold("cpu_warning", 60)
-	critical1, _ := connectors.CreateCriticalThreshold("cpu_critical", 90)
+	metric1, _ := connectors.CreateMetric(CpuMetric, 75)
+	warning1, _ := connectors.CreateWarningThreshold(CpuMetricWarning, 60)
+	critical1, _ := connectors.CreateCriticalThreshold(CpuMetricCritical, 90)
 	metric1.Thresholds = &[]transit.ThresholdValue{*warning1, *critical1}
 	// Create Double Metric with Thresholds and Unit Type
-	metric2, _ := connectors.CreateMetric("percentFree", 99.82, transit.PercentCPU)
-	warning2, _ := connectors.CreateWarningThreshold("cpu_warning", 80.5)
-	critical2, _ := connectors.CreateCriticalThreshold("cpu_critical", 90.8)
+	metric2, _ := connectors.CreateMetric(PercentFreeMetric, 99.82, transit.PercentCPU)
+	warning2, _ := connectors.CreateWarningThreshold(PercentFreeMetricWarning, 80.5)
+	critical2, _ := connectors.CreateCriticalThreshold(PercentFreeMetricCritical, 90.8)
 	metric2.Thresholds = &[]transit.ThresholdValue{*warning2, *critical2}
 	// create with interval
 	now := time.Now()
@@ -51,7 +66,7 @@ func main() {
 		EndTime:   milliseconds.MillisecondTimestamp{Time: now},
 		StartTime: milliseconds.MillisecondTimestamp{Time: now},
 	}
-	metric3, _ := connectors.CreateMetric("percentFree", 65.82, transit.GB, interval)
+	metric3, _ := connectors.CreateMetric(DiskUsed, 65.82, transit.GB, interval)
 	// add tags
 	metric3.CreateTag("myTag1", "myTagValue1")
 	metric3.CreateTag("myTag2", "myTagValue2")
@@ -62,15 +77,15 @@ func main() {
 	fmt.Printf("metric 3 created with thresholds: %+v\n", metric3)
 
 	// Create a Service and add metrics ...
-	service1, _ := connectors.CreateService("myservice1", "myhost1", []transit.TimeSeries{*metric1, *metric2, *metric3})
+	service1, _ := connectors.CreateService(Service1, Resource1, []transit.TimeSeries{*metric1, *metric2, *metric3})
 	fmt.Printf("service 1 created with metrics: %+v\n", service1)
-	service2, _ := connectors.CreateService("myservice2", "myhost2", []transit.TimeSeries{*metric1})
+	service2, _ := connectors.CreateService(Service2, Resource2, []transit.TimeSeries{*metric1})
 	fmt.Printf("service 1 created with metrics: %+v\n", service2)
 
 	// Create a Monitored Resource and Add Service
-	resource1, _ := connectors.CreateResource("myhost1", []transit.MonitoredService{*service1})
+	resource1, _ := connectors.CreateResource(Resource1, []transit.MonitoredService{*service1})
 	fmt.Printf("resource 1 created with services: %+v\n", resource1)
-	resource2, _ := connectors.CreateResource("myhost2", []transit.MonitoredService{*service2})
+	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if (enableTransit) {
