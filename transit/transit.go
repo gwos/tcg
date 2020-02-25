@@ -3,6 +3,7 @@ package transit
 import (
 	"fmt"
 	"github.com/gwos/tng/milliseconds"
+	"strconv"
 )
 
 // VersionString defines type of constant
@@ -185,6 +186,21 @@ type TypedValue struct {
 	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
+func (value TypedValue) String() string {
+	switch value.ValueType {
+	case IntegerType:
+		return strconv.FormatInt(value.IntegerValue, 10)
+	case StringType:
+		return value.StringValue
+	case DoubleType:
+		return fmt.Sprintf("%f", value.DoubleValue)
+	case BooleanType:
+		return strconv.FormatBool(value.BoolValue)
+	case TimeType:
+	}
+	return ""
+}
+
 // ThresholdValue describes threshold
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
@@ -210,6 +226,13 @@ type TimeSeries struct {
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
 	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
+}
+
+func (metric *TimeSeries) CreateTag(name string, value string) {
+	if metric.Tags == nil {
+		metric.Tags = make(map[string]string)
+	}
+	metric.Tags[name] = value
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -561,7 +584,7 @@ type GroundworkEventsUnackRequest struct {
 
 // GroundworkEventUnack describes event ack
 type GroundworkEventUnack struct {
-	AppType            string `json:"appType,required"`
-	Host               string `json:"host,required"`
-	Service            string `json:"service,omitempty"`
+	AppType string `json:"appType,required"`
+	Host    string `json:"host,required"`
+	Service string `json:"service,omitempty"`
 }
