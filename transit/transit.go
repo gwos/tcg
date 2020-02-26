@@ -163,6 +163,13 @@ type TimeInterval struct {
 	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
+func (value TimeInterval) String() string {
+	return fmt.Sprintf("[%s, %s]",
+		value.EndTime.String(),
+		value.StartTime.String(),
+	)
+}
+
 // TypedValue defines a single strongly-typed value.
 type TypedValue struct {
 	ValueType ValueType `json:"valueType"`
@@ -197,7 +204,7 @@ func (value TypedValue) String() string {
 	case BooleanType:
 		return strconv.FormatBool(value.BoolValue)
 	case TimeType:
-		// TODO:
+		return value.TimeValue.String()
 	}
 	return ""
 }
@@ -209,6 +216,10 @@ type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
 	Label      string           `json:"label"`
 	Value      *TypedValue      `json:"value"`
+}
+
+func (value ThresholdValue) String() string {
+	return fmt.Sprintf("[%s, %s, %s]", value.SampleType, value.Label, value.Value.String())
 }
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
@@ -229,6 +240,17 @@ type TimeSeries struct {
 	Tags       map[string]string `json:"tags,omitempty"`
 	Unit       UnitType          `json:"unit,omitempty"`
 	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
+}
+
+func (metric TimeSeries) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
+		metric.MetricName,
+		metric.SampleType,
+		metric.Interval.String(),
+		metric.Value.String(),
+		metric.Tags,
+		metric.Unit,
+		*metric.Thresholds)
 }
 
 func (metric *TimeSeries) CreateTag(name string, value string) {
@@ -332,11 +354,19 @@ type LabelDescriptor struct {
 	ValueType ValueType `json:"valueType,omitempty"`
 }
 
+func (value LabelDescriptor) String() string {
+	return fmt.Sprintf("[%s, %s, %s]", value.Description, value.Key, value.ValueType)
+}
+
 // ThresholdDescriptor defines a Threshold
 type ThresholdDescriptor struct {
 	// Key: The threshold key.
 	Key   string `json:"key"`
 	Value int32  `json:"value"`
+}
+
+func (value ThresholdDescriptor) String() string {
+	return fmt.Sprintf("[%s, %d]", value.Key, value.Value)
 }
 
 // InventoryResource represents a resource that is included in a inventory scan.
@@ -369,6 +399,19 @@ type InventoryResource struct {
 	Services []InventoryService `json:"services"`
 }
 
+func (value InventoryResource) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
+		value.Name,
+		value.Type,
+		value.Owner,
+		value.Category,
+		value.Description,
+		value.Device,
+		value.Properties,
+		value.Services,
+	)
+}
+
 // TODO: func (metric *InventoryResource) CreateProperty(name string, value TypedValue) {
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
@@ -389,6 +432,17 @@ type InventoryService struct {
 	Description string `json:"description,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+func (value InventoryService) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
+		value.Name,
+		value.Type,
+		value.Owner,
+		value.Category,
+		value.Description,
+		value.Properties,
+	)
 }
 
 // TODO: func (metric *InventoryService) CreateProperty(name string, value TypedValue) {
@@ -426,8 +480,21 @@ type MonitoredResource struct {
 	Services []MonitoredService `json:"services"`
 }
 
-// TODO: func (metric *MonitoredResource) CreateProperty(name string, value TypedValue) {
+func (value MonitoredResource) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
+		value.Name,
+		value.Type,
+		value.Owner,
+		value.Status,
+		value.LastCheckTime.String(),
+		value.NextCheckTime.String(),
+		value.LastPlugInOutput,
+		value.Properties,
+		value.Services,
+	)
+}
 
+// TODO: func (metric *MonitoredResource) CreateProperty(name string, value TypedValue) {
 
 // A MonitoredService represents a Groundwork Service creating during a metrics scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
@@ -457,6 +524,20 @@ type MonitoredService struct {
 	Metrics []TimeSeries `json:"metrics"`
 }
 
+func (value MonitoredService) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
+		value.Name,
+		value.Type,
+		value.Owner,
+		value.Status,
+		value.LastCheckTime.String(),
+		value.NextCheckTime.String(),
+		value.LastPlugInOutput,
+		value.Properties,
+		value.Metrics,
+	)
+}
+
 // TODO: func (metric *MonitoredService) CreateProperty(name string, value TypedValue) {
 
 // MonitoredResourceRef references a MonitoredResource in a group collection
@@ -470,6 +551,14 @@ type MonitoredResourceRef struct {
 	Owner string `json:"owner,omitempty"`
 }
 
+func (value MonitoredResourceRef) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		value.Name,
+		value.Type,
+		value.Owner,
+	)
+}
+
 // TracerContext describes a Transit call
 type TracerContext struct {
 	AppType    string                            `json:"appType"`
@@ -479,6 +568,16 @@ type TracerContext struct {
 	Version    VersionString                     `json:"version"`
 }
 
+func (value TracerContext) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
+		value.AppType,
+		value.AgentID,
+		value.TraceToken,
+		value.TimeStamp,
+		value.Version,
+	)
+}
+
 // OperationResult defines API answer
 type OperationResult struct {
 	Entity   string `json:"entity"`
@@ -486,6 +585,16 @@ type OperationResult struct {
 	Message  string `json:"message"`
 	Location string `json:"location"`
 	EntityID int    `json:"entityID"`
+}
+
+func (value OperationResult) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %d]",
+		value.Entity,
+		value.Status,
+		value.Message,
+		value.Location,
+		value.EntityID,
+	)
 }
 
 // OperationResults defines API answer
@@ -499,6 +608,18 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
+func (value OperationResults) String() string {
+	return fmt.Sprintf("[%d, %d, %s, %s, %d, %d, %s]",
+		value.ResourcesAdded,
+		value.ResourcesDeleted,
+		value.EntityType,
+		value.Operation,
+		value.Warning,
+		value.Count,
+		*value.Results,
+	)
+}
+
 // ResourceGroup defines group entity
 type ResourceGroup struct {
 	GroupName   string                 `json:"groupName,required"`
@@ -507,10 +628,26 @@ type ResourceGroup struct {
 	Resources   []MonitoredResourceRef `json:"resources,required"`
 }
 
+func (value ResourceGroup) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s]",
+		value.GroupName,
+		value.Type,
+		value.Description,
+		value.Resources,
+	)
+}
+
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
+}
+
+func (value ResourcesWithServicesRequest) String() string {
+	return fmt.Sprintf("[%s, %s]",
+		value.Context.String(),
+		value.Resources,
+	)
 }
 
 // InventoryRequest defines SynchronizeInventory payload
@@ -518,6 +655,14 @@ type InventoryRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []InventoryResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
+}
+
+func (value InventoryRequest) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		value.Context.String(),
+		value.Resources,
+		value.Groups,
+	)
 }
 
 // IncidentAlert describes alerts received from cloud services
@@ -532,9 +677,26 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+func (value IncidentAlert) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
+		value.IncidentID,
+		value.ResourceName,
+		value.Status,
+		value.StartedAt.String(),
+		value.EndedAt.String(),
+		value.ConditionName,
+		value.URL,
+		value.Summary,
+	)
+}
+
 // GroundworkEventsRequest describes request payload
 type GroundworkEventsRequest struct {
 	Events []GroundworkEvent `json:"events"`
+}
+
+func (value GroundworkEventsRequest) String() string {
+	return fmt.Sprintf("[%s]", value.Events)
 }
 
 // GroundworkEvent describes event
@@ -563,6 +725,16 @@ type GroundworkEvent struct {
 	ApplicationName   string `json:"applicationName,omitempty"`
 }
 
+func (value GroundworkEvent) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
+		value.Device, value.Host, value.Service, value.OperationStatus, value.MonitorStatus, value.Severity,
+		value.ApplicationSeverity, value.Component, value.SubComponent, value.Priority, value.TypeRule,
+		value.TextMessage, value.LastInsertDate.String(), value.ReportDate.String(), value.AppType,
+		value.MonitorServer, value.ConsolidationName, value.LogType, value.ErrorType, value.LoggerName,
+		value.ApplicationName,
+	)
+}
+
 // MonitorConnection describes the connection to the monitored system
 type MonitorConnection struct {
 	ID          int                    `json:"id"`
@@ -573,6 +745,19 @@ type MonitorConnection struct {
 	URL         string                 `json:"url"`
 	Extensions  map[string]interface{} `json:"extensions"`
 	ConnectorID int                    `json:"connectorId"`
+}
+
+func (value MonitorConnection) String() string {
+	return fmt.Sprintf("[%d, %s, %s, %s, %t, %s, %s, %d]",
+		value.ID,
+		value.Server,
+		value.UserName,
+		value.Password,
+		value.SslEnabled,
+		value.URL,
+		value.Extensions,
+		value.ConnectorID,
+	)
 }
 
 // GroundworkEventsAckRequest describes request payload
@@ -589,6 +774,16 @@ type GroundworkEventAck struct {
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
 
+func (value GroundworkEventAck) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
+		value.AppType,
+		value.Host,
+		value.Service,
+		value.AcknowledgedBy,
+		value.AcknowledgeComment,
+	)
+}
+
 // GroundworkEventsUnackRequest describes request payload
 type GroundworkEventsUnackRequest struct {
 	Unacks []GroundworkEventUnack `json:"unacks"`
@@ -599,4 +794,12 @@ type GroundworkEventUnack struct {
 	AppType string `json:"appType,required"`
 	Host    string `json:"host,required"`
 	Service string `json:"service,omitempty"`
+}
+
+func (value GroundworkEventUnack) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		value.AppType,
+		value.Host,
+		value.Service,
+	)
 }
