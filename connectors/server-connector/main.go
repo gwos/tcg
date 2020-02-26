@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/gwos/tng/connectors"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -25,6 +26,7 @@ var transitService *services.TransitService
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	connectors.ControlCHandler()
 	transitService = services.GetTransitService()
 	err := transitService.StartNats()
 	if err != nil {
