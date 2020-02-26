@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -23,6 +24,9 @@ const (
 )
 
 func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
+	monitoredResources, inventoryResources, resourceGroups := make(map[string]transit.MonitoredResource), make(map[string]transit.InventoryResource),
+		make(map[string]transit.ResourceGroup)
+
 	storedQueries, _ := RetrieveStoredQueries(nil)
 
 	// TODO: these should come from environment variables
@@ -34,36 +38,26 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	}
 	esClient, _ := elasticsearch.NewClient(cfg)
 
-	monitoredResources := make(map[string]transit.MonitoredResource)
-	inventoryResources := make(map[string]transit.InventoryResource)
-	resourceGroups := make(map[string]transit.ResourceGroup)
-
 	indexPatterns := make(map[string]IndexPattern)
 
 	for _, storedQuery := range storedQueries {
+		query, queryBool := make(map[string]interface{}), make(map[string]interface{})
+		var must, mustNot, should, filter []interface{}
+
 		indexSet := make(map[string]struct{})
-
-		query := make(map[string]interface{})
-		queryBool := make(map[string]interface{})
-		var must []interface{}
-		var mustNot []interface{}
-		var should []interface{}
-		var filter []interface{}
-
 		for _, filter := range storedQuery.Filters {
-			index := filter["index"].(string)
-			queryType := filter["type"].(string)
-			negate := filter["negate"].(bool)
-			key := filter["key"].(string)
+			index, queryType, negate, key := filter["index"].(string), filter["type"].(string), filter["negate"].(bool),
+				filter["key"].(string)
 
 			indexPattern := RetrieveIndexPattern(index)
 			indexPatterns[indexPattern.Id] = indexPattern
 			indexSet[indexPattern.Title] = struct{}{}
+
 			switch queryType {
 			case TypePhrase:
 				q := map[string]interface{}{
 					"match": map[string]interface{}{
-						filter["key"].(string): filter["value"].(string),
+						key: filter["value"].(string),
 					}}
 				if !negate {
 					must = append(must, q)
@@ -107,7 +101,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 			case TypeExists:
 				q := map[string]interface{}{
 					"exists": map[string]interface{}{
-						"field": filter["key"].(string),
+						"field": key,
 					}}
 				if !negate {
 					must = append(must, q)
@@ -117,26 +111,23 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 				break
 			}
 		}
-		var gte = storedQuery.TimeFilter.From
-		var lte = storedQuery.TimeFilter.To
+		var gte, lt = storedQuery.TimeFilter.From, storedQuery.TimeFilter.To
 		if strings.Contains(gte, "$interval") {
 			gte = strings.ReplaceAll(gte, "$interval", "5d")
 		}
-		if strings.Contains(lte, "$interval") {
-			lte = strings.ReplaceAll(lte, "$interval", "5d")
+		if strings.Contains(lt, "$interval") {
+			lt = strings.ReplaceAll(lt, "$interval", "5d")
 		}
+		var startTime, endTime = parseTime(gte, true), parseTime(lt, false)
 		filter = append(filter, map[string]interface{}{
 			"range": map[string]interface{}{
 				"@timestamp": map[string]interface{}{
 					"gte": gte,
-					"lt":  lte,
+					"lt":  lt,
 				},
 			},
 		})
-		queryBool["must"] = must
-		queryBool["must_not"] = mustNot
-		queryBool["should"] = should
-		queryBool["filter"] = filter
+		queryBool["must"], queryBool["must_not"], queryBool["should"], queryBool["filter"] = must, mustNot, should, filter
 		if should != nil {
 			queryBool["minimum_should_match"] = 1
 		}
@@ -227,23 +218,9 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						}
 
 						var timeInterval = &transit.TimeInterval{
-							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+							StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
+							EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
 						}
-
-						//if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
-						//	layout := "2006-01-02T15:04:05.000Z"
-						//	startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
-						//	if err != nil {
-						//		log.Error(err)
-						//	}
-						//	endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
-						//	if err != nil {
-						//		log.Error(err)
-						//	}
-						//	timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
-						//	timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
-						//}
 
 						var hitsMetric = transit.TimeSeries{
 							MetricName: "hits",
@@ -283,22 +260,9 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 						TimeValue:    nil,
 					}
 					var timeInterval = &transit.TimeInterval{
-						StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-						EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+						StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
+						EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
 					}
-					//if storedQuery.TimeFilterFrom != "" && storedQuery.TimeFilterTo != "" {
-					//	layout := "2006-01-02T15:04:05.000Z"
-					//	startTime, err := time.Parse(layout, storedQuery.TimeFilterFrom)
-					//	if err != nil {
-					//		log.Error(err)
-					//	}
-					//	endTime, err := time.Parse(layout, storedQuery.TimeFilterTo)
-					//	if err != nil {
-					//		log.Error(err)
-					//	}
-					//	timeInterval.StartTime = milliseconds.MillisecondTimestamp{Time: startTime}
-					//	timeInterval.EndTime = milliseconds.MillisecondTimestamp{Time: endTime}
-					//}
 					var hitsMetric = transit.TimeSeries{
 						MetricName: "hits",
 						SampleType: transit.Value,
@@ -463,6 +427,156 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 	}
 
 	return storedQueries, len(storedQueries)
+}
+
+func parseTime(timeString string, isFrom bool) time.Time {
+	if strings.Contains(timeString, "now") {
+		return parseTimeExpression(timeString, isFrom)
+	}
+	layout := "2006-01-02T15:04:05.000Z"
+	result, err := time.Parse(layout, timeString)
+	if err != nil {
+		log.Error(err)
+	}
+	return result
+}
+
+func parseTimeExpression(timeExpression string, isFrom bool) time.Time {
+	now := time.Now()
+	if timeExpression == "now" {
+		return now
+	}
+	operator := timeExpression[3:4]
+	expression := timeExpression[4:len(timeExpression)]
+	var rounded = false
+	if strings.Contains(expression, "/") {
+		expression = expression[:len(expression)-2]
+		rounded = true
+	}
+	interval := expression[:len(expression)-1]
+	period := expression[len(expression)-1 : len(expression)]
+	i, err := strconv.Atoi(interval)
+	if operator == "-" {
+		i = -i
+	}
+	if err != nil {
+		log.Error("Error parsing time filter expression: %s", err)
+	}
+	var result time.Time
+	switch period {
+	case "y":
+		result = now.AddDate(i, 0, 0)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+			} else {
+				result = time.Date(result.Year()+1, 1, 1, 0, 0, 0, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+		break
+	case "M":
+		result = now.AddDate(0, i, 0)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), result.Month(), 1, 0, 0, 0, 0, time.UTC)
+			} else {
+				result = time.Date(result.Year(), result.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+		break
+	case "w":
+		dayOfDesiredWeek := now.AddDate(0, 0, 7*i)
+		if rounded {
+			var offsetFromSunday int
+			var offsetToSaturday int
+			switch dayOfDesiredWeek.Weekday() {
+			case time.Monday:
+				offsetFromSunday = 1
+				offsetToSaturday = 5
+				break
+			case time.Tuesday:
+				offsetFromSunday = 2
+				offsetToSaturday = 4
+				break
+			case time.Wednesday:
+				offsetFromSunday = 3
+				offsetToSaturday = 3
+				break
+			case time.Thursday:
+				offsetFromSunday = 4
+				offsetToSaturday = 2
+				break
+			case time.Friday:
+				offsetFromSunday = 5
+				offsetToSaturday = 1
+				break
+			case time.Saturday:
+				offsetFromSunday = 6
+				offsetToSaturday = 0
+				break
+			case time.Sunday:
+				offsetFromSunday = 0
+				offsetToSaturday = 6
+				break
+			}
+			if isFrom {
+				result = time.Date(dayOfDesiredWeek.Year(), dayOfDesiredWeek.Month(), dayOfDesiredWeek.Day()-offsetFromSunday, 0, 0, 0, 0, time.UTC)
+			} else {
+				result = time.Date(dayOfDesiredWeek.Year(), dayOfDesiredWeek.Month(), dayOfDesiredWeek.Day()+offsetToSaturday+1, 0, 0, 0, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		} else {
+			result = dayOfDesiredWeek
+		}
+		break
+	case "d":
+		result = now.AddDate(0, 0, i)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), result.Month(), result.Day(), 0, 0, 0, 0, time.UTC)
+			} else {
+				result = time.Date(result.Year(), result.Month(), result.Day()+1, 0, 0, 0, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+	case "h":
+		result = now.Add(time.Duration(i) * time.Hour)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), result.Month(), result.Day(), result.Hour()+1, 0, 0, 0, time.UTC)
+			} else {
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+		break
+	case "m":
+		result = now.Add(time.Duration(i) * time.Minute)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), result.Month(), result.Day(), result.Hour(), result.Minute(), 0, 0, time.UTC)
+			} else {
+				result = time.Date(result.Year(), result.Month(), result.Day(), result.Hour(), result.Minute()+1, 0, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+		break
+	case "s":
+		result = now.Add(time.Duration(i) * time.Second)
+		if rounded {
+			if isFrom {
+				result = time.Date(result.Year(), result.Month(), result.Day(), result.Hour(), result.Minute(), result.Second(), 0, time.UTC)
+			} else {
+				result = time.Date(result.Year(), result.Month(), result.Day(), result.Hour(), result.Minute(), result.Second()+1, 0, time.UTC)
+				result = result.Add(-1 * time.Millisecond)
+			}
+		}
+		break
+	default:
+		log.Error("Error parsing time filter expression: unknown period format '" + period + "'")
+	}
+	return result
 }
 
 func RetrieveIndexPattern(id string) IndexPattern {
