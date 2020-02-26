@@ -6,7 +6,10 @@ import (
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
+	"os"
+	"os/signal"
 	"reflect"
+	"syscall"
 	"time"
 )
 
@@ -324,4 +327,15 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 		}
 	}
 	return transit.ServiceOk
+}
+
+func ControlCHandler() {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		fmt.Println("\r- Ctrl+C pressed in Terminal")
+		// TODO: shutdown NATS and everything else cleanly, with DRY coding
+		os.Exit(0)
+	}()
 }
