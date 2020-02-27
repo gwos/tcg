@@ -53,8 +53,16 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 }
 
 func SendInventory(resource []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
-	// TODO: implement from ServerConnector
-	return nil
+	request := transit.InventoryRequest{
+		Context:   transitService.MakeTracerContext(),
+		Resources: resource,
+		Groups:    resourceGroups,
+	}
+	b, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	return transitService.SynchronizeInventory(b)
 }
 
 // Inventory Constructors
@@ -76,6 +84,27 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 		resource.Services = append(resource.Services, s)
 	}
 	return resource
+}
+
+func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
+	resource := transit.MonitoredResourceRef{
+		Name:  name,
+		Type:  resourceType,
+		Owner: owner,
+	}
+	return resource
+}
+
+func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
+	group := transit.ResourceGroup{
+		GroupName:   name,
+		Type:        groupType,
+		Description: description,
+	}
+	for _, r := range resources {
+		group.Resources = append(group.Resources, r)
+	}
+	return group
 }
 
 // Metric Constructors
@@ -125,6 +154,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		switch arg.(type) {
 		case string:
 			metric.Unit = transit.UnitType(arg.(string))
+		case transit.UnitType:
+			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
 		//case transit.MetricSampleType:
