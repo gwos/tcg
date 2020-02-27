@@ -11,30 +11,29 @@ import (
 )
 
 //////////////////////////////////////////////////////////
-// Examples of High Level API functions
+//         Examples of High Level API functions         //
 //////////////////////////////////////////////////////////
 
 var enableTransit = false
 
-
 const (
-	Resource1 = "tng-host-1"
-	Resource2 = "tng-host-1"
-	Service1 = "tng-server-1"
-	Service2 = "tng-server-2"
-	CpuMetric = "tng-cpu"
-	CpuMetricWarning = "tng-cpu-warning"
-	CpuMetricCritical = "tng-cpu-critical"
-	PercentFreeMetric = "tng-percent-free"
-	PercentFreeMetricWarning = "tng-percent-free-warning"
+	Resource1                 = "tng-host-1"
+	Resource2                 = "tng-host-1"
+	Service1                  = "tng-server-1"
+	Service2                  = "tng-server-2"
+	CpuMetric                 = "tng-cpu"
+	CpuMetricWarning          = "tng-cpu-warning"
+	CpuMetricCritical         = "tng-cpu-critical"
+	PercentFreeMetric         = "tng-percent-free"
+	PercentFreeMetricWarning  = "tng-percent-free-warning"
 	PercentFreeMetricCritical = "tng-percent-free-critical"
-	DiskUsed = "tng-memory-used"
+	DiskUsed                  = "tng-memory-used"
 )
 
 func main() {
 
 	//////////////////////////////////////////////////////////////////////////////////////////
-	// Inventory Examples
+	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
 	iServices := []transit.InventoryService{}
 	is1 := connectors.CreateInventoryService(Service1, Resource1)
@@ -48,7 +47,7 @@ func main() {
 	//}
 
 	//////////////////////////////////////////////////////////////////////////////////////////
-	// Metrics Examples
+	//                                  Metrics Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
 	// Create Integer Metric with Thresholds
 	metric1, _ := connectors.CreateMetric(CpuMetric, 75)
@@ -88,13 +87,13 @@ func main() {
 	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
-	if (enableTransit) {
+	if enableTransit {
 		connectors.SendMetrics([]transit.MonitoredResource{*resource1, *resource2})
 	}
 }
 
 //////////////////////////////////////////////////////////
-// Examples of Low Level API functions
+//         Examples of Low Level API functions          //
 //////////////////////////////////////////////////////////
 
 func LowLevelExamples() {
