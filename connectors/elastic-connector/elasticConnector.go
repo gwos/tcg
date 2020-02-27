@@ -5,8 +5,8 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
+	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	_ "github.com/gwos/tng/milliseconds"
@@ -23,10 +23,19 @@ const (
 	KibanaApiSavedObjectsPath = "http://localhost:5601/kibana/api/saved_objects/"
 )
 
-func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	monitoredResources, inventoryResources, resourceGroups := make(map[string]transit.MonitoredResource), make(map[string]transit.InventoryResource),
-		make(map[string]transit.ResourceGroup)
+const (
+	TypePhrase  = "phrase"
+	TypePhrases = "phrases"
+	TypeRange   = "range"
+	TypeExists  = "exists"
+)
 
+const defaultInterval = 5
+
+func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
+	hosts, groups := make(map[string]Host), make(map[string][]string)
+
+	// TODO: selected queries titles and time intervals will be retrieved from stored configs, here only queries filters will be retrieved
 	storedQueries, _ := RetrieveStoredQueries(nil)
 
 	// TODO: these should come from environment variables
@@ -38,20 +47,15 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	}
 	esClient, _ := elasticsearch.NewClient(cfg)
 
-	indexPatterns := make(map[string]IndexPattern)
-
 	for _, storedQuery := range storedQueries {
-		query, queryBool := make(map[string]interface{}), make(map[string]interface{})
+		query, queryBool, indexesSet := make(map[string]interface{}), make(map[string]interface{}), make(map[string]struct{})
 		var must, mustNot, should, filter []interface{}
 
-		indexSet := make(map[string]struct{})
 		for _, filter := range storedQuery.Filters {
-			index, queryType, negate, key := filter["index"].(string), filter["type"].(string), filter["negate"].(bool),
-				filter["key"].(string)
+			index, queryType, negate, key := filter["index"].(string), filter["type"].(string), filter["negate"].(bool), filter["key"].(string)
 
 			indexPattern := RetrieveIndexPattern(index)
-			indexPatterns[indexPattern.Id] = indexPattern
-			indexSet[indexPattern.Title] = struct{}{}
+			indexesSet[indexPattern.Title] = struct{}{}
 
 			switch queryType {
 			case TypePhrase:
@@ -112,13 +116,13 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 			}
 		}
 		var gte, lt = storedQuery.TimeFilter.From, storedQuery.TimeFilter.To
+		interval := strconv.Itoa(defaultInterval) + "m"
 		if strings.Contains(gte, "$interval") {
-			gte = strings.ReplaceAll(gte, "$interval", "5d")
+			gte = strings.ReplaceAll(gte, "$interval", interval)
 		}
 		if strings.Contains(lt, "$interval") {
-			lt = strings.ReplaceAll(lt, "$interval", "5d")
+			lt = strings.ReplaceAll(lt, "$interval", interval)
 		}
-		var startTime, endTime = parseTime(gte, true), parseTime(lt, false)
 		filter = append(filter, map[string]interface{}{
 			"range": map[string]interface{}{
 				"@timestamp": map[string]interface{}{
@@ -127,6 +131,13 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 				},
 			},
 		})
+
+		var startTime, endTime = parseTime(gte, true), parseTime(lt, false)
+		timeInterval := TimeInterval{
+			StartTime: startTime,
+			EndTime:   endTime,
+		}
+
 		queryBool["must"], queryBool["must_not"], queryBool["should"], queryBool["filter"] = must, mustNot, should, filter
 		if should != nil {
 			queryBool["minimum_should_match"] = 1
@@ -142,7 +153,7 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 		}
 
 		var indexes []string
-		for index := range indexSet {
+		for index := range indexesSet {
 			indexes = append(indexes, index)
 		}
 
@@ -183,201 +194,83 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 			hit := h.(map[string]interface{})
 			if hit["_source"].(map[string]interface{})["container"] != nil {
 				container := hit["_source"].(map[string]interface{})["container"].(map[string]interface{})
+
 				hostName := container["name"].(string)
 
-				if monitoredResource, exists := monitoredResources[hostName]; exists {
-					updServices := monitoredResource.Services
+				var hostGroup string
+				if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
+					hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
+				}
+				if hosts, exists := groups[hostGroup]; exists {
+					hosts = append(hosts, hostName)
+					groups[hostGroup] = hosts
+				} else {
+					groups[hostGroup] = []string{hostName}
+				}
+
+				if host, exists := hosts[hostName]; exists {
+					services := host.Services
 					var found = false
-					for _, updService := range updServices {
-						if updService.Name == storedQuery.Title {
-							updMetric := updService.Metrics[0]
-							updValue := updMetric.Value
-
-							doubleValue := updValue.DoubleValue + 1
-							integerValue := updValue.IntegerValue + 1
-
-							updValue.DoubleValue = doubleValue
-							updValue.IntegerValue = integerValue
-							updValue.StringValue = fmt.Sprintf("%d", integerValue)
-
-							updMetric.Value = updValue
-							updService.Metrics = []transit.TimeSeries{updMetric}
-
+					for _, service := range services {
+						if service.Name == storedQuery.Title {
+							service.Hits = service.Hits + 1
 							found = true
 							break
 						}
 					}
 					if !found {
-						hitsValue := &transit.TypedValue{
-							ValueType:    transit.IntegerType,
-							BoolValue:    false,
-							DoubleValue:  1,
-							IntegerValue: 1,
-							StringValue:  "1",
-							TimeValue:    nil,
-						}
-
-						var timeInterval = &transit.TimeInterval{
-							StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
-							EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
-						}
-
-						var hitsMetric = transit.TimeSeries{
-							MetricName: "hits",
-							SampleType: transit.Value,
-							Interval:   timeInterval,
-							Value:      hitsValue,
-							Tags:       nil, // TODO
-							Unit:       transit.UnitCounter,
-							Thresholds: nil, // TODO
-						}
-
-						var metrics = []transit.TimeSeries{hitsMetric}
-
-						var service = transit.MonitoredService{
-							Name:             storedQuery.Title,
-							Type:             transit.Service,
-							Owner:            "",                                                  // TODO
-							Status:           transit.ServiceOk,                                   // TODO
-							LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-							NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-							LastPlugInOutput: "",                                                  // TODO
-							Properties:       nil,                                                 // TODO
-							Metrics:          metrics,
-						}
-
-						updServices = append(updServices, service)
-						monitoredResource.Services = updServices
+						service := Service{Name: storedQuery.Title, Hits: 1, TimeInterval: timeInterval}
+						services = append(services, service)
+						host.Services = services
 					}
-					monitoredResources[hostName] = monitoredResource
+					hosts[hostName] = host
 				} else {
-					hitsValue := &transit.TypedValue{
-						ValueType:    transit.IntegerType,
-						BoolValue:    false,
-						DoubleValue:  1,
-						IntegerValue: 1,
-						StringValue:  "1",
-						TimeValue:    nil,
-					}
-					var timeInterval = &transit.TimeInterval{
-						StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
-						EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
-					}
-					var hitsMetric = transit.TimeSeries{
-						MetricName: "hits",
-						SampleType: transit.Value,
-						Interval:   timeInterval,
-						Value:      hitsValue,
-						Tags:       nil, // TODO
-						Unit:       transit.UnitCounter,
-						Thresholds: nil, // TODO
-					}
-					var service = transit.MonitoredService{
-						Name:             storedQuery.Title,
-						Type:             transit.Service,
-						Owner:            hostName,
-						Status:           transit.ServiceOk,                                   // TODO
-						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-						LastPlugInOutput: "",                                                  // TODO
-						Properties:       nil,                                                 // TODO
-						Metrics:          []transit.TimeSeries{hitsMetric},
-					}
-					var monitoredResource = transit.MonitoredResource{
-						Name:             hostName,
-						Type:             transit.Host,
-						Owner:            "",                                                  // TODO
-						Status:           transit.HostUp,                                      // TODO
-						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO
-						LastPlugInOutput: "",                                                  // TODO
-						Properties:       nil,                                                 // TODO
-						Services:         []transit.MonitoredService{service},
-					}
-					monitoredResources[hostName] = monitoredResource
-				}
-
-				inventoryService := transit.InventoryService{
-					Name:        storedQuery.Title,
-					Type:        transit.Service,
-					Owner:       hostName,
-					Category:    "",  //TODO
-					Description: "",  //TODO
-					Properties:  nil, //TODO
-				}
-				if inventoryResource, hostExists := inventoryResources[hostName]; hostExists {
-					inventoryServices := inventoryResource.Services
-					var serviceExists = false
-					for _, service := range inventoryServices {
-						if service.Name == inventoryService.Name {
-							serviceExists = true
-							break
-						}
-					}
-					if !serviceExists {
-						inventoryServices = append(inventoryServices, inventoryService)
-						inventoryResource.Services = inventoryServices
-						inventoryResources[hostName] = inventoryResource
-					}
-				} else {
-					inventoryResource := transit.InventoryResource{
-						Name:        hostName,
-						Type:        transit.Host,
-						Owner:       "",  // TODO
-						Category:    "",  // TODO
-						Description: "",  // TODO
-						Device:      "",  // TODO
-						Properties:  nil, // TODO
-						Services:    []transit.InventoryService{inventoryService},
-					}
-					inventoryResources[hostName] = inventoryResource
-				}
-
-				resourceRef := transit.MonitoredResourceRef{
-					Name:  hostName,
-					Type:  transit.Host,
-					Owner: "", //TODO
-				}
-				var hostGroup string
-				if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
-					hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
-				}
-				if group, groupExists := resourceGroups[hostGroup]; groupExists {
-					resources := group.Resources
-					resources = append(resources, resourceRef)
-					group.Resources = resources
-					resourceGroups[hostGroup] = group
-				} else {
-					group := transit.ResourceGroup{
-						GroupName:   hostGroup,
-						Type:        transit.HostGroup,
-						Description: hostGroup,
-						Resources:   []transit.MonitoredResourceRef{resourceRef},
-					}
-					resourceGroups[hostGroup] = group
+					service := Service{Name: storedQuery.Title, Hits: 1, TimeInterval: timeInterval}
+					host := Host{Name: hostName, Services: []Service{service}, HostGroup: hostGroup}
+					hosts[hostName] = host
 				}
 			}
 		}
 	}
 
-	mrs := make([]transit.MonitoredResource, len(monitoredResources))
+	mrs := make([]transit.MonitoredResource, len(hosts))
+	irs := make([]transit.InventoryResource, len(hosts))
 	i := 0
-	for _, value := range monitoredResources {
-		mrs[i] = value
+	for _, host := range hosts {
+		monitoredServices := make([]transit.MonitoredService, len(host.Services))
+		inventoryServices := make([]transit.InventoryService, len(host.Services))
+
+		for i, service := range host.Services {
+			timeInterval := &transit.TimeInterval{
+				EndTime:   milliseconds.MillisecondTimestamp{Time: service.TimeInterval.EndTime},
+				StartTime: milliseconds.MillisecondTimestamp{Time: service.TimeInterval.StartTime},
+			}
+			metric, _ := connectors.CreateMetric("hits", service.Hits, timeInterval, transit.UnitCounter)
+			monitoredService, _ := connectors.CreateService(service.Name, host.Name, []transit.TimeSeries{*metric})
+			inventoryService := connectors.CreateInventoryService(service.Name, host.Name)
+			monitoredServices[i] = *monitoredService
+			inventoryServices[i] = inventoryService
+		}
+		monitoredResource, _ := connectors.CreateResource(host.Name, monitoredServices)
+		inventoryResource := connectors.CreateInventoryResource(host.Name, inventoryServices)
+		mrs[i] = *monitoredResource
+		irs[i] = inventoryResource
 		i++
 	}
-	irs := make([]transit.InventoryResource, len(inventoryResources))
+
+	rgs := make([]transit.ResourceGroup, len(groups))
 	j := 0
-	for _, value := range inventoryResources {
-		irs[j] = value
+	for group, hostsInGroup := range groups {
+		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
+		for i, host := range hostsInGroup {
+			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.Host)
+			monitoredResourceRefs[i] = monitoredResourceRef
+		}
+		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
+		rgs[j] = resourceGroup
 		j++
 	}
-	rgs := make([]transit.ResourceGroup, len(resourceGroups))
-	k := 0
-	for _, value := range resourceGroups {
-		rgs[k] = value
-		k++
-	}
+
 	return mrs, irs, rgs
 }
 
@@ -447,7 +340,7 @@ func parseTimeExpression(timeExpression string, isFrom bool) time.Time {
 		return now
 	}
 	operator := timeExpression[3:4]
-	expression := timeExpression[4:len(timeExpression)]
+	expression := timeExpression[4:]
 	var rounded = false
 	if strings.Contains(expression, "/") {
 		expression = expression[:len(expression)-2]
@@ -647,9 +540,19 @@ type IndexPattern struct {
 	Title string
 }
 
-const (
-	TypePhrase  = "phrase"
-	TypePhrases = "phrases"
-	TypeRange   = "range"
-	TypeExists  = "exists"
-)
+type TimeInterval struct {
+	StartTime time.Time
+	EndTime   time.Time
+}
+
+type Service struct {
+	Name         string
+	Hits         int
+	TimeInterval TimeInterval
+}
+
+type Host struct {
+	Name      string
+	Services  []Service
+	HostGroup string
+}
