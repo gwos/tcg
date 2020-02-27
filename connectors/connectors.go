@@ -35,13 +35,14 @@ func Start() error {
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
+	for i, _ := range resources {
+		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now().Local()}
+		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+	}
+
 	request := transit.ResourcesWithServicesRequest{
 		Context:   transitService.MakeTracerContext(),
 		Resources: resources,
-	}
-	for _, resource := range request.Resources {
-		resource.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		resource.NextCheckTime = milliseconds.MillisecondTimestamp{Time: resource.LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
 	}
 
 	b, err := json.Marshal(request)
