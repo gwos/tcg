@@ -5,14 +5,14 @@ connector:
   controllerAddr: ":8099"
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
-  natsFilestoreDir: "src/main/resources/datastore"
+  natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
   natsHost: ":4222"
   logLevel: 2
 dsConnection:
   hostName: "localhost"
   userName: "admin"
-  password: "frugfri328y49rgfbriegfbri" #change to valid one to test
+  password: "admin" #change to valid one to test
 gwConnections:
   -
     hostName: "localhost:80"
