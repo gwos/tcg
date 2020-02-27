@@ -3,6 +3,7 @@ package connectors
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
@@ -15,9 +16,21 @@ import (
 
 var transitService *services.TransitService
 
+// will come from extensions field
+var timer int = 120
+
 func Start() error {
 	transitService = services.GetTransitService()
-	// TODO: implement from ServerConnector main... start Nats etc
+
+	if err := transitService.StartController(); err != nil {
+		return err
+	}
+	if err := transitService.StartNats(); err != nil {
+		return err
+	}
+	if err := transitService.StartTransport(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -26,7 +39,10 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   transitService.MakeTracerContext(),
 		Resources: resources,
 	}
-	// TODO: fill in all resource LastCheck and Next Check
+	for _, resource := range request.Resources {
+		resource.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
+		resource.NextCheckTime = milliseconds.MillisecondTimestamp{Time: resource.LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+	}
 
 	b, err := json.Marshal(request)
 	if err != nil {
@@ -335,7 +351,15 @@ func ControlCHandler() {
 	go func() {
 		<-c
 		fmt.Println("\r- Ctrl+C pressed in Terminal")
-		// TODO: shutdown NATS and everything else cleanly, with DRY coding
+		if err := transitService.StopTransport(); err != nil {
+			log.Error(err.Error())
+		}
+		if err := transitService.StopNats(); err != nil {
+			log.Error(err.Error())
+		}
+		if err := transitService.StopController(); err != nil {
+			log.Error(err.Error())
+		}
 		os.Exit(0)
 	}()
 }

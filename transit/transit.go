@@ -9,9 +9,9 @@ import (
 // VersionString defines type of constant
 type VersionString string
 
-// TransitModelVersion defines versioning
+// ModelVersion defines versioning
 const (
-	TransitModelVersion VersionString = "1.0.0"
+	ModelVersion VersionString = "1.0.0"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -209,8 +209,6 @@ func (value TypedValue) String() string {
 	return ""
 }
 
-// TODO: implement String() methods for all major types, see TypedValue as example
-
 // ThresholdValue describes threshold
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
@@ -218,8 +216,9 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
-func (value ThresholdValue) String() string {
-	return fmt.Sprintf("[%s, %s, %s]", value.SampleType, value.Label, value.Value.String())
+func (thresholdValue ThresholdValue) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		thresholdValue.SampleType, thresholdValue.Label, thresholdValue.Value.String())
 }
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
@@ -242,22 +241,17 @@ type TimeSeries struct {
 	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
 }
 
-func (metric TimeSeries) String() string {
+func (timeSeries TimeSeries) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
-		metric.MetricName,
-		metric.SampleType,
-		metric.Interval.String(),
-		metric.Value.String(),
-		metric.Tags,
-		metric.Unit,
-		*metric.Thresholds)
+		timeSeries.MetricName, timeSeries.SampleType, timeSeries.Interval.String(), timeSeries.Value.String(),
+		timeSeries.Tags, timeSeries.Unit, *timeSeries.Thresholds)
 }
 
-func (metric *TimeSeries) CreateTag(name string, value string) {
-	if metric.Tags == nil {
-		metric.Tags = make(map[string]string)
+func (timeSeries *TimeSeries) CreateTag(name string, value string) {
+	if timeSeries.Tags == nil {
+		timeSeries.Tags = make(map[string]string)
 	}
-	metric.Tags[name] = value
+	timeSeries.Tags[name] = value
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -333,8 +327,8 @@ type MetricDescriptor struct {
 	MetricKind MetricKind `json:"metricKind"`
 }
 
-func (md MetricDescriptor) String() string {
-	return fmt.Sprintf("%s - %s", md.Type, md.CustomName)
+func (metricDescriptor MetricDescriptor) String() string {
+	return fmt.Sprintf("%s - %s", metricDescriptor.Type, metricDescriptor.CustomName)
 }
 
 // LabelDescriptor defines a Label.
@@ -354,8 +348,8 @@ type LabelDescriptor struct {
 	ValueType ValueType `json:"valueType,omitempty"`
 }
 
-func (value LabelDescriptor) String() string {
-	return fmt.Sprintf("[%s, %s, %s]", value.Description, value.Key, value.ValueType)
+func (labelDescriptor LabelDescriptor) String() string {
+	return fmt.Sprintf("[%s, %s, %s]", labelDescriptor.Description, labelDescriptor.Key, labelDescriptor.ValueType)
 }
 
 // ThresholdDescriptor defines a Threshold
@@ -365,8 +359,8 @@ type ThresholdDescriptor struct {
 	Value int32  `json:"value"`
 }
 
-func (value ThresholdDescriptor) String() string {
-	return fmt.Sprintf("[%s, %d]", value.Key, value.Value)
+func (thresholdDescriptor ThresholdDescriptor) String() string {
+	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
 
 // InventoryResource represents a resource that is included in a inventory scan.
@@ -399,20 +393,19 @@ type InventoryResource struct {
 	Services []InventoryService `json:"services"`
 }
 
-func (value InventoryResource) String() string {
+func (inventoryResource InventoryResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
-		value.Name,
-		value.Type,
-		value.Owner,
-		value.Category,
-		value.Description,
-		value.Device,
-		value.Properties,
-		value.Services,
+		inventoryResource.Name, inventoryResource.Type, inventoryResource.Owner, inventoryResource.Category,
+		inventoryResource.Description, inventoryResource.Device, inventoryResource.Properties, inventoryResource.Services,
 	)
 }
 
-// TODO: func (metric *InventoryResource) CreateProperty(name string, value TypedValue) {
+func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
+	if inventoryResource.Properties == nil {
+		inventoryResource.Properties = make(map[string]TypedValue)
+	}
+	inventoryResource.Properties[name] = value
+}
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
@@ -434,18 +427,19 @@ type InventoryService struct {
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
-func (value InventoryService) String() string {
+func (inventoryService InventoryService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
-		value.Name,
-		value.Type,
-		value.Owner,
-		value.Category,
-		value.Description,
-		value.Properties,
+		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
+		inventoryService.Category, inventoryService.Description, inventoryService.Properties,
 	)
 }
 
-// TODO: func (metric *InventoryService) CreateProperty(name string, value TypedValue) {
+func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
+	if inventoryService.Properties == nil {
+		inventoryService.Properties = make(map[string]TypedValue)
+	}
+	inventoryService.Properties[name] = value
+}
 
 // A MonitoredResource defines the current status and services of a resource during a metrics scan.
 // Examples include:
@@ -480,21 +474,26 @@ type MonitoredResource struct {
 	Services []MonitoredService `json:"services"`
 }
 
-func (value MonitoredResource) String() string {
+func (monitoredResource MonitoredResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
-		value.Name,
-		value.Type,
-		value.Owner,
-		value.Status,
-		value.LastCheckTime.String(),
-		value.NextCheckTime.String(),
-		value.LastPlugInOutput,
-		value.Properties,
-		value.Services,
+		monitoredResource.Name,
+		monitoredResource.Type,
+		monitoredResource.Owner,
+		monitoredResource.Status,
+		monitoredResource.LastCheckTime.String(),
+		monitoredResource.NextCheckTime.String(),
+		monitoredResource.LastPlugInOutput,
+		monitoredResource.Properties,
+		monitoredResource.Services,
 	)
 }
 
-// TODO: func (metric *MonitoredResource) CreateProperty(name string, value TypedValue) {
+func (monitoredResource *MonitoredResource) CreateProperty(name string, value TypedValue) {
+	if monitoredResource.Properties == nil {
+		monitoredResource.Properties = make(map[string]TypedValue)
+	}
+	monitoredResource.Properties[name] = value
+}
 
 // A MonitoredService represents a Groundwork Service creating during a metrics scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
@@ -524,21 +523,20 @@ type MonitoredService struct {
 	Metrics []TimeSeries `json:"metrics"`
 }
 
-func (value MonitoredService) String() string {
+func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
-		value.Name,
-		value.Type,
-		value.Owner,
-		value.Status,
-		value.LastCheckTime.String(),
-		value.NextCheckTime.String(),
-		value.LastPlugInOutput,
-		value.Properties,
-		value.Metrics,
+		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
+		monitoredService.LastCheckTime.String(), monitoredService.NextCheckTime.String(),
+		monitoredService.LastPlugInOutput, monitoredService.Properties, monitoredService.Metrics,
 	)
 }
 
-// TODO: func (metric *MonitoredService) CreateProperty(name string, value TypedValue) {
+func (monitoredService *MonitoredService) CreateProperty(name string, value TypedValue) {
+	if monitoredService.Properties == nil {
+		monitoredService.Properties = make(map[string]TypedValue)
+	}
+	monitoredService.Properties[name] = value
+}
 
 // MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {
@@ -551,11 +549,11 @@ type MonitoredResourceRef struct {
 	Owner string `json:"owner,omitempty"`
 }
 
-func (value MonitoredResourceRef) String() string {
+func (monitoredResourceRef MonitoredResourceRef) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		value.Name,
-		value.Type,
-		value.Owner,
+		monitoredResourceRef.Name,
+		monitoredResourceRef.Type,
+		monitoredResourceRef.Owner,
 	)
 }
 
@@ -568,13 +566,10 @@ type TracerContext struct {
 	Version    VersionString                     `json:"version"`
 }
 
-func (value TracerContext) String() string {
+func (tracerContext TracerContext) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
-		value.AppType,
-		value.AgentID,
-		value.TraceToken,
-		value.TimeStamp,
-		value.Version,
+		tracerContext.AppType, tracerContext.AgentID, tracerContext.TraceToken,
+		tracerContext.TimeStamp, tracerContext.Version,
 	)
 }
 
@@ -587,13 +582,10 @@ type OperationResult struct {
 	EntityID int    `json:"entityID"`
 }
 
-func (value OperationResult) String() string {
+func (operationResult OperationResult) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %d]",
-		value.Entity,
-		value.Status,
-		value.Message,
-		value.Location,
-		value.EntityID,
+		operationResult.Entity, operationResult.Status, operationResult.Message,
+		operationResult.Location, operationResult.EntityID,
 	)
 }
 
@@ -608,15 +600,10 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
-func (value OperationResults) String() string {
+func (operationResults OperationResults) String() string {
 	return fmt.Sprintf("[%d, %d, %s, %s, %d, %d, %s]",
-		value.ResourcesAdded,
-		value.ResourcesDeleted,
-		value.EntityType,
-		value.Operation,
-		value.Warning,
-		value.Count,
-		*value.Results,
+		operationResults.ResourcesAdded, operationResults.ResourcesDeleted, operationResults.EntityType,
+		operationResults.Operation, operationResults.Warning, operationResults.Count, *operationResults.Results,
 	)
 }
 
@@ -628,12 +615,9 @@ type ResourceGroup struct {
 	Resources   []MonitoredResourceRef `json:"resources,required"`
 }
 
-func (value ResourceGroup) String() string {
+func (resourceGroup ResourceGroup) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s]",
-		value.GroupName,
-		value.Type,
-		value.Description,
-		value.Resources,
+		resourceGroup.GroupName, resourceGroup.Type, resourceGroup.Description, resourceGroup.Resources,
 	)
 }
 
@@ -643,10 +627,10 @@ type ResourcesWithServicesRequest struct {
 	Resources []MonitoredResource `json:"resources"`
 }
 
-func (value ResourcesWithServicesRequest) String() string {
+func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",
-		value.Context.String(),
-		value.Resources,
+		resourcesWithServicesRequest.Context.String(),
+		resourcesWithServicesRequest.Resources,
 	)
 }
 
@@ -657,11 +641,9 @@ type InventoryRequest struct {
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
-func (value InventoryRequest) String() string {
+func (inventoryRequest InventoryRequest) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		value.Context.String(),
-		value.Resources,
-		value.Groups,
+		inventoryRequest.Context.String(), inventoryRequest.Resources, inventoryRequest.Groups,
 	)
 }
 
@@ -677,16 +659,10 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
-func (value IncidentAlert) String() string {
+func (incidentAlert IncidentAlert) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
-		value.IncidentID,
-		value.ResourceName,
-		value.Status,
-		value.StartedAt.String(),
-		value.EndedAt.String(),
-		value.ConditionName,
-		value.URL,
-		value.Summary,
+		incidentAlert.IncidentID, incidentAlert.ResourceName, incidentAlert.Status, incidentAlert.StartedAt.String(),
+		incidentAlert.EndedAt.String(), incidentAlert.ConditionName, incidentAlert.URL, incidentAlert.Summary,
 	)
 }
 
@@ -695,8 +671,8 @@ type GroundworkEventsRequest struct {
 	Events []GroundworkEvent `json:"events"`
 }
 
-func (value GroundworkEventsRequest) String() string {
-	return fmt.Sprintf("[%s]", value.Events)
+func (groundworkEventsRequest GroundworkEventsRequest) String() string {
+	return fmt.Sprintf("[%s]", groundworkEventsRequest.Events)
 }
 
 // GroundworkEvent describes event
@@ -725,13 +701,14 @@ type GroundworkEvent struct {
 	ApplicationName   string `json:"applicationName,omitempty"`
 }
 
-func (value GroundworkEvent) String() string {
+func (groundworkEvent GroundworkEvent) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
-		value.Device, value.Host, value.Service, value.OperationStatus, value.MonitorStatus, value.Severity,
-		value.ApplicationSeverity, value.Component, value.SubComponent, value.Priority, value.TypeRule,
-		value.TextMessage, value.LastInsertDate.String(), value.ReportDate.String(), value.AppType,
-		value.MonitorServer, value.ConsolidationName, value.LogType, value.ErrorType, value.LoggerName,
-		value.ApplicationName,
+		groundworkEvent.Device, groundworkEvent.Host, groundworkEvent.Service, groundworkEvent.OperationStatus,
+		groundworkEvent.MonitorStatus, groundworkEvent.Severity, groundworkEvent.ApplicationSeverity,
+		groundworkEvent.Component, groundworkEvent.SubComponent, groundworkEvent.Priority, groundworkEvent.TypeRule,
+		groundworkEvent.TextMessage, groundworkEvent.LastInsertDate.String(), groundworkEvent.ReportDate.String(),
+		groundworkEvent.AppType, groundworkEvent.MonitorServer, groundworkEvent.ConsolidationName,
+		groundworkEvent.LogType, groundworkEvent.ErrorType, groundworkEvent.LoggerName, groundworkEvent.ApplicationName,
 	)
 }
 
@@ -747,16 +724,10 @@ type MonitorConnection struct {
 	ConnectorID int                    `json:"connectorId"`
 }
 
-func (value MonitorConnection) String() string {
+func (monitorConnection MonitorConnection) String() string {
 	return fmt.Sprintf("[%d, %s, %s, %s, %t, %s, %s, %d]",
-		value.ID,
-		value.Server,
-		value.UserName,
-		value.Password,
-		value.SslEnabled,
-		value.URL,
-		value.Extensions,
-		value.ConnectorID,
+		monitorConnection.ID, monitorConnection.Server, monitorConnection.UserName, monitorConnection.Password,
+		monitorConnection.SslEnabled, monitorConnection.URL, monitorConnection.Extensions, monitorConnection.ConnectorID,
 	)
 }
 
@@ -774,13 +745,10 @@ type GroundworkEventAck struct {
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
 
-func (value GroundworkEventAck) String() string {
+func (groundworkEventAck GroundworkEventAck) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
-		value.AppType,
-		value.Host,
-		value.Service,
-		value.AcknowledgedBy,
-		value.AcknowledgeComment,
+		groundworkEventAck.AppType, groundworkEventAck.Host, groundworkEventAck.Service,
+		groundworkEventAck.AcknowledgedBy, groundworkEventAck.AcknowledgeComment,
 	)
 }
 
@@ -796,10 +764,7 @@ type GroundworkEventUnack struct {
 	Service string `json:"service,omitempty"`
 }
 
-func (value GroundworkEventUnack) String() string {
+func (groundworkEventUnack GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		value.AppType,
-		value.Host,
-		value.Service,
-	)
+		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
 }
