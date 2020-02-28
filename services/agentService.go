@@ -22,14 +22,15 @@ import (
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*config.Connector
-	agentStats  *AgentStats
-	agentStatus *AgentStatus
-	DSClient    *clients.DSClient
-	gwClients   []*clients.GWClient
-	ctrlIdx     uint8
-	ctrlChan    chan *CtrlAction
-	statsChan   chan statsCounter
-	tracerToken []byte
+	agentStats    *AgentStats
+	agentStatus   *AgentStatus
+	DSClient      *clients.DSClient
+	gwClients     []*clients.GWClient
+	ctrlIdx       uint8
+	ctrlChan      chan *CtrlAction
+	statsChan     chan statsCounter
+	tracerToken   []byte
+	ConfigHandler func([]byte)
 }
 
 // CtrlAction defines queued controll action
@@ -93,19 +94,22 @@ func GetAgentService() *AgentService {
 				Nats:       Stopped,
 				Transport:  Stopped,
 			},
-			&clients.DSClient{
-				AppName:      agentConnector.AppName,
-				DSConnection: config.GetConfig().DSConnection,
-			},
+			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
 			nil,
 			0,
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 			tracerToken,
+			nil,
 		}
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+
+		/* request configuration
+		Note: StartController has cross-dependency */
+		agentService.StartControllerAsync(nil)
+		agentService.DSClient.Reload(agentConnector.AgentID)
 	})
 	return agentService
 }
@@ -237,6 +241,7 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
+		log.Debug("#AgentService.ctrlChan: ", ctrl)
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
@@ -365,6 +370,9 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	if service.ConfigHandler != nil {
+		service.ConfigHandler(data)
+	}
 
 	reloadFlags := struct {
 		Controller bool
@@ -375,17 +383,17 @@ func (service *AgentService) config(data []byte) error {
 		service.Status().Transport == Running,
 		service.Status().Nats == Running,
 	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		_ = service.stopController()
-		_ = service.startController()
-	}
-	if reloadFlags.Nats {
-		_ = service.stopNats()
-		_ = service.startNats()
-	}
+	// TODO: Provide graceful restarts for Controller and Nats
+	// if reloadFlags.Controller {
+	// 	_ = service.stopController()
+	// 	_ = service.startController()
+	// }
+	// if reloadFlags.Nats {
+	// 	_ = service.stopNats()
+	// 	_ = service.startNats()
+	// }
 	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
+		service.stopTransport() // can be stopped with Nats
 		_ = service.startTransport()
 	}
 
@@ -394,13 +402,15 @@ func (service *AgentService) config(data []byte) error {
 
 func (service *AgentService) reload() error {
 	log.Warn("DEPRECATED RELOAD API")
-	if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
-		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
+	/*
+		if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
+			if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
+				return err
+			}
+		} else {
+			return clErr
 		}
-	} else {
-		return clErr
-	}
+	*/
 
 	reloadFlags := struct {
 		Controller bool
@@ -470,7 +480,12 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
-	cons := config.GetConfig().GWConnections
+	cons := make([]*config.GWConnection, 0)
+	for _, c := range config.GetConfig().GWConnections {
+		if c.Enabled {
+			cons = append(cons, c)
+		}
+	}
 	if len(cons) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
 	}
@@ -496,12 +511,11 @@ func (service *AgentService) stopTransport() error {
 	if service.agentStatus.Transport == Stopped {
 		return nil
 	}
-
-	err := nats.StopDispatcher()
-	if err == nil {
-		service.agentStatus.Transport = Stopped
+	if err := nats.StopDispatcher(); err != nil {
+		return err
 	}
-	return err
+	service.agentStatus.Transport = Stopped
+	return nil
 }
 
 // mixTracerContext adds `context` field if absent
