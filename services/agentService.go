@@ -383,17 +383,17 @@ func (service *AgentService) config(data []byte) error {
 		service.Status().Transport == Running,
 		service.Status().Nats == Running,
 	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		_ = service.stopController()
-		_ = service.startController()
-	}
-	if reloadFlags.Nats {
-		_ = service.stopNats()
-		_ = service.startNats()
-	}
+	// TODO: Provide graceful restarts for Controller and Nats
+	// if reloadFlags.Controller {
+	// 	_ = service.stopController()
+	// 	_ = service.startController()
+	// }
+	// if reloadFlags.Nats {
+	// 	_ = service.stopNats()
+	// 	_ = service.startNats()
+	// }
 	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
+		service.stopTransport() // can be stopped with Nats
 		_ = service.startTransport()
 	}
 
@@ -480,7 +480,12 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
-	cons := config.GetConfig().GWConnections
+	cons := make([]*config.GWConnection, 0)
+	for _, c := range config.GetConfig().GWConnections {
+		if c.Enabled {
+			cons = append(cons, c)
+		}
+	}
 	if len(cons) == 0 {
 		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
 	}
@@ -506,12 +511,11 @@ func (service *AgentService) stopTransport() error {
 	if service.agentStatus.Transport == Stopped {
 		return nil
 	}
-
-	err := nats.StopDispatcher()
-	if err == nil {
-		service.agentStatus.Transport = Stopped
+	if err := nats.StopDispatcher(); err != nil {
+		return err
 	}
-	return err
+	service.agentStatus.Transport = Stopped
+	return nil
 }
 
 // mixTracerContext adds `context` field if absent
