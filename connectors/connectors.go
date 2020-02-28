@@ -17,7 +17,7 @@ import (
 var transitService *services.TransitService
 
 // will come from extensions field
-var timer int = 120
+var Timer int = 120
 
 func Start() error {
 	transitService = services.GetTransitService()
@@ -36,7 +36,7 @@ func Start() error {
 
 func SendMetrics(resources []transit.MonitoredResource) error {
 	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(timer))
+	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
 	for i := range resources {
 		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
 		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
