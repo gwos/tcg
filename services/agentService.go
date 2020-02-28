@@ -94,10 +94,7 @@ func GetAgentService() *AgentService {
 				Nats:       Stopped,
 				Transport:  Stopped,
 			},
-			&clients.DSClient{
-				AppName:      agentConnector.AppName,
-				DSConnection: config.GetConfig().DSConnection,
-			},
+			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
 			nil,
 			0,
 			make(chan *CtrlAction, ctrlLimit),
@@ -108,6 +105,11 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+
+		/* init operations and request configuration */
+		agentService.StartNats()
+		agentService.StartController()
+		agentService.DSClient.Reload(agentConnector.AgentID)
 	})
 	return agentService
 }
@@ -399,13 +401,15 @@ func (service *AgentService) config(data []byte) error {
 
 func (service *AgentService) reload() error {
 	log.Warn("DEPRECATED RELOAD API")
-	if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
-		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
+	/*
+		if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
+			if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
+				return err
+			}
+		} else {
+			return clErr
 		}
-	} else {
-		return clErr
-	}
+	*/
 
 	reloadFlags := struct {
 		Controller bool
