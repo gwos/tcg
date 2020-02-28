@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
@@ -20,23 +21,19 @@ import (
 )
 
 const (
-	KibanaApiSavedObjectsPath = "http://localhost:5601/kibana/api/saved_objects/"
+	kibanaApiSavedObjectsPath = "http://localhost:5601/kibana/api/saved_objects/"
 )
 
 const (
-	TypePhrase  = "phrase"
-	TypePhrases = "phrases"
-	TypeRange   = "range"
-	TypeExists  = "exists"
+	typePhrase  = "phrase"
+	typePhrases = "phrases"
+	typeRange   = "range"
+	typeExists  = "exists"
 )
 
-const defaultInterval = 5
-
-func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	hosts, groups := make(map[string]Host), make(map[string][]string)
-
-	// TODO: selected queries titles and time intervals will be retrieved from stored configs, here only queries filters will be retrieved
-	storedQueries, _ := RetrieveStoredQueries(nil)
+func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup, error) {
+	// TODO: selected queries with overridden time intervals will be retrieved from configs, here we will need only their ids (titles) to retrieve filters
+	storedQueries, _ := retrieveStoredQueries(nil)
 
 	// TODO: these should come from environment variables
 	cfg := elasticsearch.Config{
@@ -45,115 +42,41 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 			// "http://localhost:9201",
 		},
 	}
-	esClient, _ := elasticsearch.NewClient(cfg)
+	esClient, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		log.Error(err)
+		if esClient == nil {
+			return nil, nil, nil, err
+		}
+	}
+	if esClient == nil {
+		log.Error("Could not create client")
+		return nil, nil, nil, fmt.Errorf("could not create client")
+	}
 
+	hosts, groups := make(map[string]hostStruct), make(map[string]map[string]struct{})
 	for _, storedQuery := range storedQueries {
-		query, queryBool, indexesSet := make(map[string]interface{}), make(map[string]interface{}), make(map[string]struct{})
-		var must, mustNot, should, filter []interface{}
+		var must, mustNot, should []interface{}
+		indexSet := make(map[string]struct{})
 
-		for _, filter := range storedQuery.Filters {
-			index, queryType, negate, key := filter["index"].(string), filter["type"].(string), filter["negate"].(bool), filter["key"].(string)
-
-			indexPattern := RetrieveIndexPattern(index)
-			indexesSet[indexPattern.Title] = struct{}{}
-
-			switch queryType {
-			case TypePhrase:
-				q := map[string]interface{}{
-					"match": map[string]interface{}{
-						key: filter["value"].(string),
-					}}
-				if !negate {
-					must = append(must, q)
-				} else {
-					mustNot = append(mustNot, q)
-				}
-				break
-			case TypePhrases:
-				params := filter["params"].([]interface{})
-				for _, param := range params {
-					param := param.(string)
-					if !negate {
-						should = append(should, map[string]interface{}{
-							"match": map[string]interface{}{
-								key: param,
-							}})
-					} else {
-						should = append(should, map[string]interface{}{
-							"bool": map[string]interface{}{
-								"must_not": map[string]interface{}{
-									"match": map[string]interface{}{
-										key: param,
-									},
-								},
-							}})
-					}
-				}
-				break
-			case TypeRange:
-				params := filter["params"].(map[string]interface{})
-				r := map[string]interface{}{
-					"range": map[string]interface{}{
-						key: params,
-					}}
-				if !negate {
-					must = append(must, r)
-				} else {
-					mustNot = append(mustNot, r)
-				}
-				break
-			case TypeExists:
-				q := map[string]interface{}{
-					"exists": map[string]interface{}{
-						"field": key,
-					}}
-				if !negate {
-					must = append(must, q)
-				} else {
-					mustNot = append(mustNot, q)
-				}
-				break
-			}
-		}
-		var gte, lt = storedQuery.TimeFilter.From, storedQuery.TimeFilter.To
-		interval := strconv.Itoa(defaultInterval) + "m"
-		if strings.Contains(gte, "$interval") {
-			gte = strings.ReplaceAll(gte, "$interval", interval)
-		}
-		if strings.Contains(lt, "$interval") {
-			lt = strings.ReplaceAll(lt, "$interval", interval)
-		}
-		filter = append(filter, map[string]interface{}{
-			"range": map[string]interface{}{
-				"@timestamp": map[string]interface{}{
-					"gte": gte,
-					"lt":  lt,
-				},
-			},
-		})
-
-		var startTime, endTime = parseTime(gte, true), parseTime(lt, false)
-		timeInterval := TimeInterval{
-			StartTime: startTime,
-			EndTime:   endTime,
+		for _, filter := range storedQuery.filters {
+			addQueryClause(filter, &must, &mustNot, &should)
+			index := filter["index"].(string)
+			indexPattern := retrieveIndexPattern(index)
+			indexSet[indexPattern] = struct{}{}
 		}
 
-		queryBool["must"], queryBool["must_not"], queryBool["should"], queryBool["filter"] = must, mustNot, should, filter
-		if should != nil {
-			queryBool["minimum_should_match"] = 1
-		}
-		query["bool"] = queryBool
-		queryBody := map[string]interface{}{
-			"query": query,
-		}
+		var from, to = storedQuery.timeFilter.from, storedQuery.timeFilter.to
+		filter := createTimeFilter(&from, &to)
+		query := createQuery(must, mustNot, should, filter)
 
 		var buf bytes.Buffer
-		if err := json.NewEncoder(&buf).Encode(queryBody); err != nil {
+		if err := json.NewEncoder(&buf).Encode(query); err != nil {
 			log.Error("Error encoding query: %s", err)
 		}
 
 		var indexes []string
-		for index := range indexesSet {
+		for index := range indexSet {
 			indexes = append(indexes, index)
 		}
 
@@ -183,10 +106,19 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 		}
 
 		responseBody, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			log.Error(err)
+		}
 		var result map[string]interface{}
 		err = json.Unmarshal(responseBody, &result)
 		if err != nil {
-			log.Error(err.Error())
+			log.Error(err)
+		}
+
+		var startTime, endTime = parseTime(from, true), parseTime(to, false)
+		timeInterval := timeIntervalStruct{
+			startTime: startTime,
+			endTime:   endTime,
 		}
 
 		hits := result["hits"].(map[string]interface{})["hits"].([]interface{})
@@ -197,36 +129,38 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 
 				hostName := container["name"].(string)
 
-				var hostGroup string
+				var groupName string
 				if container["labels"] != nil && container["labels"].(map[string]interface{})["com_docker_compose_project"] != nil {
-					hostGroup = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
+					groupName = container["labels"].(map[string]interface{})["com_docker_compose_project"].(string)
 				}
-				if hosts, exists := groups[hostGroup]; exists {
-					hosts = append(hosts, hostName)
-					groups[hostGroup] = hosts
+				if group, exists := groups[groupName]; exists {
+					group[hostName] = struct{}{}
 				} else {
-					groups[hostGroup] = []string{hostName}
+					group := make(map[string]struct{})
+					group[hostName] = struct{}{}
+					groups[groupName] = group
 				}
+				groups[groupName][hostName] = struct{}{}
 
 				if host, exists := hosts[hostName]; exists {
-					services := host.Services
+					services := host.services
 					var found = false
-					for _, service := range services {
-						if service.Name == storedQuery.Title {
-							service.Hits = service.Hits + 1
+					for i := range services {
+						if services[i].name == storedQuery.title {
+							services[i].hits = services[i].hits + 1
 							found = true
 							break
 						}
 					}
 					if !found {
-						service := Service{Name: storedQuery.Title, Hits: 1, TimeInterval: timeInterval}
+						service := serviceStruct{name: storedQuery.title, hits: 1, timeInterval: timeInterval}
 						services = append(services, service)
-						host.Services = services
+						host.services = services
 					}
 					hosts[hostName] = host
 				} else {
-					service := Service{Name: storedQuery.Title, Hits: 1, TimeInterval: timeInterval}
-					host := Host{Name: hostName, Services: []Service{service}, HostGroup: hostGroup}
+					service := serviceStruct{name: storedQuery.title, hits: 1, timeInterval: timeInterval}
+					host := hostStruct{name: hostName, services: []serviceStruct{service}, hostGroup: groupName}
 					hosts[hostName] = host
 				}
 			}
@@ -237,22 +171,22 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	irs := make([]transit.InventoryResource, len(hosts))
 	i := 0
 	for _, host := range hosts {
-		monitoredServices := make([]transit.MonitoredService, len(host.Services))
-		inventoryServices := make([]transit.InventoryService, len(host.Services))
+		monitoredServices := make([]transit.MonitoredService, len(host.services))
+		inventoryServices := make([]transit.InventoryService, len(host.services))
 
-		for i, service := range host.Services {
+		for i, service := range host.services {
 			timeInterval := &transit.TimeInterval{
-				EndTime:   milliseconds.MillisecondTimestamp{Time: service.TimeInterval.EndTime},
-				StartTime: milliseconds.MillisecondTimestamp{Time: service.TimeInterval.StartTime},
+				EndTime:   milliseconds.MillisecondTimestamp{Time: service.timeInterval.endTime},
+				StartTime: milliseconds.MillisecondTimestamp{Time: service.timeInterval.startTime},
 			}
-			metric, _ := connectors.CreateMetric("hits", service.Hits, timeInterval, transit.UnitCounter)
-			monitoredService, _ := connectors.CreateService(service.Name, host.Name, []transit.TimeSeries{*metric})
-			inventoryService := connectors.CreateInventoryService(service.Name, host.Name)
+			metric, _ := connectors.CreateMetric("hits", service.hits, timeInterval, transit.UnitCounter)
+			monitoredService, _ := connectors.CreateService(service.name, host.name, []transit.TimeSeries{*metric})
+			inventoryService := connectors.CreateInventoryService(service.name, host.name)
 			monitoredServices[i] = *monitoredService
 			inventoryServices[i] = inventoryService
 		}
-		monitoredResource, _ := connectors.CreateResource(host.Name, monitoredServices)
-		inventoryResource := connectors.CreateInventoryResource(host.Name, inventoryServices)
+		monitoredResource, _ := connectors.CreateResource(host.name, monitoredServices)
+		inventoryResource := connectors.CreateInventoryResource(host.name, inventoryServices)
 		mrs[i] = *monitoredResource
 		irs[i] = inventoryResource
 		i++
@@ -262,19 +196,23 @@ func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	j := 0
 	for group, hostsInGroup := range groups {
 		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
-		for i, host := range hostsInGroup {
+		k := 0
+		for host := range hostsInGroup {
 			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.Host)
-			monitoredResourceRefs[i] = monitoredResourceRef
+			monitoredResourceRefs[k] = monitoredResourceRef
+			k++
 		}
 		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
 		rgs[j] = resourceGroup
 		j++
 	}
 
-	return mrs, irs, rgs
+	return mrs, irs, rgs, nil
 }
 
-func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
+func retrieveStoredQueries(ids []string) ([]storedQueryStruct, int) {
+	var storedQueries []storedQueryStruct
+
 	var search string
 	if ids != nil {
 		search = "&search_fields=title&search="
@@ -286,9 +224,76 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 		}
 	}
 
-	var result = RetrieveSavedObjects("_find?type=query"+search, nil)
-	savedObjects := result["saved_objects"].([]interface{})
-	var storedQueries []StoredQuery
+	page := 0
+	perPage := 1000
+	total := 0
+	firstCall := true
+
+	for total >= page*perPage {
+		page = page + 1
+		result := retrieveSavedObjects("_find?page="+strconv.Itoa(page)+"&per_page="+strconv.Itoa(perPage)+"&type=query"+search, nil)
+		savedObjects := result["saved_objects"].([]interface{})
+		extractStoredQueries(savedObjects, &storedQueries)
+		if firstCall {
+			total = int(result["total"].(float64))
+			firstCall = false
+		}
+	}
+
+	return storedQueries, len(storedQueries)
+}
+
+func retrieveIndexPattern(id string) string {
+	var result = retrieveSavedObjects("index-pattern/"+id, nil)
+	title := result["attributes"].(map[string]interface{})["title"].(string)
+	return title
+}
+
+func retrieveSavedObjects(path string, body io.Reader) map[string]interface{} {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+
+	client := http.Client{Transport: tr}
+	var request *http.Request
+	var response *http.Response
+	var err error
+
+	request, err = http.NewRequest(http.MethodGet, kibanaApiSavedObjectsPath+path, body)
+	if err != nil {
+		log.Error("Error getting response: %s", err)
+	}
+	request.Header.Add("Content-Type", "application/json")
+	request.Header.Add("kbn-xsrf", "true")
+
+	response, err = client.Do(request)
+	if err != nil {
+		log.Error("Error getting response: %s", err)
+	}
+	if response == nil {
+		log.Error("Error getting response: response is nil")
+	}
+	if response.StatusCode == 400 {
+		log.Error("Not Found!")
+	}
+	responseBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Error("Error reading response: %s", err)
+	}
+	err = response.Body.Close()
+	if err != nil {
+		log.Error("Error processing response: %s", err)
+	}
+
+	var result map[string]interface{}
+	err = json.Unmarshal(responseBody, &result)
+	if err != nil {
+		log.Error("Error parsing response: %s", err)
+	}
+	return result
+}
+
+func extractStoredQueries(savedObjects []interface{}, storedQueries *[]storedQueryStruct) {
 	for _, so := range savedObjects {
 		savedObject := so.(map[string]interface{})
 
@@ -306,20 +311,115 @@ func RetrieveStoredQueries(ids []string) ([]StoredQuery, int) {
 			}
 			filters = append(filters, filter["meta"].(map[string]interface{}))
 		}
-		var tFilter TimeFilter
+		var tFilter timeFilterStruct
 		if savedObject["attributes"].(map[string]interface{})["timefilter"] != nil {
 			timeFilter := savedObject["attributes"].(map[string]interface{})["timefilter"].(map[string]interface{})
-			tFilter.From = timeFilter["from"].(string)
-			tFilter.To = timeFilter["to"].(string)
+			tFilter.from = timeFilter["from"].(string)
+			tFilter.to = timeFilter["to"].(string)
 		} else {
-			tFilter.From = "now-$interval"
-			tFilter.To = "now"
+			tFilter.from = "now-$interval"
+			tFilter.to = "now"
 		}
-		storedQueries = append(storedQueries, StoredQuery{id, name, description,
+		*storedQueries = append(*storedQueries, storedQueryStruct{id, name, description,
 			tFilter, filters})
 	}
+}
 
-	return storedQueries, len(storedQueries)
+func addQueryClause(filter map[string]interface{}, must *[]interface{}, mustNot *[]interface{}, should *[]interface{}) {
+	queryType, negate, key := filter["type"].(string), filter["negate"].(bool), filter["key"].(string)
+	switch queryType {
+	case typePhrase:
+		q := map[string]interface{}{
+			"match": map[string]interface{}{
+				key: filter["value"].(string),
+			}}
+		if !negate {
+			*must = append(*must, q)
+		} else {
+			*mustNot = append(*mustNot, q)
+		}
+		break
+	case typePhrases:
+		params := filter["params"].([]interface{})
+		for _, param := range params {
+			param := param.(string)
+			if !negate {
+				*should = append(*should, map[string]interface{}{
+					"match": map[string]interface{}{
+						key: param,
+					}})
+			} else {
+				*should = append(*should, map[string]interface{}{
+					"bool": map[string]interface{}{
+						"must_not": map[string]interface{}{
+							"match": map[string]interface{}{
+								key: param,
+							},
+						},
+					}})
+			}
+		}
+		break
+	case typeRange:
+		params := filter["params"].(map[string]interface{})
+		r := map[string]interface{}{
+			"range": map[string]interface{}{
+				key: params,
+			}}
+		if !negate {
+			*must = append(*must, r)
+		} else {
+			*mustNot = append(*mustNot, r)
+		}
+		break
+	case typeExists:
+		q := map[string]interface{}{
+			"exists": map[string]interface{}{
+				"field": key,
+			}}
+		if !negate {
+			*must = append(*must, q)
+		} else {
+			*mustNot = append(*mustNot, q)
+		}
+		break
+	default:
+		log.Error("Could not add query clause: unknown type '%s'", queryType)
+		break
+	}
+}
+
+func createTimeFilter(from *string, to *string) []interface{} {
+	interval := strconv.Itoa(connectors.Timer) + "s"
+	if strings.Contains(*from, "$interval") {
+		*from = strings.ReplaceAll(*from, "$interval", interval)
+	}
+	if strings.Contains(*to, "$interval") {
+		*to = strings.ReplaceAll(*to, "$interval", interval)
+	}
+	var filter []interface{}
+	filter = append(filter, map[string]interface{}{
+		"range": map[string]interface{}{
+			"@timestamp": map[string]interface{}{
+				"gte": from,
+				"lt":  to,
+			},
+		},
+	})
+	return filter
+}
+
+func createQuery(must []interface{}, mustNot []interface{}, should []interface{}, filter []interface{}) map[string]interface{} {
+	query, boolClause := make(map[string]interface{}), make(map[string]interface{})
+	boolClause["must"], boolClause["must_not"], boolClause["should"], boolClause["filter"] = must, mustNot, should, filter
+	if should != nil {
+		boolClause["minimum_should_match"] = 1
+	}
+	query["bool"] = boolClause
+	queryBody := map[string]interface{}{
+		"query": query,
+	}
+	return queryBody
 }
 
 func parseTime(timeString string, isFrom bool) time.Time {
@@ -334,6 +434,7 @@ func parseTime(timeString string, isFrom bool) time.Time {
 	return result
 }
 
+// converts relative expressions such as "now-5d" to Time
 func parseTimeExpression(timeExpression string, isFrom bool) time.Time {
 	now := time.Now()
 	if timeExpression == "now" {
@@ -347,7 +448,7 @@ func parseTimeExpression(timeExpression string, isFrom bool) time.Time {
 		rounded = true
 	}
 	interval := expression[:len(expression)-1]
-	period := expression[len(expression)-1 : len(expression)]
+	period := expression[len(expression)-1:]
 	i, err := strconv.Atoi(interval)
 	if operator == "-" {
 		i = -i
@@ -472,87 +573,32 @@ func parseTimeExpression(timeExpression string, isFrom bool) time.Time {
 	return result
 }
 
-func RetrieveIndexPattern(id string) IndexPattern {
-	var result = RetrieveSavedObjects("index-pattern/"+id, nil)
-	title := result["attributes"].(map[string]interface{})["title"].(string)
-	return IndexPattern{id, title}
+type storedQueryStruct struct {
+	id          string
+	title       string
+	description string
+	timeFilter  timeFilterStruct
+	filters     []map[string]interface{}
 }
 
-func RetrieveSavedObjects(path string, body io.Reader) map[string]interface{} {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := http.Client{Transport: tr}
-	var request *http.Request
-	var response *http.Response
-	var err error
-
-	request, err = http.NewRequest(http.MethodGet, KibanaApiSavedObjectsPath+path, body)
-	if err != nil {
-		log.Error("Error getting response: %s", err)
-	}
-	request.Header.Add("Content-Type", "application/json")
-	request.Header.Add("kbn-xsrf", "true")
-
-	response, err = client.Do(request)
-	if err != nil {
-		log.Error("Error getting response: %s", err)
-	}
-	if response == nil {
-		log.Error("Error getting response: response is nil")
-	}
-	if response.StatusCode == 400 {
-		log.Error("Not Found!")
-	}
-	responseBody, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Error("Error reading response: %s", err)
-	}
-	err = response.Body.Close()
-	if err != nil {
-		log.Error("Error processing response: %s", err)
-	}
-
-	var result map[string]interface{}
-	err = json.Unmarshal(responseBody, &result)
-	if err != nil {
-		log.Error("Error parsing response: %s", err)
-	}
-	return result
+type timeFilterStruct struct {
+	from string
+	to   string
 }
 
-type StoredQuery struct {
-	Id          string
-	Title       string
-	Description string
-	TimeFilter  TimeFilter
-	Filters     []map[string]interface{}
+type timeIntervalStruct struct {
+	startTime time.Time
+	endTime   time.Time
 }
 
-type TimeFilter struct {
-	From string
-	To   string
+type serviceStruct struct {
+	name         string
+	hits         int
+	timeInterval timeIntervalStruct
 }
 
-type IndexPattern struct {
-	Id    string
-	Title string
-}
-
-type TimeInterval struct {
-	StartTime time.Time
-	EndTime   time.Time
-}
-
-type Service struct {
-	Name         string
-	Hits         int
-	TimeInterval TimeInterval
-}
-
-type Host struct {
-	Name      string
-	Services  []Service
-	HostGroup string
+type hostStruct struct {
+	name      string
+	services  []serviceStruct
+	hostGroup string
 }
