@@ -79,7 +79,8 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
 	if controller.srv != nil {
-		return fmt.Errorf("StartController: already started")
+		log.Warn("StartController: already started")
+		return nil
 	}
 
 	var addr string

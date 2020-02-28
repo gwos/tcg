@@ -106,9 +106,9 @@ func GetAgentService() *AgentService {
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
 
-		/* init operations and request configuration */
-		agentService.StartNats()
-		agentService.StartController()
+		/* request configuration
+		Note: StartController has cross-dependency */
+		agentService.StartControllerAsync(nil)
 		agentService.DSClient.Reload(agentConnector.AgentID)
 	})
 	return agentService
@@ -241,6 +241,7 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
+		log.Debug("#AgentService.ctrlChan: ", ctrl)
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
