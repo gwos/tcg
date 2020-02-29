@@ -18,8 +18,8 @@ type DSOperations interface {
 
 // Define entrypoints for DSOperations
 const (
-	DSEntrypointReload        = "/connectors/reload/:agentID"
-	DSEntrypointValidateToken = "/validate-token"
+	DSEntrypointReload        = "/dalekservices/connectors/reload/:agentID"
+	DSEntrypointValidateToken = "/dalekservices/validate-token"
 )
 
 // DSClient implements DSOperations interface
