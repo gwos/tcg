@@ -137,7 +137,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		AppType:    service.Connector.AppType,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
-		Version:    transit.TransitModelVersion,
+		Version:    transit.ModelVersion,
 	}
 }
 
@@ -236,7 +236,7 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
-		log.Debug("#AgentService.ctrlChan: ", ctrl)
+		log.Debug("#AgentService.ctrlChan: ", string(ctrl.Data))
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
