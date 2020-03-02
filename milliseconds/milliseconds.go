@@ -97,3 +97,10 @@ func (t MillisecondTimestamp) MarshalJSON() ([]byte, error) {
 	buf = append(buf, '"')
 	return buf, nil
 }
+
+func (t MillisecondTimestamp) String() string {
+	i := t.UnixNano()/int64(time.Millisecond)
+	buf := make([]byte, 0, 16)
+	buf = strconv.AppendInt(buf, i, 10)
+	return string(buf)
+}

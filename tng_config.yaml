@@ -2,12 +2,23 @@ connector:
   agentId: "***REMOVED***"
   appName: "tng"
   appType: "VEMA"
-  controllerAddr: "0.0.0.0:8099"
+  controllerAddr: ":8099"
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
-  natsFilestoreDir: "src/main/resources/datastore"
+  natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
   natsHost: ":4222"
   logLevel: 2
 dsConnection:
-  hostName: "dalekservices:3001"
+  hostName: "localhost"
+  userName: "***REMOVED***"
+  password: "jg3gj3r=4[gjfr34=[gjr34egjr[e4gevgrfe" #change to valid one to test
+gwConnections:
+  -
+    hostName: "localhost:80"
+    userName: "RESTAPIACCESS"
+    password: "***REMOVED***"
+#  -
+#    hostName: "localhost:88"
+#    userName: "RESTAPIACCESS"
+#    password: "***REMOVED***"
