@@ -5,8 +5,8 @@ import (
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"net/http"
-	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -40,10 +40,20 @@ type GWClient struct {
 	*config.GWConnection
 	sync.Mutex
 	token string
+	sync.Once
+	uriConnect                 string
+	uriDisconnect              string
+	uriSendEvents              string
+	uriSendEventsAck           string
+	uriSendEventsUnack         string
+	uriSendResourceWithMetrics string
+	uriSynchronizeInventory    string
+	uriValidateToken           string
 }
 
 // Connect implements GWOperations.Connect.
 func (client *GWClient) Connect() error {
+	client.buildURIs()
 	prevToken := client.token
 	/* restrict by mutex for one-thread at one-time */
 	client.Lock()
@@ -58,18 +68,12 @@ func (client *GWClient) Connect() error {
 		"user":          client.GWConnection.UserName,
 		"password":      client.GWConnection.Password,
 	}
-
 	headers := map[string]string{
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   client.GWConnection.HostName,
-		Path:   GWEntrypointConnect,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
+	reqURL := client.uriConnect
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
 	if err != nil {
 		return err
 	}
@@ -84,22 +88,17 @@ func (client *GWClient) Connect() error {
 
 // Disconnect implements GWOperations.Disconnect.
 func (client *GWClient) Disconnect() error {
+	client.buildURIs()
 	formValues := map[string]string{
 		"gwos-app-name":  client.AppName,
 		"gwos-api-token": client.token,
 	}
-
 	headers := map[string]string{
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   client.GWConnection.HostName,
-		Path:   GWEntrypointDisconnect,
-	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
+	reqURL := client.uriDisconnect
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
 	if err != nil {
 		return err
 	}
@@ -112,23 +111,17 @@ func (client *GWClient) Disconnect() error {
 
 // ValidateToken implements GWOperations.ValidateToken.
 func (client *GWClient) ValidateToken(appName, apiToken string) error {
+	client.buildURIs()
 	headers := map[string]string{
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-
 	formValues := map[string]string{
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-
-	entrypoint := url.URL{
-		Scheme: "http",
-		Host:   client.GWConnection.HostName,
-		Path:   GWEntrypointValidateToken,
-	}
-
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
+	reqURL := client.uriValidateToken
+	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
 
 	if err == nil {
 		if statusCode == 200 {
@@ -146,42 +139,37 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
 func (client *GWClient) SynchronizeInventory(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSynchronizeInventory, payload)
+	return client.sendData(client.uriSynchronizeInventory, payload)
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
 func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSendResourceWithMetrics, payload)
+	return client.sendData(client.uriSendResourceWithMetrics, payload)
 }
 
 // SendEvents implements GWOperations.SendEvents.
 func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSendEvents, payload)
+	return client.sendData(client.uriSendEvents, payload)
 }
 
 // SendEventsAck implements GWOperations.SendEventsAck.
 func (client *GWClient) SendEventsAck(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSendEventsAck, payload)
+	return client.sendData(client.uriSendEventsAck, payload)
 }
 
 // SendEventsUnack implements GWOperations.SendEventsUnack.
 func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
-	return client.sendData(GWEntrypointSendEventsUnack, payload)
+	return client.sendData(client.uriSendEventsUnack, payload)
 }
 
-func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, error) {
+func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) {
+	client.buildURIs()
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	reqURL := (&url.URL{
-		Scheme: "http",
-		Host:   client.GWConnection.HostName,
-		Path:   entrypoint,
-	}).String()
-
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, nil, payload)
 	if statusCode == 401 {
 		if err := client.Connect(); err != nil {
@@ -214,4 +202,35 @@ func (client *GWClient) sendData(entrypoint string, payload []byte) ([]byte, err
 		return nil, fmt.Errorf(string(byteResponse))
 	}
 	return byteResponse, nil
+}
+
+func (client *GWClient) buildURIs() {
+	client.Once.Do(func() {
+		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
+		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
+		uriSendEvents := buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
+		uriSendEventsAck := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
+		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
+		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
+		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
+		client.Mutex.Lock()
+		client.uriConnect = uriConnect
+		client.uriDisconnect = uriDisconnect
+		client.uriSendEvents = uriSendEvents
+		client.uriSendEventsAck = uriSendEventsAck
+		client.uriSendEventsUnack = uriSendEventsUnack
+		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
+		client.uriSynchronizeInventory = uriSynchronizeInventory
+		client.uriValidateToken = uriValidateToken
+		client.Mutex.Unlock()
+	})
+}
+
+func buildURI(hostname, entrypoint string) string {
+	s := strings.TrimSuffix(strings.TrimRight(hostname, "/"), "/api")
+	if !strings.HasPrefix(s, "http") {
+		s = "https://" + s
+	}
+	return fmt.Sprintf("%s/%s", s, strings.TrimLeft(entrypoint, "/"))
 }
