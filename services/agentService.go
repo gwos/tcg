@@ -104,13 +104,19 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-
-		/* request configuration
-		Note: StartController has cross-dependency */
-		agentService.StartControllerAsync(nil)
-		agentService.DSClient.Reload(agentConnector.AgentID)
 	})
 	return agentService
+}
+
+// DemandConfig implements AgentServices.DemandConfig interface
+func (service *AgentService) DemandConfig() error {
+	if err := agentService.StartController(); err != nil {
+		return err
+	}
+	if err := agentService.DSClient.Reload(service.AgentID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
