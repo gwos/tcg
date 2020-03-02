@@ -37,9 +37,7 @@ connector:
   controllerAddr: ":8099"
   natsAckWait: 15
 dsConnection:
-  hostName: "localhost:3001"
-  userName: "RESTAPIACCESS"
-  password: ""
+  hostName: "localhost"
 gwConnections:
   -
     hostName: "localhost:80"
@@ -57,7 +55,7 @@ gwConnections:
 
 	os.Setenv(string(ConfigEnv), tmpfile.Name())
 	os.Setenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_DSCONNECTION", "{\"password\":\"SECRET\"}")
+	os.Setenv("TNG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	os.Setenv("TNG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := &Config{
@@ -73,7 +71,7 @@ gwConnections:
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
 			&GWConnection{HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
 			&GWConnection{HostName: "localhost:3001"},
@@ -97,7 +95,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
 			&GWConnection{HostName: "gw-host1"},
 			&GWConnection{HostName: "gw-host2"},
@@ -139,7 +137,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
 			&GWConnection{HostName: "gw-host-xx", UserName: "-xx-", Password: "xx"},
 		},
