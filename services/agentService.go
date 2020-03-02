@@ -367,9 +367,8 @@ func (service *AgentService) config(data []byte) error {
 		service.ConfigHandler(data)
 	}
 
-	service.stopTransport()
+	_ = service.stopTransport()
 	_ = service.startTransport()
-
 	return nil
 }
 
@@ -422,7 +421,8 @@ func (service *AgentService) startTransport() error {
 		}
 	}
 	if len(cons) == 0 {
-		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
+		log.Warn("StartTransport: empty GWConnections")
+		return nil
 	}
 	/* Process clients */
 	gwClients := make([]*clients.GWClient, len(cons))
