@@ -79,7 +79,8 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
 	if controller.srv != nil {
-		return fmt.Errorf("StartController: already started")
+		log.Warn("StartController: already started")
+		return nil
 	}
 
 	var addr string
@@ -154,6 +155,26 @@ func (controller *Controller) stopController() error {
 	log.Warn("Controller: exiting")
 	controller.srv = nil
 	return nil
+}
+
+//
+// @Description The following API endpoint can be used to Agent configure.
+// @Tags Agent
+// @Accept  json
+// @Produce  json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router /config [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) config(c *gin.Context) {
+	value, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
+	c.JSON(http.StatusOK, nil)
 }
 
 //
@@ -393,6 +414,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group := router.Group("/api/v1")
 	apiV1Group.Use(controller.validateToken)
 
+	apiV1Group.POST("/config", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
