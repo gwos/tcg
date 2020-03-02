@@ -62,14 +62,12 @@ type ConnectorStatusDTO struct {
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
 	MakeTracerContext() *transit.TracerContext
-	ReloadAsync(chan error) (*CtrlAction, error)
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)
 	StartNatsAsync(chan error) (*CtrlAction, error)
 	StopNatsAsync(chan error) (*CtrlAction, error)
 	StartTransportAsync(chan error) (*CtrlAction, error)
 	StopTransportAsync(chan error) (*CtrlAction, error)
-	Reload() error
 	StartController() error
 	StopController() error
 	StartNats() error
