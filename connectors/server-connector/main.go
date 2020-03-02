@@ -26,6 +26,17 @@ var transitService *services.TransitService
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	isConfig := false
+	transitService.ConfigHandler = func(data []byte) {
+		log.Debug("#ConfigHandler: ", string(data))
+		isConfig = true
+	}
+	for {
+		if isConfig {
+			break
+		}
+	}
+
 	connectors.ControlCHandler()
 	transitService = services.GetTransitService()
 	err := transitService.StartNats()
