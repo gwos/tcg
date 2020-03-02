@@ -1,12 +1,9 @@
-basePath: /api/v1
 definitions:
   milliseconds.MillisecondTimestamp:
     type: object
   services.AgentStats:
     properties:
       agentID:
-        description: The json blocks ensure the json response keys are  // specified
-          and lowercase
         type: string
       appType:
         type: string
@@ -19,8 +16,10 @@ definitions:
       lastAlertRun:
         $ref: '#/definitions/milliseconds.MillisecondTimestamp'
         type: object
-      lastError:
-        type: string
+      lastErrors:
+        items:
+          type: string
+        type: array
       lastInventoryRun:
         $ref: '#/definitions/milliseconds.MillisecondTimestamp'
         type: object
@@ -54,13 +53,37 @@ definitions:
       jobId:
         type: integer
     type: object
-host: localhost:8099
 info:
   contact: {}
   license: {}
-  title: TNG API Documentation
-  version: "1.0"
 paths:
+  /config:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to Agent configure.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - agent
+      - connector
   /events:
     post:
       consumes:
@@ -86,7 +109,62 @@ paths:
           schema:
             type: string
       tags:
-      - Alerts
+      - alert
+      - event
+  /events-ack:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Alerts to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - alert
+      - event
+  /events-unack:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Alerts to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200": {}
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - alert
+      - event
   /metrics:
     get:
       consumes:
@@ -120,33 +198,7 @@ paths:
           schema:
             type: string
       tags:
-      - Metrics
-  /reload:
-    post:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to reload the configuration.
-      parameters:
-      - description: Auth header
-        in: header
-        name: GWOS-APP-NAME
-        required: true
-        type: string
-      - description: Auth header
-        in: header
-        name: GWOS-API-TOKEN
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200": {}
-        "401":
-          description: Unauthorized
-          schema:
-            type: string
-      tags:
-      - Server
+      - metric
   /start:
     post:
       consumes:
@@ -179,7 +231,8 @@ paths:
           schema:
             type: string
       tags:
-      - Server
+      - agent
+      - connector
   /stats:
     get:
       consumes:
@@ -208,7 +261,8 @@ paths:
           schema:
             type: string
       tags:
-      - Agent
+      - agent
+      - connector
   /status:
     get:
       consumes:
@@ -237,7 +291,8 @@ paths:
           schema:
             type: string
       tags:
-      - Server
+      - agent
+      - connector
   /stop:
     post:
       consumes:
@@ -270,5 +325,6 @@ paths:
           schema:
             type: string
       tags:
-      - Server
+      - agent
+      - connector
 swagger: "2.0"
