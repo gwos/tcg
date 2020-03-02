@@ -257,7 +257,7 @@ func getDiskUsedService(timerSeconds time.Duration) *transit.MonitoredService {
 	}
 	value := transit.TypedValue{
 		ValueType:    transit.IntegerType,
-		IntegerValue: int64(diskStats.Used), // / MB),
+		IntegerValue: int64(diskStats.Used / MB),
 	}
 	warningValue := transit.TypedValue{ValueType: transit.IntegerType, IntegerValue: DiskUsedWarningValue}
 	criticalValue := transit.TypedValue{ValueType: transit.IntegerType, IntegerValue: DiskUsedCriticalValue}
@@ -564,32 +564,73 @@ type localProcess struct {
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
 func collectProcesses(monitoredProcesses []string) map[string]float64 {
+	hostProcesses, _ := process.Processes()
 
-	// return make(map[string]float64)
+	processes := make([]*localProcess, 0)
+	for _, hostProcess := range hostProcesses {
+		cpuUsed, err := hostProcess.CPUPercent()
+		if err != nil {
+			log.Error(err)
+		}
 
-	systemProcesses, _ := process.Processes()
-	processMap := make(map[string]float64)
-	for _, name := range monitoredProcesses {
-		processMap[name] = 0
+		name, err := hostProcess.Name()
+		if err != nil {
+			log.Error(err)
+		}
+
+		processes = append(processes, &localProcess{name, cpuUsed})
 	}
 
-	// processes := make([]*localProcess, 0)
-	for _, proc := range systemProcesses {
-		cpuUsed, err := proc.CPUPercent()
-		if err != nil {
-			log.Error("Skipping unknown proc: ", err)
-			continue
-		}
-		name, err := proc.Name()
-		if err != nil {
-			log.Error("Process not found ", err, "Process Name: " + name)
-			continue
-		}
-		_, exists := processMap[name]
+	m := make(map[string]float64)
+	for _, p := range processes {
+		_, exists := m[p.name]
 		if exists {
-			processMap[name] = cpuUsed
+			m[p.name] = m[p.name] + p.cpu
+		} else {
+			m[p.name] = p.cpu
 		}
 	}
-	return processMap
+
+	processesMap := make(map[string]float64)
+	for _, processName := range monitoredProcesses {
+		_, exists := m[processName]
+		if exists {
+			processesMap[processName] = m[processName]
+		} else {
+			processesMap[processName] = -1
+		}
+	}
+
+	return processesMap
 }
+
+//func collectProcesses(monitoredProcesses []string) map[string]float64 {
+//
+//	// return make(map[string]float64)
+//
+//	systemProcesses, _ := process.Processes()
+//	processMap := make(map[string]float64)
+//	for _, name := range monitoredProcesses {
+//		processMap[name] = 0
+//	}
+//
+//	// processes := make([]*localProcess, 0)
+//	for _, proc := range systemProcesses {
+//		cpuUsed, err := proc.CPUPercent()
+//		if err != nil {
+//			log.Error("Skipping unknown proc: ", err)
+//			continue
+//		}
+//		name, err := proc.Name()
+//		if err != nil {
+//			log.Error("Process not found ", err, "Process Name: " + name)
+//			continue
+//		}
+//		_, exists := processMap[name]
+//		if exists {
+//			processMap[name] = cpuUsed
+//		}
+//	}
+//	return processMap
+//}
 

@@ -12,7 +12,7 @@ connector:
 dsConnection:
   hostName: "localhost"
   userName: "***REMOVED***"
-  password: "***REMOVED***" #change to valid one to test
+  password: "jg3gj3r=4[gjfr34=[gjr34egjr[e4gevgrfe" #change to valid one to test
 gwConnections:
   -
     hostName: "localhost:80"

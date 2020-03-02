@@ -8,7 +8,6 @@ import (
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
-	"os/exec"
 	"time"
 )
 
@@ -20,78 +19,57 @@ const (
 
 var transitService = services.GetTransitService()
 
+var isConfig = false
+
 // @title TNG API Documentation
 // @version 1.0
 
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	isConfig := false
+	timer := DefaultTimer
+	processes := []string{"watchdogd", "Terminal", "WiFiAgent"}
+	var groups []transit.ResourceGroup
+
 	transitService.ConfigHandler = func(data []byte) {
-		log.Debug("#ConfigHandler: ", string(data))
-		isConfig = true
+		if p, g, t, err := initializeConfig(data); err == nil {
+			processes = p
+			groups = g
+			timer = t
+			isConfig = true
+		} else {
+			return
+		}
 	}
+
+	if err := transitService.DemandConfig(); err != nil {
+		log.Error(err)
+		return
+	}
+
 	for {
 		if isConfig {
 			break
 		}
 	}
 
+	if err := connectors.Start(); err != nil {
+		log.Error(err)
+		return
+	}
 	connectors.ControlCHandler()
-	err := transitService.StartNats()
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	err = transitService.StartTransport()
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	err = transitService.StartController()
-	if err != nil {
-		log.Error(err.Error())
-		return
-	}
-	defer func() {
-		err = transitService.StopNats()
-		if err != nil {
-			log.Error(err.Error())
-		}
-		err = transitService.StopTransport()
-		if err != nil {
-			log.Error(err.Error())
-		}
-		cmd := exec.Command("rm", "-rf", "src")
-		_, err = cmd.Output()
-		if err != nil {
-			log.Error(err.Error())
-		}
-		err = transitService.StopController()
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}()
 
-	//_, groups, timer, err := getConfig()
-	//if err != nil {
-	//	log.Error(err)
-	//	return
-	//}
-	timer := 120
-	groups := []transit.ResourceGroup{}
-	processes := []string{"watchdogd", "Terminal", "WiFiAgent"}
 	for {
 		if transitService.Status().Transport != services.Stopped {
 			log.Info("TNG ServerConnector: sending inventory ...")
-			err = sendInventoryResources(*Synchronize(processes), groups)
+			_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(processes)}, groups)
 		} else {
 			log.Info("TNG ServerConnector is stopped ...")
 		}
 		for i := 0; i < 10; i++ {
 			if transitService.Status().Transport != services.Stopped {
 				log.Info("TNG ServerConnector: monitoring resources ...")
-				err := sendMonitoredResources(*CollectMetrics(processes, time.Duration(timer)))
+				err := connectors.SendMetrics([]transit.MonitoredResource{*CollectMetrics(processes, time.Duration(timer))})
 				if err != nil {
 					log.Error(err.Error())
 				}
@@ -102,79 +80,36 @@ func main() {
 	}
 }
 
-func sendInventoryResources(resource transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
+func initializeConfig(data []byte) ([]string, []transit.ResourceGroup, int, error) {
+	var connector = struct {
+		Connection transit.MonitorConnection `json:"monitorConnection"`
+	}{}
 
-	monitoredResourceRef := transit.MonitoredResourceRef{
-		Name: resource.Name,
-		Type: transit.Host,
-	}
-
-	for i := range resourceGroups {
-		resourceGroups[i].Resources = append(resourceGroups[i].Resources, monitoredResourceRef)
-	}
-
-	inventoryRequest := transit.InventoryRequest{
-		Context:   transitService.MakeTracerContext(),
-		Resources: []transit.InventoryResource{resource},
-		Groups:    resourceGroups,
-	}
-
-	b, err := json.Marshal(inventoryRequest)
+	err := json.Unmarshal(data, &connector)
 	if err != nil {
-		return err
+		return []string{}, []transit.ResourceGroup{}, -1, err
+	}
+	timer := float64(DefaultTimer)
+	if _, present := connector.Connection.Extensions["timer"]; present {
+		timer = connector.Connection.Extensions["timer"].(float64)
+	}
+	var processes []string
+	if _, present := connector.Connection.Extensions["processes"]; present {
+		processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+		for _, process := range processesInterface {
+			processes = append(processes, process.(string))
+		}
+	}
+	var groups []transit.ResourceGroup
+	if _, present := connector.Connection.Extensions["groups"]; present {
+		groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
+		for _, gr := range groupsInterface {
+			groupMap := gr.(map[string]interface{})
+			groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+		}
+	} else {
+		groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
 	}
 
-	err = transitService.SynchronizeInventory(b)
-
-	return err
+	return processes, groups, int(timer), nil
 }
-
-func sendMonitoredResources(resource transit.MonitoredResource) error {
-	request := transit.ResourcesWithServicesRequest{
-		Context:   transitService.MakeTracerContext(),
-		Resources: []transit.MonitoredResource{resource},
-	}
-	b, err := json.Marshal(request)
-	if err != nil {
-		return err
-	}
-	return transitService.SendResourceWithMetrics(b)
-}
-
-//func getConfig() ([]string, []transit.ResourceGroup, int, error) {
-//	if res, clErr := transitService.DSClient.FetchConnector(transitService.AgentID); clErr == nil {
-//		var connector = struct {
-//			Connection transit.MonitorConnection `json:"monitorConnection"`
-//		}{}
-//		err := json.Unmarshal(res, &connector)
-//		if err != nil {
-//			return []string{}, []transit.ResourceGroup{}, -1, err
-//		}
-//		timer := float64(DefaultTimer)
-//		if _, present := connector.Connection.Extensions["timer"]; present {
-//			timer = connector.Connection.Extensions["timer"].(float64)
-//		}
-//		var processes []string
-//		if _, present := connector.Connection.Extensions["processes"]; present {
-//			processesInterface := connector.Connection.Extensions["processes"].([]interface{})
-//			for _, process := range processesInterface {
-//				processes = append(processes, process.(string))
-//			}
-//		}
-//		var groups []transit.ResourceGroup
-//		if _, present := connector.Connection.Extensions["groups"]; present {
-//			groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
-//			for _, gr := range groupsInterface {
-//				groupMap := gr.(map[string]interface{})
-//				groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
-//			}
-//		} else {
-//			groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
-//		}
-//
-//		return processes, groups, int(timer), nil
-//	} else {
-//		return []string{}, []transit.ResourceGroup{}, -1, clErr
-//	}
-//}
-

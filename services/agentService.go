@@ -236,7 +236,7 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
-		log.Debug("#AgentService.ctrlChan: ", ctrl)
+		log.Debug("#AgentService.ctrlChan: ", string(ctrl.Data))
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
