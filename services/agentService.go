@@ -51,7 +51,6 @@ type ctrlSubj string
 
 const (
 	ctrlSubjConfig          ctrlSubj = "config"
-	ctrlSubjReload                   = "reload"
 	ctrlSubjStartController          = "startController"
 	ctrlSubjStopController           = "stopController"
 	ctrlSubjStartNats                = "startNats"
@@ -105,13 +104,19 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-
-		/* request configuration
-		Note: StartController has cross-dependency */
-		agentService.StartControllerAsync(nil)
-		agentService.DSClient.Reload(agentConnector.AgentID)
 	})
 	return agentService
+}
+
+// DemandConfig implements AgentServices.DemandConfig interface
+func (service *AgentService) DemandConfig() error {
+	if err := agentService.StartController(); err != nil {
+		return err
+	}
+	if err := agentService.DSClient.Reload(service.AgentID); err != nil {
+		return err
+	}
+	return nil
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
@@ -134,11 +139,6 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
-}
-
-// ReloadAsync implements AgentServices.ReloadAsync interface
-func (service *AgentService) ReloadAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjReload, syncChan)
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -169,11 +169,6 @@ func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlActi
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
-}
-
-// Reload implements AgentServices.Reload interface
-func (service *AgentService) Reload() error {
-	return service.ctrlPushSync(nil, ctrlSubjReload)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -247,8 +242,6 @@ func (service *AgentService) listenCtrlChan() {
 		switch ctrl.Subj {
 		case ctrlSubjConfig:
 			err = service.config(ctrl.Data)
-		case ctrlSubjReload:
-			err = service.reload()
 		case ctrlSubjStartController:
 			err = service.startController()
 		case ctrlSubjStopController:
@@ -374,66 +367,8 @@ func (service *AgentService) config(data []byte) error {
 		service.ConfigHandler(data)
 	}
 
-	reloadFlags := struct {
-		Controller bool
-		Transport  bool
-		Nats       bool
-	}{
-		service.Status().Controller == Running,
-		service.Status().Transport == Running,
-		service.Status().Nats == Running,
-	}
-	// TODO: Provide graceful restarts for Controller and Nats
-	// if reloadFlags.Controller {
-	// 	_ = service.stopController()
-	// 	_ = service.startController()
-	// }
-	// if reloadFlags.Nats {
-	// 	_ = service.stopNats()
-	// 	_ = service.startNats()
-	// }
-	if reloadFlags.Transport {
-		service.stopTransport() // can be stopped with Nats
-		_ = service.startTransport()
-	}
-
-	return nil
-}
-
-func (service *AgentService) reload() error {
-	log.Warn("DEPRECATED RELOAD API")
-	/*
-		if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
-			if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-				return err
-			}
-		} else {
-			return clErr
-		}
-	*/
-
-	reloadFlags := struct {
-		Controller bool
-		Transport  bool
-		Nats       bool
-	}{
-		service.Status().Controller == Running,
-		service.Status().Transport == Running,
-		service.Status().Nats == Running,
-	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		_ = service.stopController()
-		_ = service.startController()
-	}
-	if reloadFlags.Nats {
-		_ = service.stopNats()
-		_ = service.startNats()
-	}
-	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
-		_ = service.startTransport()
-	}
+	service.stopTransport()
+	_ = service.startTransport()
 
 	return nil
 }
