@@ -17,14 +17,11 @@ import (
 var transitService *services.TransitService
 
 // will come from extensions field
-var timer int = 120
+var timer = 120
 
 func Start() error {
 	transitService = services.GetTransitService()
 
-	if err := transitService.StartController(); err != nil {
-		return err
-	}
 	if err := transitService.StartNats(); err != nil {
 		return err
 	}
@@ -39,12 +36,15 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   transitService.MakeTracerContext(),
 		Resources: resources,
 	}
-	for _, resource := range request.Resources {
-		resource.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		resource.NextCheckTime = milliseconds.MillisecondTimestamp{Time: resource.LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+	for i, _ := range request.Resources {
+		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
 	}
 
 	b, err := json.Marshal(request)
+
+	// log.Error(string(b))
+
 	if err != nil {
 		return err
 	}
@@ -52,9 +52,35 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 }
 
-func SendInventory(resource []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
-	// TODO: implement from ServerConnector
-	return nil
+func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
+	var monitoredResourceRefs []transit.MonitoredResourceRef
+	for _, resource := range resources {
+		monitoredResourceRefs = append(monitoredResourceRefs,
+			transit.MonitoredResourceRef{
+				Name: resource.Name,
+				Type: transit.Host,
+			},
+		)
+	}
+
+	for i := range resourceGroups {
+		resourceGroups[i].Resources = monitoredResourceRefs
+	}
+
+	inventoryRequest := transit.InventoryRequest{
+		Context:   transitService.MakeTracerContext(),
+		Resources: resources,
+		Groups:    resourceGroups,
+	}
+
+	b, err := json.Marshal(inventoryRequest)
+	if err != nil {
+		return err
+	}
+
+	err = transitService.SynchronizeInventory(b)
+
+	return err
 }
 
 // Inventory Constructors
