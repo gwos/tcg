@@ -18,7 +18,7 @@ const (
 	DefaultTimer         = 120
 )
 
-var transitService *services.TransitService
+var transitService = services.GetTransitService()
 
 // @title TNG API Documentation
 // @version 1.0
@@ -38,7 +38,6 @@ func main() {
 	}
 
 	connectors.ControlCHandler()
-	transitService = services.GetTransitService()
 	err := transitService.StartNats()
 	if err != nil {
 		log.Error(err.Error())
@@ -74,11 +73,13 @@ func main() {
 		}
 	}()
 
-	_, groups, timer, err := getConfig()
-	if err != nil {
-		log.Error(err)
-		return
-	}
+	//_, groups, timer, err := getConfig()
+	//if err != nil {
+	//	log.Error(err)
+	//	return
+	//}
+	timer := 120
+	groups := []transit.ResourceGroup{}
 	processes := []string{"watchdogd", "Terminal", "WiFiAgent"}
 	for {
 		if transitService.Status().Transport != services.Stopped {
@@ -140,40 +141,40 @@ func sendMonitoredResources(resource transit.MonitoredResource) error {
 	return transitService.SendResourceWithMetrics(b)
 }
 
-func getConfig() ([]string, []transit.ResourceGroup, int, error) {
-	if res, clErr := transitService.DSClient.FetchConnector(transitService.AgentID); clErr == nil {
-		var connector = struct {
-			Connection transit.MonitorConnection `json:"monitorConnection"`
-		}{}
-		err := json.Unmarshal(res, &connector)
-		if err != nil {
-			return []string{}, []transit.ResourceGroup{}, -1, err
-		}
-		timer := float64(DefaultTimer)
-		if _, present := connector.Connection.Extensions["timer"]; present {
-			timer = connector.Connection.Extensions["timer"].(float64)
-		}
-		var processes []string
-		if _, present := connector.Connection.Extensions["processes"]; present {
-			processesInterface := connector.Connection.Extensions["processes"].([]interface{})
-			for _, process := range processesInterface {
-				processes = append(processes, process.(string))
-			}
-		}
-		var groups []transit.ResourceGroup
-		if _, present := connector.Connection.Extensions["groups"]; present {
-			groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
-			for _, gr := range groupsInterface {
-				groupMap := gr.(map[string]interface{})
-				groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
-			}
-		} else {
-			groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
-		}
-
-		return processes, groups, int(timer), nil
-	} else {
-		return []string{}, []transit.ResourceGroup{}, -1, clErr
-	}
-}
+//func getConfig() ([]string, []transit.ResourceGroup, int, error) {
+//	if res, clErr := transitService.DSClient.FetchConnector(transitService.AgentID); clErr == nil {
+//		var connector = struct {
+//			Connection transit.MonitorConnection `json:"monitorConnection"`
+//		}{}
+//		err := json.Unmarshal(res, &connector)
+//		if err != nil {
+//			return []string{}, []transit.ResourceGroup{}, -1, err
+//		}
+//		timer := float64(DefaultTimer)
+//		if _, present := connector.Connection.Extensions["timer"]; present {
+//			timer = connector.Connection.Extensions["timer"].(float64)
+//		}
+//		var processes []string
+//		if _, present := connector.Connection.Extensions["processes"]; present {
+//			processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+//			for _, process := range processesInterface {
+//				processes = append(processes, process.(string))
+//			}
+//		}
+//		var groups []transit.ResourceGroup
+//		if _, present := connector.Connection.Extensions["groups"]; present {
+//			groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
+//			for _, gr := range groupsInterface {
+//				groupMap := gr.(map[string]interface{})
+//				groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+//			}
+//		} else {
+//			groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
+//		}
+//
+//		return processes, groups, int(timer), nil
+//	} else {
+//		return []string{}, []transit.ResourceGroup{}, -1, clErr
+//	}
+//}
 
