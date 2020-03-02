@@ -173,8 +173,6 @@ type DSConnection struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
 	HostName string `yaml:"hostName"`
-	UserName string `yaml:"userName"`
-	Password string `yaml:"password"`
 }
 
 // Decode implements envconfig.Decoder interface
@@ -186,12 +184,6 @@ func (con *DSConnection) Decode(value string) error {
 	}
 	if overrides.HostName != "" {
 		con.HostName = overrides.HostName
-	}
-	if overrides.UserName != "" {
-		con.UserName = overrides.UserName
-	}
-	if overrides.Password != "" {
-		con.Password = overrides.Password
 	}
 	return nil
 }

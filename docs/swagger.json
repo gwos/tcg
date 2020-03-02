@@ -1,14 +1,50 @@
 {
     "swagger": "2.0",
     "info": {
-        "title": "TNG API Documentation",
         "contact": {},
-        "license": {},
-        "version": "1.0"
+        "license": {}
     },
-    "host": "localhost:8099",
-    "basePath": "/api/v1",
     "paths": {
+        "/config": {
+            "post": {
+                "description": "The following API endpoint can be used to Agent configure.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "agent",
+                    "connector"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/events": {
             "post": {
                 "description": "The following API endpoint can be used to send Alerts to Foundation.",
@@ -19,7 +55,88 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Alerts"
+                    "alert",
+                    "event"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/events-ack": {
+            "post": {
+                "description": "The following API endpoint can be used to send Alerts to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "alert",
+                    "event"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {},
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/events-unack": {
+            "post": {
+                "description": "The following API endpoint can be used to send Alerts to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "alert",
+                    "event"
                 ],
                 "parameters": [
                     {
@@ -58,7 +175,7 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Metrics"
+                    "metric"
                 ],
                 "parameters": [
                     {
@@ -98,45 +215,6 @@
                 }
             }
         },
-        "/reload": {
-            "post": {
-                "description": "The following API endpoint can be used to reload the configuration.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Server"
-                ],
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-APP-NAME",
-                        "in": "header",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Auth header",
-                        "name": "GWOS-API-TOKEN",
-                        "in": "header",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {},
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "/start": {
             "post": {
                 "description": "The following API endpoint can be used to start NATS dispatcher.",
@@ -147,7 +225,8 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Server"
+                    "agent",
+                    "connector"
                 ],
                 "parameters": [
                     {
@@ -197,7 +276,8 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Agent"
+                    "agent",
+                    "connector"
                 ],
                 "parameters": [
                     {
@@ -241,7 +321,8 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Server"
+                    "agent",
+                    "connector"
                 ],
                 "parameters": [
                     {
@@ -285,7 +366,8 @@
                     "application/json"
                 ],
                 "tags": [
-                    "Server"
+                    "agent",
+                    "connector"
                 ],
                 "parameters": [
                     {
@@ -334,7 +416,6 @@
             "type": "object",
             "properties": {
                 "agentID": {
-                    "description": "The json blocks ensure the json response keys are  // specified and lowercase",
                     "type": "string"
                 },
                 "appType": {
@@ -353,8 +434,11 @@
                     "type": "object",
                     "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 },
-                "lastError": {
-                    "type": "string"
+                "lastErrors": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "lastInventoryRun": {
                     "type": "object",
