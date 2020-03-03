@@ -139,31 +139,35 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
 func (client *GWClient) SynchronizeInventory(payload []byte) ([]byte, error) {
+	client.buildURIs()
 	return client.sendData(client.uriSynchronizeInventory, payload)
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
 func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error) {
+	client.buildURIs()
 	return client.sendData(client.uriSendResourceWithMetrics, payload)
 }
 
 // SendEvents implements GWOperations.SendEvents.
 func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
+	client.buildURIs()
 	return client.sendData(client.uriSendEvents, payload)
 }
 
 // SendEventsAck implements GWOperations.SendEventsAck.
 func (client *GWClient) SendEventsAck(payload []byte) ([]byte, error) {
+	client.buildURIs()
 	return client.sendData(client.uriSendEventsAck, payload)
 }
 
 // SendEventsUnack implements GWOperations.SendEventsUnack.
 func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
+	client.buildURIs()
 	return client.sendData(client.uriSendEventsUnack, payload)
 }
 
 func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) {
-	client.buildURIs()
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",

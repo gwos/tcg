@@ -51,6 +51,7 @@ func main() {
 		if isConfig {
 			break
 		}
+		time.Sleep(time.Duration(5) * time.Second)
 	}
 
 	if err := connectors.Start(); err != nil {
