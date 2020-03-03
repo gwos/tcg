@@ -2,17 +2,20 @@ package services
 
 import (
 	"github.com/gwos/tng/config"
+	"github.com/gwos/tng/log"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func init() {
+	log.Error("HEAREEEE")
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
 	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
 			HostName: "test",
 			UserName: "test",
 			Password: "test",
+			Enabled: true,
 		},
 	}
 }
