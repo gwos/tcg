@@ -85,9 +85,12 @@ func (client *DSClient) Reload(agentID string) error {
 	})
 	logEntryLevel := log.InfoLevel
 	defer func() {
-		logEntry.Log(logEntryLevel, "DSClient: ReloadConnector")
+		logEntry.Log(logEntryLevel, "DSClient: Reload")
 	}()
 
+	if statusCode == 404 {
+		logEntry.WithField("Hint", "Check AgentAI")
+	}
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
 		return err
