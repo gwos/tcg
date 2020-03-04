@@ -104,13 +104,15 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-	})
 
-	log.Debug("[AgentService Config]: ", "AgentID: ", agentService.AgentID, "; ",
-		"AppType: ", agentService.AppType, "; ",
-		"AppName: ", agentService.AppName, "; ",
-		"ControllerAddr: ", agentService.ControllerAddr, "; ",
-		"DsClient: ", agentService.DSClient.HostName)
+		log.With(log.Fields{
+			"AgentID":        agentService.AgentID,
+			"AppType":        agentService.AppType,
+			"AppName":        agentService.AppName,
+			"ControllerAddr": agentService.ControllerAddr,
+			"DsClient":       agentService.DSClient.HostName,
+		}).Log(log.DebugLevel, "#AgentService Config")
+	})
 
 	return agentService
 }
@@ -243,7 +245,11 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
-		log.Debug("#AgentService.ctrlChan: ", string(ctrl.Data))
+		log.With(log.Fields{
+			"Idx":  ctrl.Idx,
+			"Subj": ctrl.Subj,
+			"Data": string(ctrl.Data),
+		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
