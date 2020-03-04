@@ -105,6 +105,13 @@ func GetAgentService() *AgentService {
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
 	})
+
+	log.Debug("[AgentService Config]: ", "AgentID: ", agentService.AgentID, "; ",
+		"AppType: ", agentService.AppType, "; ",
+		"AppName: ", agentService.AppName, "; ",
+		"ControllerAddr: ", agentService.ControllerAddr, "; ",
+		"DsClient: ", agentService.DSClient.HostName)
+
 	return agentService
 }
 

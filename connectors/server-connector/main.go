@@ -47,7 +47,9 @@ func main() {
 		return
 	}
 
+	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	<-chanel
+	log.Info("[Server Connector]: Configuration received")
 
 	if err := connectors.Start(); err != nil {
 		log.Error(err)

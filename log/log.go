@@ -9,11 +9,14 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync"
 	"time"
 )
 
 // Fields Type to pass when we want to call WithFields for structured logging
 type Fields map[string]interface{}
+
+var once sync.Once
 
 // Levels to pass when we want call Log on WithFields
 const (
@@ -63,7 +66,9 @@ func Config(filePath string, level int) {
 
 	ch.cache.OnEvicted(fnOnEvicted(ch.writer))
 	logger.SetOutput(ioutil.Discard)
-	logger.AddHook(&ch)
+	once.Do(func() {
+		logger.AddHook(&ch)
+	})
 
 	logger.SetFormatter(&nested.Formatter{
 		TimestampFormat: timestampFormat,
