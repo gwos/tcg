@@ -78,6 +78,19 @@ func (client *GWClient) Connect() error {
 		return err
 	}
 
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: connect")
+	}()
+
 	if statusCode == 200 {
 		client.token = string(byteResponse)
 		return nil
@@ -99,6 +112,20 @@ func (client *GWClient) Disconnect() error {
 	}
 	reqURL := client.uriDisconnect
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: disconnect")
+	}()
+
 	if err != nil {
 		return err
 	}
@@ -122,6 +149,19 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	}
 	reqURL := client.uriValidateToken
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: validate token")
+	}()
 
 	if err == nil {
 		if statusCode == 200 {
