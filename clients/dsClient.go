@@ -47,6 +47,19 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
 
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  entrypoint.String(),
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
+	}()
+
 	if err == nil {
 		if statusCode == 201 {
 			b, _ := strconv.ParseBool(string(byteResponse))

@@ -55,13 +55,13 @@ type GWClient struct {
 }
 
 type AuthPayload struct {
-	Name string           `json:"name"`
-	Password string		  `json:"password"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
 }
 
 type UserResponse struct {
-	Name string           `json:"name"`
-	AccessToken string 		`json:accessToken`
+	Name        string `json:"name"`
+	AccessToken string `json:accessToken`
 }
 
 // Connect implements GWOperations.Connect.
@@ -77,7 +77,7 @@ func (client *GWClient) Connect() error {
 	}
 
 	// TODO: find a better way to determine if local or remote connection than this:
-	if (client.GWConnection.HostName == GWLocalEntryPointConstant) {
+	if client.GWConnection.HostName == GWLocalEntryPointConstant {
 		formValues := map[string]string{
 			"gwos-app-name": client.AppName,
 			"user":          client.GWConnection.UserName,
@@ -89,13 +89,28 @@ func (client *GWClient) Connect() error {
 		}
 		reqURL := client.uriConnect
 		statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
-		log.Info("*** reqURL1: ", reqURL, statusCode, string(byteResponse), err)
+		logEntry := log.With(log.Fields{
+			"error":      err,
+			"response":   string(byteResponse),
+			"statusCode": statusCode,
+		}).WithDebug(log.Fields{
+			"headers":   headers,
+			"reqURL 01": reqURL,
+		})
+		logEntryLevel := log.InfoLevel
+		defer func() {
+			logEntry.Log(logEntryLevel, "GWClient: connect")
+		}()
+
 		if err != nil {
+			logEntryLevel = log.ErrorLevel
 			return err
 		}
 		if statusCode == 200 {
 			client.token = string(byteResponse)
-			log.Info("*** token " + client.token)
+			logEntry.WithDebug(log.Fields{
+				"token": client.token,
+			})
 			return nil
 		}
 		return fmt.Errorf(string(byteResponse))
@@ -106,14 +121,28 @@ func (client *GWClient) Connect() error {
 		}
 		authBytes, err := json.Marshal(authPayload)
 		headers := map[string]string{
-			"Accept":         "application/json",
-			"Content-Type":   "application/json",
-			"GWOS-APP-NAME":  client.AppName,
+			"Accept":        "application/json",
+			"Content-Type":  "application/json",
+			"GWOS-APP-NAME": client.AppName,
 		}
 		reqURL := client.uriConnect
 		statusCode, byteResponse, err := SendRequest(http.MethodPut, reqURL, headers, nil, authBytes)
 		log.Info("*** reqURL2: ", reqURL, statusCode, string(byteResponse), err)
+		logEntry := log.With(log.Fields{
+			"error":      err,
+			"response":   string(byteResponse),
+			"statusCode": statusCode,
+		}).WithDebug(log.Fields{
+			"headers":   headers,
+			"reqURL 01": reqURL,
+		})
+		logEntryLevel := log.InfoLevel
+		defer func() {
+			logEntry.Log(logEntryLevel, "GWClient: connect")
+		}()
+
 		if err != nil {
+			logEntryLevel = log.ErrorLevel
 			return err
 		}
 		user := UserResponse{AccessToken: ""}
@@ -121,13 +150,17 @@ func (client *GWClient) Connect() error {
 		if statusCode == 200 {
 			// client.token = string(byteResponse)
 			error2 := json.Unmarshal(byteResponse, &user)
-			if (error2 == nil) {
+			if error2 == nil {
 				client.token = user.AccessToken
-				log.Info("*** unmarshalled user = ", user)
+				logEntry.WithDebug(log.Fields{
+					"user": user,
+				})
 				return nil
 			}
 		}
-		log.Info("*** error code: ", error2)
+		logEntry.WithInfo(log.Fields{
+			"errorCode": error2,
+		})
 		return fmt.Errorf(string(error2))
 	}
 }
@@ -145,6 +178,20 @@ func (client *GWClient) Disconnect() error {
 	}
 	reqURL := client.uriDisconnect
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: disconnect")
+	}()
+
 	if err != nil {
 		return err
 	}
@@ -168,6 +215,19 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	}
 	reqURL := client.uriValidateToken
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
+
+	logEntry := log.With(log.Fields{
+		"error":      err,
+		"response":   string(byteResponse),
+		"statusCode": statusCode,
+	}).WithDebug(log.Fields{
+		"headers": headers,
+		"reqURL":  reqURL,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "GWClient: validate token")
+	}()
 
 	if err == nil {
 		if statusCode == 200 {
@@ -259,7 +319,7 @@ func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
 		// TODO: find a better way to determine if local or remote connection than this:
-		if (client.GWConnection.HostName != GWLocalEntryPointConstant) {
+		if client.GWConnection.HostName != GWLocalEntryPointConstant {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)

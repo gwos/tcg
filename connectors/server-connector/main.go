@@ -19,14 +19,14 @@ const (
 
 var transitService = services.GetTransitService()
 
-var isConfig = false
-
 // @title TNG API Documentation
 // @version 1.0
 
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	chanel := make(chan bool)
+
 	timer := DefaultTimer
 	processes := []string{"watchdogd", "Terminal", "WiFiAgent"}
 	var groups []transit.ResourceGroup
@@ -36,7 +36,7 @@ func main() {
 			processes = p
 			groups = g
 			timer = t
-			isConfig = true
+			chanel <- true
 		} else {
 			return
 		}
@@ -47,12 +47,9 @@ func main() {
 		return
 	}
 
-	for {
-		if isConfig {
-			break
-		}
-		time.Sleep(time.Duration(5) * time.Second)
-	}
+	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
+	<-chanel
+	log.Info("[Server Connector]: Configuration received")
 
 	if err := connectors.Start(); err != nil {
 		log.Error(err)
