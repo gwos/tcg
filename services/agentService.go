@@ -122,9 +122,15 @@ func (service *AgentService) DemandConfig() error {
 	if err := agentService.StartController(); err != nil {
 		return err
 	}
-	if err := agentService.DSClient.Reload(service.AgentID); err != nil {
-		return err
+	for {
+		if err := agentService.DSClient.Reload(service.AgentID); err != nil {
+			log.Error("[Demand Config] Config Server is not available ...")
+			time.Sleep(time.Duration(20) * time.Second)
+			continue
+		}
+		break
 	}
+	log.Info("[Demand Config] Config Server found and connected.")
 	return nil
 }
 
