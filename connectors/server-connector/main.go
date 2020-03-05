@@ -17,18 +17,18 @@ const (
 	DefaultTimer         = 120
 )
 
-var transitService = services.GetTransitService()
-
 // @title TNG API Documentation
 // @version 1.0
 
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	var transitService = services.GetTransitService()
+
 	chanel := make(chan bool)
 
 	timer := DefaultTimer
-	processes := []string{"watchdogd", "Terminal", "WiFiAgent"}
+	var processes []string
 	var groups []transit.ResourceGroup
 
 	transitService.ConfigHandler = func(data []byte) {
