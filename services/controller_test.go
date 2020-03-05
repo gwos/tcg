@@ -16,6 +16,7 @@ func init() {
 			HostName: "test",
 			UserName: "test",
 			Password: "test",
+			Enabled: true,
 		},
 	}
 }

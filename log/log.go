@@ -9,11 +9,14 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"sync"
 	"time"
 )
 
 // Fields Type to pass when we want to call WithFields for structured logging
 type Fields map[string]interface{}
+
+var once sync.Once
 
 // Levels to pass when we want call Log on WithFields
 const (
@@ -49,21 +52,23 @@ func Error(args ...interface{}) {
 
 // Config configures logger
 func Config(filePath string, level int) {
-	ch := ckHook{
-		cache.New(10*time.Minute, 10*time.Second),
-		os.Stdout,
-	}
-
-	if len(filePath) > 0 {
-		if logFile, err := os.OpenFile(filePath,
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			ch.writer = io.MultiWriter(os.Stdout, logFile)
+	once.Do(func() {
+		ch := ckHook{
+			cache.New(10*time.Minute, 10*time.Second),
+			os.Stdout,
 		}
-	}
 
-	ch.cache.OnEvicted(fnOnEvicted(ch.writer))
-	logger.SetOutput(ioutil.Discard)
-	logger.AddHook(&ch)
+		if len(filePath) > 0 {
+			if logFile, err := os.OpenFile(filePath,
+				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				ch.writer = io.MultiWriter(os.Stdout, logFile)
+			}
+		}
+
+		ch.cache.OnEvicted(fnOnEvicted(ch.writer))
+		logger.SetOutput(ioutil.Discard)
+		logger.AddHook(&ch)
+	})
 
 	logger.SetFormatter(&nested.Formatter{
 		TimestampFormat: timestampFormat,

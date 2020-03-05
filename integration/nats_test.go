@@ -180,6 +180,7 @@ func configNats(t *testing.T, natsAckWait int64) {
 			HostName: GWValidHost,
 			UserName: GWAccount,
 			Password: GWPassword,
+			Enabled: true,
 		},
 	}
 
