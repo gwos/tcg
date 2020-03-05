@@ -603,34 +603,3 @@ func collectProcesses(monitoredProcesses []string) map[string]float64 {
 
 	return processesMap
 }
-
-//func collectProcesses(monitoredProcesses []string) map[string]float64 {
-//
-//	// return make(map[string]float64)
-//
-//	systemProcesses, _ := process.Processes()
-//	processMap := make(map[string]float64)
-//	for _, name := range monitoredProcesses {
-//		processMap[name] = 0
-//	}
-//
-//	// processes := make([]*localProcess, 0)
-//	for _, proc := range systemProcesses {
-//		cpuUsed, err := proc.CPUPercent()
-//		if err != nil {
-//			log.Error("Skipping unknown proc: ", err)
-//			continue
-//		}
-//		name, err := proc.Name()
-//		if err != nil {
-//			log.Error("Process not found ", err, "Process Name: " + name)
-//			continue
-//		}
-//		_, exists := processMap[name]
-//		if exists {
-//			processMap[name] = cpuUsed
-//		}
-//	}
-//	return processMap
-//}
-
