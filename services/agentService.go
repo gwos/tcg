@@ -458,6 +458,7 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
+	log.Info("[StartTransport]: Started")
 	return nil
 }
 
@@ -469,6 +470,7 @@ func (service *AgentService) stopTransport() error {
 		return err
 	}
 	service.agentStatus.Transport = Stopped
+	log.Info("[StopTransport]: Stopped")
 	return nil
 }
 
