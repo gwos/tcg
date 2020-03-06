@@ -91,11 +91,11 @@ func (client *GWClient) Connect() error {
 		statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
 		logEntry := log.With(log.Fields{
 			"error":      err,
-			"response":   string(byteResponse),
 			"statusCode": statusCode,
 		}).WithDebug(log.Fields{
-			"headers":   headers,
-			"reqURL 01": reqURL,
+			"response":   string(byteResponse),
+			"headers": headers,
+			"reqURL":  reqURL,
 		})
 		logEntryLevel := log.InfoLevel
 		defer func() {
@@ -181,9 +181,9 @@ func (client *GWClient) Disconnect() error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
@@ -218,9 +218,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
@@ -292,9 +292,9 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"payload": string(payload),
 		"reqURL":  reqURL,

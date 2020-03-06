@@ -49,9 +49,9 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  entrypoint.String(),
 	})
@@ -90,9 +90,9 @@ func (client *DSClient) Reload(agentID string) error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
