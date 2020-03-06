@@ -104,19 +104,15 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-	})
 
-	logEntry := log.With(log.Fields{}).WithDebug(log.Fields{
-		"agentID":        agentService.AgentID,
-		"appType":        agentService.AppType,
-		"appName":        agentService.AppName,
-		"controllerAddr": agentService.ControllerAddr,
-		"dsClient":       agentService.DSClient.HostName,
+		log.With(log.Fields{
+			"AgentID":        agentService.AgentID,
+			"AppType":        agentService.AppType,
+			"AppName":        agentService.AppName,
+			"ControllerAddr": agentService.ControllerAddr,
+			"DsClient":       agentService.DSClient.HostName,
+		}).Log(log.DebugLevel, "#AgentService Config")
 	})
-	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "AgentService: getAgentService")
-	}()
 
 	return agentService
 }
@@ -126,9 +122,15 @@ func (service *AgentService) DemandConfig() error {
 	if err := agentService.StartController(); err != nil {
 		return err
 	}
-	if err := agentService.DSClient.Reload(service.AgentID); err != nil {
-		return err
+	for {
+		if err := agentService.DSClient.Reload(service.AgentID); err != nil {
+			log.Error("[Demand Config] Config Server is not available ...")
+			time.Sleep(time.Duration(20) * time.Second)
+			continue
+		}
+		break
 	}
+	log.Info("[Demand Config] Config Server found and connected.")
 	return nil
 }
 
@@ -249,7 +251,11 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
-		log.Debug("#AgentService.ctrlChan: ", string(ctrl.Data))
+		log.With(log.Fields{
+			"Idx":  ctrl.Idx,
+			"Subj": ctrl.Subj,
+			"Data": string(ctrl.Data),
+		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
