@@ -80,9 +80,9 @@ func (client *GWClient) Connect() error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
@@ -115,9 +115,9 @@ func (client *GWClient) Disconnect() error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
@@ -152,9 +152,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"reqURL":  reqURL,
 	})
@@ -225,9 +225,9 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
-		"response":   string(byteResponse),
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
+		"response":   string(byteResponse),
 		"headers": headers,
 		"payload": string(payload),
 		"reqURL":  reqURL,

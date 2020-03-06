@@ -106,11 +106,17 @@ func GetAgentService() *AgentService {
 		go agentService.listenStatsChan()
 	})
 
-	log.Debug("[AgentService Config]: ", "AgentID: ", agentService.AgentID, "; ",
-		"AppType: ", agentService.AppType, "; ",
-		"AppName: ", agentService.AppName, "; ",
-		"ControllerAddr: ", agentService.ControllerAddr, "; ",
-		"DsClient: ", agentService.DSClient.HostName)
+	logEntry := log.With(log.Fields{}).WithDebug(log.Fields{
+		"agentID":        agentService.AgentID,
+		"appType":        agentService.AppType,
+		"appName":        agentService.AppName,
+		"controllerAddr": agentService.ControllerAddr,
+		"dsClient":       agentService.DSClient.HostName,
+	})
+	logEntryLevel := log.InfoLevel
+	defer func() {
+		logEntry.Log(logEntryLevel, "AgentService: getAgentService")
+	}()
 
 	return agentService
 }
@@ -446,6 +452,7 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
+	log.Info("[StartTransport]: Started")
 	return nil
 }
 
@@ -457,6 +464,7 @@ func (service *AgentService) stopTransport() error {
 		return err
 	}
 	service.agentStatus.Transport = Stopped
+	log.Info("[StopTransport]: Stopped")
 	return nil
 }
 

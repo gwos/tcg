@@ -8,6 +8,6 @@ connector:
   natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
   natsHost: ":4222"
-  logLevel: 2
+  logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
   hostName: "dalekservices:3001"
