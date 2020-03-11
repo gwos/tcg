@@ -82,6 +82,13 @@ gwConnections:
 }
 
 func TestLoadConnectorDTO(t *testing.T) {
+	tmpfile, err := ioutil.TempFile("", "config")
+	assert.NoError(t, err)
+	err = tmpfile.Close()
+	assert.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+	os.Setenv(string(ConfigEnv), tmpfile.Name())
+
 	expected := &Config{
 		Connector: &Connector{
 			AgentID:          "11112222-3333-4444-a3b0-b14622f7dd39",
@@ -114,6 +121,9 @@ func TestLoadConnectorDTO(t *testing.T) {
   "appType": "test-XX",
   "logLevel": 2,
   "tngUrl": "http://tng-host:9980/",
+  "dalekservicesConnection": {
+    "hostName": "gw-host-xxx"
+  },
   "groundworkConnections": [{
     "hostName": "gw-host-xx",
     "userName": "-xx-",
@@ -121,7 +131,7 @@ func TestLoadConnectorDTO(t *testing.T) {
   }]
 }`)
 
-	_, err := cfg.LoadConnectorDTO(dto)
+	_, err = cfg.LoadConnectorDTO(dto)
 	assert.NoError(t, err)
 
 	expected = &Config{
@@ -137,7 +147,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001"},
+		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
 			&GWConnection{HostName: "gw-host-xx", UserName: "-xx-", Password: "xx"},
 		},
@@ -146,4 +156,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 	checkExpected(t, expected)
 	// ss, err := json.Marshal(GetConfig())
 	// t.Logf("%v", ss)
+
+	data, err := ioutil.ReadFile(tmpfile.Name())
+	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
 }
