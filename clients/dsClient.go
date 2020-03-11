@@ -29,6 +29,11 @@ type DSClient struct {
 
 // ValidateToken implements DSOperations.ValidateToken.
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
+	if len(client.HostName) == 0 {
+		log.Warn("DSClient: Omit ValidateToken on demand config")
+		return nil
+	}
+
 	headers := map[string]string{
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
