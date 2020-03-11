@@ -119,18 +119,23 @@ func GetAgentService() *AgentService {
 
 // DemandConfig implements AgentServices.DemandConfig interface
 func (service *AgentService) DemandConfig() error {
-	if err := agentService.StartController(); err != nil {
+	if err := service.StartController(); err != nil {
 		return err
 	}
-	for {
-		if err := agentService.DSClient.Reload(service.AgentID); err != nil {
-			log.Error("[Demand Config] Config Server is not available ...")
-			time.Sleep(time.Duration(20) * time.Second)
-			continue
+	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+		log.Info("#DemandConfig Config Server is not configured")
+	} else {
+		for {
+			if err := service.DSClient.Reload(service.AgentID); err != nil {
+				log.With(log.Fields{"error": err}).
+					Log(log.ErrorLevel, "#DemandConfig Config Server is not available")
+				time.Sleep(time.Duration(20) * time.Second)
+				continue
+			}
+			break
 		}
-		break
+		log.Info("#DemandConfig Config Server found and connected")
 	}
-	log.Info("[Demand Config] Config Server found and connected.")
 	return nil
 }
 
@@ -386,8 +391,13 @@ func (service *AgentService) config(data []byte) error {
 		service.ConfigHandler(data)
 	}
 
+	service.agentStats.AgentID = service.Connector.AgentID
+	service.agentStats.AppType = service.Connector.AppType
+
 	_ = service.stopTransport()
-	_ = service.startTransport()
+	if service.Connector.Enabled {
+		_ = service.startTransport()
+	}
 	return nil
 }
 
@@ -475,6 +485,7 @@ func (service *AgentService) stopTransport() error {
 }
 
 // mixTracerContext adds `context` field if absent
+// TODO: support demand config
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
 	if !bytes.Contains(payloadJSON, []byte("\"context\":")) ||
 		!bytes.Contains(payloadJSON, []byte("\"traceToken\":")) {
