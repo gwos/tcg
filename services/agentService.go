@@ -62,6 +62,8 @@ const (
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
 const statsLastErrorsLim = 10
+const traceOnDemandAgentID = "#traceOnDemandAgentID#"
+const traceOnDemandAppType = "#traceOnDemandAppType#"
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -152,9 +154,19 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	}
 	traceToken, _ := uuid.FormatUUID(tokenBuf)
 
+	/* use placeholders on demand config, then replace on fixTracerContext */
+	agentID := service.Connector.AgentID
+	appType := service.Connector.AppType
+	if len(agentID) == 0 {
+		agentID = traceOnDemandAgentID
+	}
+	if len(appType) == 0 {
+		appType = traceOnDemandAppType
+	}
+
 	return &transit.TracerContext{
-		AgentID:    service.Connector.AgentID,
-		AppType:    service.Connector.AppType,
+		AgentID:    agentID,
+		AppType:    appType,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
@@ -341,7 +353,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSendResourceWithMetrics,
 				func(b []byte) error {
-					_, err := gwClientRef.SendResourcesWithMetrics(b)
+					_, err := gwClientRef.SendResourcesWithMetrics(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -349,7 +361,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSynchronizeInventory,
 				func(b []byte) error {
-					_, err := gwClientRef.SynchronizeInventory(b)
+					_, err := gwClientRef.SynchronizeInventory(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -485,7 +497,6 @@ func (service *AgentService) stopTransport() error {
 }
 
 // mixTracerContext adds `context` field if absent
-// TODO: support demand config
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
 	if !bytes.Contains(payloadJSON, []byte("\"context\":")) ||
 		!bytes.Contains(payloadJSON, []byte("\"traceToken\":")) {
@@ -502,4 +513,17 @@ func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error
 		return buf.Bytes(), nil
 	}
 	return payloadJSON, nil
+}
+
+// fixTracerContext replaces placeholders
+func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
+	return bytes.ReplaceAll(
+		bytes.ReplaceAll(
+			payloadJSON,
+			[]byte(traceOnDemandAppType),
+			[]byte(service.Connector.AppType),
+		),
+		[]byte(traceOnDemandAgentID),
+		[]byte(service.Connector.AgentID),
+	)
 }
