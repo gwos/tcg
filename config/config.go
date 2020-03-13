@@ -210,7 +210,7 @@ func GetConfig() *Config {
 				NatsMaxInflight:  math.MaxInt32,
 				NatsFilestoreDir: "natsstore",
 				NatsStoreType:    "FILE",
-				NatsHost:         ":4222",
+				NatsHost:         "127.0.0.1:4222",
 			},
 			DSConnection: &DSConnection{},
 		}
