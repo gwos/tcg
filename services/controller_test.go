@@ -13,10 +13,11 @@ func init() {
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
 	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
-			HostName: "test",
-			UserName: "test",
-			Password: "test",
-			Enabled: true,
+			Enabled:         true,
+			LocalConnection: false,
+			HostName:        "test",
+			UserName:        "test",
+			Password:        "test",
 		},
 	}
 }

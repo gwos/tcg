@@ -7,7 +7,7 @@ connector:
   natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
-  natsHost: ":4222"
+  natsHost: "127.0.0.1:4222"
   logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
   hostName: "dalekservices:3001"
