@@ -62,6 +62,8 @@ const (
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
 const statsLastErrorsLim = 10
+const traceOnDemandAgentID = "#traceOnDemandAgentID#"
+const traceOnDemandAppType = "#traceOnDemandAppType#"
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -119,18 +121,23 @@ func GetAgentService() *AgentService {
 
 // DemandConfig implements AgentServices.DemandConfig interface
 func (service *AgentService) DemandConfig() error {
-	if err := agentService.StartController(); err != nil {
+	if err := service.StartController(); err != nil {
 		return err
 	}
-	for {
-		if err := agentService.DSClient.Reload(service.AgentID); err != nil {
-			log.Error("[Demand Config] Config Server is not available ...")
-			time.Sleep(time.Duration(20) * time.Second)
-			continue
+	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+		log.Info("#DemandConfig Config Server is not configured")
+	} else {
+		for {
+			if err := service.DSClient.Reload(service.AgentID); err != nil {
+				log.With(log.Fields{"error": err}).
+					Log(log.ErrorLevel, "#DemandConfig Config Server is not available")
+				time.Sleep(time.Duration(20) * time.Second)
+				continue
+			}
+			break
 		}
-		break
+		log.Info("#DemandConfig Config Server found and connected")
 	}
-	log.Info("[Demand Config] Config Server found and connected.")
 	return nil
 }
 
@@ -147,9 +154,19 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	}
 	traceToken, _ := uuid.FormatUUID(tokenBuf)
 
+	/* use placeholders on demand config, then replace on fixTracerContext */
+	agentID := service.Connector.AgentID
+	appType := service.Connector.AppType
+	if len(agentID) == 0 {
+		agentID = traceOnDemandAgentID
+	}
+	if len(appType) == 0 {
+		appType = traceOnDemandAppType
+	}
+
 	return &transit.TracerContext{
-		AgentID:    service.Connector.AgentID,
-		AppType:    service.Connector.AppType,
+		AgentID:    agentID,
+		AppType:    appType,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
@@ -336,7 +353,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSendResourceWithMetrics,
 				func(b []byte) error {
-					_, err := gwClientRef.SendResourcesWithMetrics(b)
+					_, err := gwClientRef.SendResourcesWithMetrics(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -344,7 +361,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSynchronizeInventory,
 				func(b []byte) error {
-					_, err := gwClientRef.SynchronizeInventory(b)
+					_, err := gwClientRef.SynchronizeInventory(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -386,8 +403,13 @@ func (service *AgentService) config(data []byte) error {
 		service.ConfigHandler(data)
 	}
 
+	service.agentStats.AgentID = service.Connector.AgentID
+	service.agentStats.AppType = service.Connector.AppType
+
 	_ = service.stopTransport()
-	_ = service.startTransport()
+	if service.Connector.Enabled {
+		_ = service.startTransport()
+	}
 	return nil
 }
 
@@ -491,4 +513,17 @@ func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error
 		return buf.Bytes(), nil
 	}
 	return payloadJSON, nil
+}
+
+// fixTracerContext replaces placeholders
+func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
+	return bytes.ReplaceAll(
+		bytes.ReplaceAll(
+			payloadJSON,
+			[]byte(traceOnDemandAppType),
+			[]byte(service.Connector.AppType),
+		),
+		[]byte(traceOnDemandAgentID),
+		[]byte(service.Connector.AgentID),
+	)
 }
