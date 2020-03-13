@@ -287,14 +287,6 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 		"GWOS-API-TOKEN": client.token,
 	}
 	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, nil, payload)
-	log.Info("*** sendData: ", reqURL, client.token, statusCode, err)
-	if statusCode == 401 {
-		if err := client.Connect(); err != nil {
-			return nil, err
-		}
-		headers["GWOS-API-TOKEN"] = client.token
-		statusCode, byteResponse, err = SendRequest(http.MethodPost, reqURL, headers, nil, payload)
-	}
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
@@ -306,6 +298,30 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
+
+	if statusCode == 401 {
+		logEntry.Log(logEntryLevel, "GWClient: sendData: reconnect")
+
+		if err := client.Connect(); err != nil {
+			log.With(log.Fields{"error": err}).
+				Log(log.ErrorLevel, "GWClient: reconnect error")
+			return nil, err
+		}
+
+		headers["GWOS-API-TOKEN"] = client.token
+		statusCode, byteResponse, err = SendRequest(http.MethodPost, reqURL, headers, nil, payload)
+
+		logEntry = log.With(log.Fields{
+			"error":      err,
+			"statusCode": statusCode,
+		}).WithDebug(log.Fields{
+			"response": string(byteResponse),
+			"headers":  headers,
+			"payload":  string(payload),
+			"reqURL":   reqURL,
+		})
+	}
+
 	defer func() {
 		logEntry.Log(logEntryLevel, "GWClient: sendData")
 	}()
