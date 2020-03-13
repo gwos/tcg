@@ -6,6 +6,7 @@ import (
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
+	"io/ioutil"
 	"math"
 	"net/url"
 	"os"
@@ -76,6 +77,7 @@ type Connector struct {
 	// LogFile accepts file path to log in addition to stdout
 	LogFile  string   `yaml:"logFile"`
 	LogLevel LogLevel `yaml:"logLevel"`
+	Enabled  bool     `yaml:"enabled"`
 }
 
 // ConnectorDTO defines TNG Connector configuration
@@ -85,8 +87,9 @@ type ConnectorDTO struct {
 	AppType       string        `json:"appType"`
 	TngURL        string        `json:"tngUrl"`
 	LogLevel      LogLevel      `json:"logLevel"`
+	Enabled       bool          `json:"enabled"`
+	DSConnection  DSConnection  `json:"dalekservicesConnection"`
 	GWConnections GWConnections `json:"groundworkConnections"`
-	// GWConnections []GWConnection `json:"groundworkConnections"`
 	// TODO: extend LoadConnectorDTO to handle more fields
 	// MonitorConnection MonitorConnectionDto
 	// MetricsProfile    MetricsProfileDto
@@ -217,20 +220,20 @@ func GetConfig() *Config {
 			wd, err := os.Getwd()
 			if err != nil {
 				log.Warn(err)
+				wd = ""
 			}
 			configPath = path.Join(wd, ConfigName)
 		}
 
-		configFile, err := os.Open(configPath)
-		if err == nil {
-			err = yaml.NewDecoder(configFile).Decode(cfg)
-			if err != nil {
+		if data, err := ioutil.ReadFile(configPath); err != nil {
+			log.Warn(err)
+		} else {
+			if err := yaml.Unmarshal(data, cfg); err != nil {
 				log.Warn(err)
 			}
 		}
 
-		err = envconfig.Process(EnvConfigPrefix, cfg)
-		if err != nil {
+		if err := envconfig.Process(EnvConfigPrefix, cfg); err != nil {
 			log.Warn(err)
 		}
 
@@ -263,8 +266,30 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
 	cfg.Connector.LogLevel = dto.LogLevel
+	cfg.Connector.Enabled = dto.Enabled
 	cfg.GWConnections = dto.GWConnections
+	if len(dto.DSConnection.HostName) != 0 {
+		cfg.DSConnection.HostName = dto.DSConnection.HostName
+	}
 
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+
+	if output, err := yaml.Marshal(cfg); err != nil {
+		log.Warn(err)
+	} else {
+		configPath := os.Getenv(string(ConfigEnv))
+		if configPath == "" {
+			wd, err := os.Getwd()
+			if err != nil {
+				log.Warn(err)
+				wd = ""
+			}
+			configPath = path.Join(wd, ConfigName)
+		}
+		if err := ioutil.WriteFile(configPath, output, 0644); err != nil {
+			log.Warn(err)
+		}
+	}
+
 	return &dto, nil
 }
