@@ -11,4 +11,4 @@ connector:
   natsHost: ":4222"
   logLevel: 2
 dsConnection:
-  hostName: "dalekservices:3001"
+  hostName: ""
