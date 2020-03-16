@@ -12,10 +12,11 @@ func init() {
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
 	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
-			Enabled:  true,
-			HostName: "test",
-			UserName: "test",
-			Password: "test",
+			Enabled:         true,
+			LocalConnection: false,
+			HostName:        "test",
+			UserName:        "test",
+			Password:        "test",
 		},
 	}
 }
@@ -57,7 +58,8 @@ func TestAgentService_DemandConfig(t *testing.T) {
     "hostName": "gw-host-xxx"
   },
   "groundworkConnections": [{
-    "enabled": true,
+	"enabled": true,
+	"localConnection": false,
     "hostName": "gw-host-xx",
     "userName": "-xx-",
     "password": "xx"

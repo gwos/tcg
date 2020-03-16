@@ -40,6 +40,8 @@ dsConnection:
   hostName: "localhost"
 gwConnections:
   -
+    enabled: true
+    localConnection: false
     hostName: "localhost:80"
     userName: "RESTAPIACCESS"
     password: ""
@@ -69,11 +71,11 @@ gwConnections:
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
+			NatsHost:         "127.0.0.1:4222",
 		},
 		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
-			&GWConnection{HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
+			&GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
 			&GWConnection{HostName: "localhost:3001"},
 		},
 	}
@@ -125,6 +127,8 @@ func TestLoadConnectorDTO(t *testing.T) {
     "hostName": "gw-host-xxx"
   },
   "groundworkConnections": [{
+	"enabled": true,
+	"localConnection": false,
     "hostName": "gw-host-xx",
     "userName": "-xx-",
     "password": "xx"
@@ -149,7 +153,13 @@ func TestLoadConnectorDTO(t *testing.T) {
 		},
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
-			&GWConnection{HostName: "gw-host-xx", UserName: "-xx-", Password: "xx"},
+			&GWConnection{
+				Enabled:         true,
+				LocalConnection: false,
+				HostName:        "gw-host-xx",
+				UserName:        "-xx-",
+				Password:        "xx",
+			},
 		},
 	}
 
