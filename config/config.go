@@ -130,13 +130,13 @@ func (con *GWConnection) Decode(value string) error {
 		con.Password = overrides.Password
 	}
 	if overrides.DisplayName != "" {
-		con.Password = overrides.DisplayName
+		con.DisplayName = overrides.DisplayName
 	}
 	if overrides.DeferOwnership != "" {
-		con.Password = overrides.DeferOwnership
+		con.DeferOwnership = overrides.DeferOwnership
 	}
 	if overrides.ResourceNamePrefix != "" {
-		con.Password = overrides.ResourceNamePrefix
+		con.ResourceNamePrefix = overrides.ResourceNamePrefix
 	}
 	return nil
 }
