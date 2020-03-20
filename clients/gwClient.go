@@ -77,7 +77,7 @@ func (client *GWClient) Connect() error {
 		return nil
 	}
 
-	if client.GWConnection.LocalConnection {
+	if client.GWConnection.LocalConnection && !client.GWConnection.IsChild {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
