@@ -30,12 +30,14 @@ func main() {
 	timer := DefaultTimer
 	var processes []string
 	var groups []transit.ResourceGroup
+	var metricsProfile transit.MetricsProfile
 
 	transitService.ConfigHandler = func(data []byte) {
-		if p, g, t, err := initializeConfig(data); err == nil {
+		if p, g, t, m, err := initializeConfig(data); err == nil {
 			processes = p
 			groups = g
 			timer = t
+			metricsProfile = m
 			chanel <- true
 		} else {
 			return
@@ -78,29 +80,32 @@ func main() {
 	}
 }
 
-func initializeConfig(data []byte) ([]string, []transit.ResourceGroup, int, error) {
-	var connector = struct {
-		Connection transit.MonitorConnection `json:"monitorConnection"`
+func initializeConfig(data []byte) ([]string, []transit.ResourceGroup, int, transit.MetricsProfile, error) {
+	var config = struct {
+		Connector struct {
+			MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
+			MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
+		} `json:"connector"`
 	}{}
 
-	err := json.Unmarshal(data, &connector)
+	err := json.Unmarshal(data, &config)
 	if err != nil {
-		return []string{}, []transit.ResourceGroup{}, -1, err
+		return []string{}, []transit.ResourceGroup{}, -1, transit.MetricsProfile{}, err
 	}
 	timer := float64(DefaultTimer)
-	if _, present := connector.Connection.Extensions["timer"]; present {
-		timer = connector.Connection.Extensions["timer"].(float64)
+	if _, present := config.Connector.MonitorConnection.Extensions["timer"]; present {
+		timer = config.Connector.MonitorConnection.Extensions["timer"].(float64)
 	}
 	var processes []string
-	if _, present := connector.Connection.Extensions["processes"]; present {
-		processesInterface := connector.Connection.Extensions["processes"].([]interface{})
+	if _, present := config.Connector.MonitorConnection.Extensions["processes"]; present {
+		processesInterface := config.Connector.MonitorConnection.Extensions["processes"].([]interface{})
 		for _, process := range processesInterface {
 			processes = append(processes, process.(string))
 		}
 	}
 	var groups []transit.ResourceGroup
-	if _, present := connector.Connection.Extensions["groups"]; present {
-		groupsInterface := connector.Connection.Extensions["groups"].([]interface{})
+	if _, present := config.Connector.MonitorConnection.Extensions["groups"]; present {
+		groupsInterface := config.Connector.MonitorConnection.Extensions["groups"].([]interface{})
 		for _, gr := range groupsInterface {
 			groupMap := gr.(map[string]interface{})
 			groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
@@ -109,5 +114,5 @@ func initializeConfig(data []byte) ([]string, []transit.ResourceGroup, int, erro
 		groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
 	}
 
-	return processes, groups, int(timer), nil
+	return processes, groups, int(timer), config.Connector.MetricsProfile, nil
 }

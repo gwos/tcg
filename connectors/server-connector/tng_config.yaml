@@ -1,14 +1,18 @@
-# this is configuration for a connector in Provisioning Waiting state, note the empty agentId
 connector:
-  agentId: ""
-  appName: "tng-server"
-  appType: "SERVER"
-  controllerAddr: "0.0.0.0:8099"
-  natsAckWait: 30
-  natsMaxInflight: 2147483647 # math.MaxInt32
-  natsFilestoreDir: "nats/datastore"
-  natsStoreType: "FILE"
-  natsHost: ":4222"
-  logLevel: 2
+    agentId: ""
+    appName: ""
+    appType: ""
+    controllerAddr: 0.0.0.0:8099
+    controllerCertFile: ""
+    controllerKeyFile: ""
+    natsAckWait: 30
+    natsMaxInflight: 2147483647
+    natsFilestoreDir: nats/datastore
+    natsStoreType: FILE
+    natsHost: :4222
+    logFile: ""
+    logLevel: 0
+    enabled: false
 dsConnection:
-  hostName: ""
+    hostName: ""
+gwConnections: []
