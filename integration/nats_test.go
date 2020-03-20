@@ -207,7 +207,7 @@ func cleanNats(t *testing.T) {
 	cmd := exec.Command("rm", "-rf", TestTngAgentConfigNatsFileStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
-	cache.NatsCache.Flush()
+	cache.DispatcherDoneCache.Flush()
 	log.Info("#cleanNats status: ", services.GetTransitService().Status())
 }
 

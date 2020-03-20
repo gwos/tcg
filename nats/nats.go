@@ -123,26 +123,27 @@ func StartDispatcher(options []DispatcherOption) error {
 		_, err = connDispatcher.Subscribe(
 			o.Subject,
 			func(msg *stan.Msg) {
-				_, isPresent := cache.NatsCache.Get(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10))
-				if !isPresent {
-					if err := dispatcherFn(msg.Data); err != nil {
-						log.With(log.Fields{
-							"nats.durableID": durableID,
-							"nats.subject": msg.Subject,
-						}).WithDebug(log.Fields{
-							"error": err,
-							"message": msg,
-						}).Log(log.InfoLevel, "NATS: Not delivered")
-					} else {
-						_ = msg.Ack()
-						_ = cache.NatsCache.Add(msg.Subject + "-" + strconv.FormatUint(msg.Sequence, 10), 0, 10*time.Minute)
-						log.With(log.Fields{
-							"nats.durableID": durableID,
-							"nats.subject": msg.Subject,
-						}).WithDebug(log.Fields{
-							"message": msg,
-						}).Log(log.InfoLevel, "NATS: Delivered")
-					}
+				if _, isDone := cache.DispatcherDoneCache.Get(fmt.Sprintf("%s-%d", msg.Subject, msg.Sequence)); isDone {
+					return
+				}
+
+				if err := dispatcherFn(msg.Data); err != nil {
+					log.With(log.Fields{
+						"nats.durableID": durableID,
+						"nats.subject":   msg.Subject,
+					}).WithDebug(log.Fields{
+						"error":   err,
+						"message": msg,
+					}).Log(log.InfoLevel, "NATS: Not delivered")
+				} else {
+					_ = msg.Ack()
+					_ = cache.DispatcherDoneCache.Add(fmt.Sprintf("%s-%d", msg.Subject, msg.Sequence), 0, 10*time.Minute)
+					log.With(log.Fields{
+						"nats.durableID": durableID,
+						"nats.subject":   msg.Subject,
+					}).WithDebug(log.Fields{
+						"message": msg,
+					}).Log(log.InfoLevel, "NATS: Delivered")
 				}
 			},
 			stan.SetManualAckMode(),
