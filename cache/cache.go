@@ -12,7 +12,10 @@ var AuthCache = cache.New(8*time.Hour, time.Hour)
 var DispatcherDoneCache = cache.New(10*time.Minute, 10*time.Minute)
 
 // DispatcherRetryCache used by NATS Dispatcher
-var DispatcherRetryCache = cache.New(22*time.Minute, 22*time.Minute)
+var DispatcherRetryCache = cache.New(30*time.Minute, 30*time.Minute)
+
+// DispatcherWorkersCache used by NATS Dispatcher
+var DispatcherWorkersCache = cache.New(-1, -1)
 
 // TraceTokenCache used by AgentService
 var TraceTokenCache = cache.New(-1, -1)
