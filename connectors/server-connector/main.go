@@ -61,7 +61,6 @@ func main() {
 	for {
 		if transitService.Status().Transport != services.Stopped {
 			log.Info("TNG ServerConnector: sending inventory ...")
-			// TODO: ownership type
 			_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.processes)}, config.groups, config.ownership)
 		} else {
 			log.Info("TNG ServerConnector is stopped ...")
