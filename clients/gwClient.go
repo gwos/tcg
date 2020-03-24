@@ -119,7 +119,10 @@ func (client *GWClient) connectLocal() error {
 		})
 		return nil
 	}
-	return fmt.Errorf(string(byteResponse))
+	if statusCode == 502 || statusCode == 504 {
+		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+	}
+	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 }
 
 func (client *GWClient) connectRemote() error {
@@ -168,7 +171,10 @@ func (client *GWClient) connectRemote() error {
 	logEntry.WithInfo(log.Fields{
 		"errorCode": error2,
 	})
-	return fmt.Errorf(string(error2))
+	if statusCode == 502 || statusCode == 504 {
+		return fmt.Errorf("%w: %v", ErrGateway, string(error2))
+	}
+	return fmt.Errorf("%w: %v", ErrUndecided, string(error2))
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -205,7 +211,10 @@ func (client *GWClient) Disconnect() error {
 	if statusCode == 200 {
 		return nil
 	}
-	return fmt.Errorf(string(byteResponse))
+	if statusCode == 502 || statusCode == 504 {
+		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+	}
+	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 }
 
 // ValidateToken implements GWOperations.ValidateToken.
@@ -241,9 +250,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 			if b {
 				return nil
 			}
-			return fmt.Errorf("invalid gwos-app-name or gwos-api-token")
+			return fmt.Errorf("%w: %v", ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
 		}
-		return fmt.Errorf(string(byteResponse))
+		return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 	}
 
 	return err
@@ -330,9 +339,17 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 		logEntryLevel = log.ErrorLevel
 		return nil, err
 	}
+	if statusCode == 401 {
+		logEntryLevel = log.WarnLevel
+		return nil, fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+	}
+	if statusCode == 502 || statusCode == 504 {
+		logEntryLevel = log.WarnLevel
+		return nil, fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf(string(byteResponse))
+		return nil, fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 	}
 	return byteResponse, nil
 }
