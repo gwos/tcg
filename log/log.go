@@ -28,7 +28,13 @@ const (
 
 const timestampFormat = "2006-01-02 15:04:05"
 
-var logger = logrus.New()
+var logger = struct {
+	*logrus.Logger
+	consPeriod int
+}{
+	logrus.New(),
+	0,
+}
 
 // Info makes entries in the log on Info level
 func Info(args ...interface{}) {
@@ -51,7 +57,7 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, level int) {
+func Config(filePath string, level int, consPeriod int) {
 	once.Do(func() {
 		ch := ckHook{
 			cache.New(10*time.Minute, 10*time.Second),
@@ -87,6 +93,8 @@ func Config(filePath string, level int) {
 	default:
 		logger.SetLevel(logrus.DebugLevel)
 	}
+
+	logger.consPeriod = consPeriod
 }
 
 // Entry wraps logrus.Entry
@@ -125,9 +133,9 @@ func fnOnEvicted(w io.Writer) func(string, interface{}) {
 	return func(ck string, i interface{}) {
 		v := i.(uint16)
 		if v > 0 {
-			fmt.Fprintf(w, "%s [consolidate: %d more entries last 60 seconds] %s\n",
+			fmt.Fprintf(w, "%s [consolidate: %d more entries last %d seconds] %s\n",
 				time.Now().Format(timestampFormat),
-				v, ck)
+				v, logger.consPeriod, ck)
 		}
 	}
 }
@@ -160,7 +168,10 @@ func (h *ckHook) Fire(entry *logrus.Entry) error {
 	if _, ok := h.cache.Get(ck); ok {
 		h.cache.Increment(ck, 1)
 	} else {
-		h.cache.Add(ck, uint16(0), 60*time.Second)
+		/* skip caching if consolidation off */
+		if logger.consPeriod > 0 {
+			h.cache.Add(ck, uint16(0), time.Duration(logger.consPeriod)*time.Second)
+		}
 		output, _ := entry.Logger.Formatter.Format(entry)
 		h.writer.Write(output)
 	}
