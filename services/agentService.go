@@ -130,7 +130,7 @@ func (service *AgentService) DemandConfig() error {
 		for {
 			if err := service.DSClient.Reload(service.AgentID); err != nil {
 				log.With(log.Fields{"error": err}).
-					Log(log.ErrorLevel, "#DemandConfig Config Server is not available")
+					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
 				time.Sleep(time.Duration(20) * time.Second)
 				continue
 			}
