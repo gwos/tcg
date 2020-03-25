@@ -73,6 +73,9 @@ type Connector struct {
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
 	NatsHost string `yaml:"natsHost"`
+	// LogConsPeriod accepts number of seconds
+	// if 0 turn off consolidation
+	LogConsPeriod int `yaml:"logConsPeriod"`
 	// LogFile accepts file path to log in addition to stdout
 	LogFile  string   `yaml:"logFile"`
 	LogLevel LogLevel `yaml:"logLevel"`
@@ -85,6 +88,7 @@ type ConnectorDTO struct {
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
 	TngURL        string        `json:"tngUrl"`
+	LogConsPeriod int           `json:"logConsPeriod"`
 	LogLevel      LogLevel      `json:"logLevel"`
 	Enabled       bool          `json:"enabled"`
 	DSConnection  DSConnection  `json:"dalekservicesConnection"`
@@ -204,6 +208,7 @@ func GetConfig() *Config {
 		cfg = &Config{
 			Connector: &Connector{
 				ControllerAddr:   ":8099",
+				LogConsPeriod:    60,
 				LogLevel:         1,
 				NatsAckWait:      30,
 				NatsMaxInflight:  math.MaxInt32,
@@ -236,7 +241,7 @@ func GetConfig() *Config {
 			log.Warn(err)
 		}
 
-		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 	})
 	return cfg
 }
@@ -266,6 +271,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
+	cfg.Connector.LogConsPeriod = dto.LogConsPeriod
 	cfg.Connector.LogLevel = dto.LogLevel
 	cfg.Connector.Enabled = dto.Enabled
 	cfg.GWConnections = dto.GWConnections
@@ -273,7 +279,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		cfg.DSConnection.HostName = dto.DSConnection.HostName
 	}
 
-	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 
 	if output, err := yaml.Marshal(cfg); err != nil {
 		log.Warn(err)
