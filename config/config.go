@@ -208,7 +208,7 @@ func GetConfig() *Config {
 		cfg = &Config{
 			Connector: &Connector{
 				ControllerAddr:   ":8099",
-				LogConsPeriod:    60,
+				LogConsPeriod:    0,
 				LogLevel:         1,
 				NatsAckWait:      30,
 				NatsMaxInflight:  math.MaxInt32,
