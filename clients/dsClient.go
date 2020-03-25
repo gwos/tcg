@@ -28,7 +28,7 @@ type DSClient struct {
 }
 
 // ValidateToken implements DSOperations.ValidateToken.
-func (client *DSClient) ValidateToken(appName, apiToken string) error {
+func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL string) error {
 	if len(client.HostName) == 0 {
 		log.Warn("DSClient: Omit ValidateToken on demand config")
 		return nil
@@ -43,10 +43,12 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-
+	if dalekServicesURL == "" {
+		dalekServicesURL = client.DSConnection.HostName
+	}
 	entrypoint := url.URL{
 		Scheme: "http",
-		Host:   client.DSConnection.HostName,
+		Host:   dalekServicesURL,
 		Path:   DSEntrypointValidateToken,
 	}
 

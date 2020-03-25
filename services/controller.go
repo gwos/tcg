@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -173,6 +175,21 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
+	var dto config.ConnectorDTO
+	if err := json.Unmarshal(value, &dto); err != nil {
+		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
+		return
+	}
+
+	credentials := cache.Credentials{
+		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
+		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
+	}
+	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, "could not validate config token request: " + dto.DSConnection.HostName)
+	}
+
 	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
 	c.JSON(http.StatusOK, nil)
 }
@@ -374,7 +391,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
+		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
@@ -393,9 +410,10 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
 	apiV1Group := router.Group("/api/v1")
+	apiV1Config := router.Group("/api/v1/config")
 	apiV1Group.Use(controller.validateToken)
 
-	apiV1Group.POST("/config", controller.config)
+	apiV1Config.POST("/", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
