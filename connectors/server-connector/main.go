@@ -60,7 +60,10 @@ func main() {
 	}
 	connectors.ControlCHandler()
 
-	log.Info(metricsProfile.String())
+	if transitService.Status().Transport != services.Stopped {
+		log.Info("[Server Connector]: Sending inventory ...")
+		_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(metricsProfile.Metrics)}, groups)
+	}
 
 	for {
 		if transitService.Status().Transport != services.Stopped {
@@ -74,7 +77,7 @@ func main() {
 		} else {
 			log.Info("[Server Connector]: Transport is stopped ...")
 		}
-		if transitService.Status().Transport != services.Stopped {
+		if transitService.Status().Transport != services.Stopped && len(metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			err := connectors.SendMetrics([]transit.MonitoredResource{*CollectMetrics(metricsProfile.Metrics, time.Duration(timer))})
 			if err != nil {

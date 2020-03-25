@@ -28,9 +28,9 @@ const (
 // Default 'Critical' and 'Warning' values for monitored processes(in MB)
 // TODO: remove these when thresholds ready in database and ui
 const (
-	MB                                uint64 = 1048576
-	ProcessCPUUsageCriticalValue             = 0.90
-	ProcessCPUUsageWarningValue              = 0.50
+	MB                           uint64 = 1048576
+	ProcessCPUUsageCriticalValue        = 0.90
+	ProcessCPUUsageWarningValue         = 0.50
 )
 
 var processToFuncMap = map[string]interface{}{
@@ -63,6 +63,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 
 	inventoryResource := transit.InventoryResource{
 		Name:     hostName,
+		Device:   "SomeDevice",
 		Type:     transit.Host,
 		Services: []transit.InventoryService{},
 	}
@@ -70,7 +71,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 	for _, pr := range processes {
 		inventoryResource.Services = append(inventoryResource.Services, transit.InventoryService{
 			Name:  pr.Name,
-			Type:  transit.NetworkDevice,
+			Type:  transit.Service,
 			Owner: hostName,
 		})
 	}
