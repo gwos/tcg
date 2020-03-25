@@ -66,7 +66,7 @@ gwConnections:
 			AppName:          "test-app",
 			AppType:          "test",
 			ControllerAddr:   ":8099",
-			LogConsPeriod:    60,
+			LogConsPeriod:    0,
 			LogLevel:         1,
 			NatsAckWait:      15,
 			NatsMaxInflight:  2147483647,

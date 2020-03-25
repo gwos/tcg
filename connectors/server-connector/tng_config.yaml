@@ -8,7 +8,8 @@ connector:
   natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
-  natsHost: ":4222"
+  natsHost: "127.0.0.1:4222"
+  logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 2
 dsConnection:
   hostName: ""
