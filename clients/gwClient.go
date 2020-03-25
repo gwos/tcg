@@ -77,7 +77,7 @@ func (client *GWClient) Connect() error {
 		return nil
 	}
 
-	if client.GWConnection.LocalConnection {
+	if client.GWConnection.LocalConnection && !client.GWConnection.IsChild {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
@@ -340,7 +340,7 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		if !client.GWConnection.LocalConnection {
+		if !client.GWConnection.LocalConnection || client.GWConnection.IsChild {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)

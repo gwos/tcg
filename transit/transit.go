@@ -14,6 +14,18 @@ const (
 	ModelVersion VersionString = "1.0.0"
 )
 
+// HostOwnershipType defines the host ownership type of inventory.
+type HostOwnershipType string
+
+// Take - Always take ownership, can overwrite ownership, aggressive take everything
+// Creator - Leave ownership if already owned (owns things it creates, if I didn't create it I don't own it)
+// Yield - Always defer ownership - don't want to own it, if someone else comes along, let them own it
+const (
+	Creator HostOwnershipType = "Creator"
+	Take                      = "Take"
+	Yield                     = "Yield"
+)
+
 // MetricKind defines the metric kind of the time series.
 type MetricKind string
 
@@ -636,9 +648,10 @@ func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   *TracerContext      `json:"context,omitempty"`
-	Resources []InventoryResource `json:"resources"`
-	Groups    []ResourceGroup     `json:"groups,omitempty"`
+	Context       *TracerContext      `json:"context,omitempty"`
+	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
+	Resources     []InventoryResource `json:"resources"`
+	Groups        []ResourceGroup     `json:"groups,omitempty"`
 }
 
 func (inventoryRequest InventoryRequest) String() string {
