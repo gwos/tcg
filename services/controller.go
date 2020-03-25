@@ -413,7 +413,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Config := router.Group("/api/v1/config")
 	apiV1Group.Use(controller.validateToken)
 
-	apiV1Config.POST("/", controller.config)
+	apiV1Config.POST("", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
