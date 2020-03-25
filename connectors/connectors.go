@@ -52,7 +52,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 }
 
-func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
+func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
 	var monitoredResourceRefs []transit.MonitoredResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
@@ -68,9 +68,10 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 	}
 
 	inventoryRequest := transit.InventoryRequest{
-		Context:   transitService.MakeTracerContext(),
-		Resources: resources,
-		Groups:    resourceGroups,
+		Context:       transitService.MakeTracerContext(),
+		OwnershipType: ownershipType,
+		Resources:     resources,
+		Groups:        resourceGroups,
 	}
 
 	b, err := json.Marshal(inventoryRequest)
