@@ -8,7 +8,7 @@ connector:
   natsFilestoreDir: "nats/datastore"
   natsStoreType: "FILE"
   natsHost: "127.0.0.1:4222"
-  logConsPeriod: 60 # seconds; 0 - off consolidation
+  logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
   hostName: "dalekservices:3001"
