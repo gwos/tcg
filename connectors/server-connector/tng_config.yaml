@@ -1,7 +1,6 @@
-# this is configuration for a connector in Provisioning Waiting state, note the empty agentId
 connector:
   agentId: ""
-  appName: "tng-server"
+  appName: "SERVER"
   appType: "SERVER"
   controllerAddr: "0.0.0.0:8099"
   natsAckWait: 30

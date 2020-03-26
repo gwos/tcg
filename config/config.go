@@ -252,6 +252,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var tempURLString string
 
 	if err := json.Unmarshal(data, &dto); err != nil {
+		log.Error(err.Error())
 		return nil, err
 	}
 
