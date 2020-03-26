@@ -1,7 +1,7 @@
 connector:
-    agentId: ""
-    appName: ""
-    appType: ""
+    agentId: ***REMOVED***
+    appName: tng
+    appType: SERVER
     controllerAddr: 0.0.0.0:8099
     controllerCertFile: ""
     controllerKeyFile: ""
@@ -9,10 +9,23 @@ connector:
     natsMaxInflight: 2147483647
     natsFilestoreDir: nats/datastore
     natsStoreType: FILE
-    natsHost: :4222
+    natsHost: 127.0.0.1:4222
+    logConsPeriod: 0
     logFile: ""
-    logLevel: 0
-    enabled: false
+    logLevel: 3
+    enabled: true
 dsConnection:
     hostName: ""
-gwConnections: []
+gwConnections:
+  - hostName: localhost
+    userName: RESTAPIACCESS
+    password: ***REMOVED***
+    enabled: true
+    isChild: false
+    displayName: display
+    mergeHosts: false
+    localConnection: true
+    deferOwnership: ""
+    prefixResourceNames: false
+    resourceNamePrefix: ""
+    sendAllInventory: true

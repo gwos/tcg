@@ -17,6 +17,14 @@ const (
 	DefaultTimer         = 120
 )
 
+type InitializeConfigResult struct {
+	processes      []string
+	groups         []transit.ResourceGroup
+	metricsProfile transit.MetricsProfile
+	timer          float64
+	ownership      transit.HostOwnershipType
+}
+
 // @title TNG API Documentation
 // @version 1.0
 
@@ -27,17 +35,11 @@ func main() {
 
 	chanel := make(chan bool)
 
-	timer := DefaultTimer
-	var processes []string
-	var groups []transit.ResourceGroup
-	var metricsProfile transit.MetricsProfile
+	var config *InitializeConfigResult
 
 	transitService.ConfigHandler = func(data []byte) {
-		if p, g, t, m, err := initializeConfig(data); err == nil {
-			processes = p
-			groups = g
-			timer = t
-			metricsProfile = m
+		if cfg, err := initializeConfig(data); err == nil {
+			config = cfg
 			chanel <- true
 		} else {
 			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
@@ -62,7 +64,7 @@ func main() {
 
 	if transitService.Status().Transport != services.Stopped {
 		log.Info("[Server Connector]: Sending inventory ...")
-		_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(metricsProfile.Metrics)}, groups)
+		_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
 	}
 
 	for {
@@ -70,56 +72,79 @@ func main() {
 			select {
 			case <-chanel:
 				log.Info("[Server Connector]: Sending inventory ...")
-				_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(metricsProfile.Metrics)}, groups)
+				_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
 			default:
 				log.Info("[Server Connector]: No new config received, skipping inventory ...")
 			}
 		} else {
 			log.Info("[Server Connector]: Transport is stopped ...")
 		}
-		if transitService.Status().Transport != services.Stopped && len(metricsProfile.Metrics) > 0 {
+		if transitService.Status().Transport != services.Stopped && len(config.metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
-			err := connectors.SendMetrics([]transit.MonitoredResource{*CollectMetrics(metricsProfile.Metrics, time.Duration(timer))})
+			err := connectors.SendMetrics([]transit.MonitoredResource{*CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))})
 			if err != nil {
 				log.Error(err.Error())
 			}
 		}
 		LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		time.Sleep(time.Duration(int64(timer) * int64(time.Second)))
+		time.Sleep(time.Duration(int64(config.timer) * int64(time.Second)))
 	}
 }
 
-func initializeConfig(data []byte) ([]string, []transit.ResourceGroup, int, transit.MetricsProfile, error) {
+func initializeConfig(data []byte) (*InitializeConfigResult, error) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
 		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
+		Connections       []struct {
+			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
+		} `json:"groundworkConnections"`
 	}{}
+
+	config := InitializeConfigResult{
+		processes:      []string{},
+		groups:         []transit.ResourceGroup{},
+		metricsProfile: transit.MetricsProfile{},
+		timer:          0,
+		ownership:      transit.Yield,
+	}
 
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
-		return []string{}, []transit.ResourceGroup{}, -1, transit.MetricsProfile{}, err
+		return &InitializeConfigResult{
+			processes:      []string{},
+			groups:         []transit.ResourceGroup{},
+			metricsProfile: transit.MetricsProfile{},
+			timer:          0,
+			ownership:      transit.Yield,
+		}, err
 	}
-	timer := float64(DefaultTimer)
+	config.timer = float64(DefaultTimer)
 	if _, present := connector.MonitorConnection.Extensions["timer"]; present {
-		timer = connector.MonitorConnection.Extensions["timer"].(float64)
+		config.timer = connector.MonitorConnection.Extensions["timer"].(float64)
 	}
-	var processes []string
+
 	if _, present := connector.MonitorConnection.Extensions["processes"]; present {
 		processesInterface := connector.MonitorConnection.Extensions["processes"].([]interface{})
 		for _, process := range processesInterface {
-			processes = append(processes, process.(string))
+			config.processes = append(config.processes, process.(string))
 		}
 	}
-	var groups []transit.ResourceGroup
+
 	if _, present := connector.MonitorConnection.Extensions["groups"]; present {
 		groupsInterface := connector.MonitorConnection.Extensions["groups"].([]interface{})
 		for _, gr := range groupsInterface {
 			groupMap := gr.(map[string]interface{})
-			groups = append(groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+			config.groups = append(config.groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
 		}
 	} else {
-		groups = append(groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
+		config.groups = append(config.groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
 	}
 
-	return processes, groups, int(timer), connector.MetricsProfile, nil
+	if len(connector.Connections) > 0 {
+		config.ownership = connector.Connections[0].DeferOwnership
+	}
+
+	config.metricsProfile = connector.MetricsProfile
+
+	return &config, nil
 }

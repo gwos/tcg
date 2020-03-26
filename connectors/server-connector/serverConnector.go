@@ -100,14 +100,17 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 		Services:      []transit.MonitoredService{},
 	}
 
+	var notDefaultProcesses []transit.MetricDefinition
 	for _, pr := range processes {
 		if function, exists := processToFuncMap[pr.Name]; exists {
 			monitoredResource.Services = append(monitoredResource.Services,
 				*function.(func(int, int, time.Duration) *transit.MonitoredService)(pr.WarningThreshold, pr.CriticalThreshold, timerSeconds))
+		} else {
+			notDefaultProcesses = append(notDefaultProcesses, pr)
 		}
 	}
 
-	processesMap := collectProcesses(processes)
+	processesMap := collectProcesses(notDefaultProcesses)
 	interval := time.Now()
 
 	warningValue := transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: ProcessCPUUsageWarningValue}
