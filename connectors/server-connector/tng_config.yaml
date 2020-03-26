@@ -1,6 +1,6 @@
 connector:
   agentId: ""
-  appName: "server"
+  appName: "SERVER"
   appType: "SERVER"
   controllerAddr: "0.0.0.0:8099"
   natsAckWait: 30
