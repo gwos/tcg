@@ -781,3 +781,43 @@ func (groundworkEventUnack GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
 }
+
+type MetricsProfile struct {
+	Name        string             `json:"name"`
+	ProfileType string             `json:"profileType"`
+	IsTemplate  bool               `json:"isTemplate"`
+	Metrics     []MetricDefinition `json:"metrics"`
+}
+
+func (metricsProfile MetricsProfile) String() string {
+	return fmt.Sprintf("[%s, %s, %t, %s]",
+		metricsProfile.Name, metricsProfile.ProfileType,
+		metricsProfile.IsTemplate, metricsProfile.Metrics,
+	)
+}
+
+type MetricDefinition struct {
+	Name              string      `json:"name"`
+	CustomName        string      `json:"customName"`
+	Description       string      `json:"description"`
+	Monitored         bool        `json:"monitored"`
+	Graphed           bool        `json:"graphed"`
+	MetricType        MetricKind  `json:"metricType"`
+	ComputeType       ComputeType `json:"computeType"`
+	ServiceType       string      `json:"serviceType"`
+	SourceType        string      `json:"sourceType"`
+	AggregateType     string      `json:"aggregateType"`
+	WarningThreshold  int         `json:"warningThreshold"`
+	CriticalThreshold int         `json:"criticalThreshold"`
+	Expression        string      `json:"expression"`
+	Format            string      `json:"format"`
+}
+
+func (metricDefinition MetricDefinition) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %t, %t, %s, %s, %s, %s, %s, %d, %d, %s, %s]",
+		metricDefinition.Name, metricDefinition.CustomName, metricDefinition.Description, metricDefinition.Monitored,
+		metricDefinition.Graphed, metricDefinition.MetricType, metricDefinition.ComputeType, metricDefinition.ServiceType,
+		metricDefinition.SourceType, metricDefinition.AggregateType, metricDefinition.WarningThreshold,
+		metricDefinition.CriticalThreshold, metricDefinition.Expression, metricDefinition.Format,
+	)
+}
