@@ -1,31 +1,14 @@
 connector:
-    agentId: ***REMOVED***
-    appName: tng
-    appType: SERVER
-    controllerAddr: 0.0.0.0:8099
-    controllerCertFile: ""
-    controllerKeyFile: ""
-    natsAckWait: 30
-    natsMaxInflight: 2147483647
-    natsFilestoreDir: nats/datastore
-    natsStoreType: FILE
-    natsHost: 127.0.0.1:4222
-    logConsPeriod: 0
-    logFile: ""
-    logLevel: 3
-    enabled: true
+  agentId: ""
+  appName: "server"
+  appType: "SERVER"
+  controllerAddr: "0.0.0.0:8099"
+  natsAckWait: 30
+  natsMaxInflight: 2147483647 # math.MaxInt32
+  natsFilestoreDir: "nats/datastore"
+  natsStoreType: "FILE"
+  natsHost: "127.0.0.1:4222"
+  logConsPeriod: 0 # seconds; 0 - off consolidation
+  logLevel: 2
 dsConnection:
-    hostName: ""
-gwConnections:
-  - hostName: localhost
-    userName: RESTAPIACCESS
-    password: ***REMOVED***
-    enabled: true
-    isChild: false
-    displayName: display
-    mergeHosts: false
-    localConnection: true
-    deferOwnership: ""
-    prefixResourceNames: false
-    resourceNamePrefix: ""
-    sendAllInventory: true
+  hostName: ""
