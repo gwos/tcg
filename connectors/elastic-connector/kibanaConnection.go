@@ -78,7 +78,10 @@ func findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *Kiban
 		page = page + 1
 		path := buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
 		response, successful := executeRequest(http.MethodGet, path, nil, kibanaHeaders)
-		if !successful {
+		if response == nil {
+			log.Error("Kibana Find Saved Objects response is nil.")
+		}
+		if !successful || response == nil {
 			if total != -1 {
 				// previous calls were fine let's try to get remaining data
 				allSuccessful = false
@@ -135,7 +138,10 @@ func bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) [
 
 	path := buildBulkGetSavedObjectsPath()
 	response, successful := executeRequest(http.MethodPost, path, &body, kibanaHeaders)
-	if !successful {
+	if response == nil {
+		log.Error("Kibana Bulk Get Saved Objects response is nil.")
+	}
+	if !successful || response == nil {
 		log.Error("Kibana Bulk Get Saved Objects failed.")
 		return nil
 	}

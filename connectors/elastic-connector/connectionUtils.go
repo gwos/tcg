@@ -8,11 +8,23 @@ import (
 	"net/http"
 )
 
-func executeRequest(method string, path string, body io.Reader, headers map[string]string) ([]byte, bool) {
+var client *http.Client
+
+func initClient() {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := http.Client{Transport: tr}
+	client = &http.Client{Transport: tr}
+}
+
+func executeRequest(method string, path string, body io.Reader, headers map[string]string) ([]byte, bool) {
+	if client == nil {
+		initClient()
+	}
+	if client == nil {
+		log.Error("Could not create http client. ")
+		return nil, false
+	}
 
 	var request *http.Request
 	var response *http.Response
