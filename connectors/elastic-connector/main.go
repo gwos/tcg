@@ -6,12 +6,9 @@ import (
 )
 
 func main() {
-	monitoredResources, inventoryResources, resourceGroups, err := CollectMetrics()
-	if err != nil {
-		log.Error(err.Error())
-	}
+	monitoredResources, inventoryResources, resourceGroups := CollectMetrics()
 	connectors.ControlCHandler()
-	err = connectors.Start()
+	err := connectors.Start()
 	if err != nil {
 		log.Error(err.Error())
 		return
