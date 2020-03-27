@@ -44,7 +44,10 @@ func retrieveHits(storedQuery SavedObject) []Hit {
 		}
 		log.Info(body.String())
 		response, successful := executeRequest(http.MethodGet, path, &body, elasticHeaders)
-		if !successful {
+		if response == nil {
+			log.Error("Search response is nil.")
+		}
+		if !successful || response == nil {
 			if total != -1 {
 				// previous calls were fine let's try to get remaining data
 				allSuccessful = false
