@@ -12,6 +12,12 @@ package main
 //static char *invokeGetTextHandler(getTextHandlerType fn) {
 //	return fn();
 //}
+//
+//typedef void *(*demandConfigCallback) ();
+//
+//static void *invokeDemandConfigCallback(demandConfigCallback fn) {
+//	fn();
+//}
 import "C"
 import (
 	"encoding/json"
@@ -222,6 +228,20 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
 	services.GetController().RemoveListMetricsHandler()
+}
+
+// RegisterDemandConfigCallback is a C API for services.GetTransitService().RegisterDemandConfigCallback
+//export RegisterDemandConfigCallback
+func RegisterDemandConfigCallback(fn C.demandConfigCallback) {
+	services.GetTransitService().RegisterDemandConfigCallback(func() {
+		C.invokeDemandConfigCallback(fn)
+	})
+}
+
+// RemoveDemandConfigCallback is a C API for services.GetTransitService().RemoveDemandConfigHandler()
+//export RemoveDemandConfigCallback
+func RemoveDemandConfigCallback() {
+	services.GetTransitService().RemoveDemandConfigHandler()
 }
 
 // GetConnectorConfig is a C API for getting services.GetTransitService().Connector

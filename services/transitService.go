@@ -38,3 +38,11 @@ func (service *TransitService) SynchronizeInventory(payload []byte) error {
 	}
 	return nats.Publish(SubjSynchronizeInventory, res)
 }
+
+func (service *TransitService) RegisterDemandConfigCallback(fn func()) {
+	service.DemandConfigHandler = fn
+}
+
+func (service *TransitService) RemoveDemandConfigHandler() {
+	service.DemandConfigHandler = nil
+}

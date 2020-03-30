@@ -31,6 +31,7 @@ type AgentService struct {
 	statsChan     chan statsCounter
 	tracerToken   []byte
 	ConfigHandler func([]byte)
+	DemandConfigHandler func()
 }
 
 // CtrlAction defines queued controll action
@@ -101,6 +102,7 @@ func GetAgentService() *AgentService {
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 			tracerToken,
+			nil,
 			nil,
 		}
 
@@ -401,6 +403,9 @@ func (service *AgentService) config(data []byte) error {
 	}
 	if service.ConfigHandler != nil {
 		service.ConfigHandler(data)
+	}
+	if service.DemandConfigHandler != nil {
+		service.DemandConfigHandler()
 	}
 
 	service.agentStats.AgentID = service.Connector.AgentID
