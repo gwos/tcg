@@ -41,6 +41,8 @@ bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
                                  size_t errBufLen) = NULL;
 bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
                              size_t errBufLen) = NULL;
+void (*registerDemandConfigCallback)(void *(*)()) = NULL;
+
 /* define handlers for other libtransit functions */
 bool (*isControllerRunning)() = NULL;
 bool (*isNatsRunning)() = NULL;
@@ -62,6 +64,10 @@ char *listMetricsHandler() {
 
   printf("\nlistMetricsHandler: %s : %ld", buf, bufLen);
   return buf;
+}
+
+void *demandConfigCallback() {
+    printf("\nDemandConfig was called by the TCG");
 }
 
 void *libtransit_handle;
@@ -106,6 +112,7 @@ void load_libtransit() {
   stopController = find_symbol("StopController");
   stopNats = find_symbol("StopNats");
   stopTransport = find_symbol("StopTransport");
+  registerDemandConfigCallback = find_symbol("RegisterDemandConfigCallback");
 }
 
 void test_libtransit_control() {
@@ -284,6 +291,11 @@ void test_libtransit_control() {
   if (!res) {
     fail(errBuf);
   }
+
+  printf("Testing registerDemandConfigCallback ...\n");
+  registerDemandConfigCallback(demandConfigCallback);
+
+  system("curl -s -X POST -d '{}' -H 'GWOS-APP-NAME:GW8' -H 'GWOS-API-TOKEN:c3fafe42-bdd1-4d08-9aff-5c70e4c72d09' -H 'Accept: application/json' 'http://localhost:8099/api/v1/config'");
 }
 
 void test_SendResourcesWithMetrics() {
