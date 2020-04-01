@@ -2,6 +2,7 @@ package main
 
 //#include <stddef.h>
 //#include <stdlib.h>
+//#include <stdbool.h>
 //
 ///* getTextHandlerType defines a function type that returns an allocated string.
 // * It should be safe to call `C.free` on it. */
@@ -13,10 +14,10 @@ package main
 //	return fn();
 //}
 //
-//typedef void *(*demandConfigCallback) ();
+//typedef bool (*demandConfigCallback) ();
 //
-//static void *invokeDemandConfigCallback(demandConfigCallback fn) {
-//	fn();
+//static bool invokeDemandConfigCallback(demandConfigCallback fn) {
+//	return fn();
 //}
 import "C"
 import (
@@ -233,8 +234,8 @@ func RemoveListMetricsHandler() {
 // RegisterDemandConfigCallback is a C API for services.GetTransitService().RegisterDemandConfigCallback
 //export RegisterDemandConfigCallback
 func RegisterDemandConfigCallback(fn C.demandConfigCallback) {
-	services.GetTransitService().RegisterDemandConfigCallback(func() {
-		C.invokeDemandConfigCallback(fn)
+	services.GetTransitService().RegisterDemandConfigCallback(func() bool{
+		return bool(C.invokeDemandConfigCallback(fn))
 	})
 }
 

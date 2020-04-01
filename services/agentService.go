@@ -22,16 +22,17 @@ import (
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*config.Connector
-	agentStats    *AgentStats
-	agentStatus   *AgentStatus
-	DSClient      *clients.DSClient
-	gwClients     []*clients.GWClient
-	ctrlIdx       uint8
-	ctrlChan      chan *CtrlAction
-	statsChan     chan statsCounter
-	tracerToken   []byte
-	ConfigHandler func([]byte)
-	DemandConfigHandler func()
+	agentStats          *AgentStats
+	agentStatus         *AgentStatus
+	DSClient            *clients.DSClient
+	gwClients           []*clients.GWClient
+	ctrlIdx             uint8
+	ctrlChan            chan *CtrlAction
+	statsChan           chan statsCounter
+	tracerToken         []byte
+	ConfigHandler       func([]byte)
+	DemandConfigHandler func() bool
+	Mux                 sync.Mutex
 }
 
 // CtrlAction defines queued controll action
@@ -104,6 +105,7 @@ func GetAgentService() *AgentService {
 			tracerToken,
 			nil,
 			nil,
+			sync.Mutex{},
 		}
 
 		go agentService.listenCtrlChan()
@@ -404,9 +406,14 @@ func (service *AgentService) config(data []byte) error {
 	if service.ConfigHandler != nil {
 		service.ConfigHandler(data)
 	}
+	service.Mux.Lock()
 	if service.DemandConfigHandler != nil {
-		service.DemandConfigHandler()
+		if success := service.DemandConfigHandler(); !success {
+			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
+		}
+		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
+	service.Mux.Unlock()
 
 	service.agentStats.AgentID = service.Connector.AgentID
 	service.agentStats.AppType = service.Connector.AppType

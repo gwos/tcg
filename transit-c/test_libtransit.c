@@ -41,7 +41,7 @@ bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
                                  size_t errBufLen) = NULL;
 bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
                              size_t errBufLen) = NULL;
-void (*registerDemandConfigCallback)(void *(*)()) = NULL;
+void (*registerDemandConfigCallback)(bool (*)()) = NULL;
 
 /* define handlers for other libtransit functions */
 bool (*isControllerRunning)() = NULL;
@@ -66,8 +66,9 @@ char *listMetricsHandler() {
   return buf;
 }
 
-void *demandConfigCallback() {
+bool demandConfigCallback() {
     printf("\nDemandConfig was called by the TCG");
+    return true;
 }
 
 void *libtransit_handle;
