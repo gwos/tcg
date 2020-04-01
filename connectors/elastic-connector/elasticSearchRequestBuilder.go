@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func buildSearchRequest(savedObject SavedObject) SearchRequest {
+func buildSearchRequest(savedObject SavedObject, simpleHttpRequest bool) SearchRequest {
 	var searchRequest SearchRequest
 
 	for _, filter := range savedObject.Attributes.Filters {
@@ -33,6 +33,19 @@ func buildSearchRequest(savedObject SavedObject) SearchRequest {
 
 	if savedObject.Attributes.Timefilter != nil {
 		addTimeFilter(savedObject, &searchRequest)
+	}
+
+	if simpleHttpRequest {
+		trackTotalHits := true
+		searchRequest.TrackTotalHits = &trackTotalHits
+
+		perPage := 10000
+		searchRequest.Size = &perPage
+
+		var sortByIdAsc = map[string]string{
+			"_id": "asc",
+		}
+		searchRequest.Sort = append(searchRequest.Sort, sortByIdAsc)
 	}
 
 	return searchRequest
