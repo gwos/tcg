@@ -39,10 +39,14 @@ func (service *TransitService) SynchronizeInventory(payload []byte) error {
 	return nats.Publish(SubjSynchronizeInventory, res)
 }
 
-func (service *TransitService) RegisterDemandConfigCallback(fn func()) {
+func (service *TransitService) RegisterDemandConfigCallback(fn func() bool) {
+	service.Mux.Lock()
 	service.DemandConfigHandler = fn
+	service.Mux.Unlock()
 }
 
 func (service *TransitService) RemoveDemandConfigHandler() {
+	service.Mux.Lock()
 	service.DemandConfigHandler = nil
+	service.Mux.Unlock()
 }

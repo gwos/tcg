@@ -25,6 +25,7 @@ type Controller struct {
 	*AgentService
 	srv                *http.Server
 	listMetricsHandler GetBytesHandlerType
+	Mux sync.Mutex
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -39,6 +40,7 @@ func GetController() *Controller {
 			GetAgentService(),
 			nil,
 			nil,
+			sync.Mutex{},
 		}
 	})
 	return controller
@@ -46,20 +48,26 @@ func GetController() *Controller {
 
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
+	controller.Mux.Lock()
 	if controller.listMetricsHandler != nil {
 		return controller.listMetricsHandler()
 	}
+	controller.Mux.Unlock()
 	return nil, fmt.Errorf("listMetricsHandler unavailable")
 }
 
 // RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
 func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
+	controller.Mux.Lock()
 	controller.listMetricsHandler = fn
+	controller.Mux.Unlock()
 }
 
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
+	controller.Mux.Lock()
 	controller.listMetricsHandler = nil
+	controller.Mux.Unlock()
 }
 
 // SendEvents implements Controllers.SendEvents interface
