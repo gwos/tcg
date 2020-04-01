@@ -1,6 +1,7 @@
 package main
 
 //
+//
 //import (
 //	"bytes"
 //	"context"
@@ -14,7 +15,7 @@ package main
 //
 //func retrieveHits(storedQuery SavedObject) ([]Hit) {
 //	if esClient == nil {
-//		initClient()
+//		initEsClient()
 //	}
 //	if esClient == nil {
 //		log.Error("cannot create ElasticSearch Client")
@@ -28,7 +29,7 @@ package main
 //	var hits []Hit
 //
 //	offset := 0
-//	perPage := 100
+//	perPage := 1000
 //	total := 1
 //	firstCall := true
 //
@@ -76,11 +77,12 @@ package main
 //		}
 //
 //		responseBody, err := ioutil.ReadAll(response.Body)
+//		//s := string(responseBody)
+//		//log.Info(s)
 //		if err != nil {
 //			log.Error(err)
 //			return nil
 //		}
-//
 //		var searchResponse SearchResponse
 //		err = json.Unmarshal(responseBody, &searchResponse)
 //		if err != nil {
@@ -103,7 +105,7 @@ package main
 //	return hits
 //}
 //
-//func initClient()  {
+//func initEsClient()  {
 //	// TODO: these should come from environment variables
 //	cfg := elasticsearch.Config{
 //		Addresses: []string{ // TODO: multiple load balanced elastic search

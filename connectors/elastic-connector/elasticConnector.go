@@ -26,7 +26,7 @@ const (
 
 func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	// TODO: selected queries with overridden time intervals will be retrieved from configs, here we will need only their titles to retrieve filters
-	storedQueries := retrieveStoredQueries(nil)
+	storedQueries := retrieveStoredQueries([]string{"not_error_or_warn"})
 	hosts, groups := make(map[string]tempHost), make(map[string]map[string]struct{})
 	for _, storedQuery := range storedQueries {
 		overrideTimeFilter(&storedQuery)

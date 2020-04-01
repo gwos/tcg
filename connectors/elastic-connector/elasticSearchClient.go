@@ -1,8 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
+	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/log"
 	"net/http"
 )
@@ -17,7 +17,7 @@ var elasticHeaders = map[string]string{
 }
 
 func retrieveHits(storedQuery SavedObject) []Hit {
-	searchRequest := buildSearchRequest(storedQuery)
+	searchRequest := buildSearchRequest(storedQuery, true)
 	// indexes are presented in query's filters with their ids, but for search request we need their titles
 	indexIds := extractIndexIds(storedQuery)
 	indexes := retrieveIndexTitles(indexIds)
@@ -25,72 +25,31 @@ func retrieveHits(storedQuery SavedObject) []Hit {
 
 	var hits []Hit
 
-	offset := 0
-	perPage := 1000
-	total := -1
-
-	trackTotalHits := true
-	searchRequest.TrackTotalHits = &trackTotalHits
+	step := 1
+	searchResponse := executeSearchRequest(searchRequest, path)
+	if searchResponse == nil {
+		return nil
+	}
+	hits = append(hits, searchResponse.Hits.Hits...)
+	total := searchResponse.Hits.Total.Value
 
 	allSuccessful := true
-	for total == -1 || total > offset {
-		searchRequest.Size = &perPage
-		searchRequest.From = &offset
-
-		var body bytes.Buffer
-		if err := json.NewEncoder(&body).Encode(searchRequest); err != nil {
-			log.Error("Error encoding Search request body: ", err)
-			return nil
+	for total > (*searchRequest.Size * step) {
+		step = step + 1
+		lastId := searchResponse.Hits.Hits[len(searchResponse.Hits.Hits)-1].ID
+		searchRequest.SearchAfter = append(searchRequest.SearchAfter, lastId)
+		searchResponse := executeSearchRequest(searchRequest, path)
+		if searchResponse == nil {
+			allSuccessful = false
+			continue
 		}
-		log.Info(body.String())
-		response, successful := executeRequest(http.MethodGet, path, &body, elasticHeaders)
-		if response == nil {
-			log.Error("Search response is nil.")
-		}
-		if !successful || response == nil {
-			if total != -1 {
-				// previous calls were fine let's try to get remaining data
-				allSuccessful = false
-				offset = offset + perPage
-				if offset+perPage > total {
-					perPage = total - offset
-				}
-				continue
-			} else {
-				log.Error("Search failed.")
-				return nil
-			}
-		}
-
-		var searchResponse SearchResponse
-		err := json.Unmarshal(response, &searchResponse)
-		if err != nil {
-			log.Error("Error parsing Search response: ", err)
-			if total != -1 {
-				// previous parsings were fine let's try to get remaining data
-				allSuccessful = false
-				offset = offset + perPage
-				if offset+perPage > total {
-					perPage = total - offset
-				}
-				continue
-			} else {
-				log.Error("Search failed.")
-				return nil
-			}
-		}
-
 		hits = append(hits, searchResponse.Hits.Hits...)
-
-		total = searchResponse.Hits.Total.Value
-		offset = offset + perPage
-		if offset+perPage > total {
-			perPage = total - offset
-		}
 	}
+
 	if !allSuccessful && hits != nil {
 		log.Error("Failed to extract some of Hits. The result is probably incomplete.")
 	}
+
 	return hits
 }
 
@@ -109,16 +68,48 @@ func buildSearchPath(indexes []string) string {
 	return getElasticApiPath() + indexesPath + searchPath
 }
 
+func executeSearchRequest(searchRequest SearchRequest, path string) *SearchResponse {
+	bodyBytes, err := json.Marshal(searchRequest)
+	if err != nil {
+		log.Error("Error marshalling Search request body: ", err)
+		return nil
+	}
+
+	status, response, err := clients.SendRequest(http.MethodGet, path, elasticHeaders, nil, bodyBytes)
+	if err != nil || status != 200 || response == nil {
+		if err != nil {
+			log.Error(err)
+		}
+		if status != 200 {
+			log.Error("Failure response code: ", status)
+		}
+		if response == nil {
+			log.Error("Search response is nil.")
+		}
+		return nil
+	}
+
+	var searchResponse SearchResponse
+	err = json.Unmarshal(response, &searchResponse)
+	if err != nil {
+		log.Error("Error parsing Search response: ", err)
+		return nil
+	}
+
+	return &searchResponse
+}
+
 func getElasticApiPath() string {
 	// TODO get from environment variables if not set return default
 	return defaultElasticApiPath
 }
 
 type SearchRequest struct {
-	TrackTotalHits *bool  `json:"track_total_hits,omitempty"`
-	Size           *int   `json:"size,omitempty"`
-	From           *int   `json:"from,omitempty"`
-	Query          *Query `json:"query,omitempty"`
+	TrackTotalHits *bool               `json:"track_total_hits,omitempty"`
+	Size           *int                `json:"size,omitempty"`
+	Query          *Query              `json:"query,omitempty"`
+	Sort           []map[string]string `json:"sort,omitempty"`
+	SearchAfter    []interface{}       `json:"search_after,omitempty"`
 }
 
 type Query struct {
