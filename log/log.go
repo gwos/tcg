@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -27,6 +28,8 @@ const (
 )
 
 const timestampFormat = "2006-01-02 15:04:05"
+
+var RemoveKeys = [...]string{"password", "token"}
 
 var logger = struct {
 	*logrus.Logger
@@ -170,12 +173,35 @@ func (h *ckHook) Fire(entry *logrus.Entry) error {
 	} else {
 		/* skip caching if consolidation off */
 		if logger.consPeriod > 0 {
-			h.cache.Add(ck, uint16(0), time.Duration(logger.consPeriod)*time.Second)
+			h.cache.Add(string(protectData(ck)), uint16(0), time.Duration(logger.consPeriod)*time.Second)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-		h.writer.Write(output)
+		h.writer.Write(protectData(string(output)))
 	}
 	/* debug hits */
 	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
 	return nil
+}
+
+func protectData(data string) []byte {
+	for _, key := range RemoveKeys {
+		jsonKey := fmt.Sprintf("\"%s\"", key)
+		if keyPos := strings.Index(data, jsonKey); keyPos != -1 {
+			endKeyPos := keyPos + len(jsonKey)
+			valuePos := endKeyPos + 2
+			var cut string
+			if valueEndPos := strings.Index(data[endKeyPos:], ",") + valuePos; valueEndPos != valuePos-1 {
+				cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
+				data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
+			} else {
+				if valueEndPos := strings.LastIndex(data[endKeyPos:], "}") + valuePos; valueEndPos != valuePos-1 {
+					cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
+					data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
+				} else {
+					continue
+				}
+			}
+		}
+	}
+	return []byte(data)
 }
