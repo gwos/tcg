@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -79,7 +81,8 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
 	if controller.srv != nil {
-		return fmt.Errorf("StartController: already started")
+		log.Warn("StartController: already started")
+		return nil
 	}
 
 	var addr string
@@ -110,12 +113,12 @@ func (controller *Controller) startController() error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Info("Controller: start listen TLS: ", addr)
+			log.Info("[Controller]: start listen TLS: ", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
 				log.Error("Controller: start error: ", err)
 			}
 		} else {
-			log.Info("Controller: start listen: ", addr)
+			log.Info("[Controller]: start listen: ", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Error("Controller: start error: ", err)
 			}
@@ -158,12 +161,12 @@ func (controller *Controller) stopController() error {
 
 //
 // @Description The following API endpoint can be used to Agent configure.
-// @Tags Agent
+// @Tags    agent, connector
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200
 // @Failure 401 {string} string "Unauthorized"
-// @Router /config [post]
+// @Router  /config [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) config(c *gin.Context) {
@@ -172,18 +175,33 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
+	var dto config.ConnectorDTO
+	if err := json.Unmarshal(value, &dto); err != nil {
+		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
+		return
+	}
+
+	credentials := cache.Credentials{
+		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
+		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
+	}
+	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, "could not validate config token request: " + dto.DSConnection.HostName)
+	}
+
 	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
 	c.JSON(http.StatusOK, nil)
 }
 
 //
 // @Description The following API endpoint can be used to send Alerts to Foundation.
-// @Tags Alerts
+// @Tags    alert, event
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200
 // @Failure 401 {string} string "Unauthorized"
-// @Router /events [post]
+// @Router  /events [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) events(c *gin.Context) {
@@ -202,12 +220,12 @@ func (controller *Controller) events(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to send Alerts to Foundation.
-// @Tags Alerts
+// @Tags    alert, event
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200
 // @Failure 401 {string} string "Unauthorized"
-// @Router /events-ack [post]
+// @Router  /events-ack [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) eventsAck(c *gin.Context) {
@@ -226,12 +244,12 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to send Alerts to Foundation.
-// @Tags Alerts
+// @Tags    alert, event
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200
 // @Failure 401 {string} string "Unauthorized"
-// @Router /events-unack [post]
+// @Router  /events-unack [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) eventsUnack(c *gin.Context) {
@@ -250,13 +268,13 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to get list of metrics from the server.
-// @Tags Metrics
+// @Tags    metric
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200 {object} services.AgentStatus
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /metrics [get]
+// @Router  /metrics [get]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) listMetrics(c *gin.Context) {
@@ -269,33 +287,14 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 }
 
 //
-// @Description The following API endpoint can be used to reload the configuration.
-// @Tags Server
-// @Accept  json
-// @Produce  json
-// @Success 200
-// @Failure 401 {string} string "Unauthorized"
-// @Router /reload [post]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
-func (controller *Controller) reload(c *gin.Context) {
-	ctrl, err := controller.ReloadAsync(nil)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, err.Error())
-		return
-	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
-}
-
-//
 // @Description The following API endpoint can be used to start NATS dispatcher.
-// @Tags Server
+// @Tags    agent, connector
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /start [post]
+// @Router  /start [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
@@ -314,13 +313,13 @@ func (controller *Controller) start(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to stop NATS dispatcher.
-// @Tags Server
+// @Tags    agent, connector
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
-// @Router /stop [post]
+// @Router  /stop [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
@@ -339,12 +338,12 @@ func (controller *Controller) stop(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to get TNG statistics.
-// @Tags Agent
+// @Tags    agent, connector
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200 {object} services.AgentStats
 // @Failure 401 {string} string "Unauthorized"
-// @Router /stats [get]
+// @Router  /stats [get]
 // @Param   gwos-app-name    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stats(c *gin.Context) {
@@ -353,12 +352,12 @@ func (controller *Controller) stats(c *gin.Context) {
 
 //
 // @Description The following API endpoint can be used to get TNG status.
-// @Tags Server
+// @Tags    agent, connector
 // @Accept  json
-// @Produce  json
+// @Produce json
 // @Success 200 {object} services.ConnectorStatusDTO
 // @Failure 401 {string} string "Unauthorized"
-// @Router /status [get]
+// @Router  /status [get]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
@@ -392,7 +391,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken)
+		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
@@ -411,14 +410,14 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
 	apiV1Group := router.Group("/api/v1")
+	apiV1Config := router.Group("/api/v1/config")
 	apiV1Group.Use(controller.validateToken)
 
-	apiV1Group.POST("/config", controller.config)
+	apiV1Config.POST("", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
 	apiV1Group.GET("/metrics", controller.listMetrics)
-	apiV1Group.POST("/reload", controller.reload)
 	apiV1Group.POST("/start", controller.start)
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)

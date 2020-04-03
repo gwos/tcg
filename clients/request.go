@@ -29,11 +29,34 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 		byteBody = []byte(urlValues.Encode())
 	}
 
-	request, err = http.NewRequest(httpMethod, requestURL, bytes.NewBuffer(byteBody))
-	if err != nil {
-		return -1, nil, err
+	switch httpMethod {
+	case http.MethodGet:
+		request, err = http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return -1, nil, err
+		}
+		request.Header.Set("Connection", "close")
+	case http.MethodPost:
+		request, err = http.NewRequest(http.MethodPost, requestURL, bytes.NewBuffer(byteBody))
+		if err != nil {
+			return -1, nil, err
+		}
+		request.Header.Set("Connection", "close")
+		defer request.Body.Close()
+	case http.MethodPut:
+		request, err = http.NewRequest(http.MethodPut, requestURL, bytes.NewBuffer(byteBody))
+		if err != nil {
+			return -1, nil, err
+		}
+		request.Header.Set("Connection", "close")
+		defer request.Body.Close()
+	case http.MethodDelete:
+		request, err = http.NewRequest(http.MethodDelete, requestURL, nil)
+		if err != nil {
+			return -1, nil, err
+		}
+		request.Header.Set("Connection", "close")
 	}
-	request.Header.Set("Connection", "close")
 
 	if headers != nil {
 		for key, value := range headers {

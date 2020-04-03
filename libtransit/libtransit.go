@@ -178,6 +178,16 @@ func StopTransport(errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
+// DemandConfig is a C API for services.GetTransitService().DemandConfig
+//export DemandConfig
+func DemandConfig(errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().DemandConfig(); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
 // IsControllerRunning is a C API for services.GetTransitService().Status().Controller
 //export IsControllerRunning
 func IsControllerRunning() bool {

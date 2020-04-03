@@ -2,10 +2,10 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
+	"io/ioutil"
 	"math"
 	"net/url"
 	"os"
@@ -73,9 +73,13 @@ type Connector struct {
 	// NatsHost accepts value for combined "host:port"
 	// used as `strings.Split(natsHost, ":")`
 	NatsHost string `yaml:"natsHost"`
+	// LogConsPeriod accepts number of seconds
+	// if 0 turn off consolidation
+	LogConsPeriod int `yaml:"logConsPeriod"`
 	// LogFile accepts file path to log in addition to stdout
 	LogFile  string   `yaml:"logFile"`
 	LogLevel LogLevel `yaml:"logLevel"`
+	Enabled  bool     `yaml:"enabled"`
 }
 
 // ConnectorDTO defines TNG Connector configuration
@@ -84,9 +88,11 @@ type ConnectorDTO struct {
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
 	TngURL        string        `json:"tngUrl"`
+	LogConsPeriod int           `json:"logConsPeriod"`
 	LogLevel      LogLevel      `json:"logLevel"`
+	Enabled       bool          `json:"enabled"`
+	DSConnection  DSConnection  `json:"dalekservicesConnection"`
 	GWConnections GWConnections `json:"groundworkConnections"`
-	// GWConnections []GWConnection `json:"groundworkConnections"`
 	// TODO: extend LoadConnectorDTO to handle more fields
 	// MonitorConnection MonitorConnectionDto
 	// MetricsProfile    MetricsProfileDto
@@ -127,13 +133,13 @@ func (con *GWConnection) Decode(value string) error {
 		con.Password = overrides.Password
 	}
 	if overrides.DisplayName != "" {
-		con.Password = overrides.DisplayName
+		con.DisplayName = overrides.DisplayName
 	}
 	if overrides.DeferOwnership != "" {
-		con.Password = overrides.DeferOwnership
+		con.DeferOwnership = overrides.DeferOwnership
 	}
 	if overrides.ResourceNamePrefix != "" {
-		con.Password = overrides.ResourceNamePrefix
+		con.ResourceNamePrefix = overrides.ResourceNamePrefix
 	}
 	return nil
 }
@@ -173,8 +179,6 @@ type DSConnection struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
 	HostName string `yaml:"hostName"`
-	UserName string `yaml:"userName"`
-	Password string `yaml:"password"`
 }
 
 // Decode implements envconfig.Decoder interface
@@ -186,12 +190,6 @@ func (con *DSConnection) Decode(value string) error {
 	}
 	if overrides.HostName != "" {
 		con.HostName = overrides.HostName
-	}
-	if overrides.UserName != "" {
-		con.UserName = overrides.UserName
-	}
-	if overrides.Password != "" {
-		con.Password = overrides.Password
 	}
 	return nil
 }
@@ -210,12 +208,13 @@ func GetConfig() *Config {
 		cfg = &Config{
 			Connector: &Connector{
 				ControllerAddr:   ":8099",
+				LogConsPeriod:    0,
 				LogLevel:         1,
 				NatsAckWait:      30,
 				NatsMaxInflight:  math.MaxInt32,
 				NatsFilestoreDir: "natsstore",
 				NatsStoreType:    "FILE",
-				NatsHost:         ":4222",
+				NatsHost:         "127.0.0.1:4222",
 			},
 			DSConnection: &DSConnection{},
 		}
@@ -225,24 +224,24 @@ func GetConfig() *Config {
 			wd, err := os.Getwd()
 			if err != nil {
 				log.Warn(err)
+				wd = ""
 			}
 			configPath = path.Join(wd, ConfigName)
 		}
 
-		configFile, err := os.Open(configPath)
-		if err == nil {
-			err = yaml.NewDecoder(configFile).Decode(cfg)
-			if err != nil {
+		if data, err := ioutil.ReadFile(configPath); err != nil {
+			log.Warn(err)
+		} else {
+			if err := yaml.Unmarshal(data, cfg); err != nil {
 				log.Warn(err)
 			}
 		}
 
-		err = envconfig.Process(EnvConfigPrefix, cfg)
-		if err != nil {
+		if err := envconfig.Process(EnvConfigPrefix, cfg); err != nil {
 			log.Warn(err)
 		}
 
-		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 	})
 	return cfg
 }
@@ -253,6 +252,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var tempURLString string
 
 	if err := json.Unmarshal(data, &dto); err != nil {
+		log.Error(err.Error())
 		return nil, err
 	}
 
@@ -260,9 +260,11 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if !strings.HasPrefix(tempURLString, "http://") && !strings.HasPrefix(tempURLString, "https://") {
 		tempURLString = "https://" + tempURLString
 	}
-	if tngURL, err := url.Parse(tempURLString); err == nil {
+	if _, err := url.Parse(tempURLString); err == nil {
 		// TODO: Improve addr setting
-		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
+		// cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
+		// we are no longer using port numbers in the Dalek UI, since we are now using revproxy
+		cfg.Connector.ControllerAddr = "0.0.0.0:8099"
 	} else {
 		return nil, err
 	}
@@ -270,9 +272,32 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
+	cfg.Connector.LogConsPeriod = dto.LogConsPeriod
 	cfg.Connector.LogLevel = dto.LogLevel
+	cfg.Connector.Enabled = dto.Enabled
 	cfg.GWConnections = dto.GWConnections
+	if len(dto.DSConnection.HostName) != 0 {
+		cfg.DSConnection.HostName = dto.DSConnection.HostName
+	}
 
-	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel))
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
+
+	if output, err := yaml.Marshal(cfg); err != nil {
+		log.Warn(err)
+	} else {
+		configPath := os.Getenv(string(ConfigEnv))
+		if configPath == "" {
+			wd, err := os.Getwd()
+			if err != nil {
+				log.Warn(err)
+				wd = ""
+			}
+			configPath = path.Join(wd, ConfigName)
+		}
+		if err := ioutil.WriteFile(configPath, output, 0644); err != nil {
+			log.Warn(err)
+		}
+	}
+
 	return &dto, nil
 }

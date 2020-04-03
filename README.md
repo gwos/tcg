@@ -79,6 +79,14 @@ The TNG project is built with Go Modules. See `go.mod` for a list of dependencie
     with the standard library logger.
 
         github.com/sirupsen/logrus
+    
+    > Log levels:
+       
+        0 - Error; 
+        1 - Warn; 
+        2 - Info; 
+        3 - Debug
+
 
 8. [Gopsutil](github.com/shirou/gopsutil)
 
