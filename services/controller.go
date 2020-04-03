@@ -25,6 +25,7 @@ type Controller struct {
 	*AgentService
 	srv                *http.Server
 	listMetricsHandler GetBytesHandlerType
+	ListMetricsMutex   sync.Mutex
 }
 
 const shutdownTimeout = 5 * time.Second
@@ -39,6 +40,7 @@ func GetController() *Controller {
 			GetAgentService(),
 			nil,
 			nil,
+			sync.Mutex{},
 		}
 	})
 	return controller
@@ -46,6 +48,8 @@ func GetController() *Controller {
 
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
+	controller.ListMetricsMutex.Lock()
+	defer controller.ListMetricsMutex.Unlock()
 	if controller.listMetricsHandler != nil {
 		return controller.listMetricsHandler()
 	}
@@ -54,12 +58,16 @@ func (controller *Controller) ListMetrics() ([]byte, error) {
 
 // RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
 func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
+	controller.ListMetricsMutex.Lock()
 	controller.listMetricsHandler = fn
+	controller.ListMetricsMutex.Unlock()
 }
 
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
+	controller.ListMetricsMutex.Lock()
 	controller.listMetricsHandler = nil
+	controller.ListMetricsMutex.Unlock()
 }
 
 // SendEvents implements Controllers.SendEvents interface
@@ -187,7 +195,7 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, "could not validate config token request: " + dto.DSConnection.HostName)
+		c.JSON(http.StatusBadRequest, "could not validate config token request: "+dto.DSConnection.HostName)
 	}
 
 	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
