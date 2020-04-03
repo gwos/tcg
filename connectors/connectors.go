@@ -17,14 +17,11 @@ import (
 var transitService *services.TransitService
 
 // will come from extensions field
-var Timer int = 120
+var timer = 120
 
 func Start() error {
 	transitService = services.GetTransitService()
 
-	if err := transitService.StartController(); err != nil {
-		return err
-	}
 	if err := transitService.StartNats(); err != nil {
 		return err
 	}
@@ -35,23 +32,19 @@ func Start() error {
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
-	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
-	for i := range resources {
-		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-		for j := range resources[i].Services {
-			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-		}
-	}
-
 	request := transit.ResourcesWithServicesRequest{
 		Context:   transitService.MakeTracerContext(),
 		Resources: resources,
 	}
+	for i, _ := range request.Resources {
+		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+	}
 
 	b, err := json.Marshal(request)
+
+	// log.Error(string(b))
+
 	if err != nil {
 		return err
 	}
@@ -59,17 +52,36 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 }
 
-func SendInventory(resource []transit.InventoryResource, resourceGroups []transit.ResourceGroup) error {
-	request := transit.InventoryRequest{
-		Context:   transitService.MakeTracerContext(),
-		Resources: resource,
-		Groups:    resourceGroups,
+func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	var monitoredResourceRefs []transit.MonitoredResourceRef
+	for _, resource := range resources {
+		monitoredResourceRefs = append(monitoredResourceRefs,
+			transit.MonitoredResourceRef{
+				Name: resource.Name,
+				Type: transit.Host,
+			},
+		)
 	}
-	b, err := json.Marshal(request)
+
+	for i := range resourceGroups {
+		resourceGroups[i].Resources = monitoredResourceRefs
+	}
+
+	inventoryRequest := transit.InventoryRequest{
+		Context:       transitService.MakeTracerContext(),
+		OwnershipType: ownershipType,
+		Resources:     resources,
+		Groups:        resourceGroups,
+	}
+
+	b, err := json.Marshal(inventoryRequest)
 	if err != nil {
 		return err
 	}
-	return transitService.SynchronizeInventory(b)
+
+	err = transitService.SynchronizeInventory(b)
+
+	return err
 }
 
 // Inventory Constructors
@@ -91,27 +103,6 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 		resource.Services = append(resource.Services, s)
 	}
 	return resource
-}
-
-func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
-	resource := transit.MonitoredResourceRef{
-		Name:  name,
-		Type:  resourceType,
-		Owner: owner,
-	}
-	return resource
-}
-
-func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
-	group := transit.ResourceGroup{
-		GroupName:   name,
-		Type:        groupType,
-		Description: description,
-	}
-	for _, r := range resources {
-		group.Resources = append(group.Resources, r)
-	}
-	return group
 }
 
 // Metric Constructors
@@ -161,8 +152,6 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		switch arg.(type) {
 		case string:
 			metric.Unit = transit.UnitType(arg.(string))
-		case transit.UnitType:
-			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
 		//case transit.MetricSampleType:

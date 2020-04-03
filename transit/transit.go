@@ -14,6 +14,18 @@ const (
 	ModelVersion VersionString = "1.0.0"
 )
 
+// HostOwnershipType defines the host ownership type of inventory.
+type HostOwnershipType string
+
+// Take - Always take ownership, can overwrite ownership, aggressive take everything
+// Creator - Leave ownership if already owned (owns things it creates, if I didn't create it I don't own it)
+// Yield - Always defer ownership - don't want to own it, if someone else comes along, let them own it
+const (
+	Creator HostOwnershipType = "Creator"
+	Take                      = "Take"
+	Yield                     = "Yield"
+)
+
 // MetricKind defines the metric kind of the time series.
 type MetricKind string
 
@@ -636,9 +648,10 @@ func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context   *TracerContext      `json:"context,omitempty"`
-	Resources []InventoryResource `json:"resources"`
-	Groups    []ResourceGroup     `json:"groups,omitempty"`
+	Context       *TracerContext      `json:"context,omitempty"`
+	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
+	Resources     []InventoryResource `json:"resources"`
+	Groups        []ResourceGroup     `json:"groups,omitempty"`
 }
 
 func (inventoryRequest InventoryRequest) String() string {
@@ -767,4 +780,44 @@ type GroundworkEventUnack struct {
 func (groundworkEventUnack GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
+}
+
+type MetricsProfile struct {
+	Name        string             `json:"name"`
+	ProfileType string             `json:"profileType"`
+	IsTemplate  bool               `json:"isTemplate"`
+	Metrics     []MetricDefinition `json:"metrics"`
+}
+
+func (metricsProfile MetricsProfile) String() string {
+	return fmt.Sprintf("[%s, %s, %t, %s]",
+		metricsProfile.Name, metricsProfile.ProfileType,
+		metricsProfile.IsTemplate, metricsProfile.Metrics,
+	)
+}
+
+type MetricDefinition struct {
+	Name              string      `json:"name"`
+	CustomName        string      `json:"customName"`
+	Description       string      `json:"description"`
+	Monitored         bool        `json:"monitored"`
+	Graphed           bool        `json:"graphed"`
+	MetricType        MetricKind  `json:"metricType"`
+	ComputeType       ComputeType `json:"computeType"`
+	ServiceType       string      `json:"serviceType"`
+	SourceType        string      `json:"sourceType"`
+	AggregateType     string      `json:"aggregateType"`
+	WarningThreshold  int         `json:"warningThreshold"`
+	CriticalThreshold int         `json:"criticalThreshold"`
+	Expression        string      `json:"expression"`
+	Format            string      `json:"format"`
+}
+
+func (metricDefinition MetricDefinition) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %t, %t, %s, %s, %s, %s, %s, %d, %d, %s, %s]",
+		metricDefinition.Name, metricDefinition.CustomName, metricDefinition.Description, metricDefinition.Monitored,
+		metricDefinition.Graphed, metricDefinition.MetricType, metricDefinition.ComputeType, metricDefinition.ServiceType,
+		metricDefinition.SourceType, metricDefinition.AggregateType, metricDefinition.WarningThreshold,
+		metricDefinition.CriticalThreshold, metricDefinition.Expression, metricDefinition.Format,
+	)
 }

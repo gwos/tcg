@@ -31,13 +31,16 @@ const (
 	TestTraceToken                     = "token-99e93"
 	GWAccount                          = "RESTAPIACCESS"
 	GWPassword                         = "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
-	GWValidHost                        = "localhost:80"
-	GWInvalidHost                      = "localhost:23"
+	GWAccountRemote                    = "admin"
+	GWPasswordRemote                   = "admin"
+	GWValidHost                        = "http://localhost:80"
+	GWInvalidHost                      = "http://localhost:23"
 	TestTngAgentConfigNatsFileStoreDir = "test_datastore"
 )
 
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
+// TNG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
 	configNats(t, 5)
@@ -76,6 +79,7 @@ func TestNatsQueue_1(t *testing.T) {
 
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
+// TNG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
 	configNats(t, 30)
@@ -103,6 +107,9 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
 	log.Info("NATS Server was stopped successfully")
 
+	GetConfig().GWConnections[0].LocalConnection = false
+	GetConfig().GWConnections[0].UserName = GWAccountRemote
+	GetConfig().GWConnections[0].Password = GWPasswordRemote
 	GetConfig().GWConnections[0].HostName = GWValidHost
 	log.Info("Invalid path was changed to valid one")
 
@@ -177,9 +184,11 @@ func configNats(t *testing.T, natsAckWait int64) {
 	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
 	GetConfig().GWConnections = []*GWConnection{
 		{
-			HostName: GWValidHost,
-			UserName: GWAccount,
-			Password: GWPassword,
+			Enabled:         true,
+			LocalConnection: true,
+			HostName:        GWValidHost,
+			UserName:        GWAccount,
+			Password:        GWPassword,
 		},
 	}
 
@@ -187,6 +196,7 @@ func configNats(t *testing.T, natsAckWait int64) {
 	service.Connector.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
 	service.Connector.NatsAckWait = natsAckWait
 
+	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
 	log.Info("#configNats status: ", service.Status())

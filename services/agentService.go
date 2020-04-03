@@ -22,14 +22,15 @@ import (
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*config.Connector
-	agentStats  *AgentStats
-	agentStatus *AgentStatus
-	DSClient    *clients.DSClient
-	gwClients   []*clients.GWClient
-	ctrlIdx     uint8
-	ctrlChan    chan *CtrlAction
-	statsChan   chan statsCounter
-	tracerToken []byte
+	agentStats    *AgentStats
+	agentStatus   *AgentStatus
+	DSClient      *clients.DSClient
+	gwClients     []*clients.GWClient
+	ctrlIdx       uint8
+	ctrlChan      chan *CtrlAction
+	statsChan     chan statsCounter
+	tracerToken   []byte
+	ConfigHandler func([]byte)
 }
 
 // CtrlAction defines queued controll action
@@ -50,7 +51,6 @@ type ctrlSubj string
 
 const (
 	ctrlSubjConfig          ctrlSubj = "config"
-	ctrlSubjReload                   = "reload"
 	ctrlSubjStartController          = "startController"
 	ctrlSubjStopController           = "stopController"
 	ctrlSubjStartNats                = "startNats"
@@ -62,6 +62,8 @@ const (
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
 const statsLastErrorsLim = 10
+const traceOnDemandAgentID = "#traceOnDemandAgentID#"
+const traceOnDemandAppType = "#traceOnDemandAppType#"
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -93,21 +95,50 @@ func GetAgentService() *AgentService {
 				Nats:       Stopped,
 				Transport:  Stopped,
 			},
-			&clients.DSClient{
-				AppName:      agentConnector.AppName,
-				DSConnection: config.GetConfig().DSConnection,
-			},
+			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
 			nil,
 			0,
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 			tracerToken,
+			nil,
 		}
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+
+		log.With(log.Fields{
+			"AgentID":        agentService.AgentID,
+			"AppType":        agentService.AppType,
+			"AppName":        agentService.AppName,
+			"ControllerAddr": agentService.ControllerAddr,
+			"DsClient":       agentService.DSClient.HostName,
+		}).Log(log.DebugLevel, "#AgentService Config")
 	})
+
 	return agentService
+}
+
+// DemandConfig implements AgentServices.DemandConfig interface
+func (service *AgentService) DemandConfig() error {
+	if err := service.StartController(); err != nil {
+		return err
+	}
+	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+		log.Info("[Demand Config]: Config Server is not configured")
+	} else {
+		for {
+			if err := service.DSClient.Reload(service.AgentID); err != nil {
+				log.With(log.Fields{"error": err}).
+					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
+				time.Sleep(time.Duration(20) * time.Second)
+				continue
+			}
+			break
+		}
+		log.Info("[Demand Config]: Config Server found and connected")
+	}
+	return nil
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
@@ -123,18 +154,23 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	}
 	traceToken, _ := uuid.FormatUUID(tokenBuf)
 
+	/* use placeholders on demand config, then replace on fixTracerContext */
+	agentID := service.Connector.AgentID
+	appType := service.Connector.AppType
+	if len(agentID) == 0 {
+		agentID = traceOnDemandAgentID
+	}
+	if len(appType) == 0 {
+		appType = traceOnDemandAppType
+	}
+
 	return &transit.TracerContext{
-		AgentID:    service.Connector.AgentID,
-		AppType:    service.Connector.AppType,
+		AgentID:    agentID,
+		AppType:    appType,
 		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
-}
-
-// ReloadAsync implements AgentServices.ReloadAsync interface
-func (service *AgentService) ReloadAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjReload, syncChan)
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -165,11 +201,6 @@ func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlActi
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
-}
-
-// Reload implements AgentServices.Reload interface
-func (service *AgentService) Reload() error {
-	return service.ctrlPushSync(nil, ctrlSubjReload)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -237,13 +268,16 @@ func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
 func (service *AgentService) listenCtrlChan() {
 	for {
 		ctrl := <-service.ctrlChan
+		log.With(log.Fields{
+			"Idx":  ctrl.Idx,
+			"Subj": ctrl.Subj,
+			"Data": string(ctrl.Data),
+		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
 		case ctrlSubjConfig:
 			err = service.config(ctrl.Data)
-		case ctrlSubjReload:
-			err = service.reload()
 		case ctrlSubjStartController:
 			err = service.startController()
 		case ctrlSubjStopController:
@@ -319,7 +353,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSendResourceWithMetrics,
 				func(b []byte) error {
-					_, err := gwClientRef.SendResourcesWithMetrics(b)
+					_, err := gwClientRef.SendResourcesWithMetrics(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -327,7 +361,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				durableID,
 				SubjSynchronizeInventory,
 				func(b []byte) error {
-					_, err := gwClientRef.SynchronizeInventory(b)
+					_, err := gwClientRef.SynchronizeInventory(service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -365,66 +399,17 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	if service.ConfigHandler != nil {
+		service.ConfigHandler(data)
+	}
 
-	reloadFlags := struct {
-		Controller bool
-		Transport  bool
-		Nats       bool
-	}{
-		service.Status().Controller == Running,
-		service.Status().Transport == Running,
-		service.Status().Nats == Running,
-	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		_ = service.stopController()
-		_ = service.startController()
-	}
-	if reloadFlags.Nats {
-		_ = service.stopNats()
-		_ = service.startNats()
-	}
-	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
+	service.agentStats.AgentID = service.Connector.AgentID
+	service.agentStats.AppType = service.Connector.AppType
+
+	_ = service.stopTransport()
+	if service.Connector.Enabled {
 		_ = service.startTransport()
 	}
-
-	return nil
-}
-
-func (service *AgentService) reload() error {
-	log.Warn("DEPRECATED RELOAD API")
-	if res, clErr := service.DSClient.FetchConnector(service.AgentID); clErr == nil {
-		if _, err := config.GetConfig().LoadConnectorDTO(res); err != nil {
-			return err
-		}
-	} else {
-		return clErr
-	}
-
-	reloadFlags := struct {
-		Controller bool
-		Transport  bool
-		Nats       bool
-	}{
-		service.Status().Controller == Running,
-		service.Status().Transport == Running,
-		service.Status().Nats == Running,
-	}
-	// TODO: Handle errors
-	if reloadFlags.Controller {
-		_ = service.stopController()
-		_ = service.startController()
-	}
-	if reloadFlags.Nats {
-		_ = service.stopNats()
-		_ = service.startNats()
-	}
-	if reloadFlags.Transport {
-		// service.StopTransport() // stopped with Nats
-		_ = service.startTransport()
-	}
-
 	return nil
 }
 
@@ -470,9 +455,15 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
-	cons := config.GetConfig().GWConnections
+	cons := make([]*config.GWConnection, 0)
+	for _, c := range config.GetConfig().GWConnections {
+		if c.Enabled {
+			cons = append(cons, c)
+		}
+	}
 	if len(cons) == 0 {
-		return fmt.Errorf("StartTransport: %v", "empty GWConnections")
+		log.Warn("StartTransport: empty GWConnections")
+		return nil
 	}
 	/* Process clients */
 	gwClients := make([]*clients.GWClient, len(cons))
@@ -489,6 +480,7 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
+	log.Info("[StartTransport]: Started")
 	return nil
 }
 
@@ -496,12 +488,12 @@ func (service *AgentService) stopTransport() error {
 	if service.agentStatus.Transport == Stopped {
 		return nil
 	}
-
-	err := nats.StopDispatcher()
-	if err == nil {
-		service.agentStatus.Transport = Stopped
+	if err := nats.StopDispatcher(); err != nil {
+		return err
 	}
-	return err
+	service.agentStatus.Transport = Stopped
+	log.Info("[StopTransport]: Stopped")
+	return nil
 }
 
 // mixTracerContext adds `context` field if absent
@@ -521,4 +513,17 @@ func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error
 		return buf.Bytes(), nil
 	}
 	return payloadJSON, nil
+}
+
+// fixTracerContext replaces placeholders
+func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
+	return bytes.ReplaceAll(
+		bytes.ReplaceAll(
+			payloadJSON,
+			[]byte(traceOnDemandAppType),
+			[]byte(service.Connector.AppType),
+		),
+		[]byte(traceOnDemandAgentID),
+		[]byte(service.Connector.AgentID),
+	)
 }

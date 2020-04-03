@@ -9,11 +9,15 @@ import (
 	"io/ioutil"
 	"os"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 )
 
 // Fields Type to pass when we want to call WithFields for structured logging
 type Fields map[string]interface{}
+
+var once sync.Once
 
 // Levels to pass when we want call Log on WithFields
 const (
@@ -25,7 +29,15 @@ const (
 
 const timestampFormat = "2006-01-02 15:04:05"
 
-var logger = logrus.New()
+var RemoveKeys = [...]string{"password", "token"}
+
+var logger = struct {
+	*logrus.Logger
+	consPeriod int
+}{
+	logrus.New(),
+	0,
+}
 
 // Info makes entries in the log on Info level
 func Info(args ...interface{}) {
@@ -48,22 +60,24 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, level int) {
-	ch := ckHook{
-		cache.New(10*time.Minute, 10*time.Second),
-		os.Stdout,
-	}
-
-	if len(filePath) > 0 {
-		if logFile, err := os.OpenFile(filePath,
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			ch.writer = io.MultiWriter(os.Stdout, logFile)
+func Config(filePath string, level int, consPeriod int) {
+	once.Do(func() {
+		ch := ckHook{
+			cache.New(10*time.Minute, 10*time.Second),
+			os.Stdout,
 		}
-	}
 
-	ch.cache.OnEvicted(fnOnEvicted(ch.writer))
-	logger.SetOutput(ioutil.Discard)
-	logger.AddHook(&ch)
+		if len(filePath) > 0 {
+			if logFile, err := os.OpenFile(filePath,
+				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+				ch.writer = io.MultiWriter(os.Stdout, logFile)
+			}
+		}
+
+		ch.cache.OnEvicted(fnOnEvicted(ch.writer))
+		logger.SetOutput(ioutil.Discard)
+		logger.AddHook(&ch)
+	})
 
 	logger.SetFormatter(&nested.Formatter{
 		TimestampFormat: timestampFormat,
@@ -82,6 +96,8 @@ func Config(filePath string, level int) {
 	default:
 		logger.SetLevel(logrus.DebugLevel)
 	}
+
+	logger.consPeriod = consPeriod
 }
 
 // Entry wraps logrus.Entry
@@ -120,9 +136,9 @@ func fnOnEvicted(w io.Writer) func(string, interface{}) {
 	return func(ck string, i interface{}) {
 		v := i.(uint16)
 		if v > 0 {
-			fmt.Fprintf(w, "%s [consolidate: %d more entries last 60 seconds] %s\n",
+			fmt.Fprintf(w, "%s [consolidate: %d more entries last %d seconds] %s\n",
 				time.Now().Format(timestampFormat),
-				v, ck)
+				v, logger.consPeriod, ck)
 		}
 	}
 }
@@ -155,11 +171,37 @@ func (h *ckHook) Fire(entry *logrus.Entry) error {
 	if _, ok := h.cache.Get(ck); ok {
 		h.cache.Increment(ck, 1)
 	} else {
-		h.cache.Add(ck, uint16(0), 60*time.Second)
+		/* skip caching if consolidation off */
+		if logger.consPeriod > 0 {
+			h.cache.Add(string(protectData(ck)), uint16(0), time.Duration(logger.consPeriod)*time.Second)
+		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-		h.writer.Write(output)
+		h.writer.Write(protectData(string(output)))
 	}
 	/* debug hits */
 	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
 	return nil
+}
+
+func protectData(data string) []byte {
+	for _, key := range RemoveKeys {
+		jsonKey := fmt.Sprintf("\"%s\"", key)
+		if keyPos := strings.Index(data, jsonKey); keyPos != -1 {
+			endKeyPos := keyPos + len(jsonKey)
+			valuePos := endKeyPos + 2
+			var cut string
+			if valueEndPos := strings.Index(data[endKeyPos:], ",") + valuePos; valueEndPos != valuePos-1 {
+				cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
+				data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
+			} else {
+				if valueEndPos := strings.LastIndex(data[endKeyPos:], "}") + valuePos; valueEndPos != valuePos-1 {
+					cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
+					data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
+				} else {
+					continue
+				}
+			}
+		}
+	}
+	return []byte(data)
 }

@@ -37,11 +37,11 @@ connector:
   controllerAddr: ":8099"
   natsAckWait: 15
 dsConnection:
-  hostName: "localhost:3001"
-  userName: "RESTAPIACCESS"
-  password: ""
+  hostName: "localhost"
 gwConnections:
   -
+    enabled: true
+    localConnection: false
     hostName: "localhost:80"
     userName: "RESTAPIACCESS"
     password: ""
@@ -57,7 +57,7 @@ gwConnections:
 
 	os.Setenv(string(ConfigEnv), tmpfile.Name())
 	os.Setenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_DSCONNECTION", "{\"password\":\"SECRET\"}")
+	os.Setenv("TNG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	os.Setenv("TNG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := &Config{
@@ -66,16 +66,17 @@ gwConnections:
 			AppName:          "test-app",
 			AppType:          "test",
 			ControllerAddr:   ":8099",
+			LogConsPeriod:    0,
 			LogLevel:         1,
 			NatsAckWait:      15,
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
+			NatsHost:         "127.0.0.1:4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
-			&GWConnection{HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
+			&GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
 			&GWConnection{HostName: "localhost:3001"},
 		},
 	}
@@ -84,12 +85,20 @@ gwConnections:
 }
 
 func TestLoadConnectorDTO(t *testing.T) {
+	tmpfile, err := ioutil.TempFile("", "config")
+	assert.NoError(t, err)
+	err = tmpfile.Close()
+	assert.NoError(t, err)
+	defer os.Remove(tmpfile.Name())
+	os.Setenv(string(ConfigEnv), tmpfile.Name())
+
 	expected := &Config{
 		Connector: &Connector{
 			AgentID:          "11112222-3333-4444-a3b0-b14622f7dd39",
 			AppName:          "test-app",
 			AppType:          "test",
 			ControllerAddr:   "0.0.0.0:8099",
+			LogConsPeriod:    0,
 			LogLevel:         0,
 			NatsAckWait:      15,
 			NatsMaxInflight:  2147483647,
@@ -97,7 +106,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
 			&GWConnection{HostName: "gw-host1"},
 			&GWConnection{HostName: "gw-host2"},
@@ -114,16 +123,22 @@ func TestLoadConnectorDTO(t *testing.T) {
   "agentId": "99998888-7777-6666-a3b0-b14622f7dd39",
   "appName": "test-app-XX",
   "appType": "test-XX",
+  "logConsPeriod": 30,
   "logLevel": 2,
-  "tngUrl": "http://tng-host:9980/",
+  "tngUrl": "http://tng-host/",
+  "dalekservicesConnection": {
+    "hostName": "gw-host-xxx"
+  },
   "groundworkConnections": [{
+	"enabled": true,
+	"localConnection": false,
     "hostName": "gw-host-xx",
     "userName": "-xx-",
     "password": "xx"
   }]
 }`)
 
-	_, err := cfg.LoadConnectorDTO(dto)
+	_, err = cfg.LoadConnectorDTO(dto)
 	assert.NoError(t, err)
 
 	expected = &Config{
@@ -131,7 +146,8 @@ func TestLoadConnectorDTO(t *testing.T) {
 			AgentID:          "99998888-7777-6666-a3b0-b14622f7dd39",
 			AppName:          "test-app-XX",
 			AppType:          "test-XX",
-			ControllerAddr:   "0.0.0.0:9980",
+			ControllerAddr:   "0.0.0.0:8099",
+			LogConsPeriod:    30,
 			LogLevel:         2,
 			NatsAckWait:      15,
 			NatsMaxInflight:  2147483647,
@@ -139,13 +155,22 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsStoreType:    "MEMORY",
 			NatsHost:         ":4222",
 		},
-		DSConnection: &DSConnection{"localhost:3001", "RESTAPIACCESS", "SECRET"},
+		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
-			&GWConnection{HostName: "gw-host-xx", UserName: "-xx-", Password: "xx"},
+			&GWConnection{
+				Enabled:         true,
+				LocalConnection: false,
+				HostName:        "gw-host-xx",
+				UserName:        "-xx-",
+				Password:        "xx",
+			},
 		},
 	}
 
 	checkExpected(t, expected)
 	// ss, err := json.Marshal(GetConfig())
 	// t.Logf("%v", ss)
+
+	data, err := ioutil.ReadFile(tmpfile.Name())
+	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
 }
