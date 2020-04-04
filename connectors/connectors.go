@@ -17,7 +17,7 @@ import (
 var transitService *services.TransitService
 
 // will come from extensions field
-var timer = 120
+var Timer = 120
 
 func Start() error {
 	transitService = services.GetTransitService()
@@ -38,7 +38,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	}
 	for i, _ := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
 	}
 
 	b, err := json.Marshal(request)
@@ -103,6 +103,27 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 		resource.Services = append(resource.Services, s)
 	}
 	return resource
+}
+
+func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
+	resource := transit.MonitoredResourceRef{
+		Name:  name,
+		Type:  resourceType,
+		Owner: owner,
+	}
+	return resource
+}
+
+func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
+	group := transit.ResourceGroup{
+		GroupName:   name,
+		Type:        groupType,
+		Description: description,
+	}
+	for _, r := range resources {
+		group.Resources = append(group.Resources, r)
+	}
+	return group
 }
 
 // Metric Constructors

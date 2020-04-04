@@ -1,44 +1,51 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
-	"github.com/gwos/tng/clients"
+	"errors"
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/gwos/tng/log"
-	"net/http"
+	"io/ioutil"
 )
 
-const (
-	defaultElasticApiPath = "http://localhost:9200/"
-	searchPath            = "_search"
-)
+func retrieveHits(servers []string, indexes []string, storedQuery SavedObject) ([]Hit, error) {
+	cfg := elasticsearch.Config{
+		Addresses: servers,
+	}
+	esClient, err := elasticsearch.NewClient(cfg)
+	if err != nil {
+		log.Error(err)
+		return nil, errors.New("could not initialize ES client")
+	}
 
-var elasticHeaders = map[string]string{
-	"Content-Type": "application/json",
-}
-
-func retrieveHits(storedQuery SavedObject) []Hit {
-	searchRequest := buildSearchRequest(storedQuery, true)
-	// indexes are presented in query's filters with their ids, but for search request we need their titles
-	indexIds := extractIndexIds(storedQuery)
-	indexes := retrieveIndexTitles(indexIds)
-	path := buildSearchPath(indexes)
+	searchBody := buildSearchBody(storedQuery)
 
 	var hits []Hit
 
+	var body bytes.Buffer
+	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
+		log.Error("Error encoding Search request body: ", err)
+	}
+	log.Info(body.String())
+
 	step := 1
-	searchResponse := executeSearchRequest(searchRequest, path)
+
+	searchResponse := performSearch(esClient, indexes, searchBody)
 	if searchResponse == nil {
-		return nil
+		return nil, nil
 	}
 	hits = append(hits, searchResponse.Hits.Hits...)
 	total := searchResponse.Hits.Total.Value
-
 	allSuccessful := true
-	for total > (*searchRequest.Size * step) {
+	for total > (step * perPage) {
 		step = step + 1
-		lastId := searchResponse.Hits.Hits[len(searchResponse.Hits.Hits)-1].ID
-		searchRequest.SearchAfter = append(searchRequest.SearchAfter, lastId)
-		searchResponse := executeSearchRequest(searchRequest, path)
+		lastId1 := searchResponse.Hits.Hits[len(searchResponse.Hits.Hits)-1].ID
+		log.Info(lastId1)
+		lastId := hits[len(hits)-1].ID
+		setSingleSearchAfter(lastId, &searchBody)
+		searchResponse := performSearch(esClient, indexes, searchBody)
 		if searchResponse == nil {
 			allSuccessful = false
 			continue
@@ -49,110 +56,64 @@ func retrieveHits(storedQuery SavedObject) []Hit {
 	if !allSuccessful && hits != nil {
 		log.Error("Failed to extract some of Hits. The result is probably incomplete.")
 	}
-
-	return hits
+	return hits, nil
 }
 
-func buildSearchPath(indexes []string) string {
-	var indexesPath string
-	if indexes != nil && len(indexes) > 0 {
-		for i, index := range indexes {
-			indexesPath = indexesPath + index
-			if i != len(indexes)-1 {
-				indexesPath = indexesPath + ","
-			} else {
-				indexesPath = indexesPath + "/"
-			}
-		}
+func performSearch(esClient *elasticsearch.Client, indexes []string, searchBody SearchBody) *SearchResponse {
+	var body bytes.Buffer
+	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
+		log.Error("Error encoding Search Body: ", err)
+		return nil
 	}
-	return getElasticApiPath() + indexesPath + searchPath
-}
+	log.Info(body.String())
 
-func executeSearchRequest(searchRequest SearchRequest, path string) *SearchResponse {
-	bodyBytes, err := json.Marshal(searchRequest)
+	response, err := esClient.Search(
+		esClient.Search.WithContext(context.Background()),
+		esClient.Search.WithIndex(indexes...),
+		esClient.Search.WithBody(&body),
+		esClient.Search.WithTrackTotalHits(trackTotalHits),
+		esClient.Search.WithPretty(),
+		esClient.Search.WithSize(perPage),
+		esClient.Search.WithFrom(from),
+		esClient.Search.WithSort(sortById),
+	)
+
 	if err != nil {
-		log.Error("Error marshalling Search request body: ", err)
+		log.Error("Error getting Search response: ", err)
 		return nil
 	}
 
-	status, response, err := clients.SendRequest(http.MethodGet, path, elasticHeaders, nil, bodyBytes)
-	if err != nil || status != 200 || response == nil {
-		if err != nil {
-			log.Error(err)
+	if response.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
+			log.Error("Error parsing the response body: ", err)
+		} else {
+			// Print the response status and error information.
+			log.Error(response.Status(),
+				e["error"].(map[string]interface{})["type"],
+				e["error"].(map[string]interface{})["reason"],
+			)
 		}
-		if status != 200 {
-			log.Error("Failure response code: ", status)
-		}
-		if response == nil {
-			log.Error("Search response is nil.")
-		}
+		return nil
+	}
+
+	responseBody, err := ioutil.ReadAll(response.Body)
+	str := string(responseBody)
+	if str == "" {
+		log.Error("test")
+	}
+
+	if err != nil {
+		log.Error("Error reading Search response body: ", err)
 		return nil
 	}
 
 	var searchResponse SearchResponse
-	err = json.Unmarshal(response, &searchResponse)
+	err = json.Unmarshal(responseBody, &searchResponse)
 	if err != nil {
-		log.Error("Error parsing Search response: ", err)
+		log.Error("Error parsing Search response body: ", err)
 		return nil
 	}
 
 	return &searchResponse
-}
-
-func getElasticApiPath() string {
-	// TODO get from environment variables if not set return default
-	return defaultElasticApiPath
-}
-
-type SearchRequest struct {
-	TrackTotalHits *bool               `json:"track_total_hits,omitempty"`
-	Size           *int                `json:"size,omitempty"`
-	Query          *Query              `json:"query,omitempty"`
-	Sort           []map[string]string `json:"sort,omitempty"`
-	SearchAfter    []interface{}       `json:"search_after,omitempty"`
-}
-
-type Query struct {
-	Bool Bool `json:"bool"`
-}
-
-type Bool struct {
-	Must               []Clause `json:"must,omitempty"`
-	MustNot            []Clause `json:"must_not,omitempty"`
-	Should             []Clause `json:"should,omitempty"`
-	Filter             []Clause `json:"filter,omitempty"`
-	MinimumShouldMatch *int     `json:"minimum_should_match,omitempty"`
-}
-
-type Clause struct {
-	Match  *map[string]interface{} `json:"match,omitempty"`
-	Range  *map[string]interface{} `json:"range,omitempty"`
-	Exists *Exists                 `json:"exists,omitempty"`
-	Bool   *Bool                   `json:"bool,omitempty"`
-}
-
-type Exists struct {
-	Field string `json:"field,omitempty"`
-}
-
-type SearchResponse struct {
-	Took int  `json:"took"`
-	Hits Hits `json:"hits"`
-}
-
-type Hits struct {
-	Total TotalHits `json:"total"`
-	Hits  []Hit     `json:"hits"`
-}
-
-type Hit struct {
-	Index  string                 `json:"_index"`
-	Type   string                 `json:"_type"`
-	ID     string                 `json:"_id"`
-	Score  float64                `json:"_score"`
-	Source map[string]interface{} `json:"_source"`
-}
-
-type TotalHits struct {
-	Value int `json:"value"`
 }

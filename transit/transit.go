@@ -733,8 +733,16 @@ type MonitorConnection struct {
 	Password    string                 `json:"password"`
 	SslEnabled  bool                   `json:"sslEnabled"`
 	URL         string                 `json:"url"`
+	Views       []View                 `json:"views,omitempty"`
 	Extensions  map[string]interface{} `json:"extensions"`
 	ConnectorID int                    `json:"connectorId"`
+}
+
+type View struct {
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Extensions  map[string]interface{} `json:"extensions,omitempty"`
 }
 
 func (monitorConnection MonitorConnection) String() string {
