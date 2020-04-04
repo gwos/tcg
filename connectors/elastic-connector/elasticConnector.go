@@ -11,9 +11,25 @@ import (
 	"time"
 )
 
+// keys for extensions
 const (
-	defaultTimeFilterFrom = "now-$interval"
-	defaultTimeFilterTo   = "now"
+	ekKibanaEndpoint     = "kibanaEndpoint"
+	ekTimeFilter         = "timefilter"
+	ekTimeFilterFrom     = "from"
+	ekTimeFilterTo       = "to"
+	ekTimeFilterOverride = "override"
+	ekHostNameLabelPath  = "hostNameLabelPath"
+	ekHostGroupLabelPath = "hostGroupLabelPath"
+)
+
+// default extensions values
+const (
+	defaultServer         = "http://localhost:9200"
+	defaultKibanaEndpoint = "http://localhost:5601/kibana/api/"
+
+	defaultTimeFilterFrom           = "now-$interval"
+	defaultTimeFilterTo             = "now"
+	defaultAlwaysOverrideTimeFilter = true
 
 	defaultHostNameLabel  = "container.name"
 	defaultHostGroupLabel = "container.labels.com_docker_compose_project"
@@ -24,39 +40,150 @@ const (
 	intervalPeriodSeconds = "s"
 )
 
-func CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	// TODO: selected queries with overridden time intervals will be retrieved from configs, here we will need only their titles to retrieve filters
-	storedQueries := retrieveStoredQueries([]string{"not_error_or_warn"})
-	hosts, groups := make(map[string]tempHost), make(map[string]map[string]struct{})
-	for _, storedQuery := range storedQueries {
-		overrideTimeFilter(&storedQuery)
-		hits := retrieveHits(storedQuery)
-		if hits == nil {
-			log.Info("Hits not found for query: ", storedQuery.Attributes.Title)
-			continue
-		}
-		timeInterval := getTimeInterval(storedQuery)
-		hosts, groups = parseHits(storedQuery.Attributes.Title, timeInterval, hosts, groups, hits)
+type ElasticView string
+
+const (
+	StoredQueries  ElasticView = "storedQueries"
+	StoredSearches             = "storedSearches"
+	KQL                        = "kql"
+	SelfMonitoring             = "selfMonitoring"
+)
+
+func CollectMetrics(connection transit.MonitorConnection, profile transit.MetricsProfile) ([]transit.MonitoredResource,
+	[]transit.InventoryResource, []transit.ResourceGroup) {
+	views := connection.Views
+	if views == nil || len(views) == 0 {
+		log.Info("No views found.")
+		return nil, nil, nil
 	}
+
+	config := buildElasticConnectorConfig(connection)
+
+	hosts, groups := make(map[string]tempHost), make(map[string]map[string]struct{})
+	for _, view := range views {
+		if view.Enabled {
+			switch view.Name {
+			case string(StoredQueries):
+				hosts, groups = collectStoredQueriesMetrics(hosts, groups, profile, config)
+				break
+			default:
+				log.Warn("Not supported view: ", view.Name)
+				break
+			}
+		}
+	}
+
 	monitoredResources, inventoryResources := convertHosts(hosts)
 	resourceGroups := convertGroups(groups)
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
-func overrideTimeFilter(storedQuery *SavedObject) {
-	var customTimeFilter TimeFilter
-	// TODO: get custom filter from profile, if time filter is not set in profile, then use default i.e. instead of if storedQuery.Attributes.Timefilter == nil here will be if profileTimeFilter == nil
-	if storedQuery.Attributes.Timefilter == nil {
-		customTimeFilter.From = defaultTimeFilterFrom
-		customTimeFilter.To = defaultTimeFilterTo
-	} else {
-		// TODO: instead of if storedQuery.Attributes.Timefilter here will be profileTimeFilter
-		customTimeFilter.From = storedQuery.Attributes.Timefilter.From
-		customTimeFilter.To = storedQuery.Attributes.Timefilter.To
+// Builds elastic connector configuration based on monitor connection settings and default values
+func buildElasticConnectorConfig(connection transit.MonitorConnection) elasticConnectorConfig {
+	var config elasticConnectorConfig
+
+	// servers
+	servers := connection.Server
+	if servers == "" {
+		servers = defaultServer
 	}
-	customTimeFilter.From = convertIntervalTemplate(customTimeFilter.From)
-	customTimeFilter.To = convertIntervalTemplate(customTimeFilter.To)
-	storedQuery.Attributes.Timefilter = &customTimeFilter
+	config.servers = strings.Split(servers, ",")
+
+	// kibana
+	kibanaApiEndpoint := defaultKibanaEndpoint
+	if connection.Extensions[ekKibanaEndpoint] != nil {
+		kibanaApiEndpoint = connection.Extensions[ekKibanaEndpoint].(string)
+	}
+	config.kibanaApiEndpoint = kibanaApiEndpoint
+
+	// time filter
+	if connection.Extensions[ekTimeFilter] == nil {
+		defaultTimeFilter := TimeFilter{
+			From: defaultTimeFilterFrom,
+			To:   defaultTimeFilterTo,
+		}
+		config.timeFilter = defaultTimeFilter
+		config.alwaysOverrideTimeFilter = defaultAlwaysOverrideTimeFilter
+	} else {
+		from := defaultTimeFilterFrom
+		to := defaultTimeFilterTo
+		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterFrom] != nil {
+			from = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterFrom].(string)
+		}
+		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterTo] != nil {
+			to = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterTo].(string)
+		}
+		from = convertIntervalTemplate(from)
+		to = convertIntervalTemplate(to)
+		customTimeFilter := TimeFilter{
+			From: from,
+			To:   to,
+		}
+		config.timeFilter = customTimeFilter
+		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterOverride] != nil {
+			config.alwaysOverrideTimeFilter = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterOverride].(bool)
+		} else {
+			config.alwaysOverrideTimeFilter = defaultAlwaysOverrideTimeFilter
+		}
+	}
+
+	// host name and host group labels
+	var hostNameLabels, hostGroupLabels string
+	if connection.Extensions[ekHostNameLabelPath] == nil {
+		hostNameLabels = connection.Extensions[ekHostNameLabelPath].(string)
+	} else {
+		hostNameLabels = defaultHostNameLabel
+	}
+	if connection.Extensions[ekHostGroupLabelPath] == nil {
+		hostGroupLabels = connection.Extensions[ekHostGroupLabelPath].(string)
+	} else {
+		hostGroupLabels = defaultHostGroupLabel
+	}
+	config.hostNameLabelPath = strings.Split(hostNameLabels, ".")
+	config.hostGroupLabelPath = strings.Split(hostGroupLabels, ".")
+
+	return config
+}
+
+func collectStoredQueriesMetrics(hosts map[string]tempHost, groups map[string]map[string]struct{}, profile transit.MetricsProfile,
+	config elasticConnectorConfig) (map[string]tempHost, map[string]map[string]struct{}) {
+	monitoredStoredQueriesTitles := retrieveMonitoredServiceNames(StoredQueries, profile.Metrics)
+	storedQueries := retrieveStoredQueries(config.kibanaApiEndpoint, monitoredStoredQueriesTitles)
+	if storedQueries == nil || len(storedQueries) == 0 {
+		log.Info("No stored queries retrieved.")
+		return nil, nil
+	}
+	for _, storedQuery := range storedQueries {
+		if config.alwaysOverrideTimeFilter || storedQuery.Attributes.Timefilter == nil {
+			storedQuery.Attributes.Timefilter = &config.timeFilter
+		}
+		indexIds := extractIndexIds(storedQuery)
+		indexes := retrieveIndexTitles(config.kibanaApiEndpoint, indexIds)
+		hits, err := retrieveHits(config.servers, indexes, storedQuery)
+		// error happens only if could not initialize client - no sense to continue
+		if err != nil {
+			log.Error(err)
+			break
+		}
+		if hits == nil {
+			log.Info("Hits not found for query: ", storedQuery.Attributes.Title)
+			continue
+		}
+		timeInterval := getTimeInterval(storedQuery)
+		hosts, groups = parseHits(storedQuery.Attributes.Title, timeInterval, config.hostNameLabelPath, config.hostGroupLabelPath,
+			hosts, groups, hits)
+	}
+	return hosts, groups
+}
+
+func retrieveMonitoredServiceNames(view ElasticView, services []transit.MetricDefinition) []string {
+	var names []string
+	for _, service := range services {
+		if service.ServiceType == string(view) {
+			names = append(names, service.Name)
+		}
+	}
+	return names
 }
 
 func convertIntervalTemplate(timeValue string) string {
@@ -78,13 +205,11 @@ func getTimeInterval(storedQuery SavedObject) *transit.TimeInterval {
 	return timeInterval
 }
 
-func parseHits(queryTitle string, timeInterval *transit.TimeInterval, hosts map[string]tempHost, groups map[string]map[string]struct{},
-	hits []Hit) (map[string]tempHost, map[string]map[string]struct{}) {
-	hostNameLabelsHierarchy := getHostNameLabelsHierarchy()
-	hostGroupLabelsHierarchy := getHostGroupLabelsHierarchy()
+func parseHits(queryTitle string, timeInterval *transit.TimeInterval, hostNameLabels []string, hostGroupLabels []string,
+	hosts map[string]tempHost, groups map[string]map[string]struct{}, hits []Hit) (map[string]tempHost, map[string]map[string]struct{}) {
 	for _, hit := range hits {
-		hostName := extractLabelValue(hostNameLabelsHierarchy, hit.Source)
-		hostGroupName := extractLabelValue(hostGroupLabelsHierarchy, hit.Source)
+		hostName := extractLabelValue(hostNameLabels, hit.Source)
+		hostGroupName := extractLabelValue(hostGroupLabels, hit.Source)
 		groups = updateHostGroups(hostName, hostGroupName, groups)
 		hosts = updateHosts(hostName, queryTitle, hostGroupName, timeInterval, hosts)
 	}
@@ -188,14 +313,13 @@ func convertGroups(groups map[string]map[string]struct{}) []transit.ResourceGrou
 	return rgs
 }
 
-func getHostNameLabelsHierarchy() []string {
-	// TODO: get hostNameLabel from config, if not set then use default
-	return strings.Split(defaultHostNameLabel, ".")
-}
-
-func getHostGroupLabelsHierarchy() []string {
-	// TODO: get hostGroupLabel from config, if not set then use default
-	return strings.Split(defaultHostGroupLabel, ".")
+type elasticConnectorConfig struct {
+	servers                  []string
+	kibanaApiEndpoint        string
+	timeFilter               TimeFilter
+	alwaysOverrideTimeFilter bool
+	hostNameLabelPath        []string
+	hostGroupLabelPath       []string
 }
 
 type tempService struct {

@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	defaultKibanaApiPath = "http://localhost:5601/kibana/api/"
-	savedObjectsPath     = "saved_objects/"
-	findPath             = "_find"
-	bulkGetPath          = "_bulk_get"
+	savedObjectsPath = "saved_objects/"
+	findPath         = "_find"
+	bulkGetPath      = "_bulk_get"
 )
 
 type KibanaSavedObjectType string
@@ -34,18 +33,18 @@ var kibanaHeaders = map[string]string{
 	"kbn-xsrf":     "true",
 }
 
-func retrieveStoredQueries(titles []string) []SavedObject {
+func retrieveStoredQueries(rootPath string, titles []string) []SavedObject {
 	savedObjectType := StoredQuery
 	savedObjectSearchField := Title
-	return findSavedObjects(&savedObjectType, &savedObjectSearchField, titles)
+	return findSavedObjects(rootPath, &savedObjectType, &savedObjectSearchField, titles)
 }
 
-func retrieveIndexTitles(ids []string) []string {
+func retrieveIndexTitles(rootPath string, ids []string) []string {
 	var indexes []string
 
 	var indexPatterns []SavedObject
 	savedObjectType := IndexPattern
-	indexPatterns = bulkGetSavedObjects(&savedObjectType, ids)
+	indexPatterns = bulkGetSavedObjects(rootPath, &savedObjectType, ids)
 	if indexPatterns == nil {
 		log.Error("Cannot get index patterns.")
 		return nil
@@ -66,7 +65,7 @@ func retrieveIndexTitles(ids []string) []string {
 	return indexes
 }
 
-func findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []SavedObject {
+func findSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []SavedObject {
 	var savedObjects []SavedObject
 
 	page := 0
@@ -76,7 +75,7 @@ func findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *Kiban
 	allSuccessful := true
 	for total == -1 || total >= page*perPage {
 		page = page + 1
-		path := buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
+		path := buildSavedObjectsFindPath(rootPath, &page, &perPage, savedObjectType, searchField, searchValues)
 
 		status, response, err := clients.SendRequest(http.MethodGet, path, kibanaHeaders, nil, nil)
 		if err != nil || status != 200 || response == nil {
@@ -117,7 +116,7 @@ func findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *Kiban
 	return savedObjects
 }
 
-func bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []SavedObject {
+func bulkGetSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, ids []string) []SavedObject {
 	if savedObjectType == nil || ids == nil || len(ids) == 0 {
 		log.Error("Error performing Kibana Bulk Get: type and at least one id required.")
 		return nil
@@ -131,7 +130,7 @@ func bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) [
 		})
 	}
 
-	path := buildBulkGetSavedObjectsPath()
+	path := buildBulkGetSavedObjectsPath(rootPath)
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -162,7 +161,7 @@ func bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) [
 	return savedObjectsResponse.SavedObjects
 }
 
-func buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
+func buildSavedObjectsFindPath(rootPath string, page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
 	var params string
 	if savedObjectType != nil {
 		params = "?type=" + string(*savedObjectType)
@@ -182,7 +181,7 @@ func buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaS
 			}
 		}
 	}
-	return getKibanaApiPath() + savedObjectsPath + findPath + params
+	return rootPath + savedObjectsPath + findPath + params
 }
 
 func appendParamsSeparator(params string) string {
@@ -194,13 +193,8 @@ func appendParamsSeparator(params string) string {
 	return params
 }
 
-func buildBulkGetSavedObjectsPath() string {
-	return getKibanaApiPath() + savedObjectsPath + bulkGetPath
-}
-
-func getKibanaApiPath() string {
-	// TODO get from environment variables if not set return default
-	return defaultKibanaApiPath
+func buildBulkGetSavedObjectsPath(rootPath string) string {
+	return rootPath + savedObjectsPath + bulkGetPath
 }
 
 func extractIndexIds(storedQuery SavedObject) []string {
