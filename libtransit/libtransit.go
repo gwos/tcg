@@ -2,6 +2,7 @@ package main
 
 //#include <stddef.h>
 //#include <stdlib.h>
+//#include <stdbool.h>
 //
 ///* getTextHandlerType defines a function type that returns an allocated string.
 // * It should be safe to call `C.free` on it. */
@@ -10,6 +11,12 @@ package main
 ///* invokeGetTextHandler provides a function call by reference.
 // * https://golang.org/cmd/cgo/#hdr-Go_references_to_C */
 //static char *invokeGetTextHandler(getTextHandlerType fn) {
+//	return fn();
+//}
+//
+//typedef bool (*demandConfigCallback) ();
+//
+//static bool invokeDemandConfigCallback(demandConfigCallback fn) {
 //	return fn();
 //}
 import "C"
@@ -222,6 +229,20 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
 	services.GetController().RemoveListMetricsHandler()
+}
+
+// RegisterDemandConfigCallback is a C API for services.GetTransitService().RegisterDemandConfigCallback
+//export RegisterDemandConfigCallback
+func RegisterDemandConfigCallback(fn C.demandConfigCallback) {
+	services.GetTransitService().RegisterDemandConfigCallback(func() bool{
+		return bool(C.invokeDemandConfigCallback(fn))
+	})
+}
+
+// RemoveDemandConfigCallback is a C API for services.GetTransitService().RemoveDemandConfigHandler()
+//export RemoveDemandConfigCallback
+func RemoveDemandConfigCallback() {
+	services.GetTransitService().RemoveDemandConfigHandler()
 }
 
 // GetConnectorConfig is a C API for getting services.GetTransitService().Connector
