@@ -1,14 +1,16 @@
-package main
+package clients
 
 import (
 	"encoding/json"
 	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/connectors/elastic-connector/model"
 	"github.com/gwos/tng/log"
 	"net/http"
 	"strconv"
 )
 
 const (
+	apiPath          = "kibana/api/"
 	savedObjectsPath = "saved_objects/"
 	findPath         = "_find"
 	bulkGetPath      = "_bulk_get"
@@ -33,18 +35,26 @@ var kibanaHeaders = map[string]string{
 	"kbn-xsrf":     "true",
 }
 
-func retrieveStoredQueries(rootPath string, titles []string) []SavedObject {
-	savedObjectType := StoredQuery
-	savedObjectSearchField := Title
-	return findSavedObjects(rootPath, &savedObjectType, &savedObjectSearchField, titles)
+type KibanaClient struct {
+	ApiRoot string
 }
 
-func retrieveIndexTitles(rootPath string, ids []string) []string {
+// Extracts stored queries with provided titles
+// If no titles provided extracts all stored queries
+func (client *KibanaClient) RetrieveStoredQueries(titles []string) []model.SavedObject {
+	savedObjectType := StoredQuery
+	savedObjectSearchField := Title
+	return client.findSavedObjects(&savedObjectType, &savedObjectSearchField, titles)
+}
+
+// Extracts index patterns titles associated with provided stored query
+func (client *KibanaClient) RetrieveIndexTitles(storedQuery model.SavedObject) []string {
 	var indexes []string
 
-	var indexPatterns []SavedObject
+	var indexPatterns []model.SavedObject
 	savedObjectType := IndexPattern
-	indexPatterns = bulkGetSavedObjects(rootPath, &savedObjectType, ids)
+	ids := storedQuery.ExtractIndexIds()
+	indexPatterns = client.bulkGetSavedObjects(&savedObjectType, ids)
 	if indexPatterns == nil {
 		log.Error("Cannot get index patterns.")
 		return nil
@@ -65,17 +75,18 @@ func retrieveIndexTitles(rootPath string, ids []string) []string {
 	return indexes
 }
 
-func findSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []SavedObject {
-	var savedObjects []SavedObject
+// Finds saved objects of provided type
+// and searchField matching searchValues if both searchField and searchValue set
+func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []model.SavedObject {
+	var savedObjects []model.SavedObject
 
 	page := 0
-	perPage := 1000
+	perPage := 10000
 	total := -1
 
-	allSuccessful := true
 	for total == -1 || total >= page*perPage {
 		page = page + 1
-		path := buildSavedObjectsFindPath(rootPath, &page, &perPage, savedObjectType, searchField, searchValues)
+		path := client.buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
 
 		status, response, err := clients.SendRequest(http.MethodGet, path, kibanaHeaders, nil, nil)
 		if err != nil || status != 200 || response == nil {
@@ -91,18 +102,12 @@ func findSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, s
 			return nil
 		}
 
-		var savedObjectsResponse SavedObjectsResponse
+		var savedObjectsResponse model.SavedObjectsResponse
 		err = json.Unmarshal(response, &savedObjectsResponse)
 		if err != nil {
 			log.Error("Error parsing Kibana Saved Objects response: ", err)
-			if total != -1 {
-				// previous parsings were fine let's try to get remaining data
-				allSuccessful = false
-				continue
-			} else {
-				log.Error("Kibana Find Saved Objects failed.")
-				return nil
-			}
+			log.Error("Failed to extract remaining Kibana Saved Objects. The result is incomplete.")
+			return savedObjects
 		}
 		savedObjects = append(savedObjects, savedObjectsResponse.SavedObjects...)
 
@@ -110,27 +115,25 @@ func findSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, s
 			total = savedObjectsResponse.Total
 		}
 	}
-	if !allSuccessful && savedObjects != nil {
-		log.Error("Failed to extract some of Kibana Saved Objects. The result is probably incomplete.")
-	}
 	return savedObjects
 }
 
-func bulkGetSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType, ids []string) []SavedObject {
+// Performs bulk get of saved objects for provided type and ids
+func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []model.SavedObject {
 	if savedObjectType == nil || ids == nil || len(ids) == 0 {
 		log.Error("Error performing Kibana Bulk Get: type and at least one id required.")
 		return nil
 	}
 
-	var requestBody []BulkGetRequest
+	var requestBody []model.BulkGetRequest
 	for _, id := range ids {
-		requestBody = append(requestBody, BulkGetRequest{
+		requestBody = append(requestBody, model.BulkGetRequest{
 			Type: string(*savedObjectType),
 			Id:   id,
 		})
 	}
 
-	path := buildBulkGetSavedObjectsPath(rootPath)
+	path := client.buildBulkGetSavedObjectsPath()
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -152,7 +155,7 @@ func bulkGetSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType
 		return nil
 	}
 
-	var savedObjectsResponse SavedObjectsResponse
+	var savedObjectsResponse model.SavedObjectsResponse
 	err = json.Unmarshal(response, &savedObjectsResponse)
 	if err != nil {
 		log.Error("Error parsing Kibana Bulk Get response: ", err)
@@ -161,7 +164,7 @@ func bulkGetSavedObjects(rootPath string, savedObjectType *KibanaSavedObjectType
 	return savedObjectsResponse.SavedObjects
 }
 
-func buildSavedObjectsFindPath(rootPath string, page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
+func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
 	var params string
 	if savedObjectType != nil {
 		params = "?type=" + string(*savedObjectType)
@@ -181,7 +184,11 @@ func buildSavedObjectsFindPath(rootPath string, page *int, perPage *int, savedOb
 			}
 		}
 	}
-	return rootPath + savedObjectsPath + findPath + params
+	return client.ApiRoot + apiPath + savedObjectsPath + findPath + params
+}
+
+func (client *KibanaClient) buildBulkGetSavedObjectsPath() string {
+	return client.ApiRoot + apiPath + savedObjectsPath + bulkGetPath
 }
 
 func appendParamsSeparator(params string) string {
@@ -191,76 +198,4 @@ func appendParamsSeparator(params string) string {
 		params = "?"
 	}
 	return params
-}
-
-func buildBulkGetSavedObjectsPath(rootPath string) string {
-	return rootPath + savedObjectsPath + bulkGetPath
-}
-
-func extractIndexIds(storedQuery SavedObject) []string {
-	indexIdsSet := make(map[string]struct{})
-	for _, filter := range storedQuery.Attributes.Filters {
-		if filter.Meta.Index != "" {
-			indexIdsSet[filter.Meta.Index] = struct{}{}
-		}
-	}
-	var indexIds []string
-	for indexId := range indexIdsSet {
-		indexIds = append(indexIds, indexId)
-	}
-	return indexIds
-}
-
-type SavedObjectsResponse struct {
-	Page         int           `json:"page"`
-	PerPage      int           `json:"per_page"`
-	Total        int           `json:"total"`
-	SavedObjects []SavedObject `json:"saved_objects"`
-}
-
-type SavedObject struct {
-	Type       string     `json:"type"`
-	ID         string     `json:"id"`
-	Attributes Attributes `json:"attributes"`
-}
-
-type Attributes struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Filters     []Filter    `json:"filters,omitempty"`
-	Timefilter  *TimeFilter `json:"timefilter,omitempty"`
-}
-
-type Filter struct {
-	Meta  Meta   `json:"meta"`
-	Range *Range `json:"range,omitempty"`
-}
-
-type Meta struct {
-	Index    string      `json:"index"`
-	Negate   bool        `json:"negate"`
-	Disabled bool        `json:"disabled"`
-	Type     string      `json:"type"`
-	Key      string      `json:"key"`
-	Value    interface{} `json:"value"`
-	Params   interface{} `json:"params"`
-}
-
-type Range struct {
-	Timestamp *Timestamp `json:"@timestamp,omitempty"`
-}
-
-type Timestamp struct {
-	From string `json:"gte"`
-	To   string `json:"lt"`
-}
-
-type TimeFilter struct {
-	From string `json:"from"`
-	To   string `json:"to"`
-}
-
-type BulkGetRequest struct {
-	Type string `json:"type"`
-	Id   string `json:"id"`
 }

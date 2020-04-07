@@ -1,219 +1,127 @@
 package main
 
 import (
-	"github.com/gwos/tng/connectors"
+	"github.com/gwos/tng/connectors/elastic-connector/clients"
+	"github.com/gwos/tng/connectors/elastic-connector/model"
 	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
 	_ "github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
-	"strconv"
-	"strings"
-	"time"
-)
-
-// keys for extensions
-const (
-	ekKibanaEndpoint     = "kibanaEndpoint"
-	ekTimeFilter         = "timefilter"
-	ekTimeFilterFrom     = "from"
-	ekTimeFilterTo       = "to"
-	ekTimeFilterOverride = "override"
-	ekHostNameLabelPath  = "hostNameLabelPath"
-	ekHostGroupLabelPath = "hostGroupLabelPath"
-)
-
-// default extensions values
-const (
-	defaultServer         = "http://localhost:9200"
-	defaultKibanaEndpoint = "http://localhost:5601/kibana/api/"
-
-	defaultTimeFilterFrom           = "now-$interval"
-	defaultTimeFilterTo             = "now"
-	defaultAlwaysOverrideTimeFilter = true
-
-	defaultHostNameLabel  = "container.name"
-	defaultHostGroupLabel = "container.labels.com_docker_compose_project"
-)
-
-const (
-	intervalTemplate      = "$interval"
-	intervalPeriodSeconds = "s"
 )
 
 type ElasticView string
 
 const (
-	StoredQueries  ElasticView = "storedQueries"
-	StoredSearches             = "storedSearches"
-	KQL                        = "kql"
-	SelfMonitoring             = "selfMonitoring"
+	StoredQueries ElasticView = "storedQueries"
+	//StoredSearches ElasticView = "storedSearches"
+	//KQL            ElasticView = "kql"
+	//SelfMonitoring ElasticView = "selfMonitoring"
 )
 
-func CollectMetrics(connection transit.MonitorConnection, profile transit.MetricsProfile) ([]transit.MonitoredResource,
-	[]transit.InventoryResource, []transit.ResourceGroup) {
-	views := connection.Views
-	if views == nil || len(views) == 0 {
-		log.Info("No views found.")
+type ElasticConnector struct {
+	Config          *model.ElasticConnectorConfig
+	kibanaClient    *clients.KibanaClient
+	esClient        *clients.EsClient
+	monitoringState *model.MonitoringState
+}
+
+func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
+	if connector.Config == nil {
+		log.Error("ElasticConnector config is missing.")
 		return nil, nil, nil
 	}
 
-	config := buildElasticConnectorConfig(connection)
+	views := connector.Config.Views
+	if views == nil || len(views) == 0 {
+		log.Info("No views provided.")
+		return nil, nil, nil
+	}
 
-	hosts, groups := make(map[string]tempHost), make(map[string]map[string]struct{})
-	for _, view := range views {
-		if view.Enabled {
-			switch view.Name {
+	kibanaClient := clients.KibanaClient{ApiRoot: connector.Config.KibanaServer}
+	esClient := clients.EsClient{Servers: connector.Config.Servers}
+	err := esClient.InitEsClient()
+	if err != nil {
+		log.Error("Cannot perform collection.")
+		return nil, nil, nil
+	}
+	monitoringState := model.MonitoringState{
+		Metrics: connector.Config.Metrics,
+		Hosts:   make(map[string]model.Host),
+		Groups:  make(map[string]map[string]struct{}),
+	}
+	connector.kibanaClient = &kibanaClient
+	connector.esClient = &esClient
+	connector.monitoringState = &monitoringState
+
+	for view, enabled := range views {
+		if enabled {
+			switch view {
 			case string(StoredQueries):
-				hosts, groups = collectStoredQueriesMetrics(hosts, groups, profile, config)
+				queries := retrieveMonitoredServiceNames(StoredQueries, connector.Config.Metrics)
+				err = connector.collectStoredQueriesMetrics(queries)
 				break
 			default:
-				log.Warn("Not supported view: ", view.Name)
+				log.Warn("Not supported view: ", view)
+				break
+			}
+			if err != nil {
+				log.Error("Collection interrupted.")
 				break
 			}
 		}
 	}
 
-	monitoredResources, inventoryResources := convertHosts(hosts)
-	resourceGroups := convertGroups(groups)
+	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
+	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
-// Builds elastic connector configuration based on monitor connection settings and default values
-func buildElasticConnectorConfig(connection transit.MonitorConnection) elasticConnectorConfig {
-	var config elasticConnectorConfig
-
-	// servers
-	servers := connection.Server
-	if servers == "" {
-		servers = defaultServer
-	}
-	config.servers = strings.Split(servers, ",")
-
-	// kibana
-	kibanaApiEndpoint := defaultKibanaEndpoint
-	if connection.Extensions[ekKibanaEndpoint] != nil {
-		kibanaApiEndpoint = connection.Extensions[ekKibanaEndpoint].(string)
-	}
-	config.kibanaApiEndpoint = kibanaApiEndpoint
-
-	// time filter
-	if connection.Extensions[ekTimeFilter] == nil {
-		defaultTimeFilter := TimeFilter{
-			From: defaultTimeFilterFrom,
-			To:   defaultTimeFilterTo,
-		}
-		config.timeFilter = defaultTimeFilter
-		config.alwaysOverrideTimeFilter = defaultAlwaysOverrideTimeFilter
-	} else {
-		from := defaultTimeFilterFrom
-		to := defaultTimeFilterTo
-		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterFrom] != nil {
-			from = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterFrom].(string)
-		}
-		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterTo] != nil {
-			to = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterTo].(string)
-		}
-		from = convertIntervalTemplate(from)
-		to = convertIntervalTemplate(to)
-		customTimeFilter := TimeFilter{
-			From: from,
-			To:   to,
-		}
-		config.timeFilter = customTimeFilter
-		if connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterOverride] != nil {
-			config.alwaysOverrideTimeFilter = connection.Extensions[ekTimeFilter].(map[string]interface{})[ekTimeFilterOverride].(bool)
-		} else {
-			config.alwaysOverrideTimeFilter = defaultAlwaysOverrideTimeFilter
-		}
-	}
-
-	// host name and host group labels
-	var hostNameLabels, hostGroupLabels string
-	if connection.Extensions[ekHostNameLabelPath] == nil {
-		hostNameLabels = connection.Extensions[ekHostNameLabelPath].(string)
-	} else {
-		hostNameLabels = defaultHostNameLabel
-	}
-	if connection.Extensions[ekHostGroupLabelPath] == nil {
-		hostGroupLabels = connection.Extensions[ekHostGroupLabelPath].(string)
-	} else {
-		hostGroupLabels = defaultHostGroupLabel
-	}
-	config.hostNameLabelPath = strings.Split(hostNameLabels, ".")
-	config.hostGroupLabelPath = strings.Split(hostGroupLabels, ".")
-
-	return config
-}
-
-func collectStoredQueriesMetrics(hosts map[string]tempHost, groups map[string]map[string]struct{}, profile transit.MetricsProfile,
-	config elasticConnectorConfig) (map[string]tempHost, map[string]map[string]struct{}) {
-	monitoredStoredQueriesTitles := retrieveMonitoredServiceNames(StoredQueries, profile.Metrics)
-	storedQueries := retrieveStoredQueries(config.kibanaApiEndpoint, monitoredStoredQueriesTitles)
+func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) error {
+	storedQueries := connector.kibanaClient.RetrieveStoredQueries(titles)
 	if storedQueries == nil || len(storedQueries) == 0 {
 		log.Info("No stored queries retrieved.")
-		return nil, nil
+		return nil
 	}
+
 	for _, storedQuery := range storedQueries {
-		if config.alwaysOverrideTimeFilter || storedQuery.Attributes.Timefilter == nil {
-			storedQuery.Attributes.Timefilter = &config.timeFilter
+		if connector.Config.OverrideTimeFilter || storedQuery.Attributes.TimeFilter == nil {
+			storedQuery.Attributes.TimeFilter = &connector.Config.CustomTimeFilter
 		}
-		indexIds := extractIndexIds(storedQuery)
-		indexes := retrieveIndexTitles(config.kibanaApiEndpoint, indexIds)
-		hits, err := retrieveHits(config.servers, indexes, storedQuery)
-		// error happens only if could not initialize client - no sense to continue
+		indexes := connector.kibanaClient.RetrieveIndexTitles(storedQuery)
+
+		hits, err := connector.esClient.RetrieveHits(indexes, storedQuery)
+		// error happens only if could not initialize elasticsearch client - no sense to continue
 		if err != nil {
-			log.Error(err)
-			break
+			log.Error("Unable to proceed as ES client could not be initialized.")
+			return err
 		}
 		if hits == nil {
-			log.Info("Hits not found for query: ", storedQuery.Attributes.Title)
+			log.Info("No Hits found for query: ", storedQuery.Attributes.Title)
 			continue
 		}
-		timeInterval := getTimeInterval(storedQuery)
-		hosts, groups = parseHits(storedQuery.Attributes.Title, timeInterval, config.hostNameLabelPath, config.hostGroupLabelPath,
-			hosts, groups, hits)
+		connector.parseStoredQueryHits(storedQuery, hits)
 	}
-	return hosts, groups
+
+	return nil
 }
 
-func retrieveMonitoredServiceNames(view ElasticView, services []transit.MetricDefinition) []string {
-	var names []string
-	for _, service := range services {
-		if service.ServiceType == string(view) {
-			names = append(names, service.Name)
+func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.MetricDefinition) []string {
+	var services []string
+	for _, metric := range metrics {
+		if metric.ServiceType == string(view) && metric.Monitored {
+			services = append(services, metric.Name)
 		}
 	}
-	return names
+	return services
 }
 
-func convertIntervalTemplate(timeValue string) string {
-	interval := strconv.Itoa(connectors.Timer) + intervalPeriodSeconds
-	if strings.Contains(timeValue, intervalTemplate) {
-		timeValue = strings.ReplaceAll(timeValue, intervalTemplate, interval)
-	}
-	return timeValue
-}
-
-func getTimeInterval(storedQuery SavedObject) *transit.TimeInterval {
-	location := time.Now().Location()
-	startTime := parseTime(storedQuery.Attributes.Timefilter.From, true, location)
-	endTime := parseTime(storedQuery.Attributes.Timefilter.To, false, location)
-	timeInterval := &transit.TimeInterval{
-		EndTime:   milliseconds.MillisecondTimestamp{Time: startTime},
-		StartTime: milliseconds.MillisecondTimestamp{Time: endTime},
-	}
-	return timeInterval
-}
-
-func parseHits(queryTitle string, timeInterval *transit.TimeInterval, hostNameLabels []string, hostGroupLabels []string,
-	hosts map[string]tempHost, groups map[string]map[string]struct{}, hits []Hit) (map[string]tempHost, map[string]map[string]struct{}) {
+func (connector *ElasticConnector) parseStoredQueryHits(storedQuery model.SavedObject, hits []model.Hit) {
+	timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
 	for _, hit := range hits {
-		hostName := extractLabelValue(hostNameLabels, hit.Source)
-		hostGroupName := extractLabelValue(hostGroupLabels, hit.Source)
-		groups = updateHostGroups(hostName, hostGroupName, groups)
-		hosts = updateHosts(hostName, queryTitle, hostGroupName, timeInterval, hosts)
+		hostName := extractLabelValue(connector.Config.HostNameLabelPath, hit.Source)
+		hostGroupName := extractLabelValue(connector.Config.HostGroupLabelPath, hit.Source)
+		connector.monitoringState.UpdateHostGroups(hostName, hostGroupName)
+		connector.monitoringState.UpdateHosts(hostName, storedQuery.Attributes.Title, hostGroupName, timeInterval)
 	}
-	return hosts, groups
 }
 
 func extractLabelValue(labelsHierarchy []string, source map[string]interface{}) string {
@@ -227,109 +135,4 @@ func extractLabelValue(labelsHierarchy []string, source map[string]interface{}) 
 		}
 	}
 	return value
-}
-
-func updateHostGroups(hostName string, hostGroupName string, groups map[string]map[string]struct{}) map[string]map[string]struct{} {
-	if group, exists := groups[hostGroupName]; exists {
-		group[hostName] = struct{}{}
-	} else {
-		group := make(map[string]struct{})
-		group[hostName] = struct{}{}
-		groups[hostGroupName] = group
-	}
-	groups[hostGroupName][hostName] = struct{}{}
-	return groups
-}
-
-func updateHosts(hostName string, serviceName string, hostGroupName string, timeInterval *transit.TimeInterval,
-	hosts map[string]tempHost) map[string]tempHost {
-	if host, exists := hosts[hostName]; exists {
-		services := host.services
-		var found = false
-		for i := range services {
-			if services[i].name == serviceName {
-				services[i].hits = services[i].hits + 1
-				found = true
-				break
-			}
-		}
-		if !found {
-			service := tempService{name: serviceName, hits: 1, timeInterval: timeInterval}
-			services = append(services, service)
-			host.services = services
-		}
-		hosts[hostName] = host
-	} else {
-		service := tempService{name: serviceName, hits: 1, timeInterval: timeInterval}
-		host := tempHost{name: hostName, services: []tempService{service}, hostGroup: hostGroupName}
-		hosts[hostName] = host
-	}
-	return hosts
-}
-
-func convertHosts(hosts map[string]tempHost) ([]transit.MonitoredResource, []transit.InventoryResource) {
-	mrs := make([]transit.MonitoredResource, len(hosts))
-	irs := make([]transit.InventoryResource, len(hosts))
-	i := 0
-	for _, host := range hosts {
-		monitoredServices, inventoryServices := convertServices(host)
-		monitoredResource, _ := connectors.CreateResource(host.name, monitoredServices)
-		inventoryResource := connectors.CreateInventoryResource(host.name, inventoryServices)
-		mrs[i] = *monitoredResource
-		irs[i] = inventoryResource
-		i++
-	}
-	return mrs, irs
-}
-
-func convertServices(host tempHost) ([]transit.MonitoredService, []transit.InventoryService) {
-	monitoredServices := make([]transit.MonitoredService, len(host.services))
-	inventoryServices := make([]transit.InventoryService, len(host.services))
-	for i, service := range host.services {
-		metric, _ := connectors.CreateMetric("hits", service.hits, service.timeInterval, transit.UnitCounter)
-		monitoredService, _ := connectors.CreateService(service.name, host.name, []transit.TimeSeries{*metric})
-		inventoryService := connectors.CreateInventoryService(service.name, host.name)
-		monitoredServices[i] = *monitoredService
-		inventoryServices[i] = inventoryService
-	}
-	return monitoredServices, inventoryServices
-}
-
-func convertGroups(groups map[string]map[string]struct{}) []transit.ResourceGroup {
-	rgs := make([]transit.ResourceGroup, len(groups))
-	j := 0
-	for group, hostsInGroup := range groups {
-		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
-		k := 0
-		for host := range hostsInGroup {
-			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.Host)
-			monitoredResourceRefs[k] = monitoredResourceRef
-			k++
-		}
-		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
-		rgs[j] = resourceGroup
-		j++
-	}
-	return rgs
-}
-
-type elasticConnectorConfig struct {
-	servers                  []string
-	kibanaApiEndpoint        string
-	timeFilter               TimeFilter
-	alwaysOverrideTimeFilter bool
-	hostNameLabelPath        []string
-	hostGroupLabelPath       []string
-}
-
-type tempService struct {
-	name         string
-	hits         int
-	timeInterval *transit.TimeInterval
-}
-
-type tempHost struct {
-	name      string
-	services  []tempService
-	hostGroup string
 }

@@ -19,6 +19,8 @@ var transitService *services.TransitService
 // will come from extensions field
 var Timer = 120
 
+var defaultOwnership = transit.Yield
+
 func Start() error {
 	transitService = services.GetTransitService()
 
@@ -29,6 +31,28 @@ func Start() error {
 		return err
 	}
 	return nil
+}
+
+func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, transit.HostOwnershipType) {
+	var connector = struct {
+		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
+		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
+		Connections       []struct {
+			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
+		} `json:"groundworkConnections"`
+	}{}
+
+	err := json.Unmarshal(data, &connector)
+	if err != nil {
+		log.Error("Error parsing common connector data: ", err)
+	}
+
+	ownership := defaultOwnership
+	if len(connector.Connections) > 0 {
+		ownership = connector.Connections[0].DeferOwnership
+	}
+
+	return connector.MonitorConnection, connector.MetricsProfile, ownership
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
@@ -173,6 +197,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		switch arg.(type) {
 		case string:
 			metric.Unit = transit.UnitType(arg.(string))
+		case transit.UnitType:
+			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
 		//case transit.MetricSampleType:

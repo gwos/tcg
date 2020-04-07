@@ -1,0 +1,31 @@
+connector:
+    agentId: e5ff8b3b-9a1e-4180-934b-bad93776e7b6
+    appName: ELASTIC
+    appType: ELASTIC
+    controllerAddr: 0.0.0.0:8099
+    controllerCertFile: ""
+    controllerKeyFile: ""
+    natsAckWait: 30
+    natsMaxInflight: 2147483647
+    natsFilestoreDir: nats/datastore
+    natsStoreType: FILE
+    natsHost: 127.0.0.1:4222
+    logConsPeriod: 0
+    logFile: ""
+    logLevel: 1
+    enabled: true
+dsConnection:
+    hostName: dalekservices:3001
+gwConnections:
+  - hostName: http://localhost/api
+    userName: RESTAPIACCESS
+    password: ***REMOVED***
+    enabled: true
+    isChild: false
+    displayName: Local Groundwork
+    mergeHosts: false
+    localConnection: true
+    deferOwnership: Yield
+    prefixResourceNames: false
+    resourceNamePrefix: ""
+    sendAllInventory: true
