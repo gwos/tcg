@@ -40,13 +40,13 @@ func (service *TransitService) SynchronizeInventory(payload []byte) error {
 }
 
 func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
-	service.Mux.Lock()
+	service.DemandConfigMutex.Lock()
 	service.DemandConfigHandler = fn
-	service.Mux.Unlock()
+	service.DemandConfigMutex.Unlock()
 }
 
 func (service *TransitService) RemoveDemandConfigHandler() {
-	service.Mux.Lock()
+	service.DemandConfigMutex.Lock()
 	service.DemandConfigHandler = nil
-	service.Mux.Unlock()
+	service.DemandConfigMutex.Unlock()
 }

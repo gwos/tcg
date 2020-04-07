@@ -67,7 +67,7 @@ char *listMetricsHandler() {
 }
 
 bool demandConfigCallback() {
-    printf("\nDemandConfig was called by the TCG");
+    printf("DemandConfig was called by the TCG\n");
     return true;
 }
 
@@ -296,7 +296,7 @@ void test_libtransit_control() {
   printf("Testing registerDemandConfigCallback ...\n");
   registerDemandConfigCallback(demandConfigCallback);
 
-  system("curl -s -X POST -d '{}' -H 'GWOS-APP-NAME:GW8' -H 'GWOS-API-TOKEN:c3fafe42-bdd1-4d08-9aff-5c70e4c72d09' -H 'Accept: application/json' 'http://localhost:8099/api/v1/config'");
+  system("curl -s -X POST -d '{}' -H 'GWOS-APP-NAME:GW8' -H 'X-PIN:999' -H 'Accept: application/json' 'http://localhost:8099/api/v1/config'");
 }
 
 void test_SendResourcesWithMetrics() {

@@ -32,7 +32,7 @@ type AgentService struct {
 	tracerToken         []byte
 	ConfigHandler       func([]byte)
 	DemandConfigHandler func() bool
-	Mux                 sync.Mutex
+	DemandConfigMutex   sync.Mutex
 }
 
 // CtrlAction defines queued controll action
@@ -406,14 +406,14 @@ func (service *AgentService) config(data []byte) error {
 	if service.ConfigHandler != nil {
 		service.ConfigHandler(data)
 	}
-	service.Mux.Lock()
+	service.DemandConfigMutex.Lock()
 	if service.DemandConfigHandler != nil {
 		if success := service.DemandConfigHandler(); !success {
 			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
 		}
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
-	service.Mux.Unlock()
+	service.DemandConfigMutex.Unlock()
 
 	service.agentStats.AgentID = service.Connector.AgentID
 	service.agentStats.AppType = service.Connector.AppType
