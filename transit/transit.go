@@ -22,8 +22,8 @@ type HostOwnershipType string
 // Yield - Always defer ownership - don't want to own it, if someone else comes along, let them own it
 const (
 	Creator HostOwnershipType = "Creator"
-	Take                      = "Take"
-	Yield                     = "Yield"
+	Take    HostOwnershipType = "Take"
+	Yield   HostOwnershipType = "Yield"
 )
 
 // MetricKind defines the metric kind of the time series.
