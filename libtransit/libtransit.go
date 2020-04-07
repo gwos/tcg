@@ -231,10 +231,10 @@ func RemoveListMetricsHandler() {
 	services.GetController().RemoveListMetricsHandler()
 }
 
-// RegisterDemandConfigCallback is a C API for services.GetTransitService().RegisterDemandConfigCallback
-//export RegisterDemandConfigCallback
+// RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler
+//export RegisterDemandConfigHandler
 func RegisterDemandConfigCallback(fn C.demandConfigCallback) {
-	services.GetTransitService().RegisterDemandConfigCallback(func() bool{
+	services.GetTransitService().RegisterDemandConfigHandler(func() bool{
 		return bool(C.invokeDemandConfigCallback(fn))
 	})
 }
