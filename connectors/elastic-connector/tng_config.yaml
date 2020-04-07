@@ -1,5 +1,5 @@
 connector:
-  agentId: ""
+  agentId: "e5ff8b3b-9a1e-4180-934b-bad93776e7b6"
   appName: "ELASTIC"
   appType: "ELASTIC"
   controllerAddr: "0.0.0.0:8099"
@@ -11,4 +11,4 @@ connector:
   logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 2
 dsConnection:
-  hostName: ""
+  hostName: "localhost:3001"

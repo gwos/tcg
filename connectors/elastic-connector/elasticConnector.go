@@ -106,9 +106,11 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 
 func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.MetricDefinition) []string {
 	var services []string
-	for _, metric := range metrics {
-		if metric.ServiceType == string(view) && metric.Monitored {
-			services = append(services, metric.Name)
+	if metrics != nil {
+		for _, metric := range metrics {
+			if metric.ServiceType == string(view) && metric.Monitored {
+				services = append(services, metric.Name)
+			}
 		}
 	}
 	return services
