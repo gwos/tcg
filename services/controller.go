@@ -377,6 +377,20 @@ func (controller *Controller) status(c *gin.Context) {
 	c.JSON(http.StatusOK, statusDTO)
 }
 
+//
+// @Description The following API endpoint can be used to get TNG status.
+// @Tags    agent, connector
+// @Accept  json
+// @Produce json
+// @Success 200 {object} services.ConnectorStatusDTO
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /processes/suggest/:name [get]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) listSuggestions(c *gin.Context) {
+	c.JSON(http.StatusOK, controller.AgentService.ListSuggestions(c.Param("name")))
+}
+
 func (controller *Controller) validateToken(c *gin.Context) {
 	// check local pin
 	pin := controller.Connector.ControllerPin
@@ -430,6 +444,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
+	apiV1Group.GET("/processes/suggest/:name", controller.listSuggestions)
 
 	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
