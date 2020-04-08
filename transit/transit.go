@@ -798,19 +798,19 @@ func (metricsProfile MetricsProfile) String() string {
 
 type MetricDefinition struct {
 	Name              string      `json:"name"`
-	CustomName        string      `json:"customName"`
-	Description       string      `json:"description"`
-	Monitored         bool        `json:"monitored"`
-	Graphed           bool        `json:"graphed"`
+	CustomName        string      `json:"customName,omitempty"`
+	Description       string      `json:"description,omitempty"`
+	Monitored         bool        `json:"monitored,omitempty"`
+	Graphed           bool        `json:"graphed,omitempty"`
 	MetricType        MetricKind  `json:"metricType"`
 	ComputeType       ComputeType `json:"computeType"`
 	ServiceType       string      `json:"serviceType"`
-	SourceType        string      `json:"sourceType"`
-	AggregateType     string      `json:"aggregateType"`
+	SourceType        string      `json:"sourceType,omitempty"`
+	AggregateType     string      `json:"aggregateType,omitempty"`
 	WarningThreshold  int         `json:"warningThreshold"`
 	CriticalThreshold int         `json:"criticalThreshold"`
-	Expression        string      `json:"expression"`
-	Format            string      `json:"format"`
+	Expression        string      `json:"expression,omitempty"`
+	Format            string      `json:"format,omitempty"`
 }
 
 func (metricDefinition MetricDefinition) String() string {

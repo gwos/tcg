@@ -5,7 +5,9 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"github.com/shirou/gopsutil/process"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
@@ -245,6 +247,11 @@ func (service *AgentService) Stats() AgentStats {
 // Status implements AgentServices.Status interface
 func (service *AgentService) Status() AgentStatus {
 	return *service.agentStatus
+}
+
+// ListSuggestions implements AgentServices.ListSuggestions interface
+func (service *AgentService) ListSuggestions(name string) string {
+	return service.listSuggestions(name)
 }
 
 func (service *AgentService) ctrlPushAsync(data []byte, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
@@ -538,4 +545,30 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		[]byte(traceOnDemandAgentID),
 		[]byte(service.Connector.AgentID),
 	)
+}
+
+func (service *AgentService) listSuggestions(name string) string {
+	hostProcesses, _ := process.Processes()
+
+	processes := make([]*transit.MetricDefinition, 0)
+	for _, hostProcess := range hostProcesses {
+		processName, err := hostProcess.Name()
+		if err != nil {
+			log.Error(err)
+		}
+
+		if strings.Contains(processName, name) {
+			processes = append(processes, &transit.MetricDefinition{
+				Name:              processName,
+				MetricType:        "Gauge",
+				ComputeType:       "Query",
+				ServiceType:       "SERVICE",
+				AggregateType:     "average",
+				WarningThreshold:  -1,
+				CriticalThreshold: -1,
+			})
+		}
+	}
+	jsonBytes, _ := json.Marshal(processes)
+	return string(jsonBytes)
 }
