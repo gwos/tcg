@@ -296,7 +296,7 @@ void test_libtransit_control() {
   printf("Testing registerDemandConfigHandler ...\n");
   registerDemandConfigHandler(demandConfigHandler);
 
-  system("curl -s -X POST -d '{}' -H 'GWOS-APP-NAME:GW8' -H 'X-PIN:999' -H 'Accept: application/json' 'http://localhost:8099/api/v1/config'");
+  system("sh ./transit-c/send_config_script.sh");
 }
 
 void test_SendResourcesWithMetrics() {
