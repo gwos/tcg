@@ -22,8 +22,8 @@ type HostOwnershipType string
 // Yield - Always defer ownership - don't want to own it, if someone else comes along, let them own it
 const (
 	Creator HostOwnershipType = "Creator"
-	Take                      = "Take"
-	Yield                     = "Yield"
+	Take    HostOwnershipType = "Take"
+	Yield   HostOwnershipType = "Yield"
 )
 
 // MetricKind defines the metric kind of the time series.
@@ -733,8 +733,16 @@ type MonitorConnection struct {
 	Password    string                 `json:"password"`
 	SslEnabled  bool                   `json:"sslEnabled"`
 	URL         string                 `json:"url"`
+	Views       []View                 `json:"views,omitempty"`
 	Extensions  map[string]interface{} `json:"extensions"`
 	ConnectorID int                    `json:"connectorId"`
+}
+
+type View struct {
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Extensions  map[string]interface{} `json:"extensions,omitempty"`
 }
 
 func (monitorConnection MonitorConnection) String() string {
