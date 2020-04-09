@@ -114,7 +114,7 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 	for processName, processValues := range processesMap {
 		value := transit.TypedValue{
 			ValueType:   transit.DoubleType,
-			DoubleValue: processValues.value,
+			DoubleValue: processValues.processCpu,
 		}
 		warningThreshold := transit.ThresholdValue{
 			SampleType: transit.Warning,
@@ -148,6 +148,8 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 			Metrics: []transit.TimeSeries{
 				{
 					MetricName: processName,
+					MetricComputeType: processValues.computeType,
+					MetricExpression: processValues.expression,
 					SampleType: transit.Value,
 					Interval: &transit.TimeInterval{
 						EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
@@ -159,7 +161,7 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 				},
 			},
 		}
-		if processValues.value == -1 {
+		if processValues.processCpu == -1 {
 			monitoredService.Status = transit.ServicePending
 		}
 		monitoredResource.Services = append(monitoredResource.Services, monitoredService)
@@ -572,9 +574,11 @@ type localProcess struct {
 }
 
 type values struct {
-	value         float64
+	processCpu  float64
 	criticalValue int
-	warningValue  int
+	warningValue int
+	computeType transit.ComputeType
+	expression string
 }
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
@@ -613,13 +617,13 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 		}
 		if _, exists := m[pr.Name]; exists {
 			processesMap[name] = values{
-				value:         m[pr.Name],
+				processCpu:         m[pr.Name],
 				criticalValue: pr.CriticalThreshold,
 				warningValue:  pr.WarningThreshold,
 			}
 		} else {
 			processesMap[name] = values{
-				value:         -1,
+				processCpu:         -1,
 				criticalValue: -1,
 				warningValue:  -1,
 			}

@@ -200,6 +200,7 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(value, &dto); err != nil {
+		log.Error(err)
 		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
 		return
 	}

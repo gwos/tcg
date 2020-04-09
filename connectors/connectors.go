@@ -3,6 +3,7 @@ package connectors
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/PaesslerAG/gval"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -55,6 +57,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	for i, _ := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
+		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
 	b, err := json.Marshal(request)
@@ -409,6 +412,66 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 		}
 	}
 	return transit.ServiceOk
+}
+
+func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
+	var result []transit.MonitoredService
+	vars := make(map[string]interface{})
+
+	for _, service := range services {
+		for _, metric := range service.Metrics {
+			if metric.MetricComputeType != "synthetic" {
+				switch metric.Value.ValueType {
+				case transit.IntegerType:
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.IntegerValue
+				case transit.DoubleType:
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.DoubleValue
+				}
+			}
+		}
+		result = append(result, service)
+	}
+
+	for _, service := range services {
+		for _, metric := range service.Metrics {
+			fmt.Println(metric.MetricComputeType)
+			if metric.MetricComputeType == "synthetic" {
+				if value, err := gval.Evaluate(strings.ReplaceAll(metric.MetricExpression, ".", "_"), vars); err != nil {
+					fmt.Println("THEREEEE!!!!!!!!!!!!!!!!!!!!!!1")
+					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
+					continue
+				} else {
+					fmt.Println("HERE!!!!!!!!!!!!!!!!!!!!!!1")
+					fmt.Println("VALUE:", value)
+
+					result = append(result, transit.MonitoredService{
+						Name:          service.Name,
+						Type:          transit.Service,
+						Owner:         service.Owner,
+						Status:        "UP",                                // TODO:
+						LastCheckTime: milliseconds.MillisecondTimestamp{}, // TODO:
+						NextCheckTime: milliseconds.MillisecondTimestamp{}, // TODO:
+						Metrics: []transit.TimeSeries{
+							{
+								MetricName: metric.MetricName,
+								SampleType: transit.Value,
+								Interval: &transit.TimeInterval{
+									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO:
+									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO:
+								},
+								Value: &transit.TypedValue{
+									ValueType:    metric.Value.ValueType,
+									IntegerValue: int64(value.(float64)),
+									DoubleValue:  value.(float64),
+								},
+							},
+						},
+					})
+				}
+			}
+		}
+	}
+	return result
 }
 
 func ControlCHandler() {

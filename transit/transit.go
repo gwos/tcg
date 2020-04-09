@@ -74,7 +74,7 @@ type ComputeType string
 const (
 	Query         ComputeType = "Query"
 	Regex                     = "Regex"
-	Synthetic                 = "Synthetic"
+	Synthetic                 = "synthetic"
 	Informational             = "Informational"
 	Performance               = "Performance"
 	Health                    = "Health"
@@ -247,11 +247,13 @@ type TimeSeries struct {
 	// same start time and increasing end times, until an event resets the
 	// cumulative value to zero and sets a new start time for the following
 	// samples.
-	Interval   *TimeInterval     `json:"interval"`
-	Value      *TypedValue       `json:"value"`
-	Tags       map[string]string `json:"tags,omitempty"`
-	Unit       UnitType          `json:"unit,omitempty"`
-	Thresholds *[]ThresholdValue `json:"thresholds,omitempty"`
+	Interval          *TimeInterval     `json:"interval"`
+	Value             *TypedValue       `json:"value"`
+	Tags              map[string]string `json:"tags,omitempty"`
+	Unit              UnitType          `json:"unit,omitempty"`
+	Thresholds        *[]ThresholdValue `json:"thresholds,omitempty"`
+	MetricComputeType ComputeType       `json:"-"`
+	MetricExpression  string            `json:"-"`
 }
 
 func (timeSeries TimeSeries) String() string {
