@@ -14,9 +14,9 @@ package main
 //	return fn();
 //}
 //
-//typedef bool (*demandConfigCallback) ();
+//typedef bool (*demandConfigHandler) ();
 //
-//static bool invokeDemandConfigCallback(demandConfigCallback fn) {
+//static bool invokeDemandConfigHandler(demandConfigHandler fn) {
 //	return fn();
 //}
 import "C"
@@ -231,17 +231,17 @@ func RemoveListMetricsHandler() {
 	services.GetController().RemoveListMetricsHandler()
 }
 
-// RegisterDemandConfigCallback is a C API for services.GetTransitService().RegisterDemandConfigCallback
-//export RegisterDemandConfigCallback
-func RegisterDemandConfigCallback(fn C.demandConfigCallback) {
-	services.GetTransitService().RegisterDemandConfigCallback(func() bool{
-		return bool(C.invokeDemandConfigCallback(fn))
+// RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler
+//export RegisterDemandConfigHandler
+func RegisterDemandConfigHandler(fn C.demandConfigHandler) {
+	services.GetTransitService().RegisterDemandConfigHandler(func() bool{
+		return bool(C.invokeDemandConfigHandler(fn))
 	})
 }
 
-// RemoveDemandConfigCallback is a C API for services.GetTransitService().RemoveDemandConfigHandler()
-//export RemoveDemandConfigCallback
-func RemoveDemandConfigCallback() {
+// RemoveDemandConfigHandler is a C API for services.GetTransitService().RemoveDemandConfigHandler()
+//export RemoveDemandConfigHandler
+func RemoveDemandConfigHandler() {
 	services.GetTransitService().RemoveDemandConfigHandler()
 }
 
