@@ -3,7 +3,9 @@ package model
 import (
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
+	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
+	"time"
 )
 
 const (
@@ -112,7 +114,6 @@ func (host Host) toTransitResources(metricDefinitions map[string]transit.MetricD
 				metric.Thresholds = &thresholds
 			}
 		}
-
 		monitoredService, _ := connectors.CreateService(serviceName, host.name, []transit.TimeSeries{*metric})
 		inventoryService := connectors.CreateInventoryService(serviceName, host.name)
 		monitoredServices[i] = *monitoredService
@@ -138,4 +139,17 @@ func (monitoringState *MonitoringState) ToResourceGroups() []transit.ResourceGro
 		j++
 	}
 	return rgs
+}
+
+func UpdateCheckTimes(resources []transit.MonitoredResource, timer float64) {
+	lastCheckTime := time.Now().Local()
+	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(timer))
+	for i := range resources {
+		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		for j := range resources[i].Services {
+			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		}
+	}
 }

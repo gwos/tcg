@@ -27,7 +27,7 @@ const (
 
 // keys for extensions
 const (
-	exKeyKibanaServer       = "kibanaEndpoint"
+	exKeyKibanaServer       = "kibanaServer"
 	exKeyTimeFilter         = "timefilter"
 	exKeyFrom               = "from"
 	exKeyTo                 = "to"
@@ -38,6 +38,7 @@ const (
 )
 
 const (
+	templateMetricName    = "$view_Template#"
 	intervalTemplate      = "$interval"
 	intervalPeriodSeconds = "s"
 )
@@ -45,8 +46,7 @@ const (
 type ElasticConnectorConfig struct {
 	Servers            []string
 	KibanaServer       string
-	Views              map[string]bool
-	Metrics            map[string]transit.MetricDefinition
+	Views              map[string]map[string]transit.MetricDefinition
 	CustomTimeFilter   TimeFilter
 	OverrideTimeFilter bool
 	HostNameLabelPath  []string
@@ -86,17 +86,19 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 	config.KibanaServer = kibanaServer
 
 	// Views
-	config.Views = make(map[string]bool)
-	for _, view := range connection.Views {
-		config.Views[view.Name] = view.Enabled
-	}
-	// TODO remove later
-	config.Views["storedQueries"] = true
-
-	// Metrics
-	config.Metrics = make(map[string]transit.MetricDefinition)
+	config.Views = make(map[string]map[string]transit.MetricDefinition)
 	for _, metric := range profile.Metrics {
-		config.Metrics[metric.Name] = metric
+		if templateMetricName == metric.Name {
+			continue
+		}
+		if metrics, has := config.Views[metric.ServiceType]; has {
+			metrics[metric.Name] = metric
+			config.Views[metric.ServiceType] = metrics
+		} else {
+			metrics := make(map[string]transit.MetricDefinition)
+			metrics[metric.Name] = metric
+			config.Views[metric.ServiceType] = metrics
+		}
 	}
 
 	// Time filter
