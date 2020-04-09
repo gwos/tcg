@@ -32,7 +32,8 @@ type Host struct {
 	hostGroup string
 }
 
-func (monitoringState *MonitoringState) UpdateHostGroups(hostName string, hostGroupName string) {
+func (monitoringState *MonitoringState) UpdateHostGroups(hostName string, hostNamePrefix string, hostGroupName string) {
+	hostName = hostNamePrefix + hostName
 	groups := monitoringState.Groups
 	if group, exists := groups[hostGroupName]; exists {
 		group[hostName] = struct{}{}
@@ -45,8 +46,9 @@ func (monitoringState *MonitoringState) UpdateHostGroups(hostName string, hostGr
 	monitoringState.Groups = groups
 }
 
-func (monitoringState *MonitoringState) UpdateHosts(hostName string, serviceName string, hostGroupName string,
+func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePrefix string, serviceName string, hostGroupName string,
 	timeInterval *transit.TimeInterval) {
+	hostName = hostNamePrefix + hostName
 	hosts := monitoringState.Hosts
 	if host, exists := hosts[hostName]; exists {
 		services := host.services
