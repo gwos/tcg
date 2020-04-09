@@ -332,14 +332,13 @@ func (service *AgentService) listenStatsChan() {
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	var dispatcherOptions []nats.DispatcherOption
-	for idx, gwClient := range service.gwClients {
+	for _, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
 		gwClientRef := gwClient
-		durableID := fmt.Sprintf("#%d#%s#", idx, gwClient.HostName)
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				durableID,
+				fmt.Sprintf("#%s#%s#", SubjSendEvents, gwClient.HostName),
 				SubjSendEvents,
 				func(b []byte) error {
 					var err error
@@ -354,7 +353,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				},
 			),
 			service.makeDispatcherOption(
-				durableID,
+				fmt.Sprintf("#%s#%s#", SubjSendResourceWithMetrics, gwClient.HostName),
 				SubjSendResourceWithMetrics,
 				func(b []byte) error {
 					_, err := gwClientRef.SendResourcesWithMetrics(service.fixTracerContext(b))
@@ -362,7 +361,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				},
 			),
 			service.makeDispatcherOption(
-				durableID,
+				fmt.Sprintf("#%s#%s#", SubjSynchronizeInventory, gwClient.HostName),
 				SubjSynchronizeInventory,
 				func(b []byte) error {
 					_, err := gwClientRef.SynchronizeInventory(service.fixTracerContext(b))
@@ -374,10 +373,10 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableID, subj string, subjFn func([]byte) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func([]byte) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
-		DurableID: durableID,
-		Subject:   subj,
+		DurableName: durableName,
+		Subject:     subj,
 		Handler: func(b []byte) error {
 			// TODO: filter the message by rules per gwClient
 			err := subjFn(b)
