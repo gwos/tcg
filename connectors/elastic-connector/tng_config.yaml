@@ -1,5 +1,5 @@
 connector:
-  agentId: "e5ff8b3b-9a1e-4180-934b-bad93776e7b6"
+  agentId: "testAgent"
   appName: "ELASTIC"
   appType: "ELASTIC"
   controllerAddr: "0.0.0.0:8099"

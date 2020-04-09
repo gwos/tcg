@@ -44,7 +44,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 		return nil, nil, nil
 	}
 	monitoringState := model.MonitoringState{
-		Metrics: connector.Config.Metrics,
+		Metrics: make(map[string]transit.MetricDefinition),
 		Hosts:   make(map[string]model.Host),
 		Groups:  make(map[string]map[string]struct{}),
 	}
@@ -52,25 +52,28 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	connector.esClient = &esClient
 	connector.monitoringState = &monitoringState
 
-	for view, enabled := range views {
-		if enabled {
-			switch view {
-			case string(StoredQueries):
-				queries := retrieveMonitoredServiceNames(StoredQueries, connector.Config.Metrics)
-				err = connector.collectStoredQueriesMetrics(queries)
-				break
-			default:
-				log.Warn("Not supported view: ", view)
-				break
-			}
-			if err != nil {
-				log.Error("Collection interrupted.")
-				break
-			}
+	for view, metrics := range views {
+		for metricName, metric := range metrics {
+			connector.monitoringState.Metrics[metricName] = metric
 		}
+		switch view {
+		case string(StoredQueries):
+			queries := retrieveMonitoredServiceNames(StoredQueries, metrics)
+			err = connector.collectStoredQueriesMetrics(queries)
+			break
+		default:
+			log.Warn("Not supported view: ", view)
+			break
+		}
+		if err != nil {
+			log.Error("Collection interrupted.")
+			break
+		}
+
 	}
 
 	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
+	model.UpdateCheckTimes(monitoredResources, connector.Config.Timer)
 	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
