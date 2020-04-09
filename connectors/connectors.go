@@ -17,7 +17,9 @@ import (
 var transitService *services.TransitService
 
 // will come from extensions field
-var timer = 120
+var Timer = 120
+
+var defaultOwnership = transit.Yield
 
 func Start() error {
 	transitService = services.GetTransitService()
@@ -31,6 +33,28 @@ func Start() error {
 	return nil
 }
 
+func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, transit.HostOwnershipType) {
+	var connector = struct {
+		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
+		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
+		Connections       []struct {
+			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
+		} `json:"groundworkConnections"`
+	}{}
+
+	err := json.Unmarshal(data, &connector)
+	if err != nil {
+		log.Error("Error parsing common connector data: ", err)
+	}
+
+	ownership := defaultOwnership
+	if len(connector.Connections) > 0 {
+		ownership = connector.Connections[0].DeferOwnership
+	}
+
+	return connector.MonitorConnection, connector.MetricsProfile, ownership
+}
+
 func SendMetrics(resources []transit.MonitoredResource) error {
 	request := transit.ResourcesWithServicesRequest{
 		Context:   transitService.MakeTracerContext(),
@@ -38,7 +62,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	}
 	for i, _ := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(timer))}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
 	}
 
 	b, err := json.Marshal(request)
@@ -105,6 +129,27 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 	return resource
 }
 
+func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
+	resource := transit.MonitoredResourceRef{
+		Name:  name,
+		Type:  resourceType,
+		Owner: owner,
+	}
+	return resource
+}
+
+func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
+	group := transit.ResourceGroup{
+		GroupName:   name,
+		Type:        groupType,
+		Description: description,
+	}
+	for _, r := range resources {
+		group.Resources = append(group.Resources, r)
+	}
+	return group
+}
+
 // Metric Constructors
 
 // CreateMetric
@@ -152,6 +197,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		switch arg.(type) {
 		case string:
 			metric.Unit = transit.UnitType(arg.(string))
+		case transit.UnitType:
+			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
 		//case transit.MetricSampleType:
@@ -301,13 +348,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	}
 	switch value.ValueType {
 	case transit.IntegerType:
-		if warning == nil || critical.IntegerValue == -1 {
+		if warning == nil && critical.IntegerValue == -1 {
 			if value.IntegerValue >= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil || warning.IntegerValue == -1 {
+		if critical == nil && warning.IntegerValue == -1 {
 			if value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
@@ -335,13 +382,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			return transit.ServiceOk
 		}
 	case transit.DoubleType:
-		if warning == nil || critical.DoubleValue == -1 {
+		if warning == nil && critical.DoubleValue == -1 {
 			if value.DoubleValue >= critical.DoubleValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil || warning.DoubleValue == -1 {
+		if critical == nil && warning.DoubleValue == -1 {
 			if value.DoubleValue >= warning.DoubleValue {
 				return transit.ServiceWarning
 			}
