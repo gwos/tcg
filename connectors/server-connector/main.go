@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/connectors"
@@ -53,6 +54,7 @@ func main() {
 		}
 	}
 
+
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
 			Url:    "/suggest/:viewName/:name",
@@ -66,6 +68,21 @@ func main() {
 			},
 		},
 	); err != nil {
+		log.Error(err)
+		return
+	}
+
+	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
+	<-chanel
+	log.Info("[Server Connector]: Configuration received")
+
+	if err := connectors.Start(); err != nil {
+		log.Error(err)
+		return
+	}
+	connectors.ControlCHandler()
+
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error(err)
 		return
 	}
@@ -99,7 +116,12 @@ func main() {
 		}
 		if transitService.Status().Transport != services.Stopped && len(config.metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
-			err := connectors.SendMetrics([]transit.MonitoredResource{*CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))})
+			monitoredResource := CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))
+			monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
+			log.Error("HERE-----------------")
+			str, _ := json.Marshal(*monitoredResource)
+			fmt.Println(string(str))
+			err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 			if err != nil {
 				log.Error(err.Error())
 			}
