@@ -41,7 +41,7 @@ bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
                                  size_t errBufLen) = NULL;
 bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
                              size_t errBufLen) = NULL;
-void (*registerDemandConfigCallback)(bool (*)()) = NULL;
+void (*registerDemandConfigHandler)(bool (*)()) = NULL;
 
 /* define handlers for other libtransit functions */
 bool (*isControllerRunning)() = NULL;
@@ -66,7 +66,7 @@ char *listMetricsHandler() {
   return buf;
 }
 
-bool demandConfigCallback() {
+bool demandConfigHandler() {
     printf("DemandConfig was called by the TCG\n");
     return true;
 }
@@ -113,7 +113,7 @@ void load_libtransit() {
   stopController = find_symbol("StopController");
   stopNats = find_symbol("StopNats");
   stopTransport = find_symbol("StopTransport");
-  registerDemandConfigCallback = find_symbol("RegisterDemandConfigCallback");
+  registerDemandConfigHandler = find_symbol("RegisterDemandConfigHandler");
 }
 
 void test_libtransit_control() {
@@ -293,10 +293,10 @@ void test_libtransit_control() {
     fail(errBuf);
   }
 
-  printf("Testing registerDemandConfigCallback ...\n");
-  registerDemandConfigCallback(demandConfigCallback);
+  printf("Testing registerDemandConfigHandler ...\n");
+  registerDemandConfigHandler(demandConfigHandler);
 
-  system("curl -s -X POST -d '{}' -H 'GWOS-APP-NAME:GW8' -H 'X-PIN:999' -H 'Accept: application/json' 'http://localhost:8099/api/v1/config'");
+  system("sh ./transit-c/send_config_script.sh");
 }
 
 void test_SendResourcesWithMetrics() {

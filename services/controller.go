@@ -195,7 +195,7 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, "could not validate config token request: "+dto.DSConnection.HostName)
+		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
 	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
