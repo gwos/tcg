@@ -18,6 +18,7 @@ const (
 	defaultTimeFilterTo             = "now"
 	defaultAlwaysOverrideTimeFilter = false
 
+	defaultHostNamePrefix = "gw8-"
 	defaultHostNameLabel  = "container.name"
 	defaultHostGroupLabel = "container.labels.com_docker_compose_project"
 
@@ -32,6 +33,7 @@ const (
 	exKeyFrom               = "from"
 	exKeyTo                 = "to"
 	exKeyOverride           = "override"
+	exKeyHostamePrefix      = "hostNamePrefix"
 	exKeyHostNameLabelPath  = "hostNameLabelPath"
 	exKeyHostGroupLabelPath = "hostGroupLabelPath"
 	exKeyTimer              = "timer"
@@ -49,6 +51,7 @@ type ElasticConnectorConfig struct {
 	Views              map[string]map[string]transit.MetricDefinition
 	CustomTimeFilter   TimeFilter
 	OverrideTimeFilter bool
+	HostNamePrefix     string
 	HostNameLabelPath  []string
 	HostGroupLabelPath []string
 	Timer              float64
@@ -88,7 +91,7 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 	// Views
 	config.Views = make(map[string]map[string]transit.MetricDefinition)
 	for _, metric := range profile.Metrics {
-		if templateMetricName == metric.Name {
+		if templateMetricName == metric.Name || !metric.Monitored {
 			continue
 		}
 		if metrics, has := config.Views[metric.ServiceType]; has {
@@ -130,6 +133,13 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 		config.OverrideTimeFilter = defaultAlwaysOverrideTimeFilter
 	}
 	config.CustomTimeFilter.replaceIntervalPattern()
+
+	// host name prefix
+	hostNamePrefix := defaultHostNamePrefix
+	if value, has := connection.Extensions[exKeyHostamePrefix]; has {
+		hostNamePrefix = value.(string)
+	}
+	config.HostNamePrefix = hostNamePrefix
 
 	// host name and host group labels
 	var hostNameLabels, hostGroupLabels string
