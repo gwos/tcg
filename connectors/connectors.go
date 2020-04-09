@@ -348,13 +348,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	}
 	switch value.ValueType {
 	case transit.IntegerType:
-		if warning == nil || critical.IntegerValue == -1 {
+		if warning == nil && critical.IntegerValue == -1 {
 			if value.IntegerValue >= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil || warning.IntegerValue == -1 {
+		if critical == nil && warning.IntegerValue == -1 {
 			if value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
@@ -382,13 +382,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			return transit.ServiceOk
 		}
 	case transit.DoubleType:
-		if warning == nil || critical.DoubleValue == -1 {
+		if warning == nil && critical.DoubleValue == -1 {
 			if value.DoubleValue >= critical.DoubleValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil || warning.DoubleValue == -1 {
+		if critical == nil && warning.DoubleValue == -1 {
 			if value.DoubleValue >= warning.DoubleValue {
 				return transit.ServiceWarning
 			}
