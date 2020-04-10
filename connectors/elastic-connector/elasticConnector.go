@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/gwos/tng/connectors/elastic-connector/clients"
 	"github.com/gwos/tng/connectors/elastic-connector/model"
 	"github.com/gwos/tng/log"
@@ -18,40 +19,52 @@ const (
 )
 
 type ElasticConnector struct {
-	Config          *model.ElasticConnectorConfig
+	config          *model.ElasticConnectorConfig
 	kibanaClient    *clients.KibanaClient
 	esClient        *clients.EsClient
 	monitoringState *model.MonitoringState
 }
 
+func InitElasticConnector(config *model.ElasticConnectorConfig) (*ElasticConnector, error) {
+	if config == nil {
+		return nil, errors.New("config is missing")
+	}
+
+	kibanaClient := clients.KibanaClient{ApiRoot: config.KibanaServer}
+	esClient := clients.EsClient{Servers: config.Servers}
+	err := esClient.InitEsClient()
+	if err != nil {
+		log.Error("Cannot initialize ES client.")
+		return nil, errors.New("cannot initialize ES client")
+	}
+	monitoringState := model.InitMonitoringState(nil, config)
+
+	connector := ElasticConnector{
+		config:          config,
+		kibanaClient:    &kibanaClient,
+		esClient:        &esClient,
+		monitoringState: &monitoringState,
+	}
+
+	return &connector, nil
+}
+
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	if connector.Config == nil {
-		log.Error("ElasticConnector config is missing.")
+	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
+		log.Error("ElasticConnector not configured.")
 		return nil, nil, nil
 	}
 
-	views := connector.Config.Views
+	views := connector.config.Views
 	if views == nil || len(views) == 0 {
 		log.Info("No views provided.")
 		return nil, nil, nil
 	}
 
-	kibanaClient := clients.KibanaClient{ApiRoot: connector.Config.KibanaServer}
-	esClient := clients.EsClient{Servers: connector.Config.Servers}
-	err := esClient.InitEsClient()
-	if err != nil {
-		log.Error("Cannot perform collection.")
-		return nil, nil, nil
-	}
-	monitoringState := model.MonitoringState{
-		Metrics: make(map[string]transit.MetricDefinition),
-		Hosts:   make(map[string]model.Host),
-		Groups:  make(map[string]map[string]struct{}),
-	}
-	connector.kibanaClient = &kibanaClient
-	connector.esClient = &esClient
+	monitoringState := model.InitMonitoringState(connector.monitoringState, connector.config)
 	connector.monitoringState = &monitoringState
 
+	var err error
 	for view, metrics := range views {
 		for metricName, metric := range metrics {
 			connector.monitoringState.Metrics[metricName] = metric
@@ -73,7 +86,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	}
 
 	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
-	model.UpdateCheckTimes(monitoredResources, connector.Config.Timer)
+	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
 	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
@@ -86,8 +99,8 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 	}
 
 	for _, storedQuery := range storedQueries {
-		if connector.Config.OverrideTimeFilter || storedQuery.Attributes.TimeFilter == nil {
-			storedQuery.Attributes.TimeFilter = &connector.Config.CustomTimeFilter
+		if connector.config.OverrideTimeFilter || storedQuery.Attributes.TimeFilter == nil {
+			storedQuery.Attributes.TimeFilter = &connector.config.CustomTimeFilter
 		}
 		indexes := connector.kibanaClient.RetrieveIndexTitles(storedQuery)
 
@@ -122,10 +135,9 @@ func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.
 func (connector *ElasticConnector) parseStoredQueryHits(storedQuery model.SavedObject, hits []model.Hit) {
 	timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
 	for _, hit := range hits {
-		hostName := extractLabelValue(connector.Config.HostNameLabelPath, hit.Source)
-		hostGroupName := extractLabelValue(connector.Config.HostGroupLabelPath, hit.Source)
-		connector.monitoringState.UpdateHostGroups(hostName, connector.Config.HostNamePrefix, hostGroupName)
-		connector.monitoringState.UpdateHosts(hostName, connector.Config.HostNamePrefix, storedQuery.Attributes.Title,
+		hostName := extractLabelValue(connector.config.HostNameLabelPath, hit.Source)
+		hostGroupName := extractLabelValue(connector.config.HostGroupLabelPath, hit.Source)
+		connector.monitoringState.UpdateHosts(hostName, connector.config.HostNamePrefix, storedQuery.Attributes.Title,
 			hostGroupName, timeInterval)
 	}
 }
