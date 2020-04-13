@@ -53,7 +53,7 @@ func main() {
 		if transitService.Status().Transport != services.Stopped {
 			select {
 			case <-chanel:
-				connector, err := InitElasticConnector(config)
+				err := connector.ReloadConfig(config)
 				if err != nil {
 					log.Error("Cannot initialize ElasticConnector")
 				} else {
