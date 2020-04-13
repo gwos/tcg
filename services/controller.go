@@ -28,6 +28,21 @@ type Controller struct {
 	ListMetricsMutex   sync.Mutex
 }
 
+type Entrypoint struct {
+	Url     string
+	Method  HttpMethod
+	Handler func(c *gin.Context)
+}
+
+type HttpMethod string
+
+const (
+	Get    HttpMethod = "Get"
+	Post              = "Post"
+	Put               = "Put"
+	Delete            = "Delete"
+)
+
 const shutdownTimeout = 5 * time.Second
 
 var onceController sync.Once
@@ -87,7 +102,7 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 
 // starts the http server
 // overrides AgentService implementation
-func (controller *Controller) startController() error {
+func (controller *Controller) startController(entrypoints []Entrypoint) error {
 	if controller.srv != nil {
 		log.Warn("StartController: already started")
 		return nil
@@ -109,7 +124,7 @@ func (controller *Controller) startController() error {
 	corsConfig.AllowedHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
 	router.Use(sessions.Sessions("tng-session", sessions.NewCookieStore([]byte("secret"))))
-	controller.registerAPI1(router, addr)
+	controller.registerAPI1(router, addr, entrypoints)
 
 	controller.srv = &http.Server{
 		Addr:    addr,
@@ -413,7 +428,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 	}
 }
 
-func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
+func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entrypoints []Entrypoint) {
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
@@ -430,6 +445,19 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
+
+	for _, entrypoint := range entrypoints {
+		switch entrypoint.Method {
+		case Get:
+			apiV1Group.GET(entrypoint.Url, entrypoint.Handler)
+		case Post:
+			apiV1Group.POST(entrypoint.Url, entrypoint.Handler)
+		case Put:
+			apiV1Group.PUT(entrypoint.Url, entrypoint.Handler)
+		case Delete:
+			apiV1Group.DELETE(entrypoint.Url, entrypoint.Handler)
+		}
+	}
 
 	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
