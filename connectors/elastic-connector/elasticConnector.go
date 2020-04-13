@@ -30,12 +30,9 @@ func InitElasticConnector(config *model.ElasticConnectorConfig) (*ElasticConnect
 		return nil, errors.New("config is missing")
 	}
 
-	kibanaClient := clients.KibanaClient{ApiRoot: config.KibanaServer}
-	esClient := clients.EsClient{Servers: config.Servers}
-	err := esClient.InitEsClient()
+	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
-		log.Error("Cannot initialize ES client.")
-		return nil, errors.New("cannot initialize ES client")
+		return nil, err
 	}
 	monitoringState := model.InitMonitoringState(nil, config)
 
@@ -47,6 +44,25 @@ func InitElasticConnector(config *model.ElasticConnectorConfig) (*ElasticConnect
 	}
 
 	return &connector, nil
+}
+
+func (connector *ElasticConnector) ReloadConfig(config *model.ElasticConnectorConfig) error {
+	if config == nil {
+		return errors.New("config is missing")
+	}
+
+	kibanaClient, esClient, err := initClients(config)
+	if err != nil {
+		return err
+	}
+	monitoringState := model.InitMonitoringState(connector.monitoringState, config)
+
+	connector.config = config
+	connector.kibanaClient = &kibanaClient
+	connector.esClient = &esClient
+	connector.monitoringState = &monitoringState
+
+	return nil
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
@@ -89,6 +105,17 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
 	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
+}
+
+func initClients(config *model.ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
+	kibanaClient := clients.KibanaClient{ApiRoot: config.KibanaServer}
+	esClient := clients.EsClient{Servers: config.Servers}
+	err := esClient.InitEsClient()
+	if err != nil {
+		log.Error("Cannot initialize ES client.")
+		return kibanaClient, esClient, errors.New("cannot initialize ES client")
+	}
+	return kibanaClient, esClient, nil
 }
 
 func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) error {
