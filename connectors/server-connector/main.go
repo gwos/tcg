@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/connectors"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
+	"net/http"
 	"time"
 )
 
@@ -47,7 +49,15 @@ func main() {
 		}
 	}
 
-	if err := transitService.DemandConfig(); err != nil {
+	if err := transitService.DemandConfig(
+		services.Entrypoint{
+			Url:    "/suggest/processes/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
+			},
+		},
+	); err != nil {
 		log.Error(err)
 		return
 	}

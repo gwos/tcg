@@ -28,6 +28,21 @@ type Controller struct {
 	ListMetricsMutex   sync.Mutex
 }
 
+type Entrypoint struct {
+	Url     string
+	Method  HttpMethod
+	Handler func(c *gin.Context)
+}
+
+type HttpMethod string
+
+const (
+	Get    HttpMethod = "Get"
+	Post              = "Post"
+	Put               = "Put"
+	Delete            = "Delete"
+)
+
 const shutdownTimeout = 5 * time.Second
 
 var onceController sync.Once
@@ -87,7 +102,7 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 
 // starts the http server
 // overrides AgentService implementation
-func (controller *Controller) startController() error {
+func (controller *Controller) startController(entrypoints []Entrypoint) error {
 	if controller.srv != nil {
 		log.Warn("StartController: already started")
 		return nil
@@ -109,7 +124,7 @@ func (controller *Controller) startController() error {
 	corsConfig.AllowedHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
 	router.Use(sessions.Sessions("tng-session", sessions.NewCookieStore([]byte("secret"))))
-	controller.registerAPI1(router, addr)
+	controller.registerAPI1(router, addr, entrypoints)
 
 	controller.srv = &http.Server{
 		Addr:    addr,
@@ -377,20 +392,6 @@ func (controller *Controller) status(c *gin.Context) {
 	c.JSON(http.StatusOK, statusDTO)
 }
 
-//
-// @Description The following API endpoint can be used to get TNG status.
-// @Tags    agent, connector
-// @Accept  json
-// @Produce json
-// @Success 200 {object} services.ConnectorStatusDTO
-// @Failure 401 {string} string "Unauthorized"
-// @Router  /processes/suggest/:name [get]
-// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
-// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
-func (controller *Controller) listSuggestions(c *gin.Context) {
-	c.JSON(http.StatusOK, controller.AgentService.ListSuggestions(c.Param("name")))
-}
-
 func (controller *Controller) validateToken(c *gin.Context) {
 	// check local pin
 	pin := controller.Connector.ControllerPin
@@ -427,7 +428,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 	}
 }
 
-func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
+func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entrypoints []Entrypoint) {
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
@@ -444,7 +445,19 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string) {
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
-	apiV1Group.GET("/processes/suggest/:name", controller.listSuggestions)
+
+	for _, entrypoint := range entrypoints {
+		switch entrypoint.Method {
+		case Get:
+			apiV1Group.GET(entrypoint.Url, entrypoint.Handler)
+		case Post:
+			apiV1Group.POST(entrypoint.Url, entrypoint.Handler)
+		case Put:
+			apiV1Group.PUT(entrypoint.Url, entrypoint.Handler)
+		case Delete:
+			apiV1Group.DELETE(entrypoint.Url, entrypoint.Handler)
+		}
+	}
 
 	pprofGroup := apiV1Group.Group("/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
