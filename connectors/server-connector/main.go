@@ -51,10 +51,10 @@ func main() {
 
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
-			Url:    "/suggest/processes/:viewName/:name",
+			Url:    "/suggest/:viewName/:name",
 			Method: "Get",
 			Handler: func(c *gin.Context) {
-				if (c.Param("viewName") == transit.Process) {
+				if c.Param("viewName") == string(transit.Process) {
 					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
 				} else {
 					c.JSON(http.StatusOK, "[]")
