@@ -16,34 +16,51 @@ const (
 
 type MonitoringState struct {
 	Metrics map[string]transit.MetricDefinition
-	Hosts   map[string]Host
+	Hosts   map[string]monitoringHost
 	Groups  map[string]map[string]struct{}
 }
 
-type Service struct {
+type monitoringService struct {
 	name         string
 	hits         int
 	timeInterval *transit.TimeInterval
 }
 
-type Host struct {
+type monitoringHost struct {
 	name      string
-	services  []Service
+	services  []monitoringService
 	hostGroup string
 }
 
-func (monitoringState *MonitoringState) UpdateHostGroups(hostName string, hostNamePrefix string, hostGroupName string) {
-	hostName = hostNamePrefix + hostName
-	groups := monitoringState.Groups
-	if group, exists := groups[hostGroupName]; exists {
-		group[hostName] = struct{}{}
-	} else {
-		group := make(map[string]struct{})
-		group[hostName] = struct{}{}
-		groups[hostGroupName] = group
+func InitMonitoringState(previousState *MonitoringState, config *ElasticConnectorConfig) MonitoringState {
+	var currentState MonitoringState
+
+	currentState.Metrics = make(map[string]transit.MetricDefinition)
+	for _, metrics := range config.Views {
+		for metricName, metric := range metrics {
+			currentState.Metrics[metricName] = metric
+		}
 	}
-	groups[hostGroupName][hostName] = struct{}{}
-	monitoringState.Groups = groups
+
+	currentState.Hosts = make(map[string]monitoringHost)
+	if previousState != nil && previousState.Hosts != nil {
+		for _, host := range previousState.Hosts {
+			var services []monitoringService
+			for metricName := range currentState.Metrics {
+				service := monitoringService{name: metricName, hits: 0}
+				services = append(services, service)
+			}
+			host.services = services
+			currentState.Hosts[host.name] = host
+		}
+	}
+
+	currentState.Groups = make(map[string]map[string]struct{})
+	if previousState != nil && previousState.Groups != nil {
+		currentState.Groups = previousState.Groups
+	}
+
+	return currentState
 }
 
 func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePrefix string, serviceName string, hostGroupName string,
@@ -52,23 +69,20 @@ func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePre
 	hosts := monitoringState.Hosts
 	if host, exists := hosts[hostName]; exists {
 		services := host.services
-		var found = false
 		for i := range services {
 			if services[i].name == serviceName {
 				services[i].hits = services[i].hits + 1
-				found = true
+				if services[i].timeInterval == nil {
+					services[i].timeInterval = timeInterval
+				}
 				break
 			}
 		}
-		if !found {
-			service := Service{name: serviceName, hits: 1, timeInterval: timeInterval}
-			services = append(services, service)
-			host.services = services
-		}
+		host.hostGroup = hostGroupName
 		hosts[hostName] = host
 	} else {
-		service := Service{name: serviceName, hits: 1, timeInterval: timeInterval}
-		host := Host{name: hostName, services: []Service{service}, hostGroup: hostGroupName}
+		service := monitoringService{name: serviceName, hits: 1, timeInterval: timeInterval}
+		host := monitoringHost{name: hostName, services: []monitoringService{service}, hostGroup: hostGroupName}
 		hosts[hostName] = host
 	}
 	monitoringState.Hosts = hosts
@@ -90,42 +104,43 @@ func (monitoringState *MonitoringState) ToTransitResources() ([]transit.Monitore
 	return mrs, irs
 }
 
-func (host Host) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
+func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
 	monitoredServices := make([]transit.MonitoredService, len(host.services))
 	inventoryServices := make([]transit.InventoryService, len(host.services))
+	if metricDefinitions == nil {
+		return monitoredServices, inventoryServices
+	}
 	for i, service := range host.services {
-		metric, _ := connectors.CreateMetric(hitsMetricName, service.hits, service.timeInterval, transit.UnitCounter)
-
 		serviceName := service.name
-		if metricDefinitions != nil {
-			if metricDefinition, has := metricDefinitions[serviceName]; has {
-				if metricDefinition.CustomName != "" {
-					serviceName = metricDefinition.CustomName
-				}
-				warningThreshold, err := connectors.CreateWarningThreshold(hitsMetricName+warningThresholdNameSuffix,
-					metricDefinition.WarningThreshold)
-				if err != nil {
-					log.Error("Error creating warning threshold for metric ", serviceName, ": ", err)
-				}
-				criticalThreshold, err := connectors.CreateCriticalThreshold(hitsMetricName+criticalThresholdNameSuffix,
-					metricDefinition.CriticalThreshold)
-				if err != nil {
-					log.Error("Error creating critical threshold for metric ", serviceName, ": ", err)
-				}
-				thresholds := []transit.ThresholdValue{*warningThreshold, *criticalThreshold}
-				metric.Thresholds = &thresholds
+		if metricDefinition, has := metricDefinitions[serviceName]; has {
+			metric, _ := connectors.CreateMetric(hitsMetricName, service.hits, service.timeInterval, transit.UnitCounter)
+
+			if metricDefinition.CustomName != "" {
+				serviceName = metricDefinition.CustomName
 			}
+			warningThreshold, err := connectors.CreateWarningThreshold(hitsMetricName+warningThresholdNameSuffix,
+				metricDefinition.WarningThreshold)
+			if err != nil {
+				log.Error("Error creating warning threshold for metric ", serviceName, ": ", err)
+			}
+			criticalThreshold, err := connectors.CreateCriticalThreshold(hitsMetricName+criticalThresholdNameSuffix,
+				metricDefinition.CriticalThreshold)
+			if err != nil {
+				log.Error("Error creating critical threshold for metric ", serviceName, ": ", err)
+			}
+			thresholds := []transit.ThresholdValue{*warningThreshold, *criticalThreshold}
+			metric.Thresholds = &thresholds
+			monitoredService, _ := connectors.CreateService(serviceName, host.name, []transit.TimeSeries{*metric})
+			inventoryService := connectors.CreateInventoryService(serviceName, host.name)
+			monitoredServices[i] = *monitoredService
+			inventoryServices[i] = inventoryService
 		}
-		monitoredService, _ := connectors.CreateService(serviceName, host.name, []transit.TimeSeries{*metric})
-		inventoryService := connectors.CreateInventoryService(serviceName, host.name)
-		monitoredServices[i] = *monitoredService
-		inventoryServices[i] = inventoryService
 	}
 	return monitoredServices, inventoryServices
 }
 
 func (monitoringState *MonitoringState) ToResourceGroups() []transit.ResourceGroup {
-	groups := monitoringState.Groups
+	groups := monitoringState.buildGroups()
 	rgs := make([]transit.ResourceGroup, len(groups))
 	j := 0
 	for group, hostsInGroup := range groups {
@@ -141,6 +156,24 @@ func (monitoringState *MonitoringState) ToResourceGroups() []transit.ResourceGro
 		j++
 	}
 	return rgs
+}
+
+func (monitoringState *MonitoringState) buildGroups() map[string]map[string]struct{} {
+	groups := make(map[string]map[string]struct{})
+	for _, host := range monitoringState.Hosts {
+		hostName := host.name
+		groupName := host.hostGroup
+		if group, exists := groups[groupName]; exists {
+			group[hostName] = struct{}{}
+		} else {
+			group := make(map[string]struct{})
+			group[hostName] = struct{}{}
+			groups[groupName] = group
+		}
+		groups[groupName][hostName] = struct{}{}
+		monitoringState.Groups = groups
+	}
+	return groups
 }
 
 func UpdateCheckTimes(resources []transit.MonitoredResource, timer float64) {
