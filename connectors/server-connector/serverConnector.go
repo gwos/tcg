@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -10,6 +11,7 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
+	"strings"
 	"time"
 )
 
@@ -601,4 +603,30 @@ func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]
 	}
 
 	return processesMap
+}
+
+func listSuggestions(name string) string {
+	hostProcesses, _ := process.Processes()
+
+	processes := make([]*transit.MetricDefinition, 0)
+	for _, hostProcess := range hostProcesses {
+		processName, err := hostProcess.Name()
+		if err != nil {
+			log.Error(err)
+		}
+
+		if strings.Contains(processName, name) {
+			processes = append(processes, &transit.MetricDefinition{
+				Name:              processName,
+				MetricType:        "Gauge",
+				ComputeType:       "Query",
+				ServiceType:       "Process",
+				AggregateType:     "average",
+				WarningThreshold:  -1,
+				CriticalThreshold: -1,
+			})
+		}
+	}
+	jsonBytes, _ := json.Marshal(processes)
+	return string(jsonBytes)
 }

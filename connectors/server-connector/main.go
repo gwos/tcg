@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/connectors"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
 	"github.com/gwos/tng/transit"
+	"net/http"
 	"time"
 )
 
@@ -47,7 +49,19 @@ func main() {
 		}
 	}
 
-	if err := transitService.DemandConfig(); err != nil {
+	if err := transitService.DemandConfig(
+		services.Entrypoint{
+			Url:    "/suggest/:viewName/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				if c.Param("viewName") == string(transit.Process) {
+					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
+				} else {
+					c.JSON(http.StatusOK, "[]")
+				}
+			},
+		},
+	); err != nil {
 		log.Error(err)
 		return
 	}

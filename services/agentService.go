@@ -37,7 +37,7 @@ type AgentService struct {
 
 // CtrlAction defines queued controll action
 type CtrlAction struct {
-	Data     []byte
+	Data     interface{}
 	Idx      uint8
 	Subj     ctrlSubj
 	SyncChan chan error
@@ -124,8 +124,8 @@ func GetAgentService() *AgentService {
 }
 
 // DemandConfig implements AgentServices.DemandConfig interface
-func (service *AgentService) DemandConfig() error {
-	if err := service.StartController(); err != nil {
+func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
+	if err := service.StartController(entrypoints...); err != nil {
 		return err
 	}
 	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
@@ -208,8 +208,8 @@ func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlActio
 }
 
 // StartController implements AgentServices.StartController interface
-func (service *AgentService) StartController() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartController)
+func (service *AgentService) StartController(entrypoints ...Entrypoint) error {
+	return service.ctrlPushSync(entrypoints, ctrlSubjStartController)
 }
 
 // StopController implements AgentServices.StopController interface
@@ -247,7 +247,7 @@ func (service *AgentService) Status() AgentStatus {
 	return *service.agentStatus
 }
 
-func (service *AgentService) ctrlPushAsync(data []byte, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
+func (service *AgentService) ctrlPushAsync(data interface{}, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
 	ctrl := &CtrlAction{data, service.ctrlIdx + 1, subj, syncChan}
 	select {
 	case service.ctrlChan <- ctrl:
@@ -261,7 +261,7 @@ func (service *AgentService) ctrlPushAsync(data []byte, subj ctrlSubj, syncChan 
 	}
 }
 
-func (service *AgentService) ctrlPushSync(data []byte, subj ctrlSubj) error {
+func (service *AgentService) ctrlPushSync(data interface{}, subj ctrlSubj) error {
 	syncChan := make(chan error)
 	if _, err := service.ctrlPushAsync(data, subj, syncChan); err != nil {
 		return err
@@ -275,15 +275,15 @@ func (service *AgentService) listenCtrlChan() {
 		log.With(log.Fields{
 			"Idx":  ctrl.Idx,
 			"Subj": ctrl.Subj,
-			"Data": string(ctrl.Data),
+			// "Data": string(ctrl.Data),
 		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
 		case ctrlSubjConfig:
-			err = service.config(ctrl.Data)
+			err = service.config(ctrl.Data.([]byte))
 		case ctrlSubjStartController:
-			err = service.startController()
+			err = service.startController(ctrl.Data.([]Entrypoint))
 		case ctrlSubjStopController:
 			err = service.stopController()
 		case ctrlSubjStartNats:
@@ -424,9 +424,9 @@ func (service *AgentService) config(data []byte) error {
 	return nil
 }
 
-func (service *AgentService) startController() error {
+func (service *AgentService) startController(entrypoints []Entrypoint) error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	return GetController().startController()
+	return GetController().startController(entrypoints)
 }
 
 func (service *AgentService) stopController() error {
