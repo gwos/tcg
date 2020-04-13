@@ -61,7 +61,7 @@ type ConnectorStatusDTO struct {
 
 // AgentServices defines TNG Agent services interface
 type AgentServices interface {
-	DemandConfig() error
+	DemandConfig(entrypoints ...Entrypoint) error
 	MakeTracerContext() *transit.TracerContext
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)
@@ -69,7 +69,7 @@ type AgentServices interface {
 	StopNatsAsync(chan error) (*CtrlAction, error)
 	StartTransportAsync(chan error) (*CtrlAction, error)
 	StopTransportAsync(chan error) (*CtrlAction, error)
-	StartController() error
+	StartController(entrypoints ...Entrypoint) error
 	StopController() error
 	StartNats() error
 	StopNats() error

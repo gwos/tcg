@@ -124,7 +124,8 @@ type ServiceType string
 
 // Possible Types
 const (
-	Service ServiceType = "SERVICE"
+	Process ServiceType = "Process"
+	Service = "Service"
 )
 
 // GroupType defines the foundation group type
