@@ -57,7 +57,7 @@ func main() {
 				if c.Param("viewName") == string(transit.Process) {
 					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
 				} else {
-					c.JSON(http.StatusOK, "[]")
+					c.JSON(http.StatusOK, []transit.MetricDefinition{})
 				}
 			},
 		},
