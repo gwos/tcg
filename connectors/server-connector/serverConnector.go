@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -605,10 +604,10 @@ func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]
 	return processesMap
 }
 
-func listSuggestions(name string) string {
+func listSuggestions(name string) []transit.MetricDefinition {
 	hostProcesses, _ := process.Processes()
 
-	processes := make([]*transit.MetricDefinition, 0)
+	processes := make([]transit.MetricDefinition, 0)
 	for _, hostProcess := range hostProcesses {
 		processName, err := hostProcess.Name()
 		if err != nil {
@@ -616,7 +615,7 @@ func listSuggestions(name string) string {
 		}
 
 		if strings.Contains(processName, name) {
-			processes = append(processes, &transit.MetricDefinition{
+			processes = append(processes, transit.MetricDefinition{
 				Name:              processName,
 				MetricType:        "Gauge",
 				ComputeType:       "Query",
@@ -627,6 +626,5 @@ func listSuggestions(name string) string {
 			})
 		}
 	}
-	jsonBytes, _ := json.Marshal(processes)
-	return string(jsonBytes)
+	return processes
 }
