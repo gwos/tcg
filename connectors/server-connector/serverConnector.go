@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -111,7 +112,7 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 		}
 	}
 
-	processesMap := collectProcesses(notDefaultProcesses)
+	processesMap := collectMonitoredProcesses(notDefaultProcesses)
 	interval := time.Now()
 
 	warningValue := transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: ProcessCPUUsageWarningValue}
@@ -563,7 +564,7 @@ type localProcess struct {
 }
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
-func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]float64 {
+func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) map[string]float64 {
 	hostProcesses, _ := process.Processes()
 
 	processes := make([]*localProcess, 0)
@@ -604,26 +605,28 @@ func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]
 	return processesMap
 }
 
-func listSuggestions(name string) []transit.MetricDefinition {
+func listSuggestions(name string) []string {
+	hostProcesses, _ := cache.ProcessesCache.Get("processes")
+
+	var processes []string
+	for _, hostProcess := range hostProcesses.([]string) {
+		if strings.Contains(hostProcess, name) {
+			processes = append(processes, hostProcess)
+		}
+	}
+
+	return processes
+}
+
+func collectProcessesNames() []string {
+	var processes []string
 	hostProcesses, _ := process.Processes()
 
-	processes := make([]transit.MetricDefinition, 0)
 	for _, hostProcess := range hostProcesses {
-		processName, err := hostProcess.Name()
-		if err != nil {
+		if name, err := hostProcess.Name(); err == nil {
+			processes = append(processes, name)
+		} else {
 			log.Error(err)
-		}
-
-		if strings.Contains(processName, name) {
-			processes = append(processes, transit.MetricDefinition{
-				Name:              processName,
-				MetricType:        "Gauge",
-				ComputeType:       "Query",
-				ServiceType:       "Process",
-				AggregateType:     "average",
-				WarningThreshold:  -1,
-				CriticalThreshold: -1,
-			})
 		}
 	}
 	return processes
