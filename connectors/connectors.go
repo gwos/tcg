@@ -437,3 +437,10 @@ func ControlCHandler() {
 		os.Exit(0)
 	}()
 }
+
+func Name(defaultName string, customName string) string {
+	if customName == "" {
+		return defaultName
+	}
+	return customName
+}
