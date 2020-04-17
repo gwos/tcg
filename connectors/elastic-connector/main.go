@@ -1,11 +1,13 @@
 package main
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/connectors/elastic-connector/model"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
+	"net/http"
 	"time"
 )
 
@@ -23,7 +25,17 @@ func main() {
 		chanel <- true
 	}
 
-	if err := transitService.DemandConfig(); err != nil {
+	var connector *ElasticConnector
+
+	if err := transitService.DemandConfig(
+		services.Entrypoint{
+			Url:    "/suggest/:viewName/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+	); err != nil {
 		log.Error(err)
 		return
 	}
@@ -38,15 +50,16 @@ func main() {
 	}
 	connectors.ControlCHandler()
 
-	connector, err := InitElasticConnector(config)
+	var err error
+	connector, err = InitElasticConnector(config)
 	if err != nil {
 		log.Error("Cannot initialize ElasticConnector")
-	} else {
-		_, irs, rgs := connector.CollectMetrics()
-		if transitService.Status().Transport != services.Stopped {
-			log.Info("[Elastic Connector]: Sending inventory ...")
-			_ = connectors.SendInventory(irs, rgs, config.Ownership)
-		}
+		return
+	}
+	_, irs, rgs := connector.CollectMetrics()
+	if transitService.Status().Transport != services.Stopped {
+		log.Info("[Elastic Connector]: Sending inventory ...")
+		_ = connectors.SendInventory(irs, rgs, config.Ownership)
 	}
 
 	for {
@@ -55,28 +68,19 @@ func main() {
 			case <-chanel:
 				err := connector.ReloadConfig(config)
 				if err != nil {
-					log.Error("Cannot initialize ElasticConnector")
-				} else {
-					mrs, irs, rgs := connector.CollectMetrics()
-					log.Info("[Elastic Connector]: Sending inventory ...")
-					err := connectors.SendInventory(irs, rgs, config.Ownership)
-					if err != nil {
-						log.Error(err.Error())
-					}
-					log.Info("[Elastic Connector]: Monitoring resources ...")
-					err = connectors.SendMetrics(mrs)
-					if err != nil {
-						log.Error(err.Error())
-					}
+					log.Error("Cannot reload ElasticConnector config: ", err)
 				}
-			default:
-				log.Info("[Elastic Connector]: No new config received, skipping inventory ...")
-				log.Info("[Elastic Connector]: Monitoring resources ...")
-				mrs, _, _ := connector.CollectMetrics()
-				err := connectors.SendMetrics(mrs)
-				if err != nil {
-					log.Error(err.Error())
-				}
+			}
+			mrs, irs, rgs := connector.CollectMetrics()
+			log.Info("[Elastic Connector]: Sending inventory ...")
+			err := connectors.SendInventory(irs, rgs, config.Ownership)
+			if err != nil {
+				log.Error(err.Error())
+			}
+			log.Info("[Elastic Connector]: Monitoring resources ...")
+			err = connectors.SendMetrics(mrs)
+			if err != nil {
+				log.Error(err.Error())
 			}
 		} else {
 			log.Info("[Elastic Connector]: Transport is stopped ...")

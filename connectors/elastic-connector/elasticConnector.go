@@ -7,6 +7,7 @@ import (
 	"github.com/gwos/tng/log"
 	_ "github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
+	"strings"
 )
 
 type ElasticView string
@@ -107,8 +108,34 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
+func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
+	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
+		log.Error("ElasticConnector not configured.")
+		return nil
+	}
+	var suggestions []string
+	switch view {
+	case string(StoredQueries):
+		storedQueries := connector.kibanaClient.RetrieveStoredQueries(nil)
+		for _, query := range storedQueries {
+			if strings.Contains(query.Attributes.Title, name) {
+				suggestions = append(suggestions, query.Attributes.Title)
+			}
+		}
+		break
+	default:
+		log.Warn("Not supported view: ", view)
+		break
+	}
+	return suggestions
+}
+
 func initClients(config *model.ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
-	kibanaClient := clients.KibanaClient{ApiRoot: config.KibanaServer}
+	kibanaClient := clients.KibanaClient{
+		ApiRoot:  config.Kibana.ServerName,
+		Username: config.Kibana.Username,
+		Password: config.Kibana.Password,
+	}
 	esClient := clients.EsClient{Servers: config.Servers}
 	err := esClient.InitEsClient()
 	if err != nil {

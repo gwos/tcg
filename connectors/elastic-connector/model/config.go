@@ -11,8 +11,10 @@ import (
 const (
 	defaultProtocol = "http"
 
-	defaultElasticServer = "http://localhost:9200"
-	defaultKibanaServer  = "http://localhost:5601"
+	defaultElasticServer    = "http://localhost:9200"
+	defaultKibanaServerName = "http://localhost:5601"
+	defaultKibanaUsername   = ""
+	defaultKibanaPassword   = ""
 
 	defaultTimeFilterFrom           = "now-$interval"
 	defaultTimeFilterTo             = "now"
@@ -23,12 +25,16 @@ const (
 	defaultHostGroupLabel = "container.labels.com_docker_compose_project"
 
 	// TODO move somewhere more global
-	DefaultTimer = 120
+	DefaultInterval = 300
+	DefaultTimeout  = 600
 )
 
 // keys for extensions
 const (
-	exKeyKibanaServer       = "kibanaServer"
+	exKeyKibana             = "kibana"
+	exKeyServerName         = "serverName"
+	exKeyUsername           = "userName"
+	exKeyPassword           = "password"
 	exKeyTimeFilter         = "timefilter"
 	exKeyFrom               = "from"
 	exKeyTo                 = "to"
@@ -36,7 +42,8 @@ const (
 	exKeyHostamePrefix      = "hostNamePrefix"
 	exKeyHostNameLabelPath  = "hostNameLabelPath"
 	exKeyHostGroupLabelPath = "hostGroupLabelPath"
-	exKeyTimer              = "timer"
+	exKeyInterval           = "checkIntervalMinutes"
+	exKeyTimeout            = "checkTimeoutSeconds"
 )
 
 const (
@@ -45,9 +52,15 @@ const (
 	intervalPeriodSeconds = "s"
 )
 
+type Kibana struct {
+	ServerName string
+	Username   string
+	Password   string
+}
+
 type ElasticConnectorConfig struct {
 	Servers            []string
-	KibanaServer       string
+	Kibana             Kibana
 	Views              map[string]map[string]transit.MetricDefinition
 	CustomTimeFilter   TimeFilter
 	OverrideTimeFilter bool
@@ -76,17 +89,31 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 	config.Servers = servers
 
 	// Kibana
-	kibanaServer := defaultKibanaServer
-	if value, has := connection.Extensions[exKeyKibanaServer]; has {
-		kibanaServer = value.(string)
+	kibanaServerName := defaultKibanaServerName
+	kibanaUsername := defaultKibanaUsername
+	kibanaPassword := defaultKibanaPassword
+	if kibana, has := connection.Extensions[exKeyKibana]; has {
+		if serverName, has := kibana.(map[string]interface{})[exKeyServerName]; has {
+			kibanaServerName = serverName.(string)
+		}
+		if username, has := kibana.(map[string]interface{})[exKeyUsername]; has {
+			kibanaUsername = username.(string)
+		}
+		if password, has := kibana.(map[string]interface{})[exKeyPassword]; has {
+			kibanaPassword = password.(string)
+		}
 	}
-	if !strings.HasSuffix(kibanaServer, "/") {
-		kibanaServer = kibanaServer + "/"
+	if !strings.HasSuffix(kibanaServerName, "/") {
+		kibanaServerName = kibanaServerName + "/"
 	}
-	if !strings.HasPrefix(kibanaServer, defaultProtocol) {
-		kibanaServer = defaultProtocol + ":" + "//" + kibanaServer
+	if !strings.HasPrefix(kibanaServerName, defaultProtocol) {
+		kibanaServerName = defaultProtocol + ":" + "//" + kibanaServerName
 	}
-	config.KibanaServer = kibanaServer
+	config.Kibana = Kibana{
+		ServerName: kibanaServerName,
+		Username:   kibanaUsername,
+		Password:   kibanaPassword,
+	}
 
 	// Views
 	config.Views = make(map[string]map[string]transit.MetricDefinition)
@@ -158,9 +185,9 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 	config.HostGroupLabelPath = strings.Split(hostGroupLabels, ".")
 
 	// Timer
-	config.Timer = float64(DefaultTimer)
-	if value, has := connection.Extensions[exKeyTimer]; has {
-		config.Timer = value.(float64)
+	config.Timer = float64(DefaultInterval)
+	if value, has := connection.Extensions[exKeyInterval]; has {
+		config.Timer = value.(float64) * 60
 	}
 
 	// Ownership
