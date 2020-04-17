@@ -36,7 +36,9 @@ var kibanaHeaders = map[string]string{
 }
 
 type KibanaClient struct {
-	ApiRoot string
+	ApiRoot  string
+	Username string
+	Password string
 }
 
 // Extracts stored queries with provided titles
