@@ -9,6 +9,7 @@
 tng
 test_libtransit
 connectors/server-connector/server-connector
+connectors/elastic-connector/elastic-connector
 
 # Temporary files
 ,*
