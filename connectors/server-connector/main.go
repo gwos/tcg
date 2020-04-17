@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/connectors"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
@@ -17,6 +18,7 @@ import (
 const (
 	DefaultHostGroupName = "LocalServer"
 	DefaultTimer         = 120
+	DefaultCacheTimer    = 1
 )
 
 type InitializeConfigResult struct {
@@ -33,6 +35,8 @@ type InitializeConfigResult struct {
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	go handleCache()
+
 	var transitService = services.GetTransitService()
 
 	chanel := make(chan bool)
@@ -161,4 +165,11 @@ func initializeConfig(data []byte) (*InitializeConfigResult, error) {
 	config.metricsProfile = connector.MetricsProfile
 
 	return &config, nil
+}
+
+func handleCache() {
+	for {
+		cache.ProcessesCache.SetDefault("processes", collectProcessesNames())
+		time.Sleep(DefaultCacheTimer * time.Minute)
+	}
 }

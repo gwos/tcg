@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -26,12 +27,8 @@ const (
 	ProcessesNumberServiceName    = "processes.number"
 )
 
-// Default 'Critical' and 'Warning' values for monitored processes(in MB)
-// TODO: remove these when thresholds ready in database and ui
 const (
 	MB                           uint64 = 1048576
-	ProcessCPUUsageCriticalValue        = 0.90
-	ProcessCPUUsageWarningValue         = 0.50
 )
 
 var processToFuncMap = map[string]interface{}{
@@ -111,29 +108,40 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 		}
 	}
 
-	processesMap := collectProcesses(notDefaultProcesses)
+	processesMap := collectMonitoredProcesses(notDefaultProcesses)
 	interval := time.Now()
-
-	warningValue := transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: ProcessCPUUsageWarningValue}
-	criticalValue := transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: ProcessCPUUsageCriticalValue}
 
 	for processName, processCPU := range processesMap {
 		value := transit.TypedValue{
 			ValueType:   transit.DoubleType,
-			DoubleValue: processCPU,
+			DoubleValue: processCPU.value,
 		}
 		warningThreshold := transit.ThresholdValue{
 			SampleType: transit.Warning,
 			Label:      processName + "_wn",
-			Value:      &warningValue}
+			Value: &transit.TypedValue{
+				ValueType:    transit.IntegerType,
+				IntegerValue: int64(processCPU.warningValue),
+			}}
 		errorThreshold := transit.ThresholdValue{
 			SampleType: transit.Critical,
 			Label:      processName + "_cr",
-			Value:      &criticalValue}
+			Value: &transit.TypedValue{
+				ValueType:    transit.IntegerType,
+				IntegerValue: int64(processCPU.criticalValue),
+			}}
 		monitoredService := transit.MonitoredService{
-			Name:          processName,
-			Type:          transit.Service,
-			Status:        connectors.CalculateStatus(&value, &warningValue, &criticalValue),
+			Name: processName,
+			Type: transit.Service,
+			Status: connectors.CalculateStatus(&value,
+				&transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: int64(processCPU.warningValue),
+				},
+				&transit.TypedValue{
+					ValueType:    transit.IntegerType,
+					IntegerValue: int64(processCPU.criticalValue),
+				}),
 			Owner:         hostName,
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: interval},
 			NextCheckTime: milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
@@ -151,7 +159,7 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 				},
 			},
 		}
-		if processCPU == -1 {
+		if processCPU.value == -1 {
 			monitoredService.Status = transit.ServicePending
 		}
 		monitoredResource.Services = append(monitoredResource.Services, monitoredService)
@@ -562,8 +570,14 @@ type localProcess struct {
 	cpu  float64
 }
 
+type values struct {
+	value         float64
+	criticalValue int
+	warningValue  int
+}
+
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
-func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]float64 {
+func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) map[string]values {
 	hostProcesses, _ := process.Processes()
 
 	processes := make([]*localProcess, 0)
@@ -583,47 +597,55 @@ func collectProcesses(monitoredProcesses []transit.MetricDefinition) map[string]
 
 	m := make(map[string]float64)
 	for _, p := range processes {
-		_, exists := m[p.name]
-		if exists {
+		if _, exists := m[p.name]; exists {
 			m[p.name] = m[p.name] + p.cpu
 		} else {
 			m[p.name] = p.cpu
 		}
 	}
 
-	processesMap := make(map[string]float64)
+	processesMap := make(map[string]values)
 	for _, pr := range monitoredProcesses {
-		_, exists := m[pr.Name]
-		if exists {
-			processesMap[pr.Name] = m[pr.Name]
+		if _, exists := m[pr.Name]; exists {
+			processesMap[pr.Name] = values{
+				value:         m[pr.Name],
+				criticalValue: pr.CriticalThreshold,
+				warningValue:  pr.WarningThreshold,
+			}
 		} else {
-			processesMap[pr.Name] = -1
+			processesMap[pr.Name] = values{
+				value:         -1,
+				criticalValue: -1,
+				warningValue:  -1,
+			}
 		}
 	}
 
 	return processesMap
 }
 
-func listSuggestions(name string) []transit.MetricDefinition {
+func listSuggestions(name string) []string {
+	hostProcesses, _ := cache.ProcessesCache.Get("processes")
+
+	var processes []string
+	for _, hostProcess := range hostProcesses.([]string) {
+		if strings.Contains(hostProcess, name) {
+			processes = append(processes, hostProcess)
+		}
+	}
+
+	return processes
+}
+
+func collectProcessesNames() []string {
+	var processes []string
 	hostProcesses, _ := process.Processes()
 
-	processes := make([]transit.MetricDefinition, 0)
 	for _, hostProcess := range hostProcesses {
-		processName, err := hostProcess.Name()
-		if err != nil {
+		if name, err := hostProcess.Name(); err == nil {
+			processes = append(processes, name)
+		} else {
 			log.Error(err)
-		}
-
-		if strings.Contains(processName, name) {
-			processes = append(processes, transit.MetricDefinition{
-				Name:              processName,
-				MetricType:        "Gauge",
-				ComputeType:       "Query",
-				ServiceType:       "Process",
-				AggregateType:     "average",
-				WarningThreshold:  -1,
-				CriticalThreshold: -1,
-			})
 		}
 	}
 	return processes
