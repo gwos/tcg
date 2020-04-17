@@ -76,9 +76,8 @@ func (client *GWClient) Connect() error {
 		/* token already changed */
 		return nil
 	}
-	isExternalConnector := client.AppName != "NAGIOS"; // TODO: improve this check
-	// if !client.GWConnection.LocalConnection && !client.GWConnection.IsChild || isExternalConnector {
-	if !isExternalConnector {
+	isInternalConnector := strings.HasPrefix(client.HostName, "http://foundation")
+	if isInternalConnector {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
@@ -358,8 +357,8 @@ func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) 
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		isExternalConnector := client.AppName != "NAGIOS"; // TODO: improve this check
-		if !client.GWConnection.LocalConnection || client.GWConnection.IsChild || isExternalConnector {
+		isInternalConnector := strings.HasPrefix(client.HostName, "http://foundation")
+		if !isInternalConnector {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)

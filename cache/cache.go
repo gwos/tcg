@@ -20,6 +20,9 @@ var DispatcherWorkersCache = cache.New(-1, -1)
 // TraceTokenCache used by AgentService
 var TraceTokenCache = cache.New(-1, -1)
 
+// ProcessesCache used by Server Connector
+var ProcessesCache = cache.New(5*time.Minute, 5*time.Minute)
+
 // Credentials defines type of AuthCache items
 type Credentials struct {
 	GwosAppName  string

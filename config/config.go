@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
@@ -260,11 +261,11 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if !strings.HasPrefix(tempURLString, "http://") && !strings.HasPrefix(tempURLString, "https://") {
 		tempURLString = "https://" + tempURLString
 	}
-	if _, err := url.Parse(tempURLString); err == nil {
+	if tngURL, err := url.Parse(tempURLString); err == nil {
 		// TODO: Improve addr setting
-		// cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
+		cfg.Connector.ControllerAddr = fmt.Sprintf("0.0.0.0:%s", tngURL.Port())
 		// we are no longer using port numbers in the Dalek UI, since we are now using revproxy
-		cfg.Connector.ControllerAddr = "0.0.0.0:8099"
+		//cfg.Connector.ControllerAddr = "0.0.0.0:8099"
 	} else {
 		return nil, err
 	}
