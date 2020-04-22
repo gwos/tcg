@@ -70,6 +70,8 @@ func main() {
 				if err != nil {
 					log.Error("Cannot reload ElasticConnector config: ", err)
 				}
+			default:
+				log.Info("ElasticConnector: No new config received.")
 			}
 			mrs, irs, rgs := connector.CollectMetrics()
 			log.Info("[Elastic Connector]: Sending inventory ...")
