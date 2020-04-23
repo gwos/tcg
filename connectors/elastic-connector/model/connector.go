@@ -1,6 +1,8 @@
 package model
 
 import (
+	"github.com/gwos/tng/clients"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
@@ -34,6 +36,12 @@ type monitoringHost struct {
 
 func InitMonitoringState(previousState *MonitoringState, config *ElasticConnectorConfig) MonitoringState {
 	var currentState MonitoringState
+
+	if config.GWConnection == nil {
+		log.Error("Cannot get previous state")
+	}
+	getPreviousState(config.AppType, config.AgentId, config.GWConnection)
+	// TODO build inventory of prev state
 
 	currentState.Metrics = make(map[string]transit.MetricDefinition)
 	for _, metrics := range config.Views {
@@ -187,4 +195,17 @@ func UpdateCheckTimes(resources []transit.MonitoredResource, timer float64) {
 			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
 		}
 	}
+}
+
+func getPreviousState(appType string, agentId string, gwConnection *config.GWConnection) {
+	gwClient := clients.GWClient{
+		AppName:      appType,
+		GWConnection: gwConnection,
+	}
+	gwClient.Connect()
+	services, err := gwClient.GetServices(agentId)
+	if err != nil {
+		log.Error(err)
+	}
+	log.Info(services)
 }

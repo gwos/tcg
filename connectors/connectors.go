@@ -3,6 +3,7 @@ package connectors
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/services"
@@ -19,8 +20,6 @@ var transitService *services.TransitService
 // will come from extensions field
 var Timer = 120
 
-var defaultOwnership = transit.Yield
-
 func Start() error {
 	transitService = services.GetTransitService()
 
@@ -33,13 +32,11 @@ func Start() error {
 	return nil
 }
 
-func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, transit.HostOwnershipType) {
+func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, config.GWConnections) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
 		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
-		Connections       []struct {
-			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
-		} `json:"groundworkConnections"`
+		Connections       config.GWConnections      `json:"groundworkConnections"`
 	}{}
 
 	err := json.Unmarshal(data, &connector)
@@ -47,12 +44,7 @@ func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transi
 		log.Error("Error parsing common connector data: ", err)
 	}
 
-	ownership := defaultOwnership
-	if len(connector.Connections) > 0 {
-		ownership = connector.Connections[0].DeferOwnership
-	}
-
-	return connector.MonitorConnection, connector.MetricsProfile, ownership
+	return connector.MonitorConnection, connector.MetricsProfile, connector.Connections
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
