@@ -106,7 +106,7 @@ func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("Error parsing the response body: ", err)
+			log.Error("Error parsing Search response body: ", err)
 		} else {
 			// Print the response status and error information.
 			log.Error(response.Status(),

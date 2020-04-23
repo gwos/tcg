@@ -1,12 +1,14 @@
 package model
 
 import (
+	"encoding/json"
 	"github.com/gwos/tng/clients"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/milliseconds"
 	"github.com/gwos/tng/transit"
+	"sync"
 	"time"
 )
 
@@ -15,6 +17,8 @@ const (
 	warningThresholdNameSuffix  = "_wn"
 	criticalThresholdNameSuffix = "_cr"
 )
+
+var doOnce sync.Once
 
 type MonitoringState struct {
 	Metrics map[string]transit.MetricDefinition
@@ -37,12 +41,6 @@ type monitoringHost struct {
 func InitMonitoringState(previousState *MonitoringState, config *ElasticConnectorConfig) MonitoringState {
 	var currentState MonitoringState
 
-	if config.GWConnection == nil {
-		log.Error("Cannot get previous state")
-	}
-	getPreviousState(config.AppType, config.AgentId, config.GWConnection)
-	// TODO build inventory of prev state
-
 	currentState.Metrics = make(map[string]transit.MetricDefinition)
 	for _, metrics := range config.Views {
 		for metricName, metric := range metrics {
@@ -51,18 +49,41 @@ func InitMonitoringState(previousState *MonitoringState, config *ElasticConnecto
 	}
 
 	currentState.Hosts = make(map[string]monitoringHost)
+
+	doOnce.Do(func() {
+		log.Info("Initializing state with GW hosts for agent ", config.AgentId)
+		// add hosts form GW to current state
+		if config.GWConnection == nil {
+			log.Error("Unable to get GW hosts to initialize state: GW connection is not set.")
+		} else {
+			gwHosts := retrieveExistingGwHosts(config.AppType, config.AgentId, config.GWConnection)
+			if gwHosts != nil {
+				currentState.Hosts = gwHosts
+			} else {
+				log.Info("No GW hosts received.")
+			}
+		}
+	})
+
+	// update with hosts from prev runs
 	if previousState != nil && previousState.Hosts != nil {
 		for _, host := range previousState.Hosts {
-			var services []monitoringService
-			for metricName := range currentState.Metrics {
-				service := monitoringService{name: metricName, hits: 0}
-				services = append(services, service)
-			}
-			host.services = services
 			currentState.Hosts[host.name] = host
 		}
 	}
 
+	// nullify services
+	for _, host := range currentState.Hosts {
+		var services []monitoringService
+		for metricName := range currentState.Metrics {
+			service := monitoringService{name: metricName, hits: 0}
+			services = append(services, service)
+		}
+		host.services = services
+		currentState.Hosts[host.name] = host
+	}
+
+	// update with groups from prev runs
 	currentState.Groups = make(map[string]map[string]struct{})
 	if previousState != nil && previousState.Groups != nil {
 		currentState.Groups = previousState.Groups
@@ -197,15 +218,42 @@ func UpdateCheckTimes(resources []transit.MonitoredResource, timer float64) {
 	}
 }
 
-func getPreviousState(appType string, agentId string, gwConnection *config.GWConnection) {
+func retrieveExistingGwHosts(appType string, agentId string, gwConnection *config.GWConnection) map[string]monitoringHost {
+	gwHosts := make(map[string]monitoringHost)
+
 	gwClient := clients.GWClient{
 		AppName:      appType,
 		GWConnection: gwConnection,
 	}
-	gwClient.Connect()
-	services, err := gwClient.GetServices(agentId)
+	err := gwClient.Connect()
 	if err != nil {
-		log.Error(err)
+		log.Error("Unable to connect to GW to get hosts to initialize state: ", err)
+		return gwHosts
 	}
-	log.Info(services)
+	response, err := gwClient.GetServicesByAgent(agentId)
+	if err != nil {
+		log.Error("Unable to get GW hosts to initialize state: ", err)
+		return gwHosts
+	}
+	var gwServices struct {
+		Services []struct {
+			HostName string `json:"hostName"`
+		} `json:"services"`
+	}
+	err = json.Unmarshal(response, &gwServices)
+	if err != nil {
+		log.Error("Unable to parse received GW hosts to initialize state: ", err)
+		return gwHosts
+	}
+	for _, gwService := range gwServices.Services {
+		if _, exists := gwHosts[gwService.HostName]; exists {
+		} else {
+			host := monitoringHost{
+				name: gwService.HostName,
+			}
+			gwHosts[gwService.HostName] = host
+		}
+	}
+
+	return gwHosts
 }
