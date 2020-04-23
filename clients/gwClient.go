@@ -6,6 +6,7 @@ import (
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -33,6 +34,7 @@ const (
 	GWEntrypointSendEventsUnack         = "/api/events/unack"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
+	GWEntrypointServices                = "/api/services"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
 )
 
@@ -50,6 +52,7 @@ type GWClient struct {
 	uriSendEventsUnack         string
 	uriSendResourceWithMetrics string
 	uriSynchronizeInventory    string
+	uriServices                string
 	uriValidateToken           string
 }
 
@@ -288,14 +291,31 @@ func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
 	return client.sendData(client.uriSendEventsUnack, payload)
 }
 
+func (client *GWClient) GetServices(agentId string) ([]byte, error) {
+	client.buildURIs()
+	agentIdQuery := url.QueryEscape("agentid = '" + agentId + "'")
+	query := strings.ReplaceAll(agentIdQuery, "+", "%20")
+	//	queryParams := "?query=" + query + "'&depth=Deep"
+	formValues := make(map[string]string)
+	formValues["query"] = query
+	formValues["depth"] = "Deep"
+	//	reqUrl := client.uriServices + queryParams
+	//	return client.sendRequest(http.MethodGet, reqUrl, nil, nil)
+	return client.sendRequest(http.MethodGet, client.uriServices, formValues, nil)
+}
+
 func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) {
+	return client.sendRequest(http.MethodPost, reqURL, nil, payload)
+}
+
+func (client *GWClient) sendRequest(httpMethod string, reqURL string, formValues map[string]string, payload []byte) ([]byte, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, nil, payload)
+	statusCode, byteResponse, err := SendRequest(httpMethod, reqURL, headers, formValues, payload)
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
@@ -367,6 +387,7 @@ func (client *GWClient) buildURIs() {
 		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
 		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
 		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
@@ -376,6 +397,7 @@ func (client *GWClient) buildURIs() {
 		client.uriSendEventsUnack = uriSendEventsUnack
 		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
 		client.uriSynchronizeInventory = uriSynchronizeInventory
+		client.uriServices = uriServices
 		client.uriValidateToken = uriValidateToken
 		client.Mutex.Unlock()
 	})
