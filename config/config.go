@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"strings"
 	"sync"
 )
 
@@ -254,17 +253,12 @@ func GetConfig() *Config {
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
-	var tempURLString string
 
 	if err := json.Unmarshal(data, &dto); err != nil {
 		log.Error(err.Error())
 		return nil, err
 	}
 
-	tempURLString = dto.TngURL
-	if !strings.HasPrefix(tempURLString, "http://") && !strings.HasPrefix(tempURLString, "https://") {
-		tempURLString = "https://" + tempURLString
-	}
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
