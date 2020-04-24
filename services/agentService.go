@@ -128,20 +128,27 @@ func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
 	if err := service.StartController(entrypoints...); err != nil {
 		return err
 	}
+	if config.GetConfig().IsConfiguringPMC() {
+		log.Info("[Demand Config]: Configuring PARENT_MANAGED_CHILD")
+		// expect the config api call
+		return nil
+	}
 	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
 		log.Info("[Demand Config]: Config Server is not configured")
-	} else {
-		for {
-			if err := service.DSClient.Reload(service.AgentID); err != nil {
-				log.With(log.Fields{"error": err}).
-					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
-				time.Sleep(time.Duration(20) * time.Second)
-				continue
-			}
-			break
-		}
-		log.Info("[Demand Config]: Config Server found and connected")
+		// expect the config api call
+		return nil
 	}
+
+	for {
+		if err := service.DSClient.Reload(service.AgentID); err != nil {
+			log.With(log.Fields{"error": err}).
+				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
+			time.Sleep(time.Duration(20) * time.Second)
+			continue
+		}
+		break
+	}
+	log.Info("[Demand Config]: Config Server found and connected")
 	return nil
 }
 
