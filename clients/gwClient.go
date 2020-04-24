@@ -2,6 +2,7 @@ package clients
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
@@ -34,6 +35,7 @@ const (
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointServices                = "/api/services"
+	GWEntrypointHostgroups              = "/api/hostgroups"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
 )
 
@@ -52,6 +54,7 @@ type GWClient struct {
 	uriSendResourceWithMetrics string
 	uriSynchronizeInventory    string
 	uriServices                string
+	uriHostGroups              string
 	uriValidateToken           string
 }
 
@@ -293,9 +296,31 @@ func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
 func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
 	params := make(map[string]string)
 	params["query"] = "agentid = '" + agentId + "'"
-	params["depth"] = "Deep"
+	params["depth"] = "Shallow"
 	client.buildURIs()
 	reqUrl := client.uriServices + BuildQueryParams(params)
+	return client.sendRequest(http.MethodGet, reqUrl, nil)
+}
+
+func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
+	if hostNames == nil || len(hostNames) == 0 {
+		return nil, errors.New("Unable to get host groups of host: host names are not provided.")
+	}
+	query := "( hosts.hostName in ("
+	for i, hostName := range hostNames {
+		query = query + "'" + hostName + "'"
+		if i != len(hostNames)-1 {
+			query = query + ","
+		} else {
+			query = query + ")"
+		}
+	}
+	query = query + " ) and appType = '" + appType + "'"
+	params := make(map[string]string)
+	params["query"] = query
+	params["depth"] = "Shallow"
+	client.buildURIs()
+	reqUrl := client.uriHostGroups + BuildQueryParams(params)
 	return client.sendRequest(http.MethodGet, reqUrl, nil)
 }
 
@@ -383,6 +408,7 @@ func (client *GWClient) buildURIs() {
 		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
 		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
+		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
 		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
@@ -393,6 +419,7 @@ func (client *GWClient) buildURIs() {
 		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
 		client.uriSynchronizeInventory = uriSynchronizeInventory
 		client.uriServices = uriServices
+		client.uriHostGroups = uriHostGroups
 		client.uriValidateToken = uriValidateToken
 		client.Mutex.Unlock()
 	})
