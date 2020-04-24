@@ -33,9 +33,9 @@ type monitoringService struct {
 }
 
 type monitoringHost struct {
-	name      string
-	services  []monitoringService
-	hostGroup string
+	name       string
+	services   []monitoringService
+	hostGroups []string
 }
 
 func InitMonitoringState(previousState *MonitoringState, config *ElasticConnectorConfig) MonitoringState {
@@ -107,11 +107,14 @@ func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePre
 				break
 			}
 		}
-		host.hostGroup = hostGroupName
+		hostGroups := host.hostGroups
+		hostGroups = append(hostGroups, hostGroupName)
+		host.hostGroups = hostGroups
 		hosts[hostName] = host
 	} else {
 		service := monitoringService{name: serviceName, hits: 1, timeInterval: timeInterval}
-		host := monitoringHost{name: hostName, services: []monitoringService{service}, hostGroup: hostGroupName}
+		hostGroups := []string{hostGroupName}
+		host := monitoringHost{name: hostName, services: []monitoringService{service}, hostGroups: hostGroups}
 		hosts[hostName] = host
 	}
 	monitoringState.Hosts = hosts
@@ -191,16 +194,20 @@ func (monitoringState *MonitoringState) buildGroups() map[string]map[string]stru
 	groups := make(map[string]map[string]struct{})
 	for _, host := range monitoringState.Hosts {
 		hostName := host.name
-		groupName := host.hostGroup
-		if group, exists := groups[groupName]; exists {
-			group[hostName] = struct{}{}
-		} else {
-			group := make(map[string]struct{})
-			group[hostName] = struct{}{}
-			groups[groupName] = group
+		for _, groupName := range host.hostGroups {
+			if groupName == "" {
+				continue
+			}
+			if group, exists := groups[groupName]; exists {
+				group[hostName] = struct{}{}
+			} else {
+				group := make(map[string]struct{})
+				group[hostName] = struct{}{}
+				groups[groupName] = group
+			}
+			groups[groupName][hostName] = struct{}{}
+			monitoringState.Groups = groups
 		}
-		groups[groupName][hostName] = struct{}{}
-		monitoringState.Groups = groups
 	}
 	return groups
 }
@@ -245,6 +252,7 @@ func retrieveExistingGwHosts(appType string, agentId string, gwConnection *confi
 		log.Error("Unable to parse received GW hosts to initialize state: ", err)
 		return gwHosts
 	}
+	var hostNames []string
 	for _, gwService := range gwServices.Services {
 		if _, exists := gwHosts[gwService.HostName]; exists {
 		} else {
@@ -252,6 +260,38 @@ func retrieveExistingGwHosts(appType string, agentId string, gwConnection *confi
 				name: gwService.HostName,
 			}
 			gwHosts[gwService.HostName] = host
+			hostNames = append(hostNames, gwService.HostName)
+		}
+	}
+
+	response, err = gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
+	if err != nil {
+		log.Error("Unable to get GW host groups to initialize state: ", err)
+		return gwHosts
+	}
+
+	var gwHostGroups struct {
+		HostGroups []struct {
+			Name  string `json:"name"`
+			Hosts []struct {
+				HostName string `json:"hostName"`
+			} `json:"hosts"`
+		} `json:"hostGroups"`
+	}
+	err = json.Unmarshal(response, &gwHostGroups)
+	if err != nil {
+		log.Error("Unable to parse received GW host groups to initialize state: ", err)
+		return gwHosts
+	}
+
+	for _, gwHostGroup := range gwHostGroups.HostGroups {
+		for _, gwHost := range gwHostGroup.Hosts {
+			if host, exists := gwHosts[gwHost.HostName]; exists {
+				hostGroups := host.hostGroups
+				hostGroups = append(hostGroups, gwHostGroup.Name)
+				host.hostGroups = hostGroups
+				gwHosts[gwHost.HostName] = host
+			}
 		}
 	}
 
