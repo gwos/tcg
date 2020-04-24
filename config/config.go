@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"path"
-	"strings"
 	"sync"
 )
 
@@ -24,9 +23,14 @@ type ConfigStringConstant string
 // EnvConfigPrefix defines name prefix for environment variables
 //   for example: TNG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
-	ConfigName                           = "tng_config.yaml"
-	EnvConfigPrefix                      = "TNG"
+	ConfigEnv           ConfigStringConstant = "TNG_CONFIG"
+	ConfigName                               = "tng_config.yaml"
+	EnvConfigPrefix                          = "TNG"
+	InstallationModeEnv                      = "INSTALLATION_MODE"
+	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
+	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
+	InstallationModeP                        = "PARENT"
+	InstallationModeS                        = "STANDALONE"
 )
 
 // LogLevel defines levels for logrus
@@ -76,9 +80,10 @@ type Connector struct {
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile  string   `yaml:"logFile"`
-	LogLevel LogLevel `yaml:"logLevel"`
-	Enabled  bool     `yaml:"enabled"`
+	LogFile          string   `yaml:"logFile"`
+	LogLevel         LogLevel `yaml:"logLevel"`
+	Enabled          bool     `yaml:"enabled"`
+	InstallationMode string   `yaml:"installationMode,omitempty"`
 }
 
 // ConnectorDTO defines TNG Connector configuration
@@ -248,17 +253,12 @@ func GetConfig() *Config {
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
-	var tempURLString string
 
 	if err := json.Unmarshal(data, &dto); err != nil {
 		log.Error(err.Error())
 		return nil, err
 	}
 
-	tempURLString = dto.TngURL
-	if !strings.HasPrefix(tempURLString, "http://") && !strings.HasPrefix(tempURLString, "https://") {
-		tempURLString = "https://" + tempURLString
-	}
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
@@ -271,6 +271,10 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	}
 
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
+
+	if cfg.IsConfiguringPMC() {
+		cfg.Connector.InstallationMode = string(InstallationModePMC)
+	}
 
 	if output, err := yaml.Marshal(cfg); err != nil {
 		log.Warn(err)
@@ -290,4 +294,10 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	}
 
 	return &dto, nil
+}
+
+// IsConfiguringPMC checks configuration stage
+func (cfg *Config) IsConfiguringPMC() bool {
+	return os.Getenv(string(InstallationModeEnv)) == string(InstallationModePMC) &&
+		cfg.Connector.InstallationMode != string(InstallationModePMC)
 }
