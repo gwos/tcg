@@ -2,6 +2,7 @@ package clients
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/log"
@@ -33,6 +34,8 @@ const (
 	GWEntrypointSendEventsUnack         = "/api/events/unack"
 	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
+	GWEntrypointServices                = "/api/services"
+	GWEntrypointHostgroups              = "/api/hostgroups"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
 	NAGIOS_APP							= "NAGIOS"
 )
@@ -51,6 +54,8 @@ type GWClient struct {
 	uriSendEventsUnack         string
 	uriSendResourceWithMetrics string
 	uriSynchronizeInventory    string
+	uriServices                string
+	uriHostGroups              string
 	uriValidateToken           string
 }
 
@@ -289,14 +294,49 @@ func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
 	return client.sendData(client.uriSendEventsUnack, payload)
 }
 
+func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
+	params := make(map[string]string)
+	params["query"] = "agentid = '" + agentId + "'"
+	params["depth"] = "Shallow"
+	client.buildURIs()
+	reqUrl := client.uriServices + BuildQueryParams(params)
+	return client.sendRequest(http.MethodGet, reqUrl, nil)
+}
+
+func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
+	if hostNames == nil || len(hostNames) == 0 {
+		return nil, errors.New("Unable to get host groups of host: host names are not provided.")
+	}
+	query := "( hosts.hostName in ("
+	for i, hostName := range hostNames {
+		query = query + "'" + hostName + "'"
+		if i != len(hostNames)-1 {
+			query = query + ","
+		} else {
+			query = query + ")"
+		}
+	}
+	query = query + " ) and appType = '" + appType + "'"
+	params := make(map[string]string)
+	params["query"] = query
+	params["depth"] = "Shallow"
+	client.buildURIs()
+	reqUrl := client.uriHostGroups + BuildQueryParams(params)
+	return client.sendRequest(http.MethodGet, reqUrl, nil)
+}
+
 func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) {
+	return client.sendRequest(http.MethodPost, reqURL, payload)
+}
+
+func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []byte) ([]byte, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, nil, payload)
+	statusCode, byteResponse, err := SendRequest(httpMethod, reqURL, headers, nil, payload)
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
@@ -368,6 +408,8 @@ func (client *GWClient) buildURIs() {
 		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
 		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
+		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
 		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
@@ -377,6 +419,8 @@ func (client *GWClient) buildURIs() {
 		client.uriSendEventsUnack = uriSendEventsUnack
 		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
 		client.uriSynchronizeInventory = uriSynchronizeInventory
+		client.uriServices = uriServices
+		client.uriHostGroups = uriHostGroups
 		client.uriValidateToken = uriValidateToken
 		client.Mutex.Unlock()
 	})

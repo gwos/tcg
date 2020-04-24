@@ -1,6 +1,7 @@
 package model
 
 import (
+	"github.com/gwos/tng/config"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/transit"
 	"strconv"
@@ -23,6 +24,8 @@ const (
 	defaultHostNamePrefix = "gw8-"
 	defaultHostNameLabel  = "container.name"
 	defaultHostGroupLabel = "container.labels.com_docker_compose_project"
+
+	defaultOwnership = transit.Yield
 
 	// TODO move somewhere more global
 	DefaultInterval = 300
@@ -59,6 +62,8 @@ type Kibana struct {
 }
 
 type ElasticConnectorConfig struct {
+	AppType            string
+	AgentId            string
 	Servers            []string
 	Kibana             Kibana
 	Views              map[string]map[string]transit.MetricDefinition
@@ -68,12 +73,15 @@ type ElasticConnectorConfig struct {
 	HostNameLabelPath  []string
 	HostGroupLabelPath []string
 	Timer              float64
-	Ownership          transit.HostOwnershipType
+	GWConnection       *config.GWConnection
 }
 
 // Builds elastic connector configuration based on monitor connection settings and default values
-func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsProfile, ownership transit.HostOwnershipType) *ElasticConnectorConfig {
+func InitConfig(appType string, agentId string, connection *transit.MonitorConnection, profile *transit.MetricsProfile, connections config.GWConnections) *ElasticConnectorConfig {
 	var config ElasticConnectorConfig
+
+	config.AppType = appType
+	config.AgentId = agentId
 
 	// Servers
 	server := connection.Server
@@ -190,8 +198,10 @@ func InitConfig(connection *transit.MonitorConnection, profile *transit.MetricsP
 		config.Timer = value.(float64) * 60
 	}
 
-	// Ownership
-	config.Ownership = ownership
+	// GWConnection
+	if len(connections) > 0 {
+		config.GWConnection = connections[0]
+	}
 
 	return &config
 }

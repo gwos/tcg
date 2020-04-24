@@ -61,3 +61,20 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 	defer response.Body.Close()
 	return response.StatusCode, responseBody, nil
 }
+
+func BuildQueryParams(params map[string]string) string {
+	var query string
+	for paramName, paramValue := range params {
+		query = appendSeparator(query) + url.QueryEscape(paramName) + "=" + url.QueryEscape(paramValue)
+	}
+	return query
+}
+
+func appendSeparator(params string) string {
+	if params != "" {
+		params = params + "&"
+	} else {
+		params = "?"
+	}
+	return params
+}
