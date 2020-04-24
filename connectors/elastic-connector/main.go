@@ -7,6 +7,7 @@ import (
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
+	"github.com/gwos/tng/transit"
 	"net/http"
 	"time"
 )
@@ -19,8 +20,9 @@ func main() {
 	var config *model.ElasticConnectorConfig
 
 	transitService.ConfigHandler = func(data []byte) {
-		connection, profile, ownership := connectors.RetrieveCommonConnectorInfo(data)
-		cfg := model.InitConfig(&connection, &profile, ownership)
+		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
+		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
+			&connection, &profile, gwConnections)
 		config = cfg
 		chanel <- true
 	}
@@ -59,7 +61,7 @@ func main() {
 	_, irs, rgs := connector.CollectMetrics()
 	if transitService.Status().Transport != services.Stopped {
 		log.Info("[Elastic Connector]: Sending inventory ...")
-		_ = connectors.SendInventory(irs, rgs, config.Ownership)
+		_ = connectors.SendInventory(irs, rgs, transit.HostOwnershipType(config.GWConnection.DeferOwnership))
 	}
 
 	for {
@@ -71,11 +73,11 @@ func main() {
 					log.Error("Cannot reload ElasticConnector config: ", err)
 				}
 			default:
-				log.Info("ElasticConnector: No new config received.")
+				log.Info("[Elastic Connector]: No new config received.")
 			}
 			mrs, irs, rgs := connector.CollectMetrics()
 			log.Info("[Elastic Connector]: Sending inventory ...")
-			err := connectors.SendInventory(irs, rgs, config.Ownership)
+			err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(config.GWConnection.DeferOwnership))
 			if err != nil {
 				log.Error(err.Error())
 			}

@@ -167,37 +167,30 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 }
 
 func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
-	var params string
+	params := make(map[string]string)
 	if savedObjectType != nil {
-		params = "?type=" + string(*savedObjectType)
+		params["type"] = string(*savedObjectType)
 	}
 	if page != nil {
-		params = appendParamsSeparator(params) + "page=" + strconv.Itoa(*page)
+		params["page"] = strconv.Itoa(*page)
 	}
 	if perPage != nil {
-		params = appendParamsSeparator(params) + "per_page=" + strconv.Itoa(*perPage)
+		params["per_page"] = strconv.Itoa(*perPage)
 	}
 	if searchField != nil && searchValues != nil {
-		params = appendParamsSeparator(params) + "search_fields=" + string(*searchField) + "&search="
+		params["search_fields"] = string(*searchField)
+		var searchValue string
 		for index, id := range searchValues {
-			params = params + id
+			searchValue = searchValue + id
 			if index != len(searchValues)-1 {
-				params = params + "|"
+				searchValue = searchValue + "|"
 			}
 		}
+		params["search"] = searchValue
 	}
-	return client.ApiRoot + apiPath + savedObjectsPath + findPath + params
+	return client.ApiRoot + apiPath + savedObjectsPath + findPath + clients.BuildQueryParams(params)
 }
 
 func (client *KibanaClient) buildBulkGetSavedObjectsPath() string {
 	return client.ApiRoot + apiPath + savedObjectsPath + bulkGetPath
-}
-
-func appendParamsSeparator(params string) string {
-	if params != "" {
-		params = params + "&"
-	} else {
-		params = "?"
-	}
-	return params
 }
