@@ -82,8 +82,7 @@ func (client *GWClient) Connect() error {
 		/* token already changed */
 		return nil
 	}
-	isInternalConnector := client.AppName == NAGIOS_APP && client.IsChild == false
-	if isInternalConnector {
+	if client.LocalConnection {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
@@ -398,8 +397,7 @@ func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		isInternalConnector := client.AppName == NAGIOS_APP && client.IsChild == false
-		if !isInternalConnector {
+		if !client.LocalConnection {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
