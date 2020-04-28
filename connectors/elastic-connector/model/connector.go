@@ -230,6 +230,7 @@ func retrieveExistingGwHosts(appType string, agentId string, gwConnection *confi
 
 	gwClient := clients.GWClient{
 		AppName:      appType,
+		AppType:      appType,
 		GWConnection: gwConnection,
 	}
 	err := gwClient.Connect()

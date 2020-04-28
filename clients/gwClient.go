@@ -43,6 +43,7 @@ const (
 // GWClient implements GWOperations interface
 type GWClient struct {
 	AppName string
+	AppType string
 	*config.GWConnection
 	sync.Mutex
 	token string
@@ -82,7 +83,8 @@ func (client *GWClient) Connect() error {
 		/* token already changed */
 		return nil
 	}
-	if client.LocalConnection {
+	isInternalConnector := client.AppType == NAGIOS_APP && client.IsChild == false
+	if isInternalConnector {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
@@ -397,7 +399,8 @@ func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		if !client.LocalConnection {
+		isInternalConnector := client.AppType == NAGIOS_APP && client.IsChild == false
+		if !isInternalConnector {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
