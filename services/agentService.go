@@ -488,6 +488,7 @@ func (service *AgentService) startTransport() error {
 	for i := range cons {
 		gwClients[i] = &clients.GWClient{
 			AppName:      service.AppName,
+			AppType:      service.AppType,
 			GWConnection: cons[i],
 		}
 	}
