@@ -1,10 +1,15 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"github.com/gwos/tng/log"
 	"github.com/kelseyhightower/envconfig"
+	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
+	"io"
 	"io/ioutil"
 	"math"
 	"os"
@@ -26,6 +31,7 @@ const (
 	ConfigEnv           ConfigStringConstant = "TNG_CONFIG"
 	ConfigName                               = "tng_config.yaml"
 	EnvConfigPrefix                          = "TNG"
+	SecKeyEnv                                = "TNG_SECKEY"
 	InstallationModeEnv                      = "INSTALLATION_MODE"
 	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
 	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
@@ -118,6 +124,38 @@ type GWConnection struct {
 	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
 	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
 	SendAllInventory    bool   `yaml:"sendAllInventory"`
+}
+
+// MarshalYAML implements yaml.Marshaler interface
+// overrides the password field
+func (con GWConnection) MarshalYAML() (interface{}, error) {
+	type plain GWConnection
+	c := plain(con)
+	if s := os.Getenv(string(SecKeyEnv)); s != "" {
+		encrypted, err := Encrypt([]byte(c.Password), []byte(s))
+		if err != nil {
+			return nil, err
+		}
+		c.Password = string(encrypted)
+	}
+	return c, nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+// overrides the password field
+func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type plain GWConnection
+	if err := unmarshal((*plain)(con)); err != nil {
+		return err
+	}
+	if s := os.Getenv(string(SecKeyEnv)); s != "" {
+		decrypted, err := Decrypt([]byte(con.Password), []byte(s))
+		if err != nil {
+			return err
+		}
+		con.Password = string(decrypted)
+	}
+	return nil
 }
 
 // Decode implements envconfig.Decoder interface
@@ -300,4 +338,30 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 func (cfg *Config) IsConfiguringPMC() bool {
 	return os.Getenv(string(InstallationModeEnv)) == string(InstallationModePMC) &&
 		cfg.Connector.InstallationMode != string(InstallationModePMC)
+}
+
+// Decrypt decrypts small messages
+// golang.org/x/crypto/nacl/secretbox
+func Decrypt(message, secret []byte) ([]byte, error) {
+	var nonce [24]byte
+	var secretKey [32]byte
+	secretKey = sha256.Sum256([]byte(secret))
+	copy(nonce[:], message[:24])
+	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
+	if !ok {
+		return nil, fmt.Errorf("decryption error")
+	}
+	return decrypted, nil
+}
+
+// Encrypt encrypts small messages
+// golang.org/x/crypto/nacl/secretbox
+func Encrypt(message, secret []byte) ([]byte, error) {
+	var nonce [24]byte
+	var secretKey [32]byte
+	secretKey = sha256.Sum256([]byte(secret))
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return nil, err
+	}
+	return secretbox.Seal(nonce[:], message, &nonce, &secretKey), nil
 }
