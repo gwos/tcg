@@ -147,10 +147,10 @@ func CollectMetrics(processes []transit.MetricDefinition, timerSeconds time.Dura
 			NextCheckTime: milliseconds.MillisecondTimestamp{Time: interval.Local().Add(time.Second * timerSeconds)},
 			Metrics: []transit.TimeSeries{
 				{
-					MetricName: processName,
+					MetricName:        processName,
 					MetricComputeType: processValues.computeType,
-					MetricExpression: processValues.expression,
-					SampleType: transit.Value,
+					MetricExpression:  processValues.expression,
+					SampleType:        transit.Value,
 					Interval: &transit.TimeInterval{
 						EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
 						StartTime: milliseconds.MillisecondTimestamp{Time: interval},
@@ -574,11 +574,11 @@ type localProcess struct {
 }
 
 type values struct {
-	processCpu  float64
+	processCpu    float64
+	computeType   transit.ComputeType
+	expression    string
 	criticalValue int
-	warningValue int
-	computeType transit.ComputeType
-	expression string
+	warningValue  int
 }
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
@@ -615,17 +615,21 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 		if pr.CustomName != "" {
 			name = pr.CustomName
 		}
-		if _, exists := m[pr.Name]; exists {
+		if _, exists := m[pr.Name]; exists && pr.ComputeType != transit.Synthetic {
 			processesMap[name] = values{
-				processCpu:         m[pr.Name],
+				processCpu:    m[pr.Name],
 				criticalValue: pr.CriticalThreshold,
 				warningValue:  pr.WarningThreshold,
+				computeType:   pr.ComputeType,
+				expression:    "",
 			}
 		} else {
 			processesMap[name] = values{
-				processCpu:         -1,
+				processCpu:    -1,
 				criticalValue: -1,
 				warningValue:  -1,
+				computeType:   transit.Synthetic,
+				expression:    pr.Expression,
 			}
 		}
 	}
