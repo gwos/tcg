@@ -420,7 +420,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 
 	for _, service := range services {
 		for _, metric := range service.Metrics {
-			if metric.MetricComputeType != "synthetic" {
+			if metric.MetricComputeType != transit.Synthetic {
 				switch metric.Value.ValueType {
 				case transit.IntegerType:
 					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.IntegerValue
@@ -432,32 +432,29 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		result = append(result, service)
 	}
 
-	for _, service := range services {
-		for _, metric := range service.Metrics {
+	for i, _ := range result {
+		for _, metric := range result[i].Metrics {
 			fmt.Println(metric.MetricComputeType)
-			if metric.MetricComputeType == "synthetic" {
+			if metric.MetricComputeType == transit.Synthetic {
 				if value, err := gval.Evaluate(strings.ReplaceAll(metric.MetricExpression, ".", "_"), vars); err != nil {
-					fmt.Println("THEREEEE!!!!!!!!!!!!!!!!!!!!!!1")
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
 					continue
 				} else {
-					fmt.Println("HERE!!!!!!!!!!!!!!!!!!!!!!1")
-					fmt.Println("VALUE:", value)
-
-					result = append(result, transit.MonitoredService{
-						Name:          service.Name,
+					result[i] = transit.MonitoredService{
+						Name:          result[i].Name,
 						Type:          transit.Service,
-						Owner:         service.Owner,
-						Status:        "UP",                                // TODO:
-						LastCheckTime: milliseconds.MillisecondTimestamp{}, // TODO:
-						NextCheckTime: milliseconds.MillisecondTimestamp{}, // TODO:
+						Owner:         result[i].Owner,
+						Status:        "SERVICE_OK",
+						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
+						LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+						NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
 								SampleType: transit.Value,
 								Interval: &transit.TimeInterval{
-									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO:
-									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO:
+									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 								},
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
@@ -466,7 +463,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 								},
 							},
 						},
-					})
+					}
 				}
 			}
 		}

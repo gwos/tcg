@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/cache"
 	"github.com/gwos/tng/connectors"
@@ -18,7 +17,7 @@ import (
 // Default values for 'Group' and loop 'Timer'
 const (
 	DefaultHostGroupName = "LocalServer"
-	DefaultTimer         = 120
+	DefaultTimer         = 20
 	DefaultCacheTimer    = 1
 )
 
@@ -47,13 +46,13 @@ func main() {
 	transitService.ConfigHandler = func(data []byte) {
 		if cfg, err := initializeConfig(data); err == nil {
 			config = cfg
+			connectors.Timer = int(config.timer)
 			chanel <- true
 		} else {
 			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
 			return
 		}
 	}
-
 
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
@@ -68,21 +67,6 @@ func main() {
 			},
 		},
 	); err != nil {
-		log.Error(err)
-		return
-	}
-
-	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	<-chanel
-	log.Info("[Server Connector]: Configuration received")
-
-	if err := connectors.Start(); err != nil {
-		log.Error(err)
-		return
-	}
-	connectors.ControlCHandler()
-
-	if err := transitService.DemandConfig(); err != nil {
 		log.Error(err)
 		return
 	}
@@ -118,9 +102,6 @@ func main() {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			monitoredResource := CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))
 			monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
-			log.Error("HERE-----------------")
-			str, _ := json.Marshal(*monitoredResource)
-			fmt.Println(string(str))
 			err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 			if err != nil {
 				log.Error(err.Error())

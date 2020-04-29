@@ -74,7 +74,7 @@ type ComputeType string
 const (
 	Query         ComputeType = "Query"
 	Regex                     = "Regex"
-	Synthetic                 = "synthetic"
+	Synthetic                 = "Synthetic"
 	Informational             = "Informational"
 	Performance               = "Performance"
 	Health                    = "Health"
