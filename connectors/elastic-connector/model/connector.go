@@ -106,8 +106,7 @@ func (monitoringState *MonitoringState) UpdateHosts(hostName string, serviceName
 				break
 			}
 		}
-		hostGroups := host.hostGroups
-		hostGroups = []string{hostGroupName}
+		hostGroups := []string{hostGroupName}
 		host.hostGroups = hostGroups
 		hosts[hostName] = host
 	} else {
