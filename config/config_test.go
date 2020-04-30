@@ -187,7 +187,7 @@ gwConnections:
     enabled: true
     hostName: localhost
     userName: RESTAPIACCESS
-    password: !!binary VTqzSDq6ywW1e/yf23U7H4Y0NnoFg85/bDP0FXtD4NUX6P7Pmvtinu5jKH+DXRmP
+    password: _v1_fc0546f02af1c34298d207468a78bc38cda6bd480d3357c8220580883747505d7971c3c43610cea1bc1df9e3292cb935
 `)
 
 	os.Setenv(string(SecKeyEnv), "SECRET")
@@ -197,9 +197,9 @@ gwConnections:
 	assert.NoError(t, yaml.Unmarshal(configYAML, &cfg))
 	assert.Equal(t, "P@SSW0RD", cfg.GWConnections[0].Password)
 
-	data, err := yaml.Marshal(cfg)
+	res, err := yaml.Marshal(cfg)
 	assert.NoError(t, err)
-	assert.Contains(t, string(data), "password: !!binary")
-	assert.NotContains(t, string(data), "password: !!binary VTqzSDq6ywW1e")
+	assert.Contains(t, string(res), "password: _v1_")
+	assert.NotContains(t, string(res), "password: _v1_fc0546f02")
 	// t.Logf("$$\n%v", string(data))
 }
