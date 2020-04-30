@@ -45,7 +45,7 @@ require (
 	github.com/swaggo/swag v1.6.5
 	github.com/ugorji/go v1.1.7 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
-	golang.org/x/crypto v0.0.0-20191112222119-e1110fd1c708 // indirect
+	golang.org/x/crypto v0.0.0-20191112222119-e1110fd1c708
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
 	golang.org/x/sys v0.0.0-20191009170203-06d7bd2c5f4f // indirect
 	golang.org/x/tools v0.0.0-20200114052453-d31a08c2edf2 // indirect
