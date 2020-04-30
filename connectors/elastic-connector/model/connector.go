@@ -92,9 +92,8 @@ func InitMonitoringState(previousState *MonitoringState, config *ElasticConnecto
 	return currentState
 }
 
-func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePrefix string, serviceName string, hostGroupName string,
+func (monitoringState *MonitoringState) UpdateHosts(hostName string, serviceName string, hostGroupName string,
 	timeInterval *transit.TimeInterval) {
-	hostName = hostNamePrefix + hostName
 	hosts := monitoringState.Hosts
 	if host, exists := hosts[hostName]; exists {
 		services := host.services
@@ -107,8 +106,7 @@ func (monitoringState *MonitoringState) UpdateHosts(hostName string, hostNamePre
 				break
 			}
 		}
-		hostGroups := host.hostGroups
-		hostGroups = append(hostGroups, hostGroupName)
+		hostGroups := []string{hostGroupName}
 		host.hostGroups = hostGroups
 		hosts[hostName] = host
 	} else {
