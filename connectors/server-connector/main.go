@@ -66,6 +66,13 @@ func main() {
 				}
 			},
 		},
+		services.Entrypoint{
+			Url:    "/suggest/expressions/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
 	); err != nil {
 		log.Error(err)
 		return

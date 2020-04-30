@@ -1,5 +1,51 @@
 package connectors
 
+import "strings"
+
+const (
+	Mb                 = "GW:MB"
+	Kb                 = "GW:KB"
+	Tb                 = "GW:TB"
+	Mb2                = "GW:MB2"
+	Kb2                = "GW:KB2"
+	Tb2                = "GW:TB2"
+	IntMax             = "GW:maxInt"
+	IntMin             = "GW:minInt"
+	DoubleMax          = "GW:maxDouble"
+	DoubleMin          = "GW:minDouble"
+	IntDouble          = "GW:toDouble"
+	DoubleInt          = "GW:toInt"
+	ToPercent          = "GW:toPercentage"
+	PercentUsed        = "GW:percentageUsed"
+	PercentUnused      = "GW:percentageUnused"
+	ToPercentLimit     = "GW:toPercentageLimit"
+	DivideToPercent    = "GW:divideToPercentage"
+	ScalePercentUsed   = "GW:scalePercentageUsed"
+	ScalePercentUnused = "GW:scalePercentageUnused"
+)
+
+var expressionToFuncMap = map[string]interface{}{
+	Mb:                 MB,
+	Kb:                 KB,
+	Tb:                 TB,
+	Mb2:                MB2,
+	Kb2:                KB2,
+	Tb2:                TB2,
+	IntMax:             MaxInt,
+	IntMin:             MinInt,
+	DoubleMax:          MaxFloat,
+	DoubleMin:          MinFloat,
+	IntDouble:          IntToDouble,
+	DoubleInt:          DoubleToInt,
+	ToPercent:          ToPercentage,
+	PercentUsed:        PercentageUsed,
+	PercentUnused:      PercentageUnused,
+	ToPercentLimit:     ToPercentageLimit,
+	DivideToPercent:    DivideToPercentage,
+	ScalePercentUsed:   ScalePercentageUsed,
+	ScalePercentUnused: ScalePercentageUnused,
+}
+
 /*
    1 Kilobyte = 1,024 Bytes
    1 Megabyte = 1,048,576 Bytes
@@ -242,4 +288,16 @@ func ScalePercentageUsed(used, available, usedScaleFactor, availableScaleFactor 
 	}
 
 	return ToPercentage(usage)
+}
+
+func ListExpressions(name string) []string {
+	var expressions []string
+
+	for key, _ := range expressionToFuncMap {
+		if strings.Contains(key, name) {
+			expressions = append(expressions, key)
+		}
+	}
+
+	return expressions
 }
