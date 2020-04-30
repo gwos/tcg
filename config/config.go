@@ -14,6 +14,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"strings"
 	"sync"
 )
 
@@ -32,6 +33,7 @@ const (
 	ConfigName                               = "tng_config.yaml"
 	EnvConfigPrefix                          = "TNG"
 	SecKeyEnv                                = "TNG_SECKEY"
+	SecVerPrefix                             = "_v1_"
 	InstallationModeEnv                      = "INSTALLATION_MODE"
 	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
 	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
@@ -136,7 +138,7 @@ func (con GWConnection) MarshalYAML() (interface{}, error) {
 		if err != nil {
 			return nil, err
 		}
-		c.Password = string(encrypted)
+		c.Password = fmt.Sprintf("%s%x", SecVerPrefix, encrypted)
 	}
 	return c, nil
 }
@@ -148,8 +150,14 @@ func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	if err := unmarshal((*plain)(con)); err != nil {
 		return err
 	}
-	if s := os.Getenv(string(SecKeyEnv)); s != "" {
-		decrypted, err := Decrypt([]byte(con.Password), []byte(s))
+	if strings.HasPrefix(con.Password, SecVerPrefix) {
+		s := os.Getenv(string(SecKeyEnv))
+		if s == "" {
+			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
+		}
+		var encrypted []byte
+		fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
+		decrypted, err := Decrypt(encrypted, []byte(s))
 		if err != nil {
 			return err
 		}
