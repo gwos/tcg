@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -173,4 +174,32 @@ func TestLoadConnectorDTO(t *testing.T) {
 
 	data, err := ioutil.ReadFile(tmpfile.Name())
 	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
+}
+
+func TestMarshaling(t *testing.T) {
+	configYAML := []byte(`
+connector:
+  agentId: 3dcd9a52-949d-4531-a3b0-b14622f7dd39
+dsConnection:
+  hostName: localhost
+gwConnections:
+  -
+    enabled: true
+    hostName: localhost
+    userName: RESTAPIACCESS
+    password: _v1_fc0546f02af1c34298d207468a78bc38cda6bd480d3357c8220580883747505d7971c3c43610cea1bc1df9e3292cb935
+`)
+
+	os.Setenv(string(SecKeyEnv), "SECRET")
+	defer os.Unsetenv(string(SecKeyEnv))
+
+	var cfg Config
+	assert.NoError(t, yaml.Unmarshal(configYAML, &cfg))
+	assert.Equal(t, "P@SSW0RD", cfg.GWConnections[0].Password)
+
+	res, err := yaml.Marshal(cfg)
+	assert.NoError(t, err)
+	assert.Contains(t, string(res), "password: _v1_")
+	assert.NotContains(t, string(res), "password: _v1_fc0546f02")
+	// t.Logf("$$\n%v", string(data))
 }
