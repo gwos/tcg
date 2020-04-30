@@ -191,7 +191,7 @@ func (connector *ElasticConnector) parseStoredQueryHits(storedQuery model.SavedO
 	for _, hit := range hits {
 		hostName := extractLabelValue(connector.config.HostNameLabelPath, hit.Source)
 		hostGroupName := extractLabelValue(connector.config.HostGroupLabelPath, hit.Source)
-		connector.monitoringState.UpdateHosts(hostName, connector.config.HostNamePrefix, storedQuery.Attributes.Title,
+		connector.monitoringState.UpdateHosts(hostName, storedQuery.Attributes.Title,
 			hostGroupName, timeInterval)
 	}
 }
