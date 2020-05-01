@@ -112,6 +112,7 @@ type ConnectorDTO struct {
 
 // GWConnection defines Groundwork Connection configuration
 type GWConnection struct {
+	ID int `yaml:"id"`
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
 	HostName            string `yaml:"hostName"`
@@ -296,15 +297,12 @@ func GetConfig() *Config {
 	return cfg
 }
 
-// LoadConnectorDTO loads ConnectorDTO into Config
-func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
-
 	if err := json.Unmarshal(data, &dto); err != nil {
 		log.Error(err.Error())
 		return nil, err
 	}
-
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
@@ -314,6 +312,46 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.GWConnections = dto.GWConnections
 	if len(dto.DSConnection.HostName) != 0 {
 		cfg.DSConnection.HostName = dto.DSConnection.HostName
+	}
+	return &dto, nil
+}
+
+func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
+	var s struct {
+		Advanced struct {
+			Prefixes []struct {
+				GWConnectionID int    `json:"groundworkConnectionId"`
+				Prefix         string `json:"prefix"`
+			} `json:"prefixes,omitempty"`
+		} `json:"advanced,omitempty"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		log.Error(err.Error())
+		return err
+	}
+	for _, c := range cfg.GWConnections {
+		c.PrefixResourceNames = false
+		c.ResourceNamePrefix = ""
+		for _, p := range s.Advanced.Prefixes {
+			if c.ID == p.GWConnectionID && p.Prefix != "" {
+				c.PrefixResourceNames = true
+				c.ResourceNamePrefix = p.Prefix
+			}
+		}
+	}
+	return nil
+}
+
+// LoadConnectorDTO loads ConnectorDTO into Config
+func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+	/* load as ConnectorDTO */
+	dto, err := cfg.loadConnector(data)
+	if err != nil {
+		return nil, err
+	}
+	/* load as struct with advanced prefixes field */
+	if err := cfg.loadAdvancedPrefixes(data); err != nil {
+		return nil, err
 	}
 
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
@@ -339,7 +377,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		}
 	}
 
-	return &dto, nil
+	return dto, nil
 }
 
 // IsConfiguringPMC checks configuration stage
