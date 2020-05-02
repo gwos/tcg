@@ -131,12 +131,19 @@ func TestLoadConnectorDTO(t *testing.T) {
     "hostName": "gw-host-xxx"
   },
   "groundworkConnections": [{
-	"enabled": true,
-	"localConnection": false,
+    "id": 101,
+    "enabled": true,
+    "localConnection": false,
     "hostName": "gw-host-xx",
     "userName": "-xx-",
     "password": "xx"
-  }]
+  }],
+  "advanced": {
+    "prefixes": [{
+      "groundworkConnectionId": 101,
+      "prefix": "c1"
+    }]
+  }
 }`)
 
 	_, err = cfg.LoadConnectorDTO(dto)
@@ -159,11 +166,14 @@ func TestLoadConnectorDTO(t *testing.T) {
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
 			&GWConnection{
-				Enabled:         true,
-				LocalConnection: false,
-				HostName:        "gw-host-xx",
-				UserName:        "-xx-",
-				Password:        "xx",
+				ID:                  101,
+				Enabled:             true,
+				LocalConnection:     false,
+				HostName:            "gw-host-xx",
+				UserName:            "-xx-",
+				Password:            "xx",
+				PrefixResourceNames: true,
+				ResourceNamePrefix:  "c1",
 			},
 		},
 	}
