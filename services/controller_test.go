@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tcg/config"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"

@@ -5,8 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	"github.com/gwos/tcg/log"
 	"io/ioutil"
 )
 

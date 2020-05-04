@@ -237,7 +237,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: The following API endpoint can be used to get TNG statistics.
+      description: The following API endpoint can be used to get TCG statistics.
       parameters:
       - description: Auth header
         in: header
@@ -267,7 +267,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: The following API endpoint can be used to get TNG status.
+      description: The following API endpoint can be used to get TCG status.
       parameters:
       - description: Auth header
         in: header

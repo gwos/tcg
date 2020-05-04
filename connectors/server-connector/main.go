@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/connectors"
-	_ "github.com/gwos/tng/docs"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/connectors"
+	_ "github.com/gwos/tcg/docs"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"net/http"
 	"time"
 )
@@ -30,7 +30,7 @@ type InitializeConfigResult struct {
 	Ownership      transit.HostOwnershipType
 }
 
-// @title TNG API Documentation
+// @title TCG API Documentation
 // @version 1.0
 
 // @host localhost:8099

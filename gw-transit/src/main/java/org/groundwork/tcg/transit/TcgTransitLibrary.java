@@ -1,8 +1,8 @@
-package org.groundwork.tng.transit;
+package org.groundwork.tcg.transit;
 
 import com.sun.jna.Library;
 
-public interface TngTransitLibrary extends Library {
+public interface TcgTransitLibrary extends Library {
     public boolean GoSetenv(String key, String value, StringByReference errorMsg, Integer errorMsgSize);
 
     public boolean SendResourcesWithMetrics(String resourceWithMetricsJson, StringByReference errorMsg, Integer errorMsgSize);

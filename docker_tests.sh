@@ -24,4 +24,4 @@ case "$ARGS" in
     *"integration"*|*"./..."*) __grab_jar ;;
 esac
 
-docker run -it --rm --network host -v "${PWD}":/src groundworkdevelopment/tng ./docker_cmd.sh $ARGS
+docker run -it --rm --network host -v "${PWD}":/src groundworkdevelopment/tcg ./docker_cmd.sh $ARGS
