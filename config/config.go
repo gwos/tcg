@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/log"
 	"github.com/kelseyhightower/envconfig"
 	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
@@ -27,12 +27,12 @@ type ConfigStringConstant string
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
-//   for example: TNG_CONNECTOR_NATSSTORETYPE
+//   for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv           ConfigStringConstant = "TNG_CONFIG"
-	ConfigName                               = "tng_config.yaml"
-	EnvConfigPrefix                          = "TNG"
-	SecKeyEnv                                = "TNG_SECKEY"
+	ConfigEnv           ConfigStringConstant = "TCG_CONFIG"
+	ConfigName                               = "tcg_config.yaml"
+	EnvConfigPrefix                          = "TCG"
+	SecKeyEnv                                = "TCG_SECKEY"
 	SecVerPrefix                             = "_v1_"
 	InstallationModeEnv                      = "INSTALLATION_MODE"
 	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
@@ -56,7 +56,7 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// Connector defines TNG Connector configuration
+// Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
 	AgentID string `yaml:"agentId"`
@@ -94,12 +94,12 @@ type Connector struct {
 	InstallationMode string   `yaml:"installationMode,omitempty"`
 }
 
-// ConnectorDTO defines TNG Connector configuration
+// ConnectorDTO defines TCG Connector configuration
 type ConnectorDTO struct {
 	AgentID       string        `json:"agentId"`
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
-	TngURL        string        `json:"tngUrl"`
+	TcgURL        string        `json:"tcgUrl"`
 	LogConsPeriod int           `json:"logConsPeriod"`
 	LogLevel      LogLevel      `json:"logLevel"`
 	Enabled       bool          `json:"enabled"`
@@ -245,7 +245,7 @@ func (con *DSConnection) Decode(value string) error {
 	return nil
 }
 
-// Config defines TNG Agent configuration
+// Config defines TCG Agent configuration
 type Config struct {
 	Connector     *Connector    `yaml:"connector"`
 	DSConnection  *DSConnection `yaml:"dsConnection"`

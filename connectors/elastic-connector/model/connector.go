@@ -2,12 +2,12 @@ package model
 
 import (
 	"encoding/json"
-	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"sync"
 	"time"
 )

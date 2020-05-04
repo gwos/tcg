@@ -26,8 +26,8 @@ The test supports environment variables:
     LIBTRANSIT=/path/to/libtransit.so
     TEST_ENDLESS - cycle run test_dlSendResourcesWithMetrics
 And all environment variables supported by libtransit itself:
-    TNG_CONFIG=/path/to/tng_config.yaml
-    TNG_AGENTCONFIG_NATSSTORETYPE=MEMORY
+    TCG_CONFIG=/path/to/tcg_config.yaml
+    TCG_AGENTCONFIG_NATSSTORETYPE=MEMORY
 For more info see package `config`
 */
 
@@ -120,9 +120,9 @@ void test_libtransit_control() {
   char errBuf[ERR_BUF_LEN] = "";
   bool res = false;
 
-  char *tng_config = getenv("TNG_CONFIG");
-  if (!tng_config) {
-    res = goSetenv("TNG_CONFIG", "../tng_config.yaml", errBuf, ERR_BUF_LEN);
+  char *tcg_config = getenv("TCG_CONFIG");
+  if (!tcg_config) {
+    res = goSetenv("TCG_CONFIG", "../tcg_config.yaml", errBuf, ERR_BUF_LEN);
     if (!res) {
       fail(errBuf);
     }
@@ -130,13 +130,13 @@ void test_libtransit_control() {
 
   // We allow our forced selection here to be externally overridden, but in
   // general for casual test purposes, we don't want the FILE type (as is
-  // specified by our ../tng_config.yaml file) to be in operation during this
+  // specified by our ../tcg_config.yaml file) to be in operation during this
   // testing, as that will cause a buildup of queued items as this test is run
   // and re-run.
-  char *nats_stor_type = getenv("TNG_CONNECTOR_NATSSTORETYPE");
+  char *nats_stor_type = getenv("TCG_CONNECTOR_NATSSTORETYPE");
   if (!nats_stor_type) {
     res =
-        goSetenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY", errBuf, ERR_BUF_LEN);
+        goSetenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY", errBuf, ERR_BUF_LEN);
     if (!res) {
       fail(errBuf);
     }
@@ -168,7 +168,7 @@ void test_libtransit_control() {
   // At least in our stack as of this writing, StopNats() will segfault inside
   // the github.com/nats-io/nats-streaming-server/server.(*StanServer).Shutdown
   // code if NATS has not previously been started.  The
-  // github.com/gwos/tng/nats.StopServer() code should be revised to not pass
+  // github.com/gwos/tcg/nats.StopServer() code should be revised to not pass
   // stuff to NATS that causes it to segfault.
   if (test_StopNats) {
     printf("Testing StopNats ...\n");
@@ -182,7 +182,7 @@ void test_libtransit_control() {
 
   // At least in our stack as of this writing, StopController() will segfault
   // inside the net/http. (*Server).Shutdown() code if the controller has not
-  // previously been started.  The github.com/gwos/tng/services.
+  // previously been started.  The github.com/gwos/tcg/services.
   // (*Controller).StopController() code should be revised to not pass stuff to
   // net/http that causes it to segfault.
   if (test_StopController) {

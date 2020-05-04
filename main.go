@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"math/rand"
 	"time"
 )
@@ -17,17 +17,17 @@ import (
 var enableTransit = false
 
 const (
-	Resource1                 = "tng-host-1"
-	Resource2                 = "tng-host-1"
-	Service1                  = "tng-server-1"
-	Service2                  = "tng-server-2"
-	CpuMetric                 = "tng-cpu"
-	CpuMetricWarning          = "tng-cpu-warning"
-	CpuMetricCritical         = "tng-cpu-critical"
-	PercentFreeMetric         = "tng-percent-free"
-	PercentFreeMetricWarning  = "tng-percent-free-warning"
-	PercentFreeMetricCritical = "tng-percent-free-critical"
-	DiskUsed                  = "tng-memory-used"
+	Resource1                 = "tcg-host-1"
+	Resource2                 = "tcg-host-1"
+	Service1                  = "tcg-server-1"
+	Service2                  = "tcg-server-2"
+	CpuMetric                 = "tcg-cpu"
+	CpuMetricWarning          = "tcg-cpu-warning"
+	CpuMetricCritical         = "tcg-cpu-critical"
+	PercentFreeMetric         = "tcg-percent-free"
+	PercentFreeMetricWarning  = "tcg-percent-free-warning"
+	PercentFreeMetricCritical = "tcg-percent-free-critical"
+	DiskUsed                  = "tcg-memory-used"
 )
 
 func main() {

@@ -1,8 +1,8 @@
 package integration
 
 import (
-	"github.com/gwos/tng/nats"
-	"github.com/gwos/tng/services"
+	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

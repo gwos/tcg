@@ -8,7 +8,7 @@ Items to take care of:
     See the sibling RECOMMENDED_CHANGES file.  There are a few
     changes either strongly or possibly recommanded there.  Making
     such adjustments may require a few corresponding adjustments
-    elsewhere in TNG code.
+    elsewhere in TCG code.
 
 (*) Consolidate all similar conversion routines, normalize them to a
     standard form, and generate a boilerplate template for that form.

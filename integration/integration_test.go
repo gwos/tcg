@@ -3,12 +3,12 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/clients"
+	. "github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
@@ -24,7 +24,7 @@ const (
 	HostDeleteAPI     = "http://localhost/api/hosts/"
 	HostStatusPending = "PENDING"
 	HostStatusUp      = "UP"
-	TestHostName      = "GW8_TNG_TEST_HOST"
+	TestHostName      = "GW8_TCG_TEST_HOST"
 )
 
 type Response struct {

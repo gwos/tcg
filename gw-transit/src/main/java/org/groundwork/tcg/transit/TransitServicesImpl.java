@@ -1,4 +1,4 @@
-package org.groundwork.tng.transit;
+package org.groundwork.tcg.transit;
 
 import com.sun.jna.Native;
 import org.codehaus.jackson.JsonProcessingException;
@@ -15,7 +15,7 @@ public class TransitServicesImpl implements TransitServices {
     private static final String LIBTRANSIT_LIBRARY_PATH_ENV = "LIBTRANSIT";
 
     private ConfiguredObjectMapper objectMapper;
-    private TngTransitLibrary tngTransitLibrary;
+    private TcgTransitLibrary tcgTransitLibrary;
     private StringByReference errorMsg;
 
     public TransitServicesImpl() {
@@ -25,13 +25,13 @@ public class TransitServicesImpl implements TransitServices {
             File lib = new File("../libtransit/" + System.mapLibraryName("libtransit.so"));
             path = lib.getAbsolutePath();
         }
-        this.tngTransitLibrary = Native.load(path, TngTransitLibrary.class);
+        this.tcgTransitLibrary = Native.load(path, TcgTransitLibrary.class);
         this.errorMsg = new StringByReference(String.join("", Collections.nCopies(128, " ")));
     }
 
     @Override
     public boolean GoSetenv(String key, String value, StringByReference errorMsg, Integer errorMsgSize) {
-        return tngTransitLibrary.GoSetenv(key, value, errorMsg, errorMsgSize);
+        return tcgTransitLibrary.GoSetenv(key, value, errorMsg, errorMsgSize);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class TransitServicesImpl implements TransitServices {
             e.printStackTrace();
         }
 
-        boolean isPublished = tngTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg,
+        boolean isPublished = tcgTransitLibrary.SendResourcesWithMetrics(resourcesJson, errorMsg,
                 LIBTRANSIT_ERR_LENGTH);
         if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
@@ -64,7 +64,7 @@ public class TransitServicesImpl implements TransitServices {
             e.printStackTrace();
         }
 
-        boolean isPublished = tngTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg,
+        boolean isPublished = tcgTransitLibrary.SynchronizeInventory(inventoryJson, errorMsg,
                 LIBTRANSIT_ERR_LENGTH);
         if (!isPublished) {
             throw new TransitException(errorMsg.getValue());
@@ -73,52 +73,52 @@ public class TransitServicesImpl implements TransitServices {
 
     @Override
     public void StartNats() throws TransitException {
-        if (!tngTransitLibrary.StartNats(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
+        if (!tcgTransitLibrary.StartNats(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
     public void StopNats() throws TransitException {
-        tngTransitLibrary.StopNats();
+        tcgTransitLibrary.StopNats();
     }
 
     @Override
     public void StartTransport() throws TransitException {
-        if (!tngTransitLibrary.StartTransport(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
+        if (!tcgTransitLibrary.StartTransport(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
     public void StopTransport() throws TransitException {
-        if (!tngTransitLibrary.StopTransport(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
+        if (!tcgTransitLibrary.StopTransport(errorMsg, LIBTRANSIT_ERR_LENGTH)) {
             throw new TransitException(errorMsg.getValue());
         }
     }
 
     @Override
     public boolean IsControllerRunning() throws TransitException {
-        return tngTransitLibrary.IsControllerRunning();
+        return tcgTransitLibrary.IsControllerRunning();
     }
 
     @Override
     public boolean IsNATSRunning() throws TransitException {
-        return tngTransitLibrary.IsNATSRunning();
+        return tcgTransitLibrary.IsNATSRunning();
     }
 
     @Override
     public boolean IsTransportRunning() throws TransitException {
-        return tngTransitLibrary.IsTransportRunning();
+        return tcgTransitLibrary.IsTransportRunning();
     }
 
     @Override
     public void RegisterListMetricsHandler(ListMetricsCallback func) throws TransitException {
-        tngTransitLibrary.RegisterListMetricsHandler(func);
+        tcgTransitLibrary.RegisterListMetricsHandler(func);
     }
 
     @Override
     public void RemoveListMetricsHandler() throws TransitException {
-        tngTransitLibrary.RemoveListMetricsHandler();
+        tcgTransitLibrary.RemoveListMetricsHandler();
     }
 }
