@@ -1,6 +1,6 @@
 connector:
   agentId: "76AE2920-0F88-44A5-BF1D-1B6B61B842C2"
-  appName: "tng"
+  appName: "tcg"
   appType: "VEMA"
   controllerAddr: "0.0.0.0:8099"
   natsAckWait: 30

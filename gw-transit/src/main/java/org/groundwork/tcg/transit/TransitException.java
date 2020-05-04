@@ -1,4 +1,4 @@
-package org.groundwork.tng.transit;
+package org.groundwork.tcg.transit;
 
 public class TransitException extends RuntimeException {
     public TransitException() {

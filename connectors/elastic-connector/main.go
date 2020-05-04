@@ -2,12 +2,12 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	_ "github.com/gwos/tng/docs"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	_ "github.com/gwos/tcg/docs"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"net/http"
 	"time"
 )

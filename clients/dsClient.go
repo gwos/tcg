@@ -2,8 +2,8 @@ package clients
 
 import (
 	"fmt"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
 	"net/http"
 	"net/url"
 	"strconv"
