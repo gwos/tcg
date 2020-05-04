@@ -153,11 +153,11 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
 >Without logs:
 
-    $ go test ./...
+    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test ./...
 
 >With logs:
 
-    $ go test -v ./...
+    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test -v ./...
 
 
 ### Run package tests:
@@ -169,6 +169,12 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 >With logs:
 
     $ go test -v ./<package_one>/ ./<package_two>/
+    
+### Run tests with environment variables
+
+>Before running integration tests you must provide environment variables for Groundwork Connection username and password:
+
+    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test ./integration
 
 
 ### Run tests in Docker container:
