@@ -384,7 +384,7 @@ func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []
 	}
 
 	for _, header := range additionalHeaders {
-		headers[header.key] = headers[header.value]
+		headers[header.key] = header.value
 	}
 
 	statusCode, byteResponse, err := SendRequest(httpMethod, reqURL, headers, nil, payload)
