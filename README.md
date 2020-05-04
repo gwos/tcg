@@ -4,7 +4,7 @@
 
 # Tcg
 
-The New Groundwork Transit connectors (feeders). TCG contains two sub-systems/packages:
+The Transit Connection Generator (TCG). TCG contains two sub-systems/packages:
 
 1. Transit agent - connects and sends metrics to Groundwork Monitor
 2. Controller service - an http server for external control of agent
