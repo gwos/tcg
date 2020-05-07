@@ -62,6 +62,9 @@ func main() {
 	if transitService.Status().Transport != services.Stopped {
 		log.Info("[Elastic Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(irs, rgs, transit.HostOwnershipType(config.GWConnection.DeferOwnership))
+		// max 5 seconds sleep at the beginning
+		sleepMs := connectors.CalcMsSleepAfterSendingInventory(irs, 5000)
+		time.Sleep(time.Duration(int64(sleepMs) * int64(time.Millisecond)))
 	}
 
 	for {
@@ -81,6 +84,10 @@ func main() {
 			if err != nil {
 				log.Error(err.Error())
 			}
+			// max 2 seconds sleep in loop
+			sleepMs := connectors.CalcMsSleepAfterSendingInventory(irs, 2000)
+			time.Sleep(time.Duration(int64(sleepMs) * int64(time.Millisecond)))
+
 			log.Info("[Elastic Connector]: Monitoring resources ...")
 			err = connectors.SendMetrics(mrs)
 			if err != nil {

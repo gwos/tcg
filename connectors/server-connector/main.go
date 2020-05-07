@@ -20,6 +20,7 @@ const (
 	DefaultTimer         = 120
 	DefaultCacheTimer    = 1
 )
+const defaultInventorySleepMsMax = 5000 // 5 seconds
 
 type InitializeConfigResult struct {
 	processes      []string
@@ -82,7 +83,10 @@ func main() {
 
 	if transitService.Status().Transport != services.Stopped {
 		log.Info("[Server Connector]: Sending inventory ...")
-		_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
+		inventory := []transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}
+		_ = connectors.SendInventory(inventory, config.groups, config.ownership)
+		sleepMs := connectors.CalcMsSleepAfterSendingInventory(inventory, defaultInventorySleepMsMax)
+		time.Sleep(time.Duration(int64(sleepMs) * int64(time.Millisecond)))
 	}
 
 	for {
@@ -90,7 +94,10 @@ func main() {
 			select {
 			case <-chanel:
 				log.Info("[Server Connector]: Sending inventory ...")
-				_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
+				inventory := []transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}
+				_ = connectors.SendInventory(inventory, config.groups, config.ownership)
+				sleepMs := connectors.CalcMsSleepAfterSendingInventory(inventory, defaultInventorySleepMsMax)
+				time.Sleep(time.Duration(int64(sleepMs) * int64(time.Millisecond)))
 			default:
 				log.Info("[Server Connector]: No new config received, skipping inventory ...")
 			}
@@ -172,4 +179,14 @@ func handleCache() {
 		cache.ProcessesCache.SetDefault("processes", collectProcessesNames())
 		time.Sleep(DefaultCacheTimer * time.Minute)
 	}
+}
+
+func calcInventorySize(inventory []transit.InventoryResource) int {
+	inventorySize := 0
+	if len(inventory) != 0 {
+		for _, i := range inventory {
+			inventorySize = inventorySize + len(i.Services)
+		}
+	}
+	return inventorySize
 }
