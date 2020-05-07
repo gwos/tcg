@@ -180,13 +180,3 @@ func handleCache() {
 		time.Sleep(DefaultCacheTimer * time.Minute)
 	}
 }
-
-func calcInventorySize(inventory []transit.InventoryResource) int {
-	inventorySize := 0
-	if len(inventory) != 0 {
-		for _, i := range inventory {
-			inventorySize = inventorySize + len(i.Services)
-		}
-	}
-	return inventorySize
-}
