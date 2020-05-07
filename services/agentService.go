@@ -328,6 +328,7 @@ func (service *AgentService) listenStatsChan() {
 				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
 				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.MetricsSent++
 			case SubjSendEvents:
 				// TODO: handle events acks, unacks
 				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
