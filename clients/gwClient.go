@@ -346,7 +346,7 @@ func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
 
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
 	if hostNames == nil || len(hostNames) == 0 {
-		return nil, errors.New("Unable to get host groups of host: host names are not provided.")
+		return nil, errors.New("unable to get host groups of host: host names are not provided")
 	}
 	query := "( hosts.hostName in ("
 	for i, hostName := range hostNames {
