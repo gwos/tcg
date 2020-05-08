@@ -1,13 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tng/connectors"
 	"github.com/gwos/tng/connectors/elastic-connector/model"
 	_ "github.com/gwos/tng/docs"
 	"github.com/gwos/tng/log"
 	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
 	"net/http"
 	"time"
 )
@@ -15,19 +16,26 @@ import (
 func main() {
 	var transitService = services.GetTransitService()
 
-	chanel := make(chan bool)
+	connector := ElasticConnector{}
 
 	var config *model.ElasticConnectorConfig
+	var configMark []byte
 
 	transitService.ConfigHandler = func(data []byte) {
 		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
 		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
 			&connection, &profile, gwConnections)
 		config = cfg
-		chanel <- true
+		cfgMark, _ := json.Marshal(cfg)
+		if !bytes.Equal(configMark, cfgMark) {
+			if err := connector.LoadConfig(config); err != nil {
+				log.Error("Cannot reload ElasticConnector config: ", err)
+			} else {
+				configMark = cfgMark
+				connector.performCollection()
+			}
+		}
 	}
-
-	var connector *ElasticConnector
 
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
@@ -42,54 +50,13 @@ func main() {
 		return
 	}
 
-	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
-	<-chanel
-	log.Info("[Elastic Connector]: Configuration received")
-
 	if err := connectors.Start(); err != nil {
 		log.Error(err)
 		return
 	}
-	connectors.ControlCHandler()
-
-	var err error
-	connector, err = InitElasticConnector(config)
-	if err != nil {
-		log.Error("Cannot initialize ElasticConnector")
-		return
-	}
-	_, irs, rgs := connector.CollectMetrics()
-	if transitService.Status().Transport != services.Stopped {
-		log.Info("[Elastic Connector]: Sending inventory ...")
-		_ = connectors.SendInventory(irs, rgs, transit.HostOwnershipType(config.GWConnection.DeferOwnership))
-	}
 
 	for {
-		if transitService.Status().Transport != services.Stopped {
-			select {
-			case <-chanel:
-				err := connector.ReloadConfig(config)
-				if err != nil {
-					log.Error("Cannot reload ElasticConnector config: ", err)
-				}
-			default:
-				log.Info("[Elastic Connector]: No new config received.")
-			}
-			mrs, irs, rgs := connector.CollectMetrics()
-			log.Info("[Elastic Connector]: Sending inventory ...")
-			err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(config.GWConnection.DeferOwnership))
-			if err != nil {
-				log.Error(err.Error())
-			}
-			log.Info("[Elastic Connector]: Monitoring resources ...")
-			err = connectors.SendMetrics(mrs)
-			if err != nil {
-				log.Error(err.Error())
-			}
-		} else {
-			log.Info("[Elastic Connector]: Transport is stopped ...")
-		}
-
-		time.Sleep(time.Duration(int64(config.Timer) * int64(time.Second)))
+		connector.performCollection()
+		time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
 	}
 }
