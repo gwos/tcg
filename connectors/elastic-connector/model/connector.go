@@ -263,33 +263,39 @@ func retrieveExistingGwHosts(appType string, agentId string, gwConnection *confi
 		}
 	}
 
-	response, err = gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
-	if err != nil {
-		log.Error("Unable to get GW host groups to initialize state: ", err)
-		return gwHosts
-	}
+	if hostNames != nil && len(hostNames) > 0 {
+		response, err = gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
+		if err != nil {
+			log.Error("Unable to get GW host groups to initialize state: ", err)
+			return gwHosts
+		}
+		if response == nil {
+			log.Error("Unable to get GW host groups to initialize state.")
+			return gwHosts
+		}
 
-	var gwHostGroups struct {
-		HostGroups []struct {
-			Name  string `json:"name"`
-			Hosts []struct {
-				HostName string `json:"hostName"`
-			} `json:"hosts"`
-		} `json:"hostGroups"`
-	}
-	err = json.Unmarshal(response, &gwHostGroups)
-	if err != nil {
-		log.Error("Unable to parse received GW host groups to initialize state: ", err)
-		return gwHosts
-	}
+		var gwHostGroups struct {
+			HostGroups []struct {
+				Name  string `json:"name"`
+				Hosts []struct {
+					HostName string `json:"hostName"`
+				} `json:"hosts"`
+			} `json:"hostGroups"`
+		}
+		err = json.Unmarshal(response, &gwHostGroups)
+		if err != nil {
+			log.Error("Unable to parse received GW host groups to initialize state: ", err)
+			return gwHosts
+		}
 
-	for _, gwHostGroup := range gwHostGroups.HostGroups {
-		for _, gwHost := range gwHostGroup.Hosts {
-			if host, exists := gwHosts[gwHost.HostName]; exists {
-				hostGroups := host.hostGroups
-				hostGroups = append(hostGroups, gwHostGroup.Name)
-				host.hostGroups = hostGroups
-				gwHosts[gwHost.HostName] = host
+		for _, gwHostGroup := range gwHostGroups.HostGroups {
+			for _, gwHost := range gwHostGroup.Hosts {
+				if host, exists := gwHosts[gwHost.HostName]; exists {
+					hostGroups := host.hostGroups
+					hostGroups = append(hostGroups, gwHostGroup.Name)
+					host.hostGroups = hostGroups
+					gwHosts[gwHost.HostName] = host
+				}
 			}
 		}
 	}
