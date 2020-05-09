@@ -9,6 +9,7 @@ import (
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -72,7 +73,7 @@ func StartServer(config Config) error {
 	var err error
 	cfg = config
 	natsOpts := stand.DefaultNatsServerOptions
-
+	natsOpts.MaxPayload = math.MaxInt32
 	addrParts := strings.Split(cfg.NatsHost, ":")
 	if len(addrParts) == 2 {
 		if addrParts[0] != "" {

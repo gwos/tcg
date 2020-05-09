@@ -85,10 +85,11 @@ func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody
 
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
-		log.Error("Error encoding Search Body: ", err)
+		log.Error("Error encoding ES Search Body: ", err)
 		return nil, nil
 	}
 
+	log.Debug("Performing ES search request with body: ", body.String())
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
 		client.Search.WithIndex(indexes...),
@@ -102,6 +103,8 @@ func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody
 		log.Error("Error getting Search response: ", err)
 		return nil, nil
 	}
+
+	log.Debug("ES Search response: ", response)
 
 	if response.IsError() {
 		var e map[string]interface{}
@@ -120,14 +123,14 @@ func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody
 	responseBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
-		log.Error("Error reading Search response body: ", err)
+		log.Error("Error reading ES Search response body: ", err)
 		return nil, nil
 	}
 
 	var searchResponse model.SearchResponse
 	err = json.Unmarshal(responseBody, &searchResponse)
 	if err != nil {
-		log.Error("Error parsing Search response body: ", err)
+		log.Error("Error parsing ES Search response body: ", err)
 		return nil, nil
 	}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	"github.com/gwos/tcg/log"
@@ -26,28 +27,7 @@ type ElasticConnector struct {
 	monitoringState *model.MonitoringState
 }
 
-func InitElasticConnector(config *model.ElasticConnectorConfig) (*ElasticConnector, error) {
-	if config == nil {
-		return nil, errors.New("config is missing")
-	}
-
-	kibanaClient, esClient, err := initClients(config)
-	if err != nil {
-		return nil, err
-	}
-	monitoringState := model.InitMonitoringState(nil, config)
-
-	connector := ElasticConnector{
-		config:          config,
-		kibanaClient:    &kibanaClient,
-		esClient:        &esClient,
-		monitoringState: &monitoringState,
-	}
-
-	return &connector, nil
-}
-
-func (connector *ElasticConnector) ReloadConfig(config *model.ElasticConnectorConfig) error {
+func (connector *ElasticConnector) LoadConfig(config *model.ElasticConnectorConfig) error {
 	if config == nil {
 		return errors.New("config is missing")
 	}
@@ -64,6 +44,22 @@ func (connector *ElasticConnector) ReloadConfig(config *model.ElasticConnectorCo
 	connector.monitoringState = &monitoringState
 
 	return nil
+}
+
+func (connector *ElasticConnector) performCollection() {
+	mrs, irs, rgs := connector.CollectMetrics()
+
+	log.Info("[Elastic Connector]: Sending inventory ...")
+	err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(connector.config.GWConnection.DeferOwnership))
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	log.Info("[Elastic Connector]: Monitoring resources ...")
+	err = connectors.SendMetrics(mrs)
+	if err != nil {
+		log.Error(err.Error())
+	}
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
