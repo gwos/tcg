@@ -48,13 +48,13 @@ binutils (for things like "ar")
 From a standing start, as checked out from Git, follow the yellow brick road:
 
 ```
-# Drop into the top-level directory for the TNG repository,
+# Drop into the top-level directory for the TCG repository,
 # whereever you have checked it out.  This is just an example.
-cd github/gwos/tng
+cd github/gwos/tcg
 
 # Make the Jansson library.  Header files and compiled library files
 # for use with the gotocjson code will be installed under the local/
-# subdirectory within the checked-out TNG repository.  The Makefile
+# subdirectory within the checked-out TCG repository.  The Makefile
 # for the C test code we are generating knows to look there.
 make
 
@@ -181,7 +181,7 @@ process.  The most important files are:
 
   * **`gotocjson/setup.go`**
 
-    This is a mostly-frozen copy of an early version of the TNG `config.go` file,
+    This is a mostly-frozen copy of an early version of the TCG `config.go` file,
     with possible later local edits.  This test file is renamed to avoid confusion
     with the production file, and placed here to insulate against random changes in
     the production file.  It is part of a testbed to show that we have support for
@@ -189,7 +189,7 @@ process.  The most important files are:
 
   * **`gotocjson/subseconds.go`**
 
-    This is a mostly-frozen copy of an early version of the TNG `milliseconds.go` file,
+    This is a mostly-frozen copy of an early version of the TCG `milliseconds.go` file,
     with possible later local edits.  This test file is renamed to avoid confusion
     with the production file, and placed here to insulate against random changes in
     the production file.  It is part of a testbed to show that we have support for
@@ -197,7 +197,7 @@ process.  The most important files are:
 
   * **`gotocjson/transport.go`**
 
-    This is a mostly-frozen copy of an early version of the TNG `transit.go` file,
+    This is a mostly-frozen copy of an early version of the TCG `transit.go` file,
     with possible later local edits.  This test file is renamed to avoid confusion
     with the production file, and placed here to insulate against random changes in
     the production file.  It is part of a testbed to show that we have support for

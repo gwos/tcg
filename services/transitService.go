@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/nats"
+	"github.com/gwos/tcg/nats"
 	"sync"
 )
 

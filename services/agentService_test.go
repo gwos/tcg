@@ -1,7 +1,7 @@
 package services
 
 import (
-	"github.com/gwos/tng/config"
+	"github.com/gwos/tcg/config"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
@@ -53,7 +53,7 @@ func TestAgentService_DemandConfig(t *testing.T) {
   "appName": "test-app-XX",
   "appType": "test-XX",
   "logLevel": 2,
-  "tngUrl": "http://tng-host:9980/",
+  "tcgUrl": "http://tcg-host:9980/",
   "dalekservicesConnection": {
     "hostName": "gw-host-xxx"
   },

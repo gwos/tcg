@@ -1,8 +1,8 @@
 package services
 
 import (
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"time"
 )
 
@@ -29,7 +29,7 @@ const (
 	Unknown           = "unknown"
 )
 
-// AgentStats defines TNG Agent statistics
+// AgentStats defines TCG Agent statistics
 type AgentStats struct {
 	AgentID                string                             `json:"agentID"`
 	AppType                string                             `json:"appType"`
@@ -45,7 +45,7 @@ type AgentStats struct {
 	LastErrors             []string                           `json:"lastErrors"`
 }
 
-// AgentStatus defines TNG Agent status
+// AgentStatus defines TCG Agent status
 type AgentStatus struct {
 	Ctrl       *CtrlAction
 	Controller Status
@@ -59,7 +59,7 @@ type ConnectorStatusDTO struct {
 	JobID  uint8  `json:"jobId,omitempty"`
 }
 
-// AgentServices defines TNG Agent services interface
+// AgentServices defines TCG Agent services interface
 type AgentServices interface {
 	DemandConfig(entrypoints ...Entrypoint) error
 	MakeTracerContext() *transit.TracerContext
@@ -79,7 +79,7 @@ type AgentServices interface {
 	Status() AgentStatus
 }
 
-// TransitServices defines TNG Agent services interface
+// TransitServices defines TCG Agent services interface
 type TransitServices interface {
 	SendResourceWithMetrics([]byte) error
 	SynchronizeInventory([]byte) error
@@ -88,7 +88,7 @@ type TransitServices interface {
 // GetBytesHandlerType defines handler type
 type GetBytesHandlerType func() ([]byte, error)
 
-// Controllers defines TNG Agent controllers interface
+// Controllers defines TCG Agent controllers interface
 type Controllers interface {
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(GetBytesHandlerType)

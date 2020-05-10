@@ -7,10 +7,10 @@ import (
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/nats"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"net/http"
@@ -123,7 +123,7 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 	corsConfig := cors.DefaultConfig()
 	corsConfig.AllowedHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
-	router.Use(sessions.Sessions("tng-session", sessions.NewCookieStore([]byte("secret"))))
+	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, entrypoints)
 
 	controller.srv = &http.Server{
@@ -360,7 +360,7 @@ func (controller *Controller) stop(c *gin.Context) {
 }
 
 //
-// @Description The following API endpoint can be used to get TNG statistics.
+// @Description The following API endpoint can be used to get TCG statistics.
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
@@ -374,7 +374,7 @@ func (controller *Controller) stats(c *gin.Context) {
 }
 
 //
-// @Description The following API endpoint can be used to get TNG status.
+// @Description The following API endpoint can be used to get TCG status.
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json

@@ -1,9 +1,9 @@
 package model
 
 import (
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
 )

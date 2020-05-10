@@ -289,7 +289,7 @@ var doc = `{
         },
         "/stats": {
             "get": {
-                "description": "The following API endpoint can be used to get TNG statistics.",
+                "description": "The following API endpoint can be used to get TCG statistics.",
                 "consumes": [
                     "application/json"
                 ],
@@ -334,7 +334,7 @@ var doc = `{
         },
         "/status": {
             "get": {
-                "description": "The following API endpoint can be used to get TNG status.",
+                "description": "The following API endpoint can be used to get TCG status.",
                 "consumes": [
                     "application/json"
                 ],

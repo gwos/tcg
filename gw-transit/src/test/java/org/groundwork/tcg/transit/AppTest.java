@@ -1,4 +1,4 @@
-package org.groundwork.tng.transit;
+package org.groundwork.tcg.transit;
 
 import org.groundwork.rs.transit.*;
 import org.junit.Test;
@@ -15,8 +15,8 @@ import java.util.List;
  */
 public class AppTest {
 
-    private static final String TEST_HOST_NAME = "GW8_TNG_TEST_HOST";
-    private static final String TEST_SERVICE_NAME = "GW8_TNG_TEST_SERVICE";
+    private static final String TEST_HOST_NAME = "GW8_TCG_TEST_HOST";
+    private static final String TEST_SERVICE_NAME = "GW8_TCG_TEST_SERVICE";
     private static final String HOST_RESOURCE_TYPE = "HOST";
     private static final String SERVICE_RESOURCE_TYPE = "SERVICE";
 
@@ -25,7 +25,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TCG
      * 3. Set path to '.so' file in TransitServiceImpl constructor.
      * 4. Run test.
      */
@@ -90,7 +90,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TCG
      * 3. Set path to '.so' file in TransitServiceImpl constructor.
      * 4. Run test.
      */
@@ -133,7 +133,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TCG
      * 3. Set path to '.so' file in TransitServiceImpl constructor.
      * 4. Set preferred TEST_SERVICES_COUNT and TEST_METRICS_COUNT constants.
      * 5. Run test.
@@ -183,7 +183,7 @@ public class AppTest {
      * <p>
      * Usage:
      * 1. Start GroundWork Foundation server
-     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TNG
+     * 2. Generate '.so' file by running `go build -o libtransit/libtransit.so -buildmode=c-shared libtransit/libtransit.go` command in TCG
      * 3. Set path to '.so' file in TransitServiceImpl constructor.
      * 4. Set preferred TEST_SERVICES_COUNT and TEST_METRICS_COUNT constants.
      * 5. Run test.
