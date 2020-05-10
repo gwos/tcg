@@ -57,9 +57,9 @@ gwConnections:
 	assert.NoError(t, err)
 
 	os.Setenv(string(ConfigEnv), tmpfile.Name())
-	os.Setenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
-	os.Setenv("TNG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
+	os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
+	os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := &Config{
 		Connector: &Connector{
@@ -126,7 +126,7 @@ func TestLoadConnectorDTO(t *testing.T) {
   "appType": "test-XX",
   "logConsPeriod": 30,
   "logLevel": 2,
-  "tngUrl": "http://tng-host/",
+  "tcgUrl": "http://tcg-host/",
   "dalekservicesConnection": {
     "hostName": "gw-host-xxx"
   },

@@ -2,9 +2,9 @@ package clients
 
 import (
 	"encoding/json"
-	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
 )

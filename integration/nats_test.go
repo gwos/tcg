@@ -3,14 +3,14 @@ package integration
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/clients"
-	. "github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/nats"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	. "github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
@@ -35,12 +35,12 @@ const (
 	GWPasswordRemote                   = "***REMOVED***"
 	GWValidHost                        = "http://localhost:80"
 	GWInvalidHost                      = "http://localhost:23"
-	TestTngAgentConfigNatsFileStoreDir = "test_datastore"
+	TestTcgAgentConfigNatsFileStoreDir = "test_datastore"
 )
 
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
-// TNG connects to Foundation as local connection
+// TCG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
 	configNats(t, 5)
@@ -79,7 +79,7 @@ func TestNatsQueue_1(t *testing.T) {
 
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
-// TNG connects to Foundation as remote connection
+// TCG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
 	configNats(t, 30)
@@ -193,7 +193,7 @@ func configNats(t *testing.T, natsAckWait int64) {
 	}
 
 	service := services.GetTransitService()
-	service.Connector.NatsFilestoreDir = TestTngAgentConfigNatsFileStoreDir
+	service.Connector.NatsFilestoreDir = TestTcgAgentConfigNatsFileStoreDir
 	service.Connector.NatsAckWait = natsAckWait
 
 	assert.NoError(t, service.StopNats())
@@ -204,7 +204,7 @@ func configNats(t *testing.T, natsAckWait int64) {
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", TestTngAgentConfigNatsFileStoreDir)
+	cmd := exec.Command("rm", "-rf", TestTcgAgentConfigNatsFileStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
 	cache.DispatcherDoneCache.Flush()

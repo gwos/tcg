@@ -1,4 +1,4 @@
-# Top-level Makefile for TNG code.
+# Top-level Makefile for TCG code.
 
 # export GOPATH := $(realpath .)
 export GOPATH := $(realpath ..):$(realpath .)
@@ -57,10 +57,10 @@ BUILD_DYNAMIC_LIBRARIES = \
 	${LIBTRANSITJSON_LIBRARY}
 
 INSTALL_DIRECTORIES = \
-	${INSTALL_BASE_DIRECTORY}/include/tng	\
+	${INSTALL_BASE_DIRECTORY}/include/tcg	\
 	${INSTALL_BASE_DIRECTORY}/lib
 
-INSTALL_HEADER_FILES = $(addprefix ${INSTALL_BASE_DIRECTORY}/include/tng/,$(notdir ${BUILD_HEADER_FILES}))
+INSTALL_HEADER_FILES = $(addprefix ${INSTALL_BASE_DIRECTORY}/include/tcg/,$(notdir ${BUILD_HEADER_FILES}))
 
 INSTALL_DYNAMIC_LIBRARIES = $(addprefix ${INSTALL_BASE_DIRECTORY}/lib/,$(notdir ${BUILD_DYNAMIC_LIBRARIES}))
 
@@ -82,23 +82,23 @@ $(1)/$(notdir $(2))	: $(2) | $(1)
 	cp -p $$< $$@
 endef
 
-$(foreach path,${BUILD_HEADER_FILES},$(eval $(call INSTALLED_FILE_template,${INSTALL_BASE_DIRECTORY}/include/tng,$(path))))
+$(foreach path,${BUILD_HEADER_FILES},$(eval $(call INSTALLED_FILE_template,${INSTALL_BASE_DIRECTORY}/include/tcg,$(path))))
 
 $(foreach path,${BUILD_DYNAMIC_LIBRARIES},$(eval $(call INSTALLED_FILE_template,${INSTALL_BASE_DIRECTORY}/lib,$(path))))
 
 # Fetch all third-party Go packages needed either directly or indirectly
-# by the TNG software.
+# by the TCG software.
 get	:
 	mkdir -p ../src
 	# [ -h src ] || ln -s ../src
 	mkdir -p ../src/github.com/gwos
-	[ -h ../src/github.com/gwos/tng ] || ln -s ../../../tng ../src/github.com/gwos/tng
+	[ -h ../src/github.com/gwos/tcg ] || ln -s ../../../tcg ../src/github.com/gwos/tcg
 	# FIX MAJOR:  It is not yet clear that the next step here will get us exactly
 	# what we want:  nothing changed with respect to the checked-out and possibly
-	# locally-modified files of the branch of github.com/gwos/tng that we are
+	# locally-modified files of the branch of github.com/gwos/tcg that we are
 	# already using.  All we want is to have it analyze the dependencies and
-	# pull those in to make them available for our TNG builds.
-	go get github.com/gwos/tng
+	# pull those in to make them available for our TCG builds.
+	go get github.com/gwos/tcg
 	go get github.com/nats-io/go-nats-streaming
 	go get github.com/nats-io/nats-streaming-server/server
 
@@ -118,7 +118,7 @@ ${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_DIRECTORY}
 ${BUILD_TARGET_DIRECTORY}	:
 	mkdir -p $@
 
-${INSTALL_BASE_DIRECTORY}/include/tng	:
+${INSTALL_BASE_DIRECTORY}/include/tcg	:
 	mkdir -p $@
 
 ${INSTALL_BASE_DIRECTORY}/lib	:

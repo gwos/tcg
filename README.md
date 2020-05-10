@@ -2,9 +2,9 @@
   <a href="http://www.gwos.com/" target="blank"><img src="https://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
 </p>
 
-# Tng
+# Tcg
 
-The New Groundwork Transit connectors (feeders). TNG contains two sub-systems/packages:
+The Transit Connection Generator (TCG). TCG contains two sub-systems/packages:
 
 1. Transit agent - connects and sends metrics to Groundwork Monitor
 2. Controller service - an http server for external control of agent
@@ -23,7 +23,7 @@ The New Groundwork Transit connectors (feeders). TNG contains two sub-systems/pa
 <a name="dependencies"></a>
 ## Dependencies
 
-The TNG project is built with Go Modules. See `go.mod` for a list of dependencies. Here are some of the main frameworks used by this project:
+The TCG project is built with Go Modules. See `go.mod` for a list of dependencies. Here are some of the main frameworks used by this project:
 
 1. [Gin Web Framework](github.com/gin-gonic/gin)
 
@@ -112,12 +112,12 @@ The TNG project is built with Go Modules. See `go.mod` for a list of dependencie
 ## Building
 
 ```
-$ cd tng
+$ cd tcg
 $ go build .
 ```
 
 
-### Building tng shared module:
+### Building tcg shared module:
 
 ```
 $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
@@ -130,7 +130,7 @@ $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit
 ## Running
 
 ```
-$ cd tng
+$ cd tcg
 $ go run .
 ```
 
@@ -140,7 +140,7 @@ $ go run .
 
 ### Build image:
 
-    $ docker build -t groundworkdevelopment/tng .
+    $ docker build -t groundworkdevelopment/tcg --build-arg GITHUB_TOKEN .
 
 
 <a name="testing"></a>
@@ -204,13 +204,13 @@ Defines path to `libtransit.so` library in docker container and tests.
     $ export LIBTRANSIT=/path/to/libtransit.so
 
 
-### TNG
+### TCG
 
-By default the config file is looked for in the work directory as `tng_config.yaml`.
+By default the config file is looked for in the work directory as `tcg_config.yaml`.
 
 The path to config file and any config option can be overridden with env vars:
 
-    $ export TNG_CONFIG=/path/to/tng_config.yaml
-    $ export TNG_CONNECTOR_NATSSTORETYPE=MEMORY
+    $ export TCG_CONFIG=/path/to/tcg_config.yaml
+    $ export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
 
 For more info see package `config` and tests.

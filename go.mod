@@ -1,4 +1,4 @@
-module github.com/gwos/tng
+module github.com/gwos/tcg
 
 go 1.13
 

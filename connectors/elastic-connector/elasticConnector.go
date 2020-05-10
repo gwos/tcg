@@ -2,12 +2,12 @@ package main
 
 import (
 	"errors"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/connectors/elastic-connector/clients"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	"github.com/gwos/tng/log"
-	_ "github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/elastic-connector/clients"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	"github.com/gwos/tcg/log"
+	_ "github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"strings"
 )
 
