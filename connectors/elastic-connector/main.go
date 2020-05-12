@@ -14,6 +14,8 @@ import (
 )
 
 func main() {
+	connectors.ControlCHandler()
+
 	var transitService = services.GetTransitService()
 
 	connector := ElasticConnector{}
@@ -22,6 +24,7 @@ func main() {
 	var configMark []byte
 
 	transitService.ConfigHandler = func(data []byte) {
+		log.Info("[Server Connector]: Configuration received")
 		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
 		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
 			&connection, &profile, gwConnections)
@@ -32,7 +35,13 @@ func main() {
 				log.Error("Cannot reload ElasticConnector config: ", err)
 			} else {
 				configMark = cfgMark
-				connector.performCollection()
+				_, irs, rgs := connector.CollectMetrics()
+
+				log.Info("[Elastic Connector]: Sending inventory ...")
+				err := connectors.SendInventory(irs, rgs, connector.config.OwnershipType)
+				if err != nil {
+					log.Error(err.Error())
+				}
 			}
 		}
 	}
@@ -56,7 +65,21 @@ func main() {
 	}
 
 	for {
-		connector.performCollection()
-		time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		if connector.config != nil {
+			mrs, irs, rgs := connector.CollectMetrics()
+
+			log.Info("[Elastic Connector]: Sending inventory ...")
+			err := connectors.SendInventory(irs, rgs, connector.config.OwnershipType)
+			if err != nil {
+				log.Error(err.Error())
+			}
+
+			log.Info("[Elastic Connector]: Monitoring resources ...")
+			err = connectors.SendMetrics(mrs)
+			if err != nil {
+				log.Error(err.Error())
+			}
+			time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		}
 	}
 }
