@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
@@ -397,7 +398,7 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 		i = -i
 	}
 	if err != nil {
-		log.Error("Error parsing time filterClause expression: %s", err)
+		log.Error(fmt.Sprintf("Error parsing time filterClause expression: %s", err.Error()))
 	}
 	var result time.Time
 	switch period {
