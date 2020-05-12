@@ -85,6 +85,8 @@ func main() {
 				log.Error(err.Error())
 			}
 			time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		} else {
+			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
 		}
 	}
 }
