@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	_ "github.com/gwos/tcg/docs"
 	"github.com/gwos/tcg/log"
@@ -40,25 +41,28 @@ func main() {
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-	var config InitializeConfigResult
-	var configMark []byte
-	agentIdMark := transitService.Connector.AgentID
+	var cfg InitializeConfigResult
+	var chksum []byte
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")
-		if cfg, err := initializeConfig(data); err == nil {
-			config = *cfg
-			cfgMark, _ := json.Marshal(cfg)
-
-			if !bytes.Equal(configMark, cfgMark) || agentIdMark != transitService.Connector.AgentID {
-				configMark = cfgMark
-				agentIdMark = transitService.Connector.AgentID
+		if c, err := initializeConfig(data); err == nil {
+			cfg = *c
+			chk, err := connectors.Hashsum(
+				config.GetConfig().Connector.AgentID,
+				config.GetConfig().GWConnections,
+				cfg,
+			)
+			if err != nil || !bytes.Equal(chksum, chk) {
 				log.Info("[Server Connector]: Sending inventory ...")
 				_ = connectors.SendInventory(
-					[]transit.InventoryResource{*Synchronize(config.MetricsProfile.Metrics)},
-					config.Groups,
-					config.Ownership,
+					[]transit.InventoryResource{*Synchronize(cfg.MetricsProfile.Metrics)},
+					cfg.Groups,
+					cfg.Ownership,
 				)
+			}
+			if err == nil {
+				chksum = chk
 			}
 		} else {
 			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
@@ -90,17 +94,17 @@ func main() {
 	}
 
 	for {
-		if len(config.MetricsProfile.Metrics) > 0 {
+		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
-				*CollectMetrics(config.MetricsProfile.Metrics, time.Duration(config.Timer)),
+				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
 			}); err != nil {
 				log.Error(err.Error())
 			}
 		}
 
 		LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		time.Sleep(time.Duration(int64(config.Timer) * int64(time.Second)))
+		time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
 	}
 }
 
