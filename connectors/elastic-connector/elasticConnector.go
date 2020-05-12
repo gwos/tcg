@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	"github.com/gwos/tcg/log"
@@ -44,22 +43,6 @@ func (connector *ElasticConnector) LoadConfig(config *model.ElasticConnectorConf
 	connector.monitoringState = &monitoringState
 
 	return nil
-}
-
-func (connector *ElasticConnector) performCollection() {
-	mrs, irs, rgs := connector.CollectMetrics()
-
-	log.Info("[Elastic Connector]: Sending inventory ...")
-	err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(connector.config.GWConnection.DeferOwnership))
-	if err != nil {
-		log.Error(err.Error())
-	}
-
-	log.Info("[Elastic Connector]: Monitoring resources ...")
-	err = connectors.SendMetrics(mrs)
-	if err != nil {
-		log.Error(err.Error())
-	}
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
@@ -105,11 +88,11 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 }
 
 func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
+	var suggestions []string
 	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
 		log.Error("ElasticConnector not configured.")
-		return nil
+		return suggestions
 	}
-	var suggestions []string
 	switch view {
 	case string(StoredQueries):
 		storedQueries := connector.kibanaClient.RetrieveStoredQueries(nil)
