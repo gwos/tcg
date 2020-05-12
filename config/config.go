@@ -1,14 +1,20 @@
 package config
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
-	"github.com/gwos/tng/log"
+	"fmt"
+	"github.com/gwos/tcg/log"
 	"github.com/kelseyhightower/envconfig"
+	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
+	"io"
 	"io/ioutil"
 	"math"
 	"os"
 	"path"
+	"strings"
 	"sync"
 )
 
@@ -21,11 +27,13 @@ type ConfigStringConstant string
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
-//   for example: TNG_CONNECTOR_NATSSTORETYPE
+//   for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv           ConfigStringConstant = "TNG_CONFIG"
-	ConfigName                               = "tng_config.yaml"
-	EnvConfigPrefix                          = "TNG"
+	ConfigEnv           ConfigStringConstant = "TCG_CONFIG"
+	ConfigName                               = "tcg_config.yaml"
+	EnvConfigPrefix                          = "TCG"
+	SecKeyEnv                                = "TCG_SECKEY"
+	SecVerPrefix                             = "_v1_"
 	InstallationModeEnv                      = "INSTALLATION_MODE"
 	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
 	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
@@ -48,7 +56,7 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// Connector defines TNG Connector configuration
+// Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
 	AgentID string `yaml:"agentId"`
@@ -86,12 +94,12 @@ type Connector struct {
 	InstallationMode string   `yaml:"installationMode,omitempty"`
 }
 
-// ConnectorDTO defines TNG Connector configuration
+// ConnectorDTO defines TCG Connector configuration
 type ConnectorDTO struct {
 	AgentID       string        `json:"agentId"`
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
-	TngURL        string        `json:"tngUrl"`
+	TcgURL        string        `json:"tcgUrl"`
 	LogConsPeriod int           `json:"logConsPeriod"`
 	LogLevel      LogLevel      `json:"logLevel"`
 	Enabled       bool          `json:"enabled"`
@@ -104,6 +112,7 @@ type ConnectorDTO struct {
 
 // GWConnection defines Groundwork Connection configuration
 type GWConnection struct {
+	ID int `yaml:"id"`
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
 	HostName            string `yaml:"hostName"`
@@ -118,6 +127,44 @@ type GWConnection struct {
 	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
 	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
 	SendAllInventory    bool   `yaml:"sendAllInventory"`
+}
+
+// MarshalYAML implements yaml.Marshaler interface
+// overrides the password field
+func (con GWConnection) MarshalYAML() (interface{}, error) {
+	type plain GWConnection
+	c := plain(con)
+	if s := os.Getenv(string(SecKeyEnv)); s != "" {
+		encrypted, err := Encrypt([]byte(c.Password), []byte(s))
+		if err != nil {
+			return nil, err
+		}
+		c.Password = fmt.Sprintf("%s%x", SecVerPrefix, encrypted)
+	}
+	return c, nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+// overrides the password field
+func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	type plain GWConnection
+	if err := unmarshal((*plain)(con)); err != nil {
+		return err
+	}
+	if strings.HasPrefix(con.Password, SecVerPrefix) {
+		s := os.Getenv(string(SecKeyEnv))
+		if s == "" {
+			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
+		}
+		var encrypted []byte
+		fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
+		decrypted, err := Decrypt(encrypted, []byte(s))
+		if err != nil {
+			return err
+		}
+		con.Password = string(decrypted)
+	}
+	return nil
 }
 
 // Decode implements envconfig.Decoder interface
@@ -198,7 +245,7 @@ func (con *DSConnection) Decode(value string) error {
 	return nil
 }
 
-// Config defines TNG Agent configuration
+// Config defines TCG Agent configuration
 type Config struct {
 	Connector     *Connector    `yaml:"connector"`
 	DSConnection  *DSConnection `yaml:"dsConnection"`
@@ -250,15 +297,12 @@ func GetConfig() *Config {
 	return cfg
 }
 
-// LoadConnectorDTO loads ConnectorDTO into Config
-func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
-
 	if err := json.Unmarshal(data, &dto); err != nil {
 		log.Error(err.Error())
 		return nil, err
 	}
-
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
@@ -268,6 +312,46 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.GWConnections = dto.GWConnections
 	if len(dto.DSConnection.HostName) != 0 {
 		cfg.DSConnection.HostName = dto.DSConnection.HostName
+	}
+	return &dto, nil
+}
+
+func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
+	var s struct {
+		Advanced struct {
+			Prefixes []struct {
+				GWConnectionID int    `json:"groundworkConnectionId"`
+				Prefix         string `json:"prefix"`
+			} `json:"prefixes,omitempty"`
+		} `json:"advanced,omitempty"`
+	}
+	if err := json.Unmarshal(data, &s); err != nil {
+		log.Error(err.Error())
+		return err
+	}
+	for _, c := range cfg.GWConnections {
+		c.PrefixResourceNames = false
+		c.ResourceNamePrefix = ""
+		for _, p := range s.Advanced.Prefixes {
+			if c.ID == p.GWConnectionID && p.Prefix != "" {
+				c.PrefixResourceNames = true
+				c.ResourceNamePrefix = p.Prefix
+			}
+		}
+	}
+	return nil
+}
+
+// LoadConnectorDTO loads ConnectorDTO into Config
+func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+	/* load as ConnectorDTO */
+	dto, err := cfg.loadConnector(data)
+	if err != nil {
+		return nil, err
+	}
+	/* load as struct with advanced prefixes field */
+	if err := cfg.loadAdvancedPrefixes(data); err != nil {
+		return nil, err
 	}
 
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
@@ -293,11 +377,37 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		}
 	}
 
-	return &dto, nil
+	return dto, nil
 }
 
 // IsConfiguringPMC checks configuration stage
 func (cfg *Config) IsConfiguringPMC() bool {
 	return os.Getenv(string(InstallationModeEnv)) == string(InstallationModePMC) &&
 		cfg.Connector.InstallationMode != string(InstallationModePMC)
+}
+
+// Decrypt decrypts small messages
+// golang.org/x/crypto/nacl/secretbox
+func Decrypt(message, secret []byte) ([]byte, error) {
+	var nonce [24]byte
+	var secretKey [32]byte
+	secretKey = sha256.Sum256([]byte(secret))
+	copy(nonce[:], message[:24])
+	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
+	if !ok {
+		return nil, fmt.Errorf("decryption error")
+	}
+	return decrypted, nil
+}
+
+// Encrypt encrypts small messages
+// golang.org/x/crypto/nacl/secretbox
+func Encrypt(message, secret []byte) ([]byte, error) {
+	var nonce [24]byte
+	var secretKey [32]byte
+	secretKey = sha256.Sum256([]byte(secret))
+	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+		return nil, err
+	}
+	return secretbox.Seal(nonce[:], message, &nonce, &secretKey), nil
 }

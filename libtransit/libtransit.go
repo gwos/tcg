@@ -23,7 +23,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tng/services"
+	"github.com/gwos/tcg/services"
 	"os"
 	"unsafe"
 )

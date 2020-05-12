@@ -1,15 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/connectors"
-	_ "github.com/gwos/tng/docs"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/connectors"
+	_ "github.com/gwos/tcg/docs"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"net/http"
 	"time"
 )
@@ -17,43 +18,55 @@ import (
 // Default values for 'Group' and loop 'Timer'
 const (
 	DefaultHostGroupName = "LocalServer"
-	DefaultTimer         = 20
+	DefaultTimer         = 120
 	DefaultCacheTimer    = 1
 )
 
 type InitializeConfigResult struct {
-	processes      []string
-	groups         []transit.ResourceGroup
-	metricsProfile transit.MetricsProfile
-	timer          float64
-	ownership      transit.HostOwnershipType
+	Processes      []string
+	Groups         []transit.ResourceGroup
+	MetricsProfile transit.MetricsProfile
+	Timer          float64
+	Ownership      transit.HostOwnershipType
 }
 
-// @title TNG API Documentation
+// @title TCG API Documentation
 // @version 1.0
 
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	connectors.ControlCHandler()
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-
-	chanel := make(chan bool)
-
-	var config *InitializeConfigResult
+	var config InitializeConfigResult
+	var configMark []byte
+	agentIdMark := transitService.Connector.AgentID
 
 	transitService.ConfigHandler = func(data []byte) {
+		log.Info("[Server Connector]: Configuration received")
 		if cfg, err := initializeConfig(data); err == nil {
-			config = cfg
-			connectors.Timer = int(config.timer)
-			chanel <- true
+			config = *cfg
+			cfgMark, _ := json.Marshal(cfg)
+
+			if !bytes.Equal(configMark, cfgMark) || agentIdMark != transitService.Connector.AgentID {
+				configMark = cfgMark
+				agentIdMark = transitService.Connector.AgentID
+				log.Info("[Server Connector]: Sending inventory ...")
+				_ = connectors.SendInventory(
+					[]transit.InventoryResource{*Synchronize(config.MetricsProfile.Metrics)},
+					config.Groups,
+					config.Ownership,
+				)
+			}
 		} else {
 			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
 			return
 		}
 	}
 
+	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
 			Url:    "/suggest/:viewName/:name",
@@ -78,34 +91,13 @@ func main() {
 		return
 	}
 
-	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	<-chanel
-	log.Info("[Server Connector]: Configuration received")
-
 	if err := connectors.Start(); err != nil {
 		log.Error(err)
 		return
 	}
-	connectors.ControlCHandler()
-
-	if transitService.Status().Transport != services.Stopped {
-		log.Info("[Server Connector]: Sending inventory ...")
-		_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
-	}
 
 	for {
-		if transitService.Status().Transport != services.Stopped {
-			select {
-			case <-chanel:
-				log.Info("[Server Connector]: Sending inventory ...")
-				_ = connectors.SendInventory([]transit.InventoryResource{*Synchronize(config.metricsProfile.Metrics)}, config.groups, config.ownership)
-			default:
-				log.Info("[Server Connector]: No new config received, skipping inventory ...")
-			}
-		} else {
-			log.Info("[Server Connector]: Transport is stopped ...")
-		}
-		if transitService.Status().Transport != services.Stopped && len(config.metricsProfile.Metrics) > 0 {
+		if len(config.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			monitoredResource := CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))
 			monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
@@ -114,8 +106,9 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
+
 		LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		time.Sleep(time.Duration(int64(config.timer) * int64(time.Second)))
+		time.Sleep(time.Duration(int64(config.Timer) * int64(time.Second)))
 	}
 }
 
@@ -129,32 +122,32 @@ func initializeConfig(data []byte) (*InitializeConfigResult, error) {
 	}{}
 
 	config := InitializeConfigResult{
-		processes:      []string{},
-		groups:         []transit.ResourceGroup{},
-		metricsProfile: transit.MetricsProfile{},
-		timer:          0,
-		ownership:      transit.Yield,
+		Processes:      []string{},
+		Groups:         []transit.ResourceGroup{},
+		MetricsProfile: transit.MetricsProfile{},
+		Timer:          0,
+		Ownership:      transit.Yield,
 	}
 
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
 		return &InitializeConfigResult{
-			processes:      []string{},
-			groups:         []transit.ResourceGroup{},
-			metricsProfile: transit.MetricsProfile{},
-			timer:          0,
-			ownership:      transit.Yield,
+			Processes:      []string{},
+			Groups:         []transit.ResourceGroup{},
+			MetricsProfile: transit.MetricsProfile{},
+			Timer:          0,
+			Ownership:      transit.Yield,
 		}, err
 	}
-	config.timer = float64(DefaultTimer)
+	config.Timer = float64(DefaultTimer)
 	if _, present := connector.MonitorConnection.Extensions["timer"]; present {
-		config.timer = connector.MonitorConnection.Extensions["timer"].(float64)
+		config.Timer = connector.MonitorConnection.Extensions["timer"].(float64)
 	}
 
 	if _, present := connector.MonitorConnection.Extensions["processes"]; present {
 		processesInterface := connector.MonitorConnection.Extensions["processes"].([]interface{})
 		for _, process := range processesInterface {
-			config.processes = append(config.processes, process.(string))
+			config.Processes = append(config.Processes, process.(string))
 		}
 	}
 
@@ -162,17 +155,17 @@ func initializeConfig(data []byte) (*InitializeConfigResult, error) {
 		groupsInterface := connector.MonitorConnection.Extensions["groups"].([]interface{})
 		for _, gr := range groupsInterface {
 			groupMap := gr.(map[string]interface{})
-			config.groups = append(config.groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
+			config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
 		}
 	} else {
-		config.groups = append(config.groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
+		config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
 	}
 
 	if len(connector.Connections) > 0 {
-		config.ownership = connector.Connections[0].DeferOwnership
+		config.Ownership = connector.Connections[0].DeferOwnership
 	}
 
-	config.metricsProfile = connector.MetricsProfile
+	config.MetricsProfile = connector.MetricsProfile
 
 	return &config, nil
 }

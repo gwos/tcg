@@ -2,11 +2,12 @@ package main
 
 import (
 	"errors"
-	"github.com/gwos/tng/connectors/elastic-connector/clients"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	"github.com/gwos/tng/log"
-	_ "github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/elastic-connector/clients"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	"github.com/gwos/tcg/log"
+	_ "github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"strings"
 )
 
@@ -26,28 +27,7 @@ type ElasticConnector struct {
 	monitoringState *model.MonitoringState
 }
 
-func InitElasticConnector(config *model.ElasticConnectorConfig) (*ElasticConnector, error) {
-	if config == nil {
-		return nil, errors.New("config is missing")
-	}
-
-	kibanaClient, esClient, err := initClients(config)
-	if err != nil {
-		return nil, err
-	}
-	monitoringState := model.InitMonitoringState(nil, config)
-
-	connector := ElasticConnector{
-		config:          config,
-		kibanaClient:    &kibanaClient,
-		esClient:        &esClient,
-		monitoringState: &monitoringState,
-	}
-
-	return &connector, nil
-}
-
-func (connector *ElasticConnector) ReloadConfig(config *model.ElasticConnectorConfig) error {
+func (connector *ElasticConnector) LoadConfig(config *model.ElasticConnectorConfig) error {
 	if config == nil {
 		return errors.New("config is missing")
 	}
@@ -64,6 +44,22 @@ func (connector *ElasticConnector) ReloadConfig(config *model.ElasticConnectorCo
 	connector.monitoringState = &monitoringState
 
 	return nil
+}
+
+func (connector *ElasticConnector) performCollection() {
+	mrs, irs, rgs := connector.CollectMetrics()
+
+	log.Info("[Elastic Connector]: Sending inventory ...")
+	err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(connector.config.GWConnection.DeferOwnership))
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	log.Info("[Elastic Connector]: Monitoring resources ...")
+	err = connectors.SendMetrics(mrs)
+	if err != nil {
+		log.Error(err.Error())
+	}
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
@@ -191,7 +187,7 @@ func (connector *ElasticConnector) parseStoredQueryHits(storedQuery model.SavedO
 	for _, hit := range hits {
 		hostName := extractLabelValue(connector.config.HostNameLabelPath, hit.Source)
 		hostGroupName := extractLabelValue(connector.config.HostGroupLabelPath, hit.Source)
-		connector.monitoringState.UpdateHosts(hostName, connector.config.HostNamePrefix, storedQuery.Attributes.Title,
+		connector.monitoringState.UpdateHosts(hostName, storedQuery.Attributes.Title,
 			hostGroupName, timeInterval)
 	}
 }

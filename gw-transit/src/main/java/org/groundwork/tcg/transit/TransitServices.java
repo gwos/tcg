@@ -1,4 +1,4 @@
-package org.groundwork.tng.transit;
+package org.groundwork.tcg.transit;
 
 import org.groundwork.rs.transit.DtoInventory;
 import org.groundwork.rs.transit.DtoResourcesWithServices;
