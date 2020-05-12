@@ -18,8 +18,8 @@ config.go
     probably mean that the Go code that uses these constants will need
     some adjustment.
 
-% diff -u ~/github/gwos/tng/config/config.go config.go
---- /home/gherteg/github/gwos/tng/config/config.go	2019-11-04 08:35:03.719679462 -0800
+% diff -u ~/github/gwos/tcg/config/config.go config.go
+--- /home/gherteg/github/gwos/tcg/config/config.go	2019-11-04 08:35:03.719679462 -0800
 +++ config.go	2019-11-04 17:15:44.828507156 -0800
 @@ -9,11 +9,17 @@
  	"gopkg.in/yaml.v3"
@@ -33,12 +33,12 @@ config.go
 +
  // ConfigEnv defines environment variable for config file path
  const (
--	ConfigEnv       = "TNG_CONFIG"
--	ConfigName      = "tng_config.yaml"
--	EnvConfigPrefix = "TNG"
-+	ConfigEnv       ConfigEnvironmentVariables = "TNG_CONFIG"
-+	ConfigName                                 = "tng_config.yaml"
-+	EnvConfigPrefix                            = "TNG"
+-	ConfigEnv       = "TCG_CONFIG"
+-	ConfigName      = "tcg_config.yaml"
+-	EnvConfigPrefix = "TCG"
++	ConfigEnv       ConfigEnvironmentVariables = "TCG_CONFIG"
++	ConfigName                                 = "tcg_config.yaml"
++	EnvConfigPrefix                            = "TCG"
  )
  
  // GroundworkAction defines configurable options for an action
@@ -68,8 +68,8 @@ transit.go
     in some cases.  But those are not the most critical adjustments,
     so I am not going into any further detail on them here.
 
-diff -u ~/github/gwos/tng/transit/transit.go transit.go
---- /home/gherteg/github/gwos/tng/transit/transit.go	2019-11-04 16:04:20.339841462 -0800
+diff -u ~/github/gwos/tcg/transit/transit.go transit.go
+--- /home/gherteg/github/gwos/tcg/transit/transit.go	2019-11-04 16:04:20.339841462 -0800
 +++ transit.go	2019-10-28 14:02:05.357566872 -0700
 @@ -80,11 +80,13 @@
  	HostUnreachable                          = "HOST_UNREACHABLE"

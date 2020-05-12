@@ -3,12 +3,12 @@ package connectors
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
 	"github.com/PaesslerAG/gval"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/services"
-	"github.com/gwos/tng/transit"
 	"os"
 	"os/signal"
 	"reflect"
@@ -17,18 +17,14 @@ import (
 	"time"
 )
 
-var transitService *services.TransitService
-
 // will come from extensions field
 var Timer = 120
 
 func Start() error {
-	transitService = services.GetTransitService()
-
-	if err := transitService.StartNats(); err != nil {
+	if err := services.GetTransitService().StartNats(); err != nil {
 		return err
 	}
-	if err := transitService.StartTransport(); err != nil {
+	if err := services.GetTransitService().StartTransport(); err != nil {
 		return err
 	}
 	return nil
@@ -51,7 +47,7 @@ func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transi
 
 func SendMetrics(resources []transit.MonitoredResource) error {
 	request := transit.ResourcesWithServicesRequest{
-		Context:   transitService.MakeTracerContext(),
+		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
 	for i, _ := range request.Resources {
@@ -67,7 +63,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	if err != nil {
 		return err
 	}
-	return transitService.SendResourceWithMetrics(b)
+	return services.GetTransitService().SendResourceWithMetrics(b)
 
 }
 
@@ -87,7 +83,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 	}
 
 	inventoryRequest := transit.InventoryRequest{
-		Context:       transitService.MakeTracerContext(),
+		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
 		Resources:     resources,
 		Groups:        resourceGroups,
@@ -98,7 +94,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		return err
 	}
 
-	err = transitService.SynchronizeInventory(b)
+	err = services.GetTransitService().SynchronizeInventory(b)
 
 	return err
 }
@@ -477,13 +473,13 @@ func ControlCHandler() {
 	go func() {
 		<-c
 		fmt.Println("\r- Ctrl+C pressed in Terminal")
-		if err := transitService.StopTransport(); err != nil {
+		if err := services.GetTransitService().StopTransport(); err != nil {
 			log.Error(err.Error())
 		}
-		if err := transitService.StopNats(); err != nil {
+		if err := services.GetTransitService().StopNats(); err != nil {
 			log.Error(err.Error())
 		}
-		if err := transitService.StopController(); err != nil {
+		if err := services.GetTransitService().StopController(); err != nil {
 			log.Error(err.Error())
 		}
 		os.Exit(0)

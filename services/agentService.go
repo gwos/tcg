@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/nats"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 )
 
@@ -328,6 +328,7 @@ func (service *AgentService) listenStatsChan() {
 				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 			case SubjSendResourceWithMetrics:
 				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.MetricsSent++
 			case SubjSendEvents:
 				// TODO: handle events acks, unacks
 				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}

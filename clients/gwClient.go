@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gwos/tng/config"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -37,7 +37,7 @@ const (
 	GWEntrypointServices                = "/api/services"
 	GWEntrypointHostgroups              = "/api/hostgroups"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
-	NAGIOS_APP							= "NAGIOS"
+	NAGIOS_APP                          = "NAGIOS"
 )
 
 // GWClient implements GWOperations interface
@@ -268,30 +268,70 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
 func (client *GWClient) SynchronizeInventory(payload []byte) ([]byte, error) {
 	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(client.uriSynchronizeInventory, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
 	return client.sendData(client.uriSynchronizeInventory, payload)
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
 func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error) {
 	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(client.uriSendResourceWithMetrics, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
 	return client.sendData(client.uriSendResourceWithMetrics, payload)
 }
 
 // SendEvents implements GWOperations.SendEvents.
 func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
 	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(client.uriSendEvents, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
 	return client.sendData(client.uriSendEvents, payload)
 }
 
 // SendEventsAck implements GWOperations.SendEventsAck.
 func (client *GWClient) SendEventsAck(payload []byte) ([]byte, error) {
 	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(client.uriSendEventsAck, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
 	return client.sendData(client.uriSendEventsAck, payload)
 }
 
 // SendEventsUnack implements GWOperations.SendEventsUnack.
 func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
 	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(client.uriSendEventsUnack, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
 	return client.sendData(client.uriSendEventsUnack, payload)
 }
 
@@ -306,7 +346,7 @@ func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
 
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
 	if hostNames == nil || len(hostNames) == 0 {
-		return nil, errors.New("Unable to get host groups of host: host names are not provided.")
+		return nil, errors.New("unable to get host groups of host: host names are not provided")
 	}
 	query := "( hosts.hostName in ("
 	for i, hostName := range hostNames {
@@ -326,17 +366,27 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	return client.sendRequest(http.MethodGet, reqUrl, nil)
 }
 
-func (client *GWClient) sendData(reqURL string, payload []byte) ([]byte, error) {
-	return client.sendRequest(http.MethodPost, reqURL, payload)
+func (client *GWClient) sendData(reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
+	return client.sendRequest(http.MethodPost, reqURL, payload, additionalHeaders...)
 }
 
-func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []byte) ([]byte, error) {
+type header struct {
+	key   string
+	value string
+}
+
+func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
+
+	for _, header := range additionalHeaders {
+		headers[header.key] = header.value
+	}
+
 	statusCode, byteResponse, err := SendRequest(httpMethod, reqURL, headers, nil, payload)
 
 	logEntry := log.With(log.Fields{

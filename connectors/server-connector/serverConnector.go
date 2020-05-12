@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/connectors"
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"

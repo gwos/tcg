@@ -2,9 +2,9 @@ package clients
 
 import (
 	"encoding/json"
-	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/connectors/elastic-connector/model"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/connectors/elastic-connector/model"
+	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
 )
@@ -90,16 +90,19 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 		page = page + 1
 		path := client.buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
 
+		log.Debug("Performing Kibana Find Saved Objects request: " + path)
 		status, response, err := clients.SendRequest(http.MethodGet, path, kibanaHeaders, nil, nil)
+		log.Debug("Kibana Find Saved Objects response: ", string(response))
+
 		if err != nil || status != 200 || response == nil {
 			if err != nil {
-				log.Error(err)
+				log.Error("Failed to perform Kibana Find Saved Objects request: ", err)
 			}
 			if status != 200 {
-				log.Error("Failure response code: ", status)
+				log.Error("Failure Kibana Find Saved Objects response code: ", status)
 			}
 			if response == nil {
-				log.Error("Find response is nil.")
+				log.Error("Kibana Find Saved Objects response is nil.")
 			}
 			return nil
 		}
@@ -107,8 +110,7 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 		var savedObjectsResponse model.SavedObjectsResponse
 		err = json.Unmarshal(response, &savedObjectsResponse)
 		if err != nil {
-			log.Error("Error parsing Kibana Saved Objects response: ", err)
-			log.Error("Failed to extract remaining Kibana Saved Objects. The result is incomplete.")
+			log.Error("Error parsing Kibana Find Saved Objects response: ", err)
 			return savedObjects
 		}
 		savedObjects = append(savedObjects, savedObjectsResponse.SavedObjects...)
@@ -139,20 +141,23 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
-		log.Error("Error marshalling Bulk Get request body: ", err)
+		log.Error("Error marshalling Kibana Bulk Get request body: ", err)
 		return nil
 	}
-
+	log.Debug("Performing Kibana Bulk Get Saved Objects request: " + path)
+	log.Debug("Kibana Bulk Get Saved Objects request body: ", string(bodyBytes))
 	status, response, err := clients.SendRequest(http.MethodPost, path, kibanaHeaders, nil, bodyBytes)
+	log.Debug("Kibana Bulk Get Saved Objects response: ", string(response))
+
 	if err != nil || status != 200 || response == nil {
 		if err != nil {
-			log.Error(err)
+			log.Error("Failed to perform Kibana Bulk Get Saved Objects request: ", err)
 		}
 		if status != 200 {
-			log.Error("Failure response code: ", status)
+			log.Error("Failure Kibana Bulk Get Saved Objects response code: ", status)
 		}
 		if response == nil {
-			log.Error("Bulk Get response is nil.")
+			log.Error("Kibana Bulk Get Saved Objects response is nil.")
 		}
 		return nil
 	}
@@ -160,7 +165,7 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 	var savedObjectsResponse model.SavedObjectsResponse
 	err = json.Unmarshal(response, &savedObjectsResponse)
 	if err != nil {
-		log.Error("Error parsing Kibana Bulk Get response: ", err)
+		log.Error("Error parsing Kibana Bulk Get Saved Objects response: ", err)
 		return nil
 	}
 	return savedObjectsResponse.SavedObjects

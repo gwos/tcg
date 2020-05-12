@@ -2,7 +2,7 @@ package transit
 
 import (
 	"fmt"
-	"github.com/gwos/tng/milliseconds"
+	"github.com/gwos/tcg/milliseconds"
 	"strconv"
 )
 
@@ -424,7 +424,7 @@ func (inventoryResource *InventoryResource) CreateProperty(name string, value Ty
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series. During inventory scans, TNG does not gather metric samples.
+// metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
 //
 // InventoryService collections are attached to an InventoryResource during inventory scans.
 type InventoryService struct {

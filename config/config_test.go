@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"reflect"
@@ -56,9 +57,9 @@ gwConnections:
 	assert.NoError(t, err)
 
 	os.Setenv(string(ConfigEnv), tmpfile.Name())
-	os.Setenv("TNG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TNG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
-	os.Setenv("TNG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
+	os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
+	os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := &Config{
 		Connector: &Connector{
@@ -125,17 +126,24 @@ func TestLoadConnectorDTO(t *testing.T) {
   "appType": "test-XX",
   "logConsPeriod": 30,
   "logLevel": 2,
-  "tngUrl": "http://tng-host/",
+  "tcgUrl": "http://tcg-host/",
   "dalekservicesConnection": {
     "hostName": "gw-host-xxx"
   },
   "groundworkConnections": [{
-	"enabled": true,
-	"localConnection": false,
+    "id": 101,
+    "enabled": true,
+    "localConnection": false,
     "hostName": "gw-host-xx",
     "userName": "-xx-",
     "password": "xx"
-  }]
+  }],
+  "advanced": {
+    "prefixes": [{
+      "groundworkConnectionId": 101,
+      "prefix": "c1"
+    }]
+  }
 }`)
 
 	_, err = cfg.LoadConnectorDTO(dto)
@@ -158,11 +166,14 @@ func TestLoadConnectorDTO(t *testing.T) {
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
 			&GWConnection{
-				Enabled:         true,
-				LocalConnection: false,
-				HostName:        "gw-host-xx",
-				UserName:        "-xx-",
-				Password:        "xx",
+				ID:                  101,
+				Enabled:             true,
+				LocalConnection:     false,
+				HostName:            "gw-host-xx",
+				UserName:            "-xx-",
+				Password:            "xx",
+				PrefixResourceNames: true,
+				ResourceNamePrefix:  "c1",
 			},
 		},
 	}
@@ -173,4 +184,32 @@ func TestLoadConnectorDTO(t *testing.T) {
 
 	data, err := ioutil.ReadFile(tmpfile.Name())
 	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
+}
+
+func TestMarshaling(t *testing.T) {
+	configYAML := []byte(`
+connector:
+  agentId: 3dcd9a52-949d-4531-a3b0-b14622f7dd39
+dsConnection:
+  hostName: localhost
+gwConnections:
+  -
+    enabled: true
+    hostName: localhost
+    userName: RESTAPIACCESS
+    password: _v1_fc0546f02af1c34298d207468a78bc38cda6bd480d3357c8220580883747505d7971c3c43610cea1bc1df9e3292cb935
+`)
+
+	os.Setenv(string(SecKeyEnv), "SECRET")
+	defer os.Unsetenv(string(SecKeyEnv))
+
+	var cfg Config
+	assert.NoError(t, yaml.Unmarshal(configYAML, &cfg))
+	assert.Equal(t, "P@SSW0RD", cfg.GWConnections[0].Password)
+
+	res, err := yaml.Marshal(cfg)
+	assert.NoError(t, err)
+	assert.Contains(t, string(res), "password: _v1_")
+	assert.NotContains(t, string(res), "password: _v1_fc0546f02")
+	// t.Logf("$$\n%v", string(data))
 }

@@ -1,9 +1,9 @@
 package model
 
 import (
-	"github.com/gwos/tng/log"
-	"github.com/gwos/tng/milliseconds"
-	"github.com/gwos/tng/transit"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
 	"time"

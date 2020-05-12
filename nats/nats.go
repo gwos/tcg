@@ -3,12 +3,13 @@ package nats
 import (
 	"errors"
 	"fmt"
-	"github.com/gwos/tng/cache"
-	"github.com/gwos/tng/clients"
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/log"
 	stan "github.com/nats-io/go-nats-streaming"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,9 +18,9 @@ import (
 
 // Define NATS IDs
 const (
-	ClusterID    = "tng-cluster"
-	DispatcherID = "tng-dispatcher"
-	PublisherID  = "tng-publisher"
+	ClusterID    = "tcg-cluster"
+	DispatcherID = "tcg-dispatcher"
+	PublisherID  = "tcg-publisher"
 )
 
 var (
@@ -72,7 +73,7 @@ func StartServer(config Config) error {
 	var err error
 	cfg = config
 	natsOpts := stand.DefaultNatsServerOptions
-
+	natsOpts.MaxPayload = math.MaxInt32
 	addrParts := strings.Split(cfg.NatsHost, ":")
 	if len(addrParts) == 2 {
 		if addrParts[0] != "" {

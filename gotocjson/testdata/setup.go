@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/gwos/tng/log"
+	"github.com/gwos/tcg/log"
 	"github.com/kelseyhightower/envconfig"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -20,9 +20,9 @@ type ConfigStringConstant string
 
 // ConfigEnv defines environment variable for setup file path
 const (
-	ConfigEnv       ConfigStringConstant = "TNG_CONFIG"
-	ConfigName                           = "tng_config.yaml"
-	EnvConfigPrefix                      = "TNG"
+	ConfigEnv       ConfigStringConstant = "TCG_CONFIG"
+	ConfigName                           = "tcg_config.yaml"
+	EnvConfigPrefix                      = "TCG"
 )
 
 // LogLevel defines levels for logrus
@@ -40,7 +40,7 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
-// AgentConfig defines TNG Transit Agent configuration
+// AgentConfig defines TCG Transit Agent configuration
 type AgentConfig struct {
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
@@ -114,7 +114,7 @@ func (gwConfigs *GWConfigs) Decode(value string) error {
 	return nil
 }
 
-// Config defines TNG Agent configuration
+// Config defines TCG Agent configuration
 type Config struct {
 	AgentConfig *AgentConfig `yaml:"agentConfig"`
 	GWConfigs GWConfigs `yaml:"gwConfigs"`
