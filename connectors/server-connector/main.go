@@ -99,7 +99,7 @@ func main() {
 	for {
 		if len(config.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
-			monitoredResource := CollectMetrics(config.metricsProfile.Metrics, time.Duration(config.timer))
+			monitoredResource := CollectMetrics(config.MetricsProfile.Metrics, time.Duration(config.Timer))
 			monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
 			err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 			if err != nil {
