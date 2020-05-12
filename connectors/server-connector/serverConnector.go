@@ -579,9 +579,11 @@ type values struct {
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
 func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) map[string]values {
-	hostProcesses, _ := process.Processes()
-
+	if len(monitoredProcesses) == 0 {
+		return make(map[string]values)
+	}
 	processes := make([]*localProcess, 0)
+	hostProcesses, _ := process.Processes()
 	for _, hostProcess := range hostProcesses {
 		cpuUsed, err := hostProcess.CPUPercent()
 		if err != nil {
