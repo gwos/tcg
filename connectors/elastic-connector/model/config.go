@@ -70,6 +70,7 @@ type ElasticConnectorConfig struct {
 	HostNameLabelPath  []string
 	HostGroupLabelPath []string
 	Timer              float64
+	OwnershipType      transit.HostOwnershipType
 	GWConnection       *config.GWConnection
 }
 
@@ -188,9 +189,11 @@ func InitConfig(appType string, agentId string, connection *transit.MonitorConne
 		config.Timer = value.(float64) * 60
 	}
 
+	config.OwnershipType = transit.Yield
 	// GWConnection
 	if len(connections) > 0 {
 		config.GWConnection = connections[0]
+		config.OwnershipType = transit.HostOwnershipType(config.GWConnection.DeferOwnership)
 	}
 
 	return &config
