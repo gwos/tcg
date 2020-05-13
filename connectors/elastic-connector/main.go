@@ -14,6 +14,8 @@ import (
 )
 
 func main() {
+	connectors.ControlCHandler()
+
 	var transitService = services.GetTransitService()
 
 	connector := ElasticConnector{}
@@ -22,10 +24,12 @@ func main() {
 	var configMark []byte
 
 	transitService.ConfigHandler = func(data []byte) {
+		log.Info("[Elastic Connector]: Configuration received")
 		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
 		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
-			&connection, &profile, gwConnections)
+			&connection, &profile, &gwConnections)
 		config = cfg
+		connectors.Timer = config.Timer
 		cfgMark, _ := json.Marshal(cfg)
 		if !bytes.Equal(configMark, cfgMark) {
 			if err := connector.LoadConfig(config); err != nil {

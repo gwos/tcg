@@ -50,7 +50,7 @@ func (connector *ElasticConnector) performCollection() {
 	mrs, irs, rgs := connector.CollectMetrics()
 
 	log.Info("[Elastic Connector]: Sending inventory ...")
-	err := connectors.SendInventory(irs, rgs, transit.HostOwnershipType(connector.config.GWConnection.DeferOwnership))
+	err := connectors.SendInventory(irs, rgs, transit.Yield) //TODO
 	if err != nil {
 		log.Error(err.Error())
 	}
@@ -99,7 +99,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	}
 
 	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
-	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
+	//	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
 	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
