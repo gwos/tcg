@@ -45,6 +45,22 @@ func (connector *ElasticConnector) LoadConfig(config *model.ElasticConnectorConf
 	return nil
 }
 
+func (connector *ElasticConnector) performCollection() {
+	mrs, irs, rgs := connector.CollectMetrics()
+
+	log.Info("[Elastic Connector]: Sending inventory ...")
+	err := connectors.SendInventory(irs, rgs, transit.Yield) //TODO
+	if err != nil {
+		log.Error(err.Error())
+	}
+
+	log.Info("[Elastic Connector]: Monitoring resources ...")
+	err = connectors.SendMetrics(mrs)
+	if err != nil {
+		log.Error(err.Error())
+	}
+}
+
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
 		log.Error("ElasticConnector not configured.")
@@ -82,7 +98,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	}
 
 	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
-	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
+	//	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
 	resourceGroups := monitoringState.ToResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }

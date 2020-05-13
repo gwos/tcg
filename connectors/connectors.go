@@ -17,8 +17,12 @@ import (
 	"time"
 )
 
+const DefaultTimer = int64(120)
+
 // will come from extensions field
-var Timer = 120
+var Timer = DefaultTimer
+
+const ExtensionsKeyTimer = "checkIntervalMinutes"
 
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
@@ -46,24 +50,29 @@ func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transi
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
+	setCheckTimes(resources)
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
-	for i, _ := range request.Resources {
-		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
-	}
-
 	b, err := json.Marshal(request)
-
-	// log.Error(string(b))
-
 	if err != nil {
 		return err
 	}
 	return services.GetTransitService().SendResourceWithMetrics(b)
+}
 
+func setCheckTimes(resources []transit.MonitoredResource) {
+	lastCheckTime := time.Now().Local()
+	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
+	for i := range resources {
+		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		for j := range resources[i].Services {
+			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		}
+	}
 }
 
 func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {

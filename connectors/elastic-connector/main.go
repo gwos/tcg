@@ -29,7 +29,6 @@ func main() {
 		c := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
 			&connection, &profile, gwConnections)
 		cfg = c
-
 		chk, err := connectors.Hashsum(
 			config.GetConfig().GWConnections,
 			cfg,
