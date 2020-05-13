@@ -17,18 +17,8 @@ import (
 
 // Default values for 'Group' and loop 'Timer'
 const (
-	DefaultHostGroupName = "LocalServer"
-	DefaultTimer         = 120
-	DefaultCacheTimer    = 1
+	DefaultCacheTimer = 1
 )
-
-type InitializeConfigResult struct {
-	Processes      []string
-	Groups         []transit.ResourceGroup
-	MetricsProfile transit.MetricsProfile
-	Timer          float64
-	Ownership      transit.HostOwnershipType
-}
 
 // @title TCG API Documentation
 // @version 1.0
@@ -37,32 +27,31 @@ type InitializeConfigResult struct {
 // @BasePath /api/v1
 func main() {
 	connectors.ControlCHandler()
+
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-	var config InitializeConfigResult
+	var config ServerConnectorConfig
 	var configMark []byte
 	agentIdMark := transitService.Connector.AgentID
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")
-		if cfg, err := initializeConfig(data); err == nil {
-			config = *cfg
-			cfgMark, _ := json.Marshal(cfg)
+		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
+		cfg := InitConfig(&connection, &profile, gwConnections)
+		config = *cfg
+		connectors.Timer = config.Timer
+		cfgMark, _ := json.Marshal(cfg)
 
-			if !bytes.Equal(configMark, cfgMark) || agentIdMark != transitService.Connector.AgentID {
-				configMark = cfgMark
-				agentIdMark = transitService.Connector.AgentID
-				log.Info("[Server Connector]: Sending inventory ...")
-				_ = connectors.SendInventory(
-					[]transit.InventoryResource{*Synchronize(config.MetricsProfile.Metrics)},
-					config.Groups,
-					config.Ownership,
-				)
-			}
-		} else {
-			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
-			return
+		if !bytes.Equal(configMark, cfgMark) || agentIdMark != transitService.Connector.AgentID {
+			configMark = cfgMark
+			agentIdMark = transitService.Connector.AgentID
+			log.Info("[Server Connector]: Sending inventory ...")
+			_ = connectors.SendInventory(
+				[]transit.InventoryResource{*Synchronize(config.MetricsProfile.Metrics)},
+				config.Groups,
+				config.Ownership,
+			)
 		}
 	}
 
@@ -102,64 +91,6 @@ func main() {
 		LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		time.Sleep(time.Duration(int64(config.Timer) * int64(time.Second)))
 	}
-}
-
-func initializeConfig(data []byte) (*InitializeConfigResult, error) {
-	var connector = struct {
-		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
-		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
-		Connections       []struct {
-			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
-		} `json:"groundworkConnections"`
-	}{}
-
-	config := InitializeConfigResult{
-		Processes:      []string{},
-		Groups:         []transit.ResourceGroup{},
-		MetricsProfile: transit.MetricsProfile{},
-		Timer:          0,
-		Ownership:      transit.Yield,
-	}
-
-	err := json.Unmarshal(data, &connector)
-	if err != nil {
-		return &InitializeConfigResult{
-			Processes:      []string{},
-			Groups:         []transit.ResourceGroup{},
-			MetricsProfile: transit.MetricsProfile{},
-			Timer:          0,
-			Ownership:      transit.Yield,
-		}, err
-	}
-	config.Timer = float64(DefaultTimer)
-	if _, present := connector.MonitorConnection.Extensions["timer"]; present {
-		config.Timer = connector.MonitorConnection.Extensions["timer"].(float64)
-	}
-
-	if _, present := connector.MonitorConnection.Extensions["processes"]; present {
-		processesInterface := connector.MonitorConnection.Extensions["processes"].([]interface{})
-		for _, process := range processesInterface {
-			config.Processes = append(config.Processes, process.(string))
-		}
-	}
-
-	if _, present := connector.MonitorConnection.Extensions["groups"]; present {
-		groupsInterface := connector.MonitorConnection.Extensions["groups"].([]interface{})
-		for _, gr := range groupsInterface {
-			groupMap := gr.(map[string]interface{})
-			config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
-		}
-	} else {
-		config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
-	}
-
-	if len(connector.Connections) > 0 {
-		config.Ownership = connector.Connections[0].DeferOwnership
-	}
-
-	config.MetricsProfile = connector.MetricsProfile
-
-	return &config, nil
 }
 
 func handleCache() {
