@@ -29,8 +29,8 @@ const (
 	TestAppType                        = "VEMA"
 	TestAgentID                        = "3939333393342"
 	TestTraceToken                     = "token-99e93"
-	GWAccount                          = "RESTAPIACCESS"
-	GWPassword                         = "63c5BtYDNAPANvNqAkh9quYszwVrvLaruxmzvM4P1FSw"
+	GWAccountEnvVar                    = "TEST_GW_USERNAME"
+	GWPasswordEnvVar                   = "TEST_GW_PASSWORD"
 	GWAccountRemote                    = "admin"
 	GWPasswordRemote                   = "admin"
 	GWValidHost                        = "http://localhost:80"
@@ -181,14 +181,25 @@ func TestNatsPerformance(t *testing.T) {
 }
 
 func configNats(t *testing.T, natsAckWait int64) {
+	time.Sleep(3 * time.Second)
+
 	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
+	testGroundworkUserName := os.Getenv(GWAccountEnvVar)
+	testGroundworkPassword := os.Getenv(GWPasswordEnvVar)
+
+	if testGroundworkUserName == "" || testGroundworkPassword == "" {
+		t.Errorf("|nats_test.go| [configNats]: Provide environment variables for Groundwork Connection username('%s') and password('%s')",
+			GWAccountEnvVar, GWPasswordEnvVar)
+		t.SkipNow()
+	}
+
 	GetConfig().GWConnections = []*GWConnection{
 		{
 			Enabled:         true,
 			LocalConnection: true,
 			HostName:        GWValidHost,
-			UserName:        GWAccount,
-			Password:        GWPassword,
+			UserName:        testGroundworkUserName,
+			Password:        testGroundworkPassword,
 		},
 	}
 

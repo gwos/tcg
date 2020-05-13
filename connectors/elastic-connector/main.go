@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	_ "github.com/gwos/tcg/docs"
@@ -20,24 +20,34 @@ func main() {
 
 	connector := ElasticConnector{}
 
-	var config *model.ElasticConnectorConfig
-	var configMark []byte
+	var cfg *model.ElasticConnectorConfig
+	var chksum []byte
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Elastic Connector]: Configuration received")
 		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
-		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
-			&connection, &profile, &gwConnections)
-		config = cfg
-		connectors.Timer = config.Timer
-		cfgMark, _ := json.Marshal(cfg)
-		if !bytes.Equal(configMark, cfgMark) {
-			if err := connector.LoadConfig(config); err != nil {
+		c := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
+			&connection, &profile, gwConnections)
+		cfg = c
+
+		chk, err := connectors.Hashsum(
+			config.GetConfig().GWConnections,
+			cfg,
+		)
+		if err != nil || !bytes.Equal(chksum, chk) {
+			if err := connector.LoadConfig(cfg); err != nil {
 				log.Error("Cannot reload ElasticConnector config: ", err)
 			} else {
-				configMark = cfgMark
-				connector.performCollection()
+				_, irs, rgs := connector.CollectMetrics()
+				log.Info("[Elastic Connector]: Sending inventory ...")
+				err := connectors.SendInventory(irs, rgs, connector.config.OwnershipType)
+				if err != nil {
+					log.Error(err.Error())
+				}
 			}
+		}
+		if err == nil {
+			chksum = chk
 		}
 	}
 
@@ -60,7 +70,23 @@ func main() {
 	}
 
 	for {
-		connector.performCollection()
-		time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		if connector.config != nil {
+			mrs, irs, rgs := connector.CollectMetrics()
+
+			log.Info("[Elastic Connector]: Sending inventory ...")
+			err := connectors.SendInventory(irs, rgs, connector.config.OwnershipType)
+			if err != nil {
+				log.Error(err.Error())
+			}
+
+			log.Info("[Elastic Connector]: Monitoring resources ...")
+			err = connectors.SendMetrics(mrs)
+			if err != nil {
+				log.Error(err.Error())
+			}
+			time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		} else {
+			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
+		}
 	}
 }

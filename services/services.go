@@ -45,6 +45,11 @@ type AgentStats struct {
 	LastErrors             []string                           `json:"lastErrors"`
 }
 
+type AgentIdentity struct {
+	AgentID                string                             `json:"agentID"`
+	AppType                string                             `json:"appType"`
+}
+
 // AgentStatus defines TCG Agent status
 type AgentStatus struct {
 	Ctrl       *CtrlAction

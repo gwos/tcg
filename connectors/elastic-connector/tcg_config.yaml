@@ -11,4 +11,4 @@ connector:
   logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 2
 dsConnection:
-  hostName: "localhost:3001"
+  hostName: ""
