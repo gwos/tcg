@@ -94,17 +94,18 @@ func main() {
 	}
 
 	for {
-		if len(cfg.MetricsProfile.Metrics) > 0 {
+			if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
 			}); err != nil {
 				log.Error(err.Error())
 			}
+			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
+			time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
+		} else {
+			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
 		}
-
-		LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
 	}
 }
 
