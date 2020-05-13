@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
@@ -32,7 +31,7 @@ func main() {
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-	var config ServerConnectorConfig
+	var cfg ServerConnectorConfig
 	var chksum []byte
 
 	transitService.ConfigHandler = func(data []byte) {
@@ -87,7 +86,7 @@ func main() {
 	}
 
 	for {
-			if len(cfg.MetricsProfile.Metrics) > 0 {
+		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
@@ -95,10 +94,8 @@ func main() {
 				log.Error(err.Error())
 			}
 			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
-		} else {
-			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
 		}
+		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
 }
 

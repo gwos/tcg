@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
-	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	"github.com/gwos/tcg/log"
 	_ "github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
@@ -20,27 +19,23 @@ const (
 )
 
 type ElasticConnector struct {
-	config          *model.ElasticConnectorConfig
+	config          ElasticConnectorConfig
 	kibanaClient    *clients.KibanaClient
 	esClient        *clients.EsClient
-	monitoringState *model.MonitoringState
+	monitoringState MonitoringState
 }
 
-func (connector *ElasticConnector) LoadConfig(config *model.ElasticConnectorConfig) error {
-	if config == nil {
-		return errors.New("config is missing")
-	}
-
+func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) error {
 	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
 		return err
 	}
-	monitoringState := model.InitMonitoringState(connector.monitoringState, config)
+	monitoringState := initMonitoringState(connector.monitoringState, config)
 
 	connector.config = config
 	connector.kibanaClient = &kibanaClient
 	connector.esClient = &esClient
-	connector.monitoringState = &monitoringState
+	connector.monitoringState = monitoringState
 
 	return nil
 }
@@ -62,8 +57,8 @@ func (connector *ElasticConnector) performCollection() {
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
-		log.Error("ElasticConnector not configured.")
+	if connector.kibanaClient == nil || connector.esClient == nil {
+		log.Error("[Elastic Connector]: Clients are not configured.")
 		return nil, nil, nil
 	}
 
@@ -73,8 +68,8 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 		return nil, nil, nil
 	}
 
-	monitoringState := model.InitMonitoringState(connector.monitoringState, connector.config)
-	connector.monitoringState = &monitoringState
+	monitoringState := initMonitoringState(connector.monitoringState, connector.config)
+	connector.monitoringState = monitoringState
 
 	var err error
 	for view, metrics := range views {
@@ -97,16 +92,16 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 
 	}
 
-	monitoredResources, inventoryResources := monitoringState.ToTransitResources()
+	monitoredResources, inventoryResources := monitoringState.toTransitResources()
 	//	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
-	resourceGroups := monitoringState.ToResourceGroups()
+	resourceGroups := monitoringState.toResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
 func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
 	var suggestions []string
-	if connector.config == nil || connector.kibanaClient == nil || connector.esClient == nil || connector.monitoringState == nil {
-		log.Error("ElasticConnector not configured.")
+	if connector.kibanaClient == nil {
+		log.Error("[Elastic Connector]: Kibana client is not configured.")
 		return suggestions
 	}
 	switch view {
@@ -125,7 +120,26 @@ func (connector *ElasticConnector) ListSuggestions(view string, name string) []s
 	return suggestions
 }
 
-func initClients(config *model.ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
+func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
+	var hosts []string
+	var metrics []string
+	hostGroups := make(map[string]map[string]struct{})
+	monitoringState := connector.monitoringState
+	if monitoringState.Hosts != nil {
+		for hostName := range monitoringState.Hosts {
+			hosts = append(hosts, hostName)
+		}
+	}
+	if monitoringState.Metrics != nil {
+		for metricName := range monitoringState.Metrics {
+			metrics = append(metrics, metricName)
+		}
+	}
+	hostGroups = monitoringState.buildGroups()
+	return connectors.Hashsum(hosts, metrics, hostGroups)
+}
+
+func initClients(config ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
 	kibanaClient := clients.KibanaClient{
 		ApiRoot:  config.Kibana.ServerName,
 		Username: config.Kibana.Username,
@@ -181,12 +195,12 @@ func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.
 	return services
 }
 
-func (connector *ElasticConnector) parseStoredQueryHits(storedQuery model.SavedObject, hits []model.Hit) {
+func (connector *ElasticConnector) parseStoredQueryHits(storedQuery clients.SavedObject, hits []clients.Hit) {
 	timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
 	for _, hit := range hits {
 		hostName := extractLabelValue(connector.config.HostNameLabelPath, hit.Source)
 		hostGroupName := extractLabelValue(connector.config.HostGroupLabelPath, hit.Source)
-		connector.monitoringState.UpdateHosts(hostName, storedQuery.Attributes.Title,
+		connector.monitoringState.updateHosts(hostName, storedQuery.Attributes.Title,
 			hostGroupName, timeInterval)
 	}
 }
