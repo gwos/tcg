@@ -1,4 +1,4 @@
-package model
+package clients
 
 import (
 	"fmt"

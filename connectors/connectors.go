@@ -2,7 +2,6 @@ package connectors
 
 import (
 	"bytes"
-	"hash/fnv"
 	"encoding/json"
 	"fmt"
 	"github.com/gwos/tcg/config"
@@ -10,6 +9,7 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"hash/fnv"
 	"os"
 	"os/signal"
 	"reflect"
@@ -34,7 +34,7 @@ func Start() error {
 	return nil
 }
 
-func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, config.GWConnections) {
+func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *transit.MetricsProfile, config.GWConnections, error) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
 		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
@@ -44,9 +44,10 @@ func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transi
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
 		log.Error("Error parsing common connector data: ", err)
+		return nil, nil, nil, err
 	}
 
-	return connector.MonitorConnection, connector.MetricsProfile, connector.Connections
+	return &connector.MonitorConnection, &connector.MetricsProfile, connector.Connections, nil
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {

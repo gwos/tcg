@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
@@ -31,16 +30,15 @@ func main() {
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-	var cfg InitializeConfigResult
+	var cfg ServerConnectorConfig
 	var chksum []byte
-	var config ServerConnectorConfig
-	var configMark []byte
-	agentIdMark := transitService.Connector.AgentID
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")
-		if c, err := initializeConfig(data); err == nil {
+		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
+			c := InitConfig(monitorConn, profile, gwConnections)
 			cfg = *c
+			connectors.Timer = cfg.Timer
 			chk, err := connectors.Hashsum(
 				config.GetConfig().Connector.AgentID,
 				config.GetConfig().GWConnections,
@@ -87,7 +85,7 @@ func main() {
 	}
 
 	for {
-			if len(cfg.MetricsProfile.Metrics) > 0 {
+		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
@@ -95,10 +93,8 @@ func main() {
 				log.Error(err.Error())
 			}
 			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
-		} else {
-			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
 		}
+		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
 }
 
