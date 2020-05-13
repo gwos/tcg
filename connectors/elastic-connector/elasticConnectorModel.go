@@ -1,4 +1,4 @@
-package model
+package main
 
 import (
 	"encoding/json"
@@ -21,7 +21,6 @@ var doOnce sync.Once
 type MonitoringState struct {
 	Metrics map[string]transit.MetricDefinition
 	Hosts   map[string]monitoringHost
-	Groups  map[string]map[string]struct{}
 }
 
 type monitoringService struct {
@@ -36,25 +35,25 @@ type monitoringHost struct {
 	hostGroups []string
 }
 
-func InitMonitoringState(previousState *MonitoringState, config *ElasticConnectorConfig) MonitoringState {
-	var currentState MonitoringState
+func initMonitoringState(previousState MonitoringState, config ElasticConnectorConfig) MonitoringState {
+	currentState := MonitoringState{
+		Metrics: make(map[string]transit.MetricDefinition),
+		Hosts:   make(map[string]monitoringHost),
+	}
 
-	currentState.Metrics = make(map[string]transit.MetricDefinition)
 	for _, metrics := range config.Views {
 		for metricName, metric := range metrics {
 			currentState.Metrics[metricName] = metric
 		}
 	}
 
-	currentState.Hosts = make(map[string]monitoringHost)
-
 	doOnce.Do(func() {
 		log.Info("Initializing state with GW hosts for agent ", config.AgentId)
 		// add hosts form GW to current state
-		if config.GWConnections == nil || len(*config.GWConnections) == 0 {
+		if config.GWConnections == nil || len(config.GWConnections) == 0 {
 			log.Error("Unable to get GW hosts to initialize state: GW connections are not set.")
 		} else {
-			gwHosts := retrieveExistingGwHosts(config.AppType, config.AgentId, config.GWConnections)
+			gwHosts := initGwHosts(config.AppType, config.AgentId, config.GWConnections)
 			if gwHosts != nil {
 				currentState.Hosts = gwHosts
 			} else {
@@ -64,33 +63,27 @@ func InitMonitoringState(previousState *MonitoringState, config *ElasticConnecto
 	})
 
 	// update with hosts from prev runs
-	if previousState != nil && previousState.Hosts != nil {
-		for _, host := range previousState.Hosts {
-			currentState.Hosts[host.name] = host
-		}
+	for _, host := range previousState.Hosts {
+		currentState.Hosts[host.name] = host
 	}
 
 	// nullify services
 	for _, host := range currentState.Hosts {
 		var services []monitoringService
-		for metricName := range currentState.Metrics {
-			service := monitoringService{name: metricName, hits: 0}
-			services = append(services, service)
+		if currentState.Metrics != nil {
+			for metricName := range currentState.Metrics {
+				service := monitoringService{name: metricName, hits: 0}
+				services = append(services, service)
+			}
 		}
 		host.services = services
 		currentState.Hosts[host.name] = host
 	}
 
-	// update with groups from prev runs
-	currentState.Groups = make(map[string]map[string]struct{})
-	if previousState != nil && previousState.Groups != nil {
-		currentState.Groups = previousState.Groups
-	}
-
 	return currentState
 }
 
-func (monitoringState *MonitoringState) UpdateHosts(hostName string, serviceName string, hostGroupName string,
+func (monitoringState *MonitoringState) updateHosts(hostName string, serviceName string, hostGroupName string,
 	timeInterval *transit.TimeInterval) {
 	hosts := monitoringState.Hosts
 	if host, exists := hosts[hostName]; exists {
@@ -116,7 +109,7 @@ func (monitoringState *MonitoringState) UpdateHosts(hostName string, serviceName
 	monitoringState.Hosts = hosts
 }
 
-func (monitoringState *MonitoringState) ToTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
+func (monitoringState *MonitoringState) toTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
 	hosts := monitoringState.Hosts
 	mrs := make([]transit.MonitoredResource, len(hosts))
 	irs := make([]transit.InventoryResource, len(hosts))
@@ -167,7 +160,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 	return monitoredServices, inventoryServices
 }
 
-func (monitoringState *MonitoringState) ToResourceGroups() []transit.ResourceGroup {
+func (monitoringState *MonitoringState) toResourceGroups() []transit.ResourceGroup {
 	groups := monitoringState.buildGroups()
 	rgs := make([]transit.ResourceGroup, len(groups))
 	j := 0
@@ -188,8 +181,7 @@ func (monitoringState *MonitoringState) ToResourceGroups() []transit.ResourceGro
 
 func (monitoringState *MonitoringState) buildGroups() map[string]map[string]struct{} {
 	groups := make(map[string]map[string]struct{})
-	for _, host := range monitoringState.Hosts {
-		hostName := host.name
+	for hostName, host := range monitoringState.Hosts {
 		for _, groupName := range host.hostGroups {
 			if groupName == "" {
 				continue
@@ -202,30 +194,15 @@ func (monitoringState *MonitoringState) buildGroups() map[string]map[string]stru
 				groups[groupName] = group
 			}
 			groups[groupName][hostName] = struct{}{}
-			monitoringState.Groups = groups
 		}
 	}
 	return groups
 }
 
-//
-//func UpdateCheckTimes(resources []transit.MonitoredResource, timer float64) {
-//	lastCheckTime := time.Now().Local()
-//	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(timer))
-//	for i := range resources {
-//		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-//		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-//		for j := range resources[i].Services {
-//			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-//			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-//		}
-//	}
-//}
-
-func retrieveExistingGwHosts(appType string, agentId string, gwConnections *config.GWConnections) map[string]monitoringHost {
+func initGwHosts(appType string, agentId string, gwConnections config.GWConnections) map[string]monitoringHost {
 	gwHosts := make(map[string]monitoringHost)
 
-	for _, gwConnection := range *gwConnections {
+	for _, gwConnection := range gwConnections {
 		gwClient := clients.GWClient{
 			AppName:      appType,
 			AppType:      appType,

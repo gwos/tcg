@@ -1,8 +1,9 @@
-package model
+package main
 
 import (
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
@@ -44,12 +45,13 @@ type ElasticConnectorConfig struct {
 	Servers            []string
 	Kibana             Kibana
 	Views              map[string]map[string]transit.MetricDefinition
-	CustomTimeFilter   TimeFilter
+	CustomTimeFilter   clients.TimeFilter
 	OverrideTimeFilter bool
 	HostNameLabelPath  []string
 	HostGroupLabelPath []string
 	Timer              int64
-	GWConnections      *config.GWConnections
+	Ownership          transit.HostOwnershipType
+	GWConnections      config.GWConnections
 }
 
 type Kibana struct {
@@ -60,7 +62,7 @@ type Kibana struct {
 
 // Builds elastic connector configuration based on monitor connection settings and default values
 func InitConfig(appType string, agentId string, monitorConnection *transit.MonitorConnection, metricsProfile *transit.MetricsProfile,
-	gwConnections *config.GWConnections) *ElasticConnectorConfig {
+	gwConnections config.GWConnections) *ElasticConnectorConfig {
 
 	// init config with default values
 	connectorConfig := ElasticConnectorConfig{
@@ -73,7 +75,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			Password:   defaultKibanaPassword,
 		},
 		Views: make(map[string]map[string]transit.MetricDefinition),
-		CustomTimeFilter: TimeFilter{
+		CustomTimeFilter: clients.TimeFilter{
 			From: defaultTimeFilterFrom,
 			To:   defaultTimeFilterTo,
 		},
@@ -81,6 +83,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 		HostNameLabelPath:  strings.Split(defaultHostNameLabel, "."),
 		HostGroupLabelPath: strings.Split(defaultHostGroupLabel, "."),
 		Timer:              connectors.DefaultTimer,
+		Ownership:          transit.Yield,
 		GWConnections:      gwConnections,
 	}
 
@@ -165,6 +168,11 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 		}
 	}
 
+	if len(gwConnections) > 0 {
+		connectorConfig.Ownership = transit.HostOwnershipType(gwConnections[0].DeferOwnership)
+	}
+
+	// replace '$interval' with actual value in time filter
 	connectorConfig.replaceIntervalTemplates()
 
 	return &connectorConfig
