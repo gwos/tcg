@@ -34,9 +34,11 @@ const (
 	extensionsKeyHostNameLabelPath  = "hostNameLabelPath"
 	extensionsKeyHostGroupLabelPath = "hostGroupLabelPath"
 
-	templateMetricName    = "$view_Template#"
 	intervalTemplate      = "$interval"
 	intervalPeriodSeconds = "s"
+
+	// temporary solution, will be removed
+	templateMetricName = "$view_Template#"
 )
 
 type ElasticConnectorConfig struct {
@@ -154,6 +156,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 	if metricsProfile != nil {
 		// Views
 		for _, metric := range metricsProfile.Metrics {
+			// temporary solution, will be removed
 			if templateMetricName == metric.Name || !metric.Monitored {
 				continue
 			}

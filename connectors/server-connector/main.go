@@ -8,7 +8,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	_ "github.com/gwos/tcg/docs"
 	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"net/http"
@@ -89,11 +88,10 @@ func main() {
 		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
-				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
+				*CollectMetrics(cfg.MetricsProfile.Metrics),
 			}); err != nil {
 				log.Error(err.Error())
 			}
-			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		}
 		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
