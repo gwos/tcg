@@ -129,6 +129,9 @@ func (client *GWClient) connectLocal() error {
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
 	}
+	if statusCode == 401 {
+		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+	}
 	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 }
 
@@ -181,6 +184,9 @@ func (client *GWClient) connectRemote() error {
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, string(error2))
 	}
+	if statusCode == 401 {
+		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+	}
 	return fmt.Errorf("%w: %v", ErrUndecided, string(error2))
 }
 
@@ -220,6 +226,9 @@ func (client *GWClient) Disconnect() error {
 	}
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+	}
+	if statusCode == 401 {
+		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
 	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
 }
