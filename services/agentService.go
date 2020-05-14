@@ -315,7 +315,10 @@ func (service *AgentService) listenStatsChan() {
 		res := <-service.statsChan
 
 		if res.lastError != nil {
-			service.agentStats.LastErrors = append(service.agentStats.LastErrors, res.lastError.Error())
+			service.agentStats.LastErrors = append(service.agentStats.LastErrors, LastError{
+				res.lastError.Error(),
+				&milliseconds.MillisecondTimestamp{Time: time.Now()},
+			})
 			statsLastErrorsLen := len(service.agentStats.LastErrors)
 			if statsLastErrorsLen > statsLastErrorsLim {
 				service.agentStats.LastErrors = service.agentStats.LastErrors[(statsLastErrorsLen - statsLastErrorsLim):]
