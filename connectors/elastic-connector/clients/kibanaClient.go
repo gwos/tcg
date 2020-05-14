@@ -3,7 +3,6 @@ package clients
 import (
 	"encoding/json"
 	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
@@ -43,17 +42,17 @@ type KibanaClient struct {
 
 // Extracts stored queries with provided titles
 // If no titles provided extracts all stored queries
-func (client *KibanaClient) RetrieveStoredQueries(titles []string) []model.SavedObject {
+func (client *KibanaClient) RetrieveStoredQueries(titles []string) []SavedObject {
 	savedObjectType := StoredQuery
 	savedObjectSearchField := Title
 	return client.findSavedObjects(&savedObjectType, &savedObjectSearchField, titles)
 }
 
 // Extracts index patterns titles associated with provided stored query
-func (client *KibanaClient) RetrieveIndexTitles(storedQuery model.SavedObject) []string {
+func (client *KibanaClient) RetrieveIndexTitles(storedQuery SavedObject) []string {
 	var indexes []string
 
-	var indexPatterns []model.SavedObject
+	var indexPatterns []SavedObject
 	savedObjectType := IndexPattern
 	ids := storedQuery.ExtractIndexIds()
 	indexPatterns = client.bulkGetSavedObjects(&savedObjectType, ids)
@@ -79,8 +78,8 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery model.SavedObject) [
 
 // Finds saved objects of provided type
 // and searchField matching searchValues if both searchField and searchValue set
-func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []model.SavedObject {
-	var savedObjects []model.SavedObject
+func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []SavedObject {
+	var savedObjects []SavedObject
 
 	page := 0
 	perPage := 10000
@@ -107,7 +106,7 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 			return nil
 		}
 
-		var savedObjectsResponse model.SavedObjectsResponse
+		var savedObjectsResponse SavedObjectsResponse
 		err = json.Unmarshal(response, &savedObjectsResponse)
 		if err != nil {
 			log.Error("Error parsing Kibana Find Saved Objects response: ", err)
@@ -123,15 +122,15 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 }
 
 // Performs bulk get of saved objects for provided type and ids
-func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []model.SavedObject {
+func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []SavedObject {
 	if savedObjectType == nil || ids == nil || len(ids) == 0 {
 		log.Error("Error performing Kibana Bulk Get: type and at least one id required.")
 		return nil
 	}
 
-	var requestBody []model.BulkGetRequest
+	var requestBody []BulkGetRequest
 	for _, id := range ids {
-		requestBody = append(requestBody, model.BulkGetRequest{
+		requestBody = append(requestBody, BulkGetRequest{
 			Type: string(*savedObjectType),
 			Id:   id,
 		})
@@ -162,7 +161,7 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 		return nil
 	}
 
-	var savedObjectsResponse model.SavedObjectsResponse
+	var savedObjectsResponse SavedObjectsResponse
 	err = json.Unmarshal(response, &savedObjectsResponse)
 	if err != nil {
 		log.Error("Error parsing Kibana Bulk Get Saved Objects response: ", err)
