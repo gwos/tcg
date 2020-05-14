@@ -21,8 +21,8 @@ const (
 
 type ElasticConnector struct {
 	config          ElasticConnectorConfig
-	kibanaClient    *clients.KibanaClient
-	esClient        *clients.EsClient
+	kibanaClient    clients.KibanaClient
+	esClient        clients.EsClient
 	monitoringState MonitoringState
 }
 
@@ -34,30 +34,19 @@ func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) err
 	monitoringState := initMonitoringState(connector.monitoringState, config)
 
 	connector.config = config
-	connector.kibanaClient = &kibanaClient
-	connector.esClient = &esClient
+	connector.kibanaClient = kibanaClient
+	connector.esClient = esClient
 	connector.monitoringState = monitoringState
 
 	return nil
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
-	if connector.kibanaClient == nil || connector.esClient == nil {
-		log.Error("[Elastic Connector]: Clients are not configured.")
-		return nil, nil, nil
-	}
-
-	views := connector.config.Views
-	if views == nil || len(views) == 0 {
-		log.Info("No views provided.")
-		return nil, nil, nil
-	}
-
 	monitoringState := initMonitoringState(connector.monitoringState, connector.config)
 	connector.monitoringState = monitoringState
 
 	var err error
-	for view, metrics := range views {
+	for view, metrics := range connector.config.Views {
 		for metricName, metric := range metrics {
 			connector.monitoringState.Metrics[metricName] = metric
 		}
@@ -78,15 +67,14 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	}
 
 	monitoredResources, inventoryResources := monitoringState.toTransitResources()
-	//	model.UpdateCheckTimes(monitoredResources, connector.config.Timer)
 	resourceGroups := monitoringState.toResourceGroups()
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
 func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
 	var suggestions []string
-	if connector.kibanaClient == nil {
-		log.Error("[Elastic Connector]: Kibana client is not configured.")
+	if connector.kibanaClient.ApiRoot == "" {
+		// client is not configured yet
 		return suggestions
 	}
 	switch view {

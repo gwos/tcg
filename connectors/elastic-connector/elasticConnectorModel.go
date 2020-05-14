@@ -10,12 +10,6 @@ import (
 	"sync"
 )
 
-const (
-	hitsMetricName              = "hits"
-	warningThresholdNameSuffix  = "_wn"
-	criticalThresholdNameSuffix = "_cr"
-)
-
 var doOnce sync.Once
 
 type MonitoringState struct {
@@ -116,10 +110,19 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.Monitore
 	i := 0
 	for _, host := range hosts {
 		monitoredServices, inventoryServices := host.toTransitResources(monitoringState.Metrics)
-		monitoredResource, _ := connectors.CreateResource(host.name, monitoredServices)
+
 		inventoryResource := connectors.CreateInventoryResource(host.name, inventoryServices)
-		mrs[i] = *monitoredResource
 		irs[i] = inventoryResource
+
+		monitoredResource, err := connectors.CreateResource(host.name, monitoredServices)
+		if err != nil {
+			log.Error("Error when creating resource ", host.name)
+			log.Error(err)
+		}
+		if monitoredResource != nil {
+			mrs[i] = *monitoredResource
+		}
+
 		i++
 	}
 	return mrs, irs
@@ -132,29 +135,33 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 		return monitoredServices, inventoryServices
 	}
 	for i, service := range host.services {
-		serviceName := service.name
-		if metricDefinition, has := metricDefinitions[serviceName]; has {
-			metric, _ := connectors.CreateMetric(hitsMetricName, service.hits, service.timeInterval, transit.UnitCounter)
+		if metricDefinition, has := metricDefinitions[service.name]; has {
+			serviceName := connectors.Name(service.name, metricDefinition.CustomName)
 
-			if metricDefinition.CustomName != "" {
-				serviceName = metricDefinition.CustomName
-			}
-			warningThreshold, err := connectors.CreateWarningThreshold(hitsMetricName+warningThresholdNameSuffix,
-				metricDefinition.WarningThreshold)
-			if err != nil {
-				log.Error("Error creating warning threshold for metric ", serviceName, ": ", err)
-			}
-			criticalThreshold, err := connectors.CreateCriticalThreshold(hitsMetricName+criticalThresholdNameSuffix,
-				metricDefinition.CriticalThreshold)
-			if err != nil {
-				log.Error("Error creating critical threshold for metric ", serviceName, ": ", err)
-			}
-			thresholds := []transit.ThresholdValue{*warningThreshold, *criticalThreshold}
-			metric.Thresholds = &thresholds
-			monitoredService, _ := connectors.CreateService(serviceName, host.name, []transit.TimeSeries{*metric})
 			inventoryService := connectors.CreateInventoryService(serviceName, host.name)
-			monitoredServices[i] = *monitoredService
 			inventoryServices[i] = inventoryService
+
+			metricBuilder := connectors.MetricBuilder{
+				Name:       service.name,
+				CustomName: metricDefinition.CustomName,
+				Value:      service.hits,
+				UnitType:   transit.UnitCounter,
+				Warning:    metricDefinition.WarningThreshold,
+				Critical:   metricDefinition.CriticalThreshold,
+			}
+			if service.timeInterval != nil {
+				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
+				metricBuilder.EndTimestamp = &service.timeInterval.EndTime
+			}
+
+			monitoredService, err := connectors.BuildServiceForMetric(host.name, metricBuilder)
+			if err != nil {
+				log.Error("Error when creating service ", host.name, ":", serviceName)
+				log.Error(err)
+			}
+			if monitoredService != nil {
+				monitoredServices[i] = *monitoredService
+			}
 		}
 	}
 	return monitoredServices, inventoryServices
