@@ -3,6 +3,7 @@ package connectors
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
@@ -152,6 +153,66 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 
 // Metric Constructors
 
+type MetricBuilder struct {
+	Name           string
+	CustomName     string
+	Value          interface{}
+	UnitType       interface{}
+	Warning        interface{}
+	Critical       interface{}
+	StartTimestamp *milliseconds.MillisecondTimestamp
+	EndTimestamp   *milliseconds.MillisecondTimestamp
+}
+
+// Creates metric based on data provided with metricBuilder
+func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
+	var args []interface{}
+	if metricBuilder.UnitType != nil {
+		args = append(args, metricBuilder.UnitType)
+	}
+	if metricBuilder.StartTimestamp != nil && metricBuilder.EndTimestamp != nil {
+		timeInterval := &transit.TimeInterval{
+			StartTime: *metricBuilder.StartTimestamp,
+			EndTime:   *metricBuilder.EndTimestamp,
+		}
+		args = append(args, timeInterval)
+	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
+		log.Error("Error creating time interval for metric ", metricBuilder.Name,
+			": either start time or end time is not provided")
+	}
+
+	metricName := Name(metricBuilder.Name, metricBuilder.CustomName)
+	metric, err := CreateMetric(metricName, metricBuilder.Value, args...)
+	if err != nil {
+		return metric, err
+	}
+
+	var thresholds []transit.ThresholdValue
+	if metricBuilder.Warning != nil {
+		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
+			metricBuilder.Warning)
+		if err != nil {
+			log.Error("Error creating warning threshold for metric ", metricBuilder.Name,
+				": ", err)
+		}
+		thresholds = append(thresholds, *warningThreshold)
+	}
+	if metricBuilder.Critical != nil {
+		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
+			metricBuilder.Critical)
+		if err != nil {
+			log.Error("Error creating critical threshold for metric ", metricBuilder.Name,
+				": ", err)
+		}
+		thresholds = append(thresholds, *criticalThreshold)
+	}
+	if len(thresholds) > 0 {
+		metric.Thresholds = &thresholds
+	}
+
+	return metric, nil
+}
+
 // CreateMetric
 //	required parameters: name, value
 //  optional parameters: interval, UnitType
@@ -259,6 +320,20 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 		Value:      &typedValue,
 	}
 	return &threshold, nil
+}
+
+// Creates metric based on data provided in metric builder and if metric successfully created
+// creates service with same name as metric which contains only this one metric
+// returns the result of service creation
+func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
+	metric, err := BuildMetric(metricBuilder)
+	if err != nil {
+		log.Error("Error creating metric for process: ", metricBuilder.Name)
+		log.Error(err)
+		return nil, errors.New("cannot create service with metric due to metric creation failure")
+	}
+	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
+	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
 }
 
 // Create Service
