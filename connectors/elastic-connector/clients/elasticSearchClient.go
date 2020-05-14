@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/elastic/go-elasticsearch/v7"
-	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	"github.com/gwos/tcg/log"
 	"io/ioutil"
 )
@@ -36,10 +35,10 @@ func (esClient *EsClient) InitEsClient() error {
 
 // Retrieves all documents matching query's filters
 // Error is being returned only in case of non-working client
-func (esClient EsClient) RetrieveHits(indexes []string, storedQuery model.SavedObject) ([]model.Hit, error) {
-	var hits []model.Hit
+func (esClient EsClient) RetrieveHits(indexes []string, storedQuery SavedObject) ([]Hit, error) {
+	var hits []Hit
 
-	var searchBody model.SearchBody
+	var searchBody SearchBody
 	searchBody.FromStoredQuery(storedQuery)
 
 	step := 1
@@ -73,7 +72,7 @@ func (esClient EsClient) RetrieveHits(indexes []string, storedQuery model.SavedO
 
 // Retrieves single window of documents matching query's filters
 // Error is being returned only in case of non-working client
-func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody model.SearchBody) (*model.SearchResponse, error) {
+func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody SearchBody) (*SearchResponse, error) {
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
@@ -127,7 +126,7 @@ func (esClient EsClient) retrieveSingleSearchWindow(indexes []string, searchBody
 		return nil, nil
 	}
 
-	var searchResponse model.SearchResponse
+	var searchResponse SearchResponse
 	err = json.Unmarshal(responseBody, &searchResponse)
 	if err != nil {
 		log.Error("Error parsing ES Search response body: ", err)

@@ -2,14 +2,12 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	_ "github.com/gwos/tcg/docs"
 	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"net/http"
@@ -18,18 +16,8 @@ import (
 
 // Default values for 'Group' and loop 'Timer'
 const (
-	DefaultHostGroupName = "LocalServer"
-	DefaultTimer         = 120
-	DefaultCacheTimer    = 1
+	DefaultCacheTimer = 1
 )
-
-type InitializeConfigResult struct {
-	Processes      []string
-	Groups         []transit.ResourceGroup
-	MetricsProfile transit.MetricsProfile
-	Timer          float64
-	Ownership      transit.HostOwnershipType
-}
 
 // @title TCG API Documentation
 // @version 1.0
@@ -41,13 +29,15 @@ func main() {
 	go handleCache()
 
 	var transitService = services.GetTransitService()
-	var cfg InitializeConfigResult
+	var cfg ServerConnectorConfig
 	var chksum []byte
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")
-		if c, err := initializeConfig(data); err == nil {
+		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
+			c := InitConfig(monitorConn, profile, gwConnections)
 			cfg = *c
+			connectors.Timer = cfg.Timer
 			chk, err := connectors.Hashsum(
 				config.GetConfig().Connector.AgentID,
 				config.GetConfig().GWConnections,
@@ -94,77 +84,16 @@ func main() {
 	}
 
 	for {
-			if len(cfg.MetricsProfile.Metrics) > 0 {
+		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
-				*CollectMetrics(cfg.MetricsProfile.Metrics, time.Duration(cfg.Timer)),
+				*CollectMetrics(cfg.MetricsProfile.Metrics),
 			}); err != nil {
 				log.Error(err.Error())
 			}
-			LastCheck = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			time.Sleep(time.Duration(int64(cfg.Timer) * int64(time.Second)))
-		} else {
-			time.Sleep(time.Duration(int64(connectors.Timer) * int64(time.Second)))
 		}
+		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
-}
-
-func initializeConfig(data []byte) (*InitializeConfigResult, error) {
-	var connector = struct {
-		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
-		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
-		Connections       []struct {
-			DeferOwnership transit.HostOwnershipType `json:"deferOwnership"`
-		} `json:"groundworkConnections"`
-	}{}
-
-	config := InitializeConfigResult{
-		Processes:      []string{},
-		Groups:         []transit.ResourceGroup{},
-		MetricsProfile: transit.MetricsProfile{},
-		Timer:          0,
-		Ownership:      transit.Yield,
-	}
-
-	err := json.Unmarshal(data, &connector)
-	if err != nil {
-		return &InitializeConfigResult{
-			Processes:      []string{},
-			Groups:         []transit.ResourceGroup{},
-			MetricsProfile: transit.MetricsProfile{},
-			Timer:          0,
-			Ownership:      transit.Yield,
-		}, err
-	}
-	config.Timer = float64(DefaultTimer)
-	if _, present := connector.MonitorConnection.Extensions["timer"]; present {
-		config.Timer = connector.MonitorConnection.Extensions["timer"].(float64)
-	}
-
-	if _, present := connector.MonitorConnection.Extensions["processes"]; present {
-		processesInterface := connector.MonitorConnection.Extensions["processes"].([]interface{})
-		for _, process := range processesInterface {
-			config.Processes = append(config.Processes, process.(string))
-		}
-	}
-
-	if _, present := connector.MonitorConnection.Extensions["groups"]; present {
-		groupsInterface := connector.MonitorConnection.Extensions["groups"].([]interface{})
-		for _, gr := range groupsInterface {
-			groupMap := gr.(map[string]interface{})
-			config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: groupMap["name"].(string), Type: transit.GroupType(groupMap["type"].(string))})
-		}
-	} else {
-		config.Groups = append(config.Groups, transit.ResourceGroup{GroupName: DefaultHostGroupName, Type: transit.HostGroup})
-	}
-
-	if len(connector.Connections) > 0 {
-		config.Ownership = connector.Connections[0].DeferOwnership
-	}
-
-	config.MetricsProfile = connector.MetricsProfile
-
-	return &config, nil
 }
 
 func handleCache() {
