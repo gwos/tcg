@@ -42,12 +42,17 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastErrors             []string                           `json:"lastErrors"`
+	LastErrors             []LastError                        `json:"lastErrors"`
+}
+
+type LastError struct {
+	Message string                             `json:"message"`
+	Time    *milliseconds.MillisecondTimestamp `json:"time"`
 }
 
 type AgentIdentity struct {
-	AgentID                string                             `json:"agentID"`
-	AppType                string                             `json:"appType"`
+	AgentID string `json:"agentID"`
+	AppType string `json:"appType"`
 }
 
 // AgentStatus defines TCG Agent status
