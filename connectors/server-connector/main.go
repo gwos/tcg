@@ -26,7 +26,6 @@ const (
 // @BasePath /api/v1
 func main() {
 	connectors.ControlCHandler()
-
 	go handleCache()
 
 	var transitService = services.GetTransitService()

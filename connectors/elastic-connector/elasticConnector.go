@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/log"
 	_ "github.com/gwos/tcg/milliseconds"
@@ -38,22 +39,6 @@ func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) err
 	connector.monitoringState = monitoringState
 
 	return nil
-}
-
-func (connector *ElasticConnector) performCollection() {
-	mrs, irs, rgs := connector.CollectMetrics()
-
-	log.Info("[Elastic Connector]: Sending inventory ...")
-	err := connectors.SendInventory(irs, rgs, transit.Yield) //TODO
-	if err != nil {
-		log.Error(err.Error())
-	}
-
-	log.Info("[Elastic Connector]: Monitoring resources ...")
-	err = connectors.SendMetrics(mrs)
-	if err != nil {
-		log.Error(err.Error())
-	}
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
