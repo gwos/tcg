@@ -9,7 +9,7 @@ import (
 
 // keys for extensions
 const (
-	defaultHostGroupName = "LocalServer"
+	defaultHostGroupName = "Servers"
 
 	extensionsKeyProcesses = "processes"
 	extensionsKeyGroups    = "groups"
