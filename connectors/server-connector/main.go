@@ -30,6 +30,19 @@ type InitializeConfigResult struct {
 	Ownership      transit.HostOwnershipType
 }
 
+// How to test:
+//func main() {
+//  str := "GW:toPercentageLimit(arg1)"
+//	m := map[string]interface{}{
+//		"arg1": 1.87,
+//		"arg2": 1000.0,
+//		"arg3": 1.0,
+//	}
+//	val, _, err := connectors.EvaluateGroundworkFunction(str, m)
+//	fmt.Println(val)
+//	fmt.Println(err)
+//}
+
 // @title TCG API Documentation
 // @version 1.0
 
@@ -69,7 +82,7 @@ func main() {
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
-			Url:    "/suggest/:viewName/:name",
+			Url:    "/suggest/services/:viewName/:name",
 			Method: "Get",
 			Handler: func(c *gin.Context) {
 				if c.Param("viewName") == string(transit.Process) {

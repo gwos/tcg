@@ -8,7 +8,6 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"github.com/PaesslerAG/gval"
 	"os"
 	"os/signal"
 	"reflect"
@@ -419,7 +418,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 			if metric.MetricComputeType != transit.Synthetic {
 				switch metric.Value.ValueType {
 				case transit.IntegerType:
-					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.IntegerValue
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = float64(metric.Value.IntegerValue)
 				case transit.DoubleType:
 					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.DoubleValue
 				}
@@ -432,7 +431,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		for _, metric := range result[i].Metrics {
 			fmt.Println(metric.MetricComputeType)
 			if metric.MetricComputeType == transit.Synthetic {
-				if value, err := gval.Evaluate(strings.ReplaceAll(metric.MetricExpression, ".", "_"), vars); err != nil {
+				if value, _, err := EvaluateGroundworkFunction(metric.MetricExpression, vars); err != nil {
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
 					continue
 				} else {
@@ -454,8 +453,8 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 								},
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
-									IntegerValue: int64(value.(float64)),
-									DoubleValue:  value.(float64),
+									IntegerValue: int64(value),
+									DoubleValue:  value,
 								},
 							},
 						},
