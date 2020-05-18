@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	apiPath          = "kibana/api/"
+	apiPath          = "api/"
 	savedObjectsPath = "saved_objects/"
 	findPath         = "_find"
 	bulkGetPath      = "_bulk_get"
