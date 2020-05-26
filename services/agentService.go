@@ -88,8 +88,6 @@ func GetAgentService() *AgentService {
 		agentService = &AgentService{
 			agentConnector,
 			&AgentStats{
-				AgentID: agentConnector.AgentID,
-				AppType: agentConnector.AppType,
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
 			&AgentStatus{
@@ -245,8 +243,14 @@ func (service *AgentService) StopTransport() error {
 }
 
 // Stats implements AgentServices.Stats interface
-func (service *AgentService) Stats() AgentStats {
-	return *service.agentStats
+func (service *AgentService) Stats() AgentIdentityStats {
+	return AgentIdentityStats{AgentIdentity{
+		AgentID: controller.Connector.AgentID,
+		AppName: controller.Connector.AppName,
+		AppType: controller.Connector.AppType,
+	},
+		*service.agentStats,
+	}
 }
 
 // Status implements AgentServices.Status interface
@@ -410,12 +414,15 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 }
 
 func (service *AgentService) config(data []byte) error {
+	// load general config data
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	// custom connector may provide additional handler for extended fields
 	if service.ConfigHandler != nil {
 		service.ConfigHandler(data)
 	}
+	// notify C-API config change
 	service.DemandConfigMutex.Lock()
 	if service.DemandConfigHandler != nil {
 		if success := service.DemandConfigHandler(); !success {
@@ -424,10 +431,7 @@ func (service *AgentService) config(data []byte) error {
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
 	service.DemandConfigMutex.Unlock()
-
-	service.agentStats.AgentID = service.Connector.AgentID
-	service.agentStats.AppType = service.Connector.AppType
-
+	// restart nats processing
 	_ = service.stopTransport()
 	if service.Connector.Enabled {
 		_ = service.startTransport()

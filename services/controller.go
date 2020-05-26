@@ -364,7 +364,7 @@ func (controller *Controller) stop(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentStats
+// @Success 200 {object} services.AgentIdentityStats
 // @Failure 401 {string} string "Unauthorized"
 // @Router  /stats [get]
 // @Param   gwos-app-name    header    string     true        "Auth header"
@@ -378,12 +378,13 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentStats
+// @Success 200 {object} services.AgentIdentity
 // @Router  /agent [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
 	agentIdentity := AgentIdentity{
-		AgentID: controller.Stats().AgentID,
-		AppType: controller.Stats().AppType,
+		AgentID: controller.Connector.AgentID,
+		AppName: controller.Connector.AppName,
+		AppType: controller.Connector.AppType,
 	}
 	c.JSON(http.StatusOK, agentIdentity)
 }
