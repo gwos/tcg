@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -17,22 +18,27 @@ import (
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
+	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // AgentService implements AgentServices interface
 type AgentService struct {
 	*config.Connector
-	agentStats          *AgentStats
-	agentStatus         *AgentStatus
-	DSClient            *clients.DSClient
-	gwClients           []*clients.GWClient
-	ctrlIdx             uint8
-	ctrlChan            chan *CtrlAction
-	statsChan           chan statsCounter
-	tracerToken         []byte
-	ConfigHandler       func([]byte)
-	DemandConfigHandler func() bool
-	DemandConfigMutex   sync.Mutex
+	agentStats            *AgentStats
+	agentStatus           *AgentStatus
+	DSClient              *clients.DSClient
+	gwClients             []*clients.GWClient
+	ctrlIdx               uint8
+	ctrlChan              chan *CtrlAction
+	statsChan             chan statsCounter
+	tracerToken           []byte
+	ConfigHandler         func([]byte)
+	DemandConfigHandler   func() bool
+	DemandConfigMutex     sync.Mutex
+	TelemetryProvider     *sdktrace.Provider
+	TelemetryFlushHandler func()
 }
 
 // CtrlAction defines queued controll action
@@ -73,6 +79,8 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
+		telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
+
 		/* prepare random tracerToken */
 		tracerToken := []byte("aaaabbbbccccdddd")
 		if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
@@ -104,6 +112,8 @@ func GetAgentService() *AgentService {
 			nil,
 			nil,
 			sync.Mutex{},
+			telemetryProvider,
+			telemetryFlushHandler,
 		}
 
 		go agentService.listenCtrlChan()
@@ -393,8 +403,20 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 		DurableName: durableName,
 		Subject:     subj,
 		Handler: func(b []byte) error {
+			var err error
+			if service.TelemetryProvider != nil {
+				tr := service.TelemetryProvider.Tracer("services")
+				_, span := tr.Start(context.Background(), subj)
+				defer func() {
+					span.SetAttribute("error", err)
+					span.SetAttribute("payloadLen", len(b))
+					span.SetAttribute("durableName", durableName)
+					span.End()
+				}()
+			}
+
 			// TODO: filter the message by rules per gwClient
-			err := subjFn(b)
+			err = subjFn(b)
 			if err == nil {
 				service.statsChan <- statsCounter{
 					bytesSent: len(b),
@@ -431,8 +453,16 @@ func (service *AgentService) config(data []byte) error {
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
 	service.DemandConfigMutex.Unlock()
-	// restart nats processing
+	// stop nats processing
+	// flush uploading telemetry and configure provider while processing stopped
 	_ = service.stopTransport()
+	if service.TelemetryFlushHandler != nil {
+		service.TelemetryFlushHandler()
+	}
+	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
+	service.TelemetryFlushHandler = telemetryFlushHandler
+	service.TelemetryProvider = telemetryProvider
+	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
 	}
@@ -552,5 +582,34 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		),
 		[]byte(traceOnDemandAgentID),
 		[]byte(service.Connector.AgentID),
+	)
+}
+
+// initTelemetryProvider creates a new provider instance and registers it as global provider
+func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
+	hostName := config.GetConfig().Telemetry.HostName
+	if len(hostName) == 0 {
+		err := fmt.Errorf("Telemetry not configured")
+		log.Warn(err.Error())
+		return nil, nil, err
+	}
+
+	agentConnector := config.GetConfig().Connector
+	serviceName := fmt.Sprintf("%s:%s:%s",
+		agentConnector.AppType, agentConnector.AppName, agentConnector.AgentID)
+	tags := []kv.KeyValue{
+		kv.String("runtime", "golang"),
+	}
+	for k, v := range config.GetConfig().Telemetry.Tags {
+		tags = append(tags, kv.String(k, v))
+	}
+	return jaeger.NewExportPipeline(
+		jaeger.WithAgentEndpoint(hostName),
+		jaeger.WithProcess(jaeger.Process{
+			ServiceName: serviceName,
+			Tags:        tags,
+		}),
+		jaeger.RegisterAsGlobal(),
+		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
 }

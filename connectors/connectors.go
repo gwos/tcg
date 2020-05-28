@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -52,12 +53,23 @@ func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *tran
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
+	var b []byte
+	var err error
+	if services.GetTransitService().TelemetryProvider != nil {
+		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
+		_, span := tr.Start(context.Background(), "SendMetrics")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(b))
+			span.End()
+		}()
+	}
 	setCheckTimes(resources)
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
-	b, err := json.Marshal(request)
+	b, err = json.Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -78,6 +90,18 @@ func setCheckTimes(resources []transit.MonitoredResource) {
 }
 
 func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	var b []byte
+	var err error
+	if services.GetTransitService().TelemetryProvider != nil {
+		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
+		_, span := tr.Start(context.Background(), "SendInventory")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(b))
+			span.End()
+		}()
+	}
+
 	var monitoredResourceRefs []transit.MonitoredResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
@@ -99,7 +123,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		Groups:        resourceGroups,
 	}
 
-	b, err := json.Marshal(inventoryRequest)
+	b, err = json.Marshal(inventoryRequest)
 	if err != nil {
 		return err
 	}
