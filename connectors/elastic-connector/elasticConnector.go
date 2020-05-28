@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/log"
 	_ "github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"go.opentelemetry.io/otel/api/trace"
 	"strings"
 )
 
@@ -42,10 +45,29 @@ func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) err
 }
 
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
+	var err error
+	var spanCollectMetrics trace.Span
+	var spanMonitoringState trace.Span
+	var ctx context.Context
+
+	if services.GetTransitService().TelemetryProvider != nil {
+		tr := services.GetTransitService().TelemetryProvider.Tracer("elasticConnector")
+		ctx, spanCollectMetrics = tr.Start(context.Background(), "CollectMetrics")
+		_, spanMonitoringState = tr.Start(ctx, "initMonitoringState")
+		defer func() {
+			spanCollectMetrics.SetAttribute("error", err)
+			spanCollectMetrics.End()
+		}()
+	}
+
 	monitoringState := initMonitoringState(connector.monitoringState, connector.config)
 	connector.monitoringState = monitoringState
+	if services.GetTransitService().TelemetryProvider != nil {
+		spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
+		spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
+		spanMonitoringState.End()
+	}
 
-	var err error
 	for view, metrics := range connector.config.Views {
 		for metricName, metric := range metrics {
 			connector.monitoringState.Metrics[metricName] = metric
