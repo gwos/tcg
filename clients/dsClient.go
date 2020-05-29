@@ -62,7 +62,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"headers": headers,
 		"reqURL":  entrypoint.String(),
 	})
-	logEntryLevel := log.InfoLevel
+	logEntryLevel := log.DebugLevel
 	defer func() {
 		logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
 	}()
