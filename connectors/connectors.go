@@ -1,13 +1,17 @@
 package connectors
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"hash/fnv"
 	"os"
 	"os/signal"
 	"reflect"
@@ -16,8 +20,12 @@ import (
 	"time"
 )
 
+const DefaultTimer = int64(120)
+
 // will come from extensions field
-var Timer = 120
+var Timer = DefaultTimer
+
+const ExtensionsKeyTimer = "checkIntervalMinutes"
 
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
@@ -29,7 +37,7 @@ func Start() error {
 	return nil
 }
 
-func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transit.MetricsProfile, config.GWConnections) {
+func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *transit.MetricsProfile, config.GWConnections, error) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
 		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
@@ -39,12 +47,25 @@ func RetrieveCommonConnectorInfo(data []byte) (transit.MonitorConnection, transi
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
 		log.Error("Error parsing common connector data: ", err)
+		return nil, nil, nil, err
 	}
 
-	return connector.MonitorConnection, connector.MetricsProfile, connector.Connections
+	return &connector.MonitorConnection, &connector.MetricsProfile, connector.Connections, nil
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
+	var b []byte
+	var err error
+	if services.GetTransitService().TelemetryProvider != nil {
+		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
+		_, span := tr.Start(context.Background(), "SendMetrics")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(b))
+			span.End()
+		}()
+	}
+	setCheckTimes(resources)
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
@@ -55,7 +76,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
-	b, err := json.Marshal(request)
+	b, err = json.Marshal(request)
 
 	// log.Error(string(b))
 
@@ -63,10 +84,34 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		return err
 	}
 	return services.GetTransitService().SendResourceWithMetrics(b)
+}
 
+func setCheckTimes(resources []transit.MonitoredResource) {
+	lastCheckTime := time.Now().Local()
+	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
+	for i := range resources {
+		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		for j := range resources[i].Services {
+			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
+			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
+		}
+	}
 }
 
 func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	var b []byte
+	var err error
+	if services.GetTransitService().TelemetryProvider != nil {
+		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
+		_, span := tr.Start(context.Background(), "SendInventory")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(b))
+			span.End()
+		}()
+	}
+
 	var monitoredResourceRefs []transit.MonitoredResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
@@ -88,7 +133,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		Groups:        resourceGroups,
 	}
 
-	b, err := json.Marshal(inventoryRequest)
+	b, err = json.Marshal(inventoryRequest)
 	if err != nil {
 		return err
 	}
@@ -141,6 +186,66 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 }
 
 // Metric Constructors
+
+type MetricBuilder struct {
+	Name           string
+	CustomName     string
+	Value          interface{}
+	UnitType       interface{}
+	Warning        interface{}
+	Critical       interface{}
+	StartTimestamp *milliseconds.MillisecondTimestamp
+	EndTimestamp   *milliseconds.MillisecondTimestamp
+}
+
+// Creates metric based on data provided with metricBuilder
+func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
+	var args []interface{}
+	if metricBuilder.UnitType != nil {
+		args = append(args, metricBuilder.UnitType)
+	}
+	if metricBuilder.StartTimestamp != nil && metricBuilder.EndTimestamp != nil {
+		timeInterval := &transit.TimeInterval{
+			StartTime: *metricBuilder.StartTimestamp,
+			EndTime:   *metricBuilder.EndTimestamp,
+		}
+		args = append(args, timeInterval)
+	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
+		log.Error("Error creating time interval for metric ", metricBuilder.Name,
+			": either start time or end time is not provided")
+	}
+
+	metricName := Name(metricBuilder.Name, metricBuilder.CustomName)
+	metric, err := CreateMetric(metricName, metricBuilder.Value, args...)
+	if err != nil {
+		return metric, err
+	}
+
+	var thresholds []transit.ThresholdValue
+	if metricBuilder.Warning != nil {
+		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
+			metricBuilder.Warning)
+		if err != nil {
+			log.Error("Error creating warning threshold for metric ", metricBuilder.Name,
+				": ", err)
+		}
+		thresholds = append(thresholds, *warningThreshold)
+	}
+	if metricBuilder.Critical != nil {
+		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
+			metricBuilder.Critical)
+		if err != nil {
+			log.Error("Error creating critical threshold for metric ", metricBuilder.Name,
+				": ", err)
+		}
+		thresholds = append(thresholds, *criticalThreshold)
+	}
+	if len(thresholds) > 0 {
+		metric.Thresholds = &thresholds
+	}
+
+	return metric, nil
+}
 
 // CreateMetric
 //	required parameters: name, value
@@ -249,6 +354,20 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 		Value:      &typedValue,
 	}
 	return &threshold, nil
+}
+
+// Creates metric based on data provided in metric builder and if metric successfully created
+// creates service with same name as metric which contains only this one metric
+// returns the result of service creation
+func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
+	metric, err := BuildMetric(metricBuilder)
+	if err != nil {
+		log.Error("Error creating metric for process: ", metricBuilder.Name)
+		log.Error(err)
+		return nil, errors.New("cannot create service with metric due to metric creation failure")
+	}
+	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
+	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
 }
 
 // Create Service
@@ -490,4 +609,23 @@ func Name(defaultName string, customName string) string {
 		return defaultName
 	}
 	return customName
+}
+
+// Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
+func Hashsum(args ...interface{}) ([]byte, error) {
+	var b bytes.Buffer
+	for _, arg := range args {
+		s, err := json.Marshal(arg)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := b.Write(s); err != nil {
+			return nil, err
+		}
+	}
+	h := fnv.New128()
+	if _, err := h.Write(b.Bytes()); err != nil {
+		return nil, err
+	}
+	return h.Sum(nil), nil
 }

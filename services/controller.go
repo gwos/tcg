@@ -365,13 +365,29 @@ func (controller *Controller) stop(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentStats
+// @Success 200 {object} services.AgentIdentityStats
 // @Failure 401 {string} string "Unauthorized"
 // @Router  /stats [get]
 // @Param   gwos-app-name    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stats(c *gin.Context) {
 	c.JSON(http.StatusOK, controller.Stats())
+}
+
+//
+// @Description The following API endpoint can be used to get a TCG agent id
+// @Tags    agent, connector
+// @Accept  json
+// @Produce json
+// @Success 200 {object} services.AgentIdentity
+// @Router  /agent [get]
+func (controller *Controller) agentIdentity(c *gin.Context) {
+	agentIdentity := AgentIdentity{
+		AgentID: controller.Connector.AgentID,
+		AppName: controller.Connector.AppName,
+		AppType: controller.Connector.AppType,
+	}
+	c.JSON(http.StatusOK, agentIdentity)
 }
 
 //
@@ -435,6 +451,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 
 	apiV1Group := router.Group("/api/v1")
 	apiV1Config := router.Group("/api/v1/config")
+	apiV1Identity := router.Group("/api/v1/identity")
 	apiV1Group.Use(controller.validateToken)
 
 	apiV1Config.POST("", controller.config)
@@ -446,6 +463,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
+	apiV1Identity.GET("", controller.agentIdentity)
 
 	for _, entrypoint := range entrypoints {
 		switch entrypoint.Method {
