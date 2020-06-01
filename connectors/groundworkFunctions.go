@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/PaesslerAG/gval"
+	"github.com/gwos/tcg/cache"
 	"strings"
 )
 
@@ -422,12 +423,12 @@ func EvaluateGroundworkFunction(expression string, vars map[string]interface{}) 
 	}
 }
 
-func ListExpressions(name string) []Expression {
-	expressions := []Expression{}
+func ListExpressions(name string) []ExpressionToSuggest {
+	expressions := []ExpressionToSuggest{}
 
 	for key, argsCount := range expressionToArgsCountMap {
 		if strings.Contains(key, name) {
-			expressions = append(expressions, Expression{
+			expressions = append(expressions, ExpressionToSuggest{
 				key, argsCount,
 			})
 		}
@@ -436,7 +437,49 @@ func ListExpressions(name string) []Expression {
 	return expressions
 }
 
-type Expression struct {
+func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64, error) {
+	vars := make(map[string]interface{})
+
+	if !override {
+		if processesInterface, exist := cache.ProcessesCache.Get("processes"); exist {
+			processes := processesInterface.(map[string]float64)
+			for _, param := range expression.Params {
+				if val, exist := processes[param.Name]; exist {
+					vars[param.Name] = val
+				}
+			}
+		} else {
+			return -1, errors.New("Processes cache not initialized ")
+		}
+	} else {
+		for _, param := range expression.Params {
+			vars[param.Name] = param.Value
+		}
+	}
+
+	if len(vars) != len(expression.Params) {
+		return -1, errors.New("Not enough expression parameters ")
+	}
+
+
+	if result, _, err := EvaluateGroundworkFunction(expression.Expression, vars); err == nil {
+		return result, nil
+	} else {
+		return -1, err
+	}
+}
+
+type ExpressionToSuggest struct {
 	Name      string `json:"name"`
 	ArgsCount int    `json:"argsCount"`
+}
+
+type ExpressionToEvaluate struct {
+	Expression string                `json:"expression"`
+	Params     []ExpressionParameter `json:"params"`
+}
+
+type ExpressionParameter struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
 }
