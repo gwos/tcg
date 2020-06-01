@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -10,7 +9,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
 	"time"
 )
 
@@ -82,26 +80,7 @@ func main() {
 	}
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(
-		services.Entrypoint{
-			Url:    "/suggest/services/:viewName/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				if c.Param("viewName") == string(transit.Process) {
-					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
-				} else {
-					c.JSON(http.StatusOK, []transit.MetricDefinition{})
-				}
-			},
-		},
-		services.Entrypoint{
-			Url:    "/suggest/expressions/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
-			},
-		},
-	); err != nil {
+	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
 		log.Error(err)
 		return
 	}
@@ -131,7 +110,7 @@ func main() {
 
 func handleCache() {
 	for {
-		cache.ProcessesCache.SetDefault("processes", collectProcessesNames())
+		cache.ProcessesCache.SetDefault("processes", collectProcesses())
 		time.Sleep(DefaultCacheTimer * time.Minute)
 	}
 }

@@ -559,7 +559,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Type:          transit.Service,
 						Owner:         result[i].Owner,
 						Status:        "SERVICE_OK",
-						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
+						LastPlugInOutput: fmt.Sprintf(" ExpressionToSuggest: %s", metric.MetricExpression),
 						LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 						NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
 						Metrics: []transit.TimeSeries{
