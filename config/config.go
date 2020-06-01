@@ -245,11 +245,20 @@ func (con *DSConnection) Decode(value string) error {
 	return nil
 }
 
+// Telemetry defines   configuration
+type Telemetry struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName string            `yaml:"hostName"`
+	Tags     map[string]string `yaml:"tags"`
+}
+
 // Config defines TCG Agent configuration
 type Config struct {
 	Connector     *Connector    `yaml:"connector"`
 	DSConnection  *DSConnection `yaml:"dsConnection"`
 	GWConnections GWConnections `yaml:"gwConnections"`
+	Telemetry     *Telemetry    `yaml:"telemetry"`
 }
 
 // GetConfig implements Singleton pattern
@@ -268,6 +277,7 @@ func GetConfig() *Config {
 				NatsHost:         "127.0.0.1:4222",
 			},
 			DSConnection: &DSConnection{},
+			Telemetry:    &Telemetry{},
 		}
 
 		configPath := os.Getenv(string(ConfigEnv))

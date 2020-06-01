@@ -5,6 +5,29 @@
         "license": {}
     },
     "paths": {
+        "/agent": {
+            "get": {
+                "description": "The following API endpoint can be used to get a TCG agent id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "agent",
+                    "connector"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.AgentIdentity"
+                        }
+                    }
+                }
+            }
+        },
         "/config": {
             "post": {
                 "description": "The following API endpoint can be used to Agent configure.",
@@ -299,7 +322,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStats"
+                            "$ref": "#/definitions/services.AgentIdentityStats"
                         }
                     },
                     "401": {
@@ -412,10 +435,27 @@
         "milliseconds.MillisecondTimestamp": {
             "type": "object"
         },
-        "services.AgentStats": {
+        "services.AgentIdentity": {
             "type": "object",
             "properties": {
                 "agentID": {
+                    "type": "string"
+                },
+                "appName": {
+                    "type": "string"
+                },
+                "appType": {
+                    "type": "string"
+                }
+            }
+        },
+        "services.AgentIdentityStats": {
+            "type": "object",
+            "properties": {
+                "agentID": {
+                    "type": "string"
+                },
+                "appName": {
                     "type": "string"
                 },
                 "appType": {
@@ -437,7 +477,7 @@
                 "lastErrors": {
                     "type": "array",
                     "items": {
-                        "type": "string"
+                        "$ref": "#/definitions/services.LastError"
                     }
                 },
                 "lastInventoryRun": {
@@ -486,6 +526,18 @@
                 },
                 "jobId": {
                     "type": "integer"
+                }
+            }
+        },
+        "services.LastError": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "object",
+                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
                 }
             }
         }

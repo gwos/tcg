@@ -1,9 +1,20 @@
 definitions:
   milliseconds.MillisecondTimestamp:
     type: object
-  services.AgentStats:
+  services.AgentIdentity:
     properties:
       agentID:
+        type: string
+      appName:
+        type: string
+      appType:
+        type: string
+    type: object
+  services.AgentIdentityStats:
+    properties:
+      agentID:
+        type: string
+      appName:
         type: string
       appType:
         type: string
@@ -18,7 +29,7 @@ definitions:
         type: object
       lastErrors:
         items:
-          type: string
+          $ref: '#/definitions/services.LastError'
         type: array
       lastInventoryRun:
         $ref: '#/definitions/milliseconds.MillisecondTimestamp'
@@ -53,10 +64,33 @@ definitions:
       jobId:
         type: integer
     type: object
+  services.LastError:
+    properties:
+      message:
+        type: string
+      time:
+        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        type: object
+    type: object
 info:
   contact: {}
   license: {}
 paths:
+  /agent:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get a TCG agent id
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.AgentIdentity'
+      tags:
+      - agent
+      - connector
   /config:
     post:
       consumes:
@@ -255,7 +289,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentStats'
+            $ref: '#/definitions/services.AgentIdentityStats'
         "401":
           description: Unauthorized
           schema:

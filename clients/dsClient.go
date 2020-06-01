@@ -47,7 +47,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		dalekServicesURL = client.DSConnection.HostName
 	}
 	entrypoint := url.URL{
-		Scheme: "http",
+		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
 		Host:   dalekServicesURL,
 		Path:   DSEntrypointValidateToken,
 	}
@@ -62,7 +62,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"headers": headers,
 		"reqURL":  entrypoint.String(),
 	})
-	logEntryLevel := log.InfoLevel
+	logEntryLevel := log.DebugLevel
 	defer func() {
 		logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
 	}()
@@ -88,7 +88,7 @@ func (client *DSClient) Reload(agentID string) error {
 		"Content-Type": "application/json",
 	}
 	reqURL := (&url.URL{
-		Scheme: "http",
+		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
 		Host:   client.DSConnection.HostName,
 		Path:   strings.ReplaceAll(DSEntrypointReload, ":agentID", agentID),
 	}).String()
@@ -120,4 +120,13 @@ func (client *DSClient) Reload(agentID string) error {
 		return fmt.Errorf(string(byteResponse))
 	}
 	return nil
+}
+
+// Create the scheme (http or https) based on hostName prefix
+func makeDalekServicesScheme(hostName string) string {
+	scheme := "https"
+	if strings.HasPrefix(hostName, "dalekservices") {
+		scheme =  "http"
+	}
+	return scheme
 }

@@ -2,10 +2,9 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/connectors/elastic-connector/model"
 	_ "github.com/gwos/tcg/docs"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
@@ -14,29 +13,51 @@ import (
 )
 
 func main() {
+	connectors.ControlCHandler()
+
 	var transitService = services.GetTransitService()
 
-	connector := ElasticConnector{}
+	var connector ElasticConnector
 
-	var config *model.ElasticConnectorConfig
-	var configMark []byte
-
+	var cfg ElasticConnectorConfig
+	var cfgChksum, iChksum []byte
 	transitService.ConfigHandler = func(data []byte) {
-		connection, profile, gwConnections := connectors.RetrieveCommonConnectorInfo(data)
-		cfg := model.InitConfig(transitService.Connector.AppType, transitService.Connector.AgentID,
-			&connection, &profile, gwConnections)
-		config = cfg
-		cfgMark, _ := json.Marshal(cfg)
-		if !bytes.Equal(configMark, cfgMark) {
-			if err := connector.LoadConfig(config); err != nil {
-				log.Error("Cannot reload ElasticConnector config: ", err)
-			} else {
-				configMark = cfgMark
-				connector.performCollection()
+		log.Info("[Elastic Connector]: Configuration received")
+		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
+			c := InitConfig(config.GetConfig().Connector.AppType, config.GetConfig().Connector.AgentID,
+				monitorConn, profile, gwConnections)
+			cfg = *c
+			connectors.Timer = cfg.Timer
+			chk, err := connectors.Hashsum(
+				config.GetConfig().GWConnections,
+				cfg,
+			)
+			if err != nil || !bytes.Equal(cfgChksum, chk) {
+				if err := connector.LoadConfig(cfg); err != nil {
+					log.Error("Cannot reload ElasticConnector config: ", err)
+				} else {
+					_, inventory, groups := connector.CollectMetrics()
+					log.Info("[Elastic Connector]: Sending inventory ...")
+					err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
+					if err != nil {
+						log.Error(err.Error())
+					}
+					iChk, iChkErr := connector.getInventoryHashSum()
+					if iChkErr == nil {
+						iChksum = iChk
+					}
+				}
 			}
+			if err == nil {
+				cfgChksum = chk
+			}
+		} else {
+			log.Error("[Elastic Connector]: Error during parsing config. Aborting ...")
+			return
 		}
 	}
 
+	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
 			Url:    "/suggest/:viewName/:name",
@@ -56,7 +77,27 @@ func main() {
 	}
 
 	for {
-		connector.performCollection()
-		time.Sleep(time.Duration(int64(connector.config.Timer) * int64(time.Second)))
+		if len(connector.monitoringState.Metrics) > 0 {
+			metrics, inventory, groups := connector.CollectMetrics()
+
+			chk, chkErr := connector.getInventoryHashSum()
+			if chkErr != nil || !bytes.Equal(iChksum, chk) {
+				log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
+				err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
+				if err != nil {
+					log.Error(err.Error())
+				}
+			}
+			if chkErr == nil {
+				iChksum = chk
+			}
+
+			log.Info("[Elastic Connector]: Monitoring resources ...")
+			err := connectors.SendMetrics(metrics)
+			if err != nil {
+				log.Error(err.Error())
+			}
+		}
+		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
 }

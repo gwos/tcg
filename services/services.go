@@ -31,8 +31,6 @@ const (
 
 // AgentStats defines TCG Agent statistics
 type AgentStats struct {
-	AgentID                string                             `json:"agentID"`
-	AppType                string                             `json:"appType"`
 	BytesSent              int                                `json:"bytesSent"`
 	MetricsSent            int                                `json:"metricsSent"`
 	MessagesSent           int                                `json:"messagesSent"`
@@ -42,7 +40,26 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastErrors             []string                           `json:"lastErrors"`
+	LastErrors             []LastError                        `json:"lastErrors"`
+}
+
+// LastError defines
+type LastError struct {
+	Message string                             `json:"message"`
+	Time    *milliseconds.MillisecondTimestamp `json:"time"`
+}
+
+// AgentIdentity defines TCG Agent Identity
+type AgentIdentity struct {
+	AgentID string `json:"agentID"`
+	AppName string `json:"appName"`
+	AppType string `json:"appType"`
+}
+
+// AgentIdentityStats defines complex type
+type AgentIdentityStats struct {
+	AgentIdentity
+	AgentStats
 }
 
 // AgentStatus defines TCG Agent status
