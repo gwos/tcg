@@ -600,8 +600,8 @@ func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 	tags := []kv.KeyValue{
 		kv.String("runtime", "golang"),
 	}
-	for k, v := range config.GetConfig().Telemetry.Tags {
-		tags = append(tags, kv.String(k, v))
+	for _, tag := range config.GetConfig().Telemetry.Tags {
+		tags = append(tags, kv.String(tag.Name, tag.Value))
 	}
 	return jaeger.NewExportPipeline(
 		jaeger.WithAgentEndpoint(hostName),

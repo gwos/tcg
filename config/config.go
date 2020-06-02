@@ -245,12 +245,18 @@ func (con *DSConnection) Decode(value string) error {
 	return nil
 }
 
-// Telemetry defines   configuration
+// Tag defines string pair
+type Tag struct {
+	Name  string `yaml:"name"`
+	Value string `yaml:"value"`
+}
+
+// Telemetry defines exporter configuration
 type Telemetry struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
-	HostName string            `yaml:"hostName"`
-	Tags     map[string]string `yaml:"tags"`
+	HostName string `yaml:"hostName"`
+	Tags     []Tag  `yaml:"tags"`
 }
 
 // Config defines TCG Agent configuration
