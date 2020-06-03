@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/PaesslerAG/gval"
 	"github.com/gwos/tcg/cache"
+	"regexp"
 	"strings"
 )
 
@@ -32,6 +33,7 @@ const (
 	ScalePercentUnused = "GW:scalePercentageUnused"
 )
 
+// expressionToFuncMap allows to call function using it's special Groundwork name
 var expressionToFuncMap = map[string]interface{}{
 	Kb:                 KB,
 	Mb:                 MB,
@@ -56,6 +58,7 @@ var expressionToFuncMap = map[string]interface{}{
 	ScalePercentUnused: ScalePercentageUnused,
 }
 
+// expressionToFuncMap is used to return the number of arguments to the UI using only the function name
 var expressionToArgsCountMap = map[string]int{
 	Kb:                 1,
 	Mb:                 1,
@@ -69,8 +72,8 @@ var expressionToArgsCountMap = map[string]int{
 	IntMin:             2,
 	DoubleMax:          2,
 	DoubleMin:          2,
-	IntDouble:          2,
-	DoubleInt:          2,
+	IntDouble:          1,
+	DoubleInt:          1,
 	ToPercent:          1,
 	PercentUsed:        2,
 	PercentUnused:      2,
@@ -175,7 +178,8 @@ func IntToDouble(values ...float64) float64 {
 }
 
 func DoubleToInt(values ...float64) float64 {
-	return values[0]
+	result := int(values[0])
+	return float64(result)
 }
 
 func MB2(values ...float64) float64 {
@@ -371,17 +375,20 @@ func ScalePercentageUsed(values ...float64) float64 {
 	return ToPercentage(usage)
 }
 
-func EvaluateGroundworkFunction(expression string, vars map[string]interface{}) (float64, []float64, error) {
+func EvaluateGroundworkExpression(expression string, vars map[string]interface{}, argumentCounter int) (float64, []float64, error) {
 	expression = strings.TrimSpace(expression)
-	if strings.HasPrefix(expression, "GW") && strings.HasSuffix(expression, ")") {
+
+	pattern := `^GW:\w+\([^\(\)]+\)$`
+
+	if b, _ := regexp.Match(pattern, []byte(expression)); b {
 		for {
 			gwFuncName := expression[:strings.Index(expression, "(")]
 			exp := expression[strings.Index(expression, "(")+1 : strings.LastIndex(expression, ")")]
 
 			if function, exists := expressionToFuncMap[gwFuncName]; exists {
-				if _, values, err := EvaluateGroundworkFunction(exp, vars); err == nil {
+				if _, values, err := EvaluateGroundworkExpression(exp, vars, argumentCounter); err == nil {
 					if len(values) != expressionToArgsCountMap[gwFuncName] {
-						return -1, nil, errors.New(fmt.Sprintf("Too much arguments for Groundwork function [%s]", gwFuncName))
+						return -1, nil, errors.New(fmt.Sprintf("Invalid arguments count for Groundwork function [%s]", gwFuncName))
 					}
 					v := function.(func(...float64) float64)(values...)
 					return v, []float64{v}, nil
@@ -393,17 +400,28 @@ func EvaluateGroundworkFunction(expression string, vars map[string]interface{}) 
 			}
 		}
 	} else {
-		funcArgs := strings.Split(expression, ",")
 		var result []float64
-		for _, val := range funcArgs {
-			if strings.HasPrefix(val, "GW") {
-				if v, _, err := EvaluateGroundworkFunction(val, vars); err == nil {
-					result = append(result, v)
-					continue
+		if strings.Contains(expression, "GW:") {
+			for {
+				firstIndex := strings.LastIndex(expression, "GW:")
+				if firstIndex == -1 {
+					break
+				}
+				lastIndex := strings.Index(expression[firstIndex:], ")")
+				newExp := expression[firstIndex : len(expression[:firstIndex])+lastIndex+1]
+				if v, _, err := EvaluateGroundworkExpression(newExp, vars, argumentCounter); err == nil {
+					argumentToReplace := fmt.Sprintf("res_%d", argumentCounter)
+					vars[argumentToReplace] = v
+					expression = strings.ReplaceAll(expression, newExp, argumentToReplace)
+					argumentCounter++
 				} else {
 					return -1, nil, err
 				}
 			}
+		}
+		funcArgs := strings.Split(expression, ",")
+		for _, val := range funcArgs {
+			val = strings.TrimSpace(val)
 			if strings.ContainsAny(val, "+-/*") {
 				if v, err := gval.Evaluate(strings.ReplaceAll(val, ".", "_"), vars); err == nil {
 					result = append(result, v.(float64))
@@ -412,19 +430,19 @@ func EvaluateGroundworkFunction(expression string, vars map[string]interface{}) 
 					return -1, nil, err
 				}
 			}
-			if v, ok := vars[strings.ReplaceAll(strings.TrimSpace(val), ".", "_")]; ok {
+			if v, ok := vars[strings.ReplaceAll(val, ".", "_")]; ok {
 				result = append(result, v.(float64))
 				continue
 			} else {
 				return -1, nil, errors.New(fmt.Sprintf("Undefined variable %s", val))
 			}
 		}
-		return -1, result, nil
+		return result[0], result, nil
 	}
 }
 
 func ListExpressions(name string) []ExpressionToSuggest {
-	expressions := []ExpressionToSuggest{}
+	var expressions []ExpressionToSuggest
 
 	for key, argsCount := range expressionToArgsCountMap {
 		if strings.Contains(key, name) {
@@ -432,6 +450,9 @@ func ListExpressions(name string) []ExpressionToSuggest {
 				key, argsCount,
 			})
 		}
+	}
+	if expressions == nil {
+		return []ExpressionToSuggest{}
 	}
 
 	return expressions
@@ -461,8 +482,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 		return -1, errors.New("Not enough expression parameters ")
 	}
 
-
-	if result, _, err := EvaluateGroundworkFunction(expression.Expression, vars); err == nil {
+	if result, _, err := EvaluateGroundworkExpression(expression.Expression, vars, 0); err == nil {
 		return result, nil
 	} else {
 		return -1, err

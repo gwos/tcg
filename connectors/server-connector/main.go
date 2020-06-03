@@ -17,27 +17,6 @@ const (
 	DefaultCacheTimer = 1
 )
 
-type InitializeConfigResult struct {
-	Processes      []string
-	Groups         []transit.ResourceGroup
-	MetricsProfile transit.MetricsProfile
-	Timer          float64
-	Ownership      transit.HostOwnershipType
-}
-
-// How to test:
-//func main() {
-//  str := "GW:toPercentageLimit(arg1)"
-//	m := map[string]interface{}{
-//		"arg1": 1.87,
-//		"arg2": 1000.0,
-//		"arg3": 1.0,
-//	}
-//	val, _, err := connectors.EvaluateGroundworkFunction(str, m)
-//	fmt.Println(val)
-//	fmt.Println(err)
-//}
-
 // @title TCG API Documentation
 // @version 1.0
 

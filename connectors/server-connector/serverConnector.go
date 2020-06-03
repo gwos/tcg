@@ -497,6 +497,7 @@ func initializeEntrypoints() []services.Entrypoint {
 					c.JSON(http.StatusOK, result)
 					return
 				}
+				log.Error("[Server Connector]: " + err.Error())
 				c.JSON(http.StatusBadRequest, err.Error())
 			},
 		})
