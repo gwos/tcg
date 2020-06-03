@@ -550,7 +550,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		for _, metric := range result[i].Metrics {
 			fmt.Println(metric.MetricComputeType)
 			if metric.MetricComputeType == transit.Synthetic {
-				if value, _, err := EvaluateGroundworkFunction(metric.MetricExpression, vars); err != nil {
+				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
 					continue
 				} else {
