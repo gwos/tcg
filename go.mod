@@ -16,7 +16,6 @@ require (
 	github.com/go-openapi/swag v0.19.6 // indirect
 	github.com/go-sql-driver/mysql v1.4.1 // indirect
 	github.com/gogo/protobuf v1.3.0 // indirect
-	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/sessions v1.2.0 // indirect
 	github.com/hashicorp/go-hclog v0.9.2 // indirect
@@ -52,6 +51,5 @@ require (
 	golang.org/x/sys v0.0.0-20191009170203-06d7bd2c5f4f // indirect
 	golang.org/x/tools v0.0.0-20200114052453-d31a08c2edf2 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
-	gopkg.in/yaml.v2 v2.2.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20191010095647-fc94e3f71652
 )
