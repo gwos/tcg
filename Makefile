@@ -17,6 +17,10 @@ CONVERT_GO_TO_C_BUILD_OBJECTS = \
 	gotocjson/_c_code/convert_go_to_c.c	\
 	gotocjson/_c_code/convert_go_to_c.h
 
+GENERIC_DATATYPES_BUILD_OBJECTS = \
+	${BUILD_TARGET_DIRECTORY}/generic_datatypes.c	\
+	${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
+
 CONFIG_BUILD_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/config.c	\
 	${BUILD_TARGET_DIRECTORY}/config.h
@@ -31,6 +35,7 @@ TRANSIT_BUILD_OBJECTS =	\
 
 LIBTRANSITJSON_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	\
+	${BUILD_TARGET_DIRECTORY}/generic_datatypes.o	\
 	${BUILD_TARGET_DIRECTORY}/config.o		\
 	${BUILD_TARGET_DIRECTORY}/milliseconds.o	\
 	${BUILD_TARGET_DIRECTORY}/transit.o
@@ -48,6 +53,7 @@ LIBTRANSITJSON_LIBRARY = ${BUILD_TARGET_DIRECTORY}/libtransitjson.so
 BUILD_HEADER_FILES = \
 	${LIBTRANSIT_HEADER}				\
 	gotocjson/_c_code/convert_go_to_c.h		\
+	${BUILD_TARGET_DIRECTORY}/generic_datatypes.h	\
 	${BUILD_TARGET_DIRECTORY}/config.h		\
 	${BUILD_TARGET_DIRECTORY}/milliseconds.h	\
 	${BUILD_TARGET_DIRECTORY}/transit.h
@@ -127,6 +133,9 @@ ${INSTALL_BASE_DIRECTORY}/lib	:
 gotocjson/gotocjson	: gotocjson/gotocjson.go
 	make -C gotocjson gotocjson
 
+${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datatypes.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -g -o ${BUILD_TARGET_DIRECTORY} gotocjson/generic_datatypes.go
+
 ${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson config/config.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
 
@@ -139,13 +148,16 @@ ${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson transit/transit.go | ${BUILD_TARG
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
 	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@
 
-${BUILD_TARGET_DIRECTORY}/config.o	: ${CONFIG_BUILD_OBJECTS}
+${BUILD_TARGET_DIRECTORY}/generic_datatypes.o	: ${GENERIC_DATATYPES_BUILD_OBJECTS}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+
+${BUILD_TARGET_DIRECTORY}/config.o	: ${CONFIG_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/config.c -o $@ -Igotocjson/_c_code
 
-${BUILD_TARGET_DIRECTORY}/milliseconds.o	: ${MILLISECONDS_BUILD_OBJECTS}
+${BUILD_TARGET_DIRECTORY}/milliseconds.o	: ${MILLISECONDS_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/milliseconds.c -o $@ -Igotocjson/_c_code
 
-${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS}
+${BUILD_TARGET_DIRECTORY}/transit.o	: ${TRANSIT_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/transit.c -o $@ -Igotocjson/_c_code
 
 ${LIBTRANSITJSON_LIBRARY}	: ${LIBTRANSITJSON_OBJECTS}

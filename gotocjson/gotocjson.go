@@ -80,7 +80,7 @@ import (
 // Globals.
 
 var PROGRAM = "gotocjson"
-var VERSION = "0.2.0"
+var VERSION = "0.3.0"
 
 var bad_args = false
 var exit_early = false
@@ -88,17 +88,22 @@ var print_help = false
 var print_version = false
 var print_diagnostics = false
 var print_errors = true
+var generate_generic_datatypes = false
+var generate_generic_structures = false
 var input_filepath = ""
 var output_directory = ""
 var diag_file = os.Stdout
 
 func show_help() {
 	fmt.Fprintf(os.Stdout,
-		`usage:  %[1]s [-d] [-o outdir] filename.go
+		`usage:  %[1]s [-d] [-g] [-o outdir] filename.go
 	%[1]s -h
 	%[1]s --help
 	%[1]s --version
-where:  -d           produces diagnostic output on the stdout stream
+where:	-d           produces diagnostic output on the stdout stream
+	-g           produces output for generic datatypes, which may be shared across
+		     multiple application input files and are normally suppressed in
+		     the name of avoiding duplicate declarations and definitions
 	-o outdir    specifies the directory where the generated .h and .c files
 		     will be placed; default is the same directory in which the
 		     filename.go file lives
@@ -135,6 +140,11 @@ func parse_args() {
 		}
 		if cmd_args[0] == "-d" {
 			print_diagnostics = true
+			cmd_args = cmd_args[1:]
+			continue
+		}
+		if cmd_args[0] == "-g" {
+			generate_generic_datatypes = true
 			cmd_args = cmd_args[1:]
 			continue
 		}
@@ -962,6 +972,73 @@ node_loop:
 						}
 						// panic_message = "aborting due to previous errors"
 						// break node_loop
+					} else if type_map, ok := spec.(*ast.TypeSpec).Type.(*ast.MapType); ok {
+
+						if false {
+							// FIX LATER:  this block is just initial skeleton code, mostly copied from elsewhere; fill it
+							// in properly, as part of supporting a "type map_string_string map[string]string" declaration
+							var field_type_name string
+							var key_type_ident *ast.Ident
+							var value_type_ident *ast.Ident
+							var value_type_interface *ast.InterfaceType
+							var ok bool
+							if key_type_ident, ok = type_map.Key.(*ast.Ident); ok {
+								if print_diagnostics {
+									// fmt.Fprintf(diag_file, "    --- map Key Ident %#v\n", key_type_ident)
+								}
+							} else {
+								if print_diagnostics {
+									fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Key type:  %T\n", file_line(), type_map.Key)
+									fmt.Fprintf(diag_file, "ERROR:  struct field Type Key field is not of a recognized type\n")
+								}
+								panic_message = "aborting due to previous errors" 
+								break node_loop
+							}
+							if value_type_ident, ok = type_map.Value.(*ast.Ident); ok {
+								if print_diagnostics {
+									// fmt.Fprintf(diag_file, "    --- map Value Ident %#v\n", value_type_ident)
+								}
+								field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
+							} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
+								if print_diagnostics {
+									// Suppress Go's "unused variable" noisyness, when the following printed output is commented out.
+									value_type_interface = value_type_interface
+									// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
+								}
+								// Logically, we would want to declare the field type name to refer to some sort of 
+								// generic interface object, and then generate code to handle all the various types of
+								// objects (floats, slices, deep maps, slices of deep maps, etc.) one might encounter as
+								// instances of such an interface.  But that is far too complex for present needs.  Those
+								// needs currently are just to handle a structure in the Go code that has an interface
+								// as the value of one of its declared map values, in a structure that currently has no
+								// business being transferred between Go code and C code in the first place.  So instead,
+								// we punt; we just abort this iteration of the loop, which suppresses recognition of the
+								// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
+								// CONTINUE" below), which we handle there in a similar manner, by simply skipping further 
+								// processing of that loop iteration as well.  The net effect is that said field will not
+								// appear in the C structure at all, and it will be neither serialized nor deserialized.
+								// But that won't matter, because we don't expect to ever exchange that structure with
+								// any Go code anyway.  This is just a workaround to avoid having to make larger changes.
+								// field_type_name = "map[" + key_type_ident.Name + "]" + "interface"
+								continue
+							} else {
+								if print_diagnostics {
+									fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
+									fmt.Fprintf(diag_file, "ERROR:  struct field Type Value field is not of a recognized type\n")
+								}
+								panic_message = "aborting due to previous errors" 
+								break node_loop
+							}
+							// FIX QUICK:  This needs work to fully reflect the map structure; perhaps the new statements now do so.
+							// field_type_name = value_type_ident.Name
+							if print_diagnostics {
+								// fmt.Fprintf(diag_file, "    --- map key name and type:  map[%#v]%#v\n", key_type_ident.Name, field_type_name)
+							}
+							if print_diagnostics {
+								fmt.Fprintf(diag_file, "    --- map type:  %#v\n", field_type_name)
+							}
+						}
+
 					} else {
 						if print_diagnostics {
 							fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
@@ -1455,6 +1532,17 @@ extern "C" {
 #include <stdint.h>     // as or C99, provides "int32_t" and "int64_t" datatypes
 #include <time.h>       // to supply "struct timespec", with time_t tv_sec (seconds) and long tv_nsec (nanoseconds) members
 
+// Our JSON encoding and decoding of C structures depends on the Jansson library
+// for a lot of low-level detail.  See:
+//
+//     http://www.digip.org/jansson/
+//     https://github.com/akheron/jansson
+//     https://jansson.readthedocs.io/
+//
+#include "jansson.h"
+
+{{.GenericHeader}}
+
 #ifndef NUL_TERM_LEN
 // Size of a NUL-termination byte.  Generally useful for documenting the
 // meaning of +1 and -1 length adjustments having to do with such bytes.
@@ -1537,25 +1625,14 @@ var C_code_boilerplate = `//
 // Use of this software is subject to commercial license terms.
 //
 
-// Our JSON encoding and decoding of C structures depends on the Jansson library
-// for a lot of low-level detail.  See:
-//
-//     http://www.digip.org/jansson/
-//     https://github.com/akheron/jansson
-//     https://jansson.readthedocs.io/
-//
-// FIX MINOR:  This inclusion might be better moved to the header file,
-// if json_dumps() is expected to be used by application code.
-#include "jansson.h"
-
-#include "convert_go_to_c.h"
-
 #include <stdlib.h>	// for the declaration of free(), at least
 #include <inttypes.h>	// for PRId64
 #include <errno.h>	// for errno
 // #include <stdalign.h>  // Needed to supply alignof(), available starting with C11.
 // #include <stddef.h>
 // #include <string.h>
+
+#include "convert_go_to_c.h"
 
 {{.OtherHeaders}}
 #include "{{.HeaderFilename}}"
@@ -1639,17 +1716,32 @@ func print_type_declarations(
 	header_boilerplate := template.Must(template.New("header_header").Parse(C_header_header_boilerplate))
 	footer_boilerplate := template.Must(template.New("header_footer").Parse(C_header_footer_boilerplate))
 
-	type C_header_boilerplate_fields struct {
-		Year           int
-		HeaderFilename string
-		HeaderSymbol   string
-	}
-
 	current_year := time.Now().Year()
 	header_filename := package_name + ".h"
 	header_filepath := filepath.Join(output_directory, header_filename)
 	header_symbol := "_" + strings.ToUpper(slash.ReplaceAllLiteralString(package_name, "_")) + "_H"
-	boilerplate_variables := C_header_boilerplate_fields{Year: current_year, HeaderFilename: header_filename, HeaderSymbol: header_symbol}
+	var generic_header string
+	if generate_generic_datatypes {
+		// We expect to only ever generate generic datatypes for one particular Go file (namely, generic_datatypes.go),
+		// and the #include statement for its generated header file is already included in the general boilerplate, so
+		// there is no sense in duplicating the inclusion of that header.
+		generic_header = ""
+	} else {
+		generic_header = `#include "generic_datatypes.h"`;
+	}
+	type C_header_boilerplate_fields struct {
+		Year           int
+		HeaderFilename string
+		HeaderSymbol   string
+		GenericHeader  string
+	}
+
+	boilerplate_variables := C_header_boilerplate_fields{
+		Year:             current_year,
+		HeaderFilename:   header_filename,
+		HeaderSymbol:     header_symbol,
+		GenericHeader:    generic_header,
+	}
 
 	header_file, err := os.Create(header_filepath)
 	if err != nil {
@@ -1956,6 +2048,7 @@ func print_type_declarations(
 				//
 				// Logically, we don't really need to make the struct here, but it may help later on with compilation
 				// error messages in application code.
+				//
 				struct_definition = fmt.Sprintf("typedef struct _%s_%s_ {\n", package_name, decl_kind.type_name)
 				for _, field := range spec.(*ast.TypeSpec).Type.(*ast.StructType).Fields.List {
 					var field_tag string
@@ -2164,43 +2257,65 @@ func print_type_declarations(
 							}
 							key_type := key_value_types[1]
 							value_type := key_value_types[2]
+							is_generic_map := true
 							if package_defined_type[key_type] {
 								key_type = package_name + "_" + key_type
+								is_generic_map = false
 							}
 							if package_defined_type[value_type] {
 								value_type = package_name + "_" + value_type
+								is_generic_map = false
 							}
 							type_pair_type := key_type + "_" + value_type + "_Pair"
 							type_pair_list_type := type_pair_type + "_List"
 							if !have_pair_structs[type_pair_type] {
 								have_pair_structs[type_pair_type] = true
-								fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_type)
-								fmt.Fprintf(header_file, "    %s key;\n", key_type)
-								fmt.Fprintf(header_file, "    %s value;\n", value_type)
-								fmt.Fprintf(header_file, "} %s;\n", type_pair_type)
-								fmt.Fprintf(header_file, "\n")
-								fmt.Fprintf(header_file, "#define make_empty_%s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", type_pair_type)
-								fmt.Fprintf(header_file, "#define make_empty_%s() make_empty_%[1]s_array(1)\n", type_pair_type)
-								fmt.Fprintf(header_file, "extern bool     is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_type)
-								fmt.Fprintf(header_file, "\n")
-								struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "key")
-								struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "value")
-								struct_field_C_types[type_pair_type] = map[string]string{}
-								struct_field_C_types[type_pair_type]["key"] = key_type
-								struct_field_C_types[type_pair_type]["value"] = value_type
-								fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_list_type)
-								fmt.Fprintf(header_file, "    size_t count;\n")
-								fmt.Fprintf(header_file, "    %s *items;\n", type_pair_type)
-								fmt.Fprintf(header_file, "} %s;\n", type_pair_list_type)
-								fmt.Fprintf(header_file, "\n")
-								fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_list_type)
-								fmt.Fprintf(header_file, "\n")
-								struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "count")
-								struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "items")
-								struct_field_C_types[type_pair_list_type] = map[string]string{}
-								struct_field_C_types[type_pair_list_type]["count"] = "size_t"
-								struct_field_C_types[type_pair_list_type]["items"] = type_pair_type + " *"
-								key_value_pair_types[key_type] = append(key_value_pair_types[key_type], value_type)
+								// This suppression of header-file lines is direct and obvious.
+								if is_generic_map == generate_generic_datatypes {
+									fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_type)
+									fmt.Fprintf(header_file, "    %s key;\n", key_type)
+									fmt.Fprintf(header_file, "    %s value;\n", value_type)
+									fmt.Fprintf(header_file, "} %s;\n", type_pair_type)
+									fmt.Fprintf(header_file, "\n")
+									fmt.Fprintf(header_file, "#define make_empty_%s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", type_pair_type)
+									fmt.Fprintf(header_file, "#define make_empty_%s() make_empty_%[1]s_array(1)\n", type_pair_type)
+									fmt.Fprintf(header_file, "extern bool     is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", type_pair_type)
+									fmt.Fprintf(header_file, "\n")
+								}
+								// These settings, we allow to be made unconditionally.  That allows the creation of clean, fully
+								// descendant destroy_*() routines in non-generic code, that do not attempt to call a routine such as
+								// destroy_string_string_Pair_ptr_tree(), but instead are able to manage the field-by-field destruction
+								// of a generic map on their own.  That's both more efficient, and necessary because we have otherwise
+								// not allowed for the generation of generic destructors such as destroy_string_string_Pair_ptr_tree()
+								// from the generic code itself.
+								if true {
+									struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "key")
+									struct_fields[type_pair_type] = append(struct_fields[type_pair_type], "value")
+									struct_field_C_types[type_pair_type] = map[string]string{}
+									struct_field_C_types[type_pair_type]["key"] = key_type
+									struct_field_C_types[type_pair_type]["value"] = value_type
+								}
+								// This suppression of header-file lines is direct and obvious.
+								if is_generic_map == generate_generic_datatypes {
+									fmt.Fprintf(header_file, "typedef struct _%s_ {\n", type_pair_list_type)
+									fmt.Fprintf(header_file, "    size_t count;\n")
+									fmt.Fprintf(header_file, "    %s *items;\n", type_pair_type)
+									fmt.Fprintf(header_file, "} %s;\n", type_pair_list_type)
+									fmt.Fprintf(header_file, "\n")
+									fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value (const %[1]s *%[1]s_ptr);\n", type_pair_list_type)
+									fmt.Fprintf(header_file, "extern json_t *%[1]s_ptr_as_JSON_ptr(const %[1]s *%[1]s_ptr);\n", type_pair_list_type)
+									fmt.Fprintf(header_file, "extern         %[1]s *JSON_as_%[1]s_ptr(json_t *json);\n", type_pair_list_type)
+									fmt.Fprintf(header_file, "\n")
+								}
+								// This suppression is less obvious, because it is indirect and it's not immediately clear if there will be side effects.
+								if is_generic_map == generate_generic_datatypes {
+									struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "count")
+									struct_fields[type_pair_list_type] = append(struct_fields[type_pair_list_type], "items")
+									struct_field_C_types[type_pair_list_type] = map[string]string{}
+									struct_field_C_types[type_pair_list_type]["count"] = "size_t"
+									struct_field_C_types[type_pair_list_type]["items"] = type_pair_type + " *"
+									key_value_pair_types[key_type] = append(key_value_pair_types[key_type], value_type)
+								}
 							}
 							struct_definition += fmt.Sprintf("    %s %s;  // go: %s\n", type_pair_list_type, name.Name, field_type)
 							struct_fields[decl_kind.type_name] = append(struct_fields[decl_kind.type_name], name.Name)
@@ -2226,15 +2341,22 @@ func print_type_declarations(
 				package_name, decl_kind.type_name)
 			struct_definition += fmt.Sprintf("extern json_t *     %s_%s_ptr_as_JSON_ptr(const %[1]s_%[2]s *%[1]s_%[2]s_ptr);\n",
 				package_name, decl_kind.type_name)
-
 			struct_definition += fmt.Sprintf("#define             %s_%s_ptr_as_JSON_str(%[1]s_%[2]s_ptr) JSON_as_str(%[1]s_%[2]s_ptr_as_JSON_ptr(%[1]s_%[2]s_ptr), 0)\n",
 				package_name, decl_kind.type_name)
-
 			struct_definition += fmt.Sprintf("extern %s_%s *    JSON_as_%[1]s_%[2]s_ptr(json_t *json);\n",
 				package_name, decl_kind.type_name)
 			struct_definition += fmt.Sprintf("extern %s_%s *JSON_str_as_%[1]s_%[2]s_ptr(const char *json_str, json_t **json);\n",
 				package_name, decl_kind.type_name)
-			fmt.Fprintln(header_file, struct_definition)
+
+			// For now, we suppress generation of structure definitions from a generic-datatype file,
+			// because we are only using such a structure in the Go source code to contain the generic
+			// datatypes of interest, and the container itself has no utility in actual applications.
+			// If we want to change that, set the generate_generic_structures flag to true at the top
+			// of this file, or perhaps calculate the value of generate_generic_structures based on
+			// some sort of conventions about the name of the structure.
+			if !generate_generic_datatypes || generate_generic_structures {
+				fmt.Fprintln(header_file, struct_definition)
+			}
 		default:
 			panic(fmt.Sprintf("found unknown type declaration kind '%s'", decl_kind.type_kind))
 		}
@@ -2363,7 +2485,18 @@ func generate_all_encode_tree_routines(
 	pointer_type_zero_value_code := ""
 
 	// This is a shortcut, so we don't have to nearly-replicate some other code we will generate later on.
-	for base_type_ptr, base_type := range pointer_base_types {
+	//
+	// Processing the pointer_base_types map in a deterministic order by sorted keys is not logically
+	// necessary, but it helps with generating stable output as we evolve this code.  That way, we can
+	// more easily compare generated output as changes are made, and the cost is low.
+	//
+	var base_type_ptrs []string
+	for base_type_ptr := range pointer_base_types {
+	    base_type_ptrs = append(base_type_ptrs, base_type_ptr)
+	}
+	sort.Strings(base_type_ptrs)
+	for _, base_type_ptr := range base_type_ptrs {
+		base_type := pointer_base_types[base_type_ptr];
 		pointer_type_zero_value_code += fmt.Sprintf(`
 bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr) {
     return
@@ -3074,6 +3207,12 @@ func generate_encode_PackageName_StructTypeName_ptr_tree(
 	function_code string,
 	err error,
 ) {
+	if generate_generic_datatypes && !generate_generic_structures {
+		function_code = ""
+		err = nil
+		return function_code, err
+	}
+
 	// Here's the template for the standard encoding function we need to generate.
 	// There are also a few extra flavors, which we will get to in due course.
 
@@ -3813,6 +3952,12 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 	function_code string,
 	err error,
 ) {
+	if generate_generic_datatypes && !generate_generic_structures {
+		function_code = ""
+		err = nil
+		return function_code, err
+	}
+
 	function_code = ""
 
 	var JSON_as_object_template_ptr_part1 = `{{.Package_StructName}} *JSON_as_{{.Package_StructName}}_ptr(json_t *json) {
@@ -4447,6 +4592,12 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 	function_code string,
 	err error,
 ) {
+	if generate_generic_datatypes && !generate_generic_structures {
+		function_code = ""
+		err = nil
+		return function_code, err
+	}
+
 	trailing_List := regexp.MustCompile(`(.+)_List$`)
 	// FIX QUICK:  Check out the details of this pattern, once everything else is working; should we only recognize _Ptr (capital) again?
 	trailing_Ptr := regexp.MustCompile(`(.+)_[Pp]tr$`)
