@@ -149,7 +149,7 @@ ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} |
 	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@
 
 ${BUILD_TARGET_DIRECTORY}/generic_datatypes.o	: ${GENERIC_DATATYPES_BUILD_OBJECTS}
-	${CC} -c ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c -o $@ -Igotocjson/_c_code -I${JANSSON_INCLUDE_DIRECTORY}
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c -o $@ -Igotocjson/_c_code
 
 ${BUILD_TARGET_DIRECTORY}/config.o	: ${CONFIG_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/config.c -o $@ -Igotocjson/_c_code
