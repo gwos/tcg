@@ -62,7 +62,7 @@ CC = gcc $(CFLAGS)
 
 default	: all
 
-all	: gotocjson
+all	: gotocjson ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c
 
 ${BUILD_TARGET_DIRECTORY}	:
 	mkdir -p ${BUILD_TARGET_DIRECTORY}
@@ -98,6 +98,9 @@ tests	: ${JSON_TEST_FILES} _c_code/testjson.c ${BUILD_TARGET_DIRECTORY}/convert_
 
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
+
+${BUILD_TARGET_DIRECTORY}/generic_datatypes.h ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c	: gotocjson generic_datatypes.go
+	./gotocjson -g -d -o ${BUILD_TARGET_DIRECTORY} generic_datatypes.go > ,generic-diagnostics
 
 # Run the set of unit tests while looking for full detail on memory leaks.
 fullcheck	: ${BUILD_TARGET_DIRECTORY}/unittest
@@ -158,13 +161,14 @@ enumtest	: ${BUILD_TARGET_DIRECTORY}/enum.o
 
 clean	:
 	rm -f ${BUILD_TARGET_DIRECTORY}/*.o \
+	    ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c \
 	    ${BUILD_TARGET_DIRECTORY}/setup.h ${BUILD_TARGET_DIRECTORY}/setup.c \
 	    ${BUILD_TARGET_DIRECTORY}/subseconds.h ${BUILD_TARGET_DIRECTORY}/subseconds.c \
 	    ${BUILD_TARGET_DIRECTORY}/transport.h ${BUILD_TARGET_DIRECTORY}/transport.c \
 	    ${BUILD_TARGET_DIRECTORY}/enum.h ${BUILD_TARGET_DIRECTORY}/enum.c
 
 realclean	: clean
-	rm -f gotocjson ,setup-diagnostics ,enum-diagnostics ,subseconds-diagnostics ,transport-diagnostics \
+	rm -f gotocjson ,generic-diagnostics ,setup-diagnostics ,enum-diagnostics ,subseconds-diagnostics ,transport-diagnostics \
 	    ${BUILD_TARGET_DIRECTORY}/unittest ${BUILD_TARGET_DIRECTORY}/testjson ${BUILD_TARGET_DIRECTORY}/transport
 
 distclean	: realclean
