@@ -466,7 +466,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 			processes := processesInterface.(map[string]float64)
 			for _, param := range expression.Params {
 				if val, exist := processes[param.Name]; exist {
-					vars[param.Name] = val
+					vars[strings.ReplaceAll(param.Name, ".", "_")] = val
 				}
 			}
 		} else {
@@ -474,7 +474,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 		}
 	} else {
 		for _, param := range expression.Params {
-			vars[param.Name] = param.Value
+			vars[strings.ReplaceAll(param.Name, ".", "_")] = param.Value
 		}
 	}
 
