@@ -465,7 +465,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 		if processesInterface, exist := cache.ProcessesCache.Get("processes"); exist {
 			processes := processesInterface.(map[string]float64)
 			for _, param := range expression.Params {
-				if val, exist := processes[param.Name]; exist {
+				if val, exist := processes[strings.ReplaceAll(param.Name, ".", "_")]; exist {
 					vars[strings.ReplaceAll(param.Name, ".", "_")] = val
 				}
 			}
@@ -481,7 +481,6 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	if len(vars) != len(expression.Params) {
 		return -1, errors.New("Not enough expression parameters ")
 	}
-
 	if result, _, err := EvaluateGroundworkExpression(expression.Expression, vars, 0); err == nil {
 		return result, nil
 	} else {
