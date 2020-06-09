@@ -449,7 +449,19 @@ func collectProcesses() map[string]float64 {
 	for _, hostProcess := range hostProcesses {
 		cpuUsed, _ := hostProcess.CPUPercent()
 		name, _ := hostProcess.Name()
-		processes[name] = cpuUsed
+		processes[strings.ReplaceAll(name, ".", "_")] = cpuUsed
+	}
+
+	for name, function := range processToFuncMap {
+		monitoredService := function.(func(int, int, string) *transit.MonitoredService)(-1, -1, "")
+		if monitoredService != nil {
+			if monitoredService.Metrics[0].Value.ValueType == transit.DoubleType {
+				processes[strings.ReplaceAll(name, ".", "_")] = monitoredService.Metrics[0].Value.DoubleValue
+			}
+			if monitoredService.Metrics[0].Value.ValueType == transit.IntegerType {
+				processes[strings.ReplaceAll(name, ".", "_")] = float64(monitoredService.Metrics[0].Value.IntegerValue)
+			}
+		}
 	}
 
 	return processes
