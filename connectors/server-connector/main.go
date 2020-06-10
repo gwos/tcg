@@ -88,8 +88,5 @@ func main() {
 }
 
 func handleCache() {
-	for {
-		cache.ProcessesCache.SetDefault("processes", collectProcesses())
-		time.Sleep(DefaultCacheTimer * time.Minute)
-	}
+	cache.ProcessesCache.SetDefault("processes", collectProcesses())
 }

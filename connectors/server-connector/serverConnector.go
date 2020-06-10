@@ -77,6 +77,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 	return &inventoryResource
 }
 
+// TODO: update cache
 // CollectMetrics method gather metrics data for necessary processes
 func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredResource {
 	hostStat, err := host.Info()
@@ -131,6 +132,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 		monitoredResource.Services = append(monitoredResource.Services, *monitoredService)
 	}
+
+	updateCache()
 
 	return monitoredResource
 }
@@ -433,9 +436,9 @@ func listSuggestions(name string) []string {
 	hostProcesses, _ := cache.ProcessesCache.Get("processes")
 
 	var processes []string
-	for _, hostProcess := range hostProcesses.([]localProcess) {
-		if strings.Contains(hostProcess.name, name) {
-			processes = append(processes, hostProcess.name)
+	for n, _ := range hostProcesses.(map[string]float64) {
+		if strings.Contains(n, name) {
+			processes = append(processes, n)
 		}
 	}
 
@@ -465,6 +468,10 @@ func collectProcesses() map[string]float64 {
 	}
 
 	return processes
+}
+
+func updateCache() {
+	cache.ProcessesCache.SetDefault("processes", collectProcesses())
 }
 
 func initializeEntrypoints() []services.Entrypoint {
