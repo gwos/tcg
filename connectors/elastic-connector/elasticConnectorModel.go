@@ -5,16 +5,19 @@ import (
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
+	ecClients "github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/transit"
+	"strings"
 	"sync"
 )
 
 var doOnce sync.Once
 
 type MonitoringState struct {
-	Metrics map[string]transit.MetricDefinition
-	Hosts   map[string]monitoringHost
+	Metrics    map[string]transit.MetricDefinition
+	Hosts      map[string]monitoringHost
+	HostGroups map[string]map[string]struct{}
 }
 
 type monitoringService struct {
@@ -25,11 +28,11 @@ type monitoringService struct {
 
 type monitoringHost struct {
 	name       string
-	services   []monitoringService
+	services   map[string]monitoringService
 	hostGroups []string
 }
 
-func initMonitoringState(previousState MonitoringState, config ElasticConnectorConfig) MonitoringState {
+func initMonitoringState(previousState MonitoringState, config ElasticConnectorConfig, esClient *ecClients.EsClient) MonitoringState {
 	currentState := MonitoringState{
 		Metrics: make(map[string]transit.MetricDefinition),
 		Hosts:   make(map[string]monitoringHost),
@@ -61,46 +64,42 @@ func initMonitoringState(previousState MonitoringState, config ElasticConnectorC
 		currentState.Hosts[host.name] = host
 	}
 
+	// update with hosts extracted from ES right now
+	esHosts := initEsHosts(config, esClient)
+	for _, host := range esHosts {
+		currentState.Hosts[host.name] = host
+	}
+
 	// nullify services
-	for _, host := range currentState.Hosts {
-		var services []monitoringService
-		if currentState.Metrics != nil {
+	if currentState.Metrics != nil {
+		for _, host := range currentState.Hosts {
+			host.services = make(map[string]monitoringService, len(currentState.Metrics))
 			for metricName := range currentState.Metrics {
 				service := monitoringService{name: metricName, hits: 0}
-				services = append(services, service)
+				host.services[metricName] = service
 			}
+			currentState.Hosts[host.name] = host
 		}
-		host.services = services
-		currentState.Hosts[host.name] = host
 	}
 
 	return currentState
 }
 
-func (monitoringState *MonitoringState) updateHosts(hostName string, serviceName string, hostGroupName string,
-	timeInterval *transit.TimeInterval) {
-	hosts := monitoringState.Hosts
-	if host, exists := hosts[hostName]; exists {
-		services := host.services
-		for i := range services {
-			if services[i].name == serviceName {
-				services[i].hits = services[i].hits + 1
-				if services[i].timeInterval == nil {
-					services[i].timeInterval = timeInterval
+func (monitoringState *MonitoringState) updateHost(hostName string, serviceName string, value int, timeInterval *transit.TimeInterval) {
+	if host, exists := monitoringState.Hosts[hostName]; exists {
+		if host.services != nil {
+			if service, exists := host.services[serviceName]; exists {
+				service.hits = value
+				if service.timeInterval == nil {
+					service.timeInterval = timeInterval
 				}
-				break
+				host.services[serviceName] = service
 			}
 		}
-		hostGroups := []string{hostGroupName}
-		host.hostGroups = hostGroups
-		hosts[hostName] = host
+		monitoringState.Hosts[hostName] = host
 	} else {
-		service := monitoringService{name: serviceName, hits: 1, timeInterval: timeInterval}
-		hostGroups := []string{hostGroupName}
-		host := monitoringHost{name: hostName, services: []monitoringService{service}, hostGroups: hostGroups}
-		hosts[hostName] = host
+		log.Error("[Elastic Connector]: Host not found in monitoring state: ", hostName)
 	}
-	monitoringState.Hosts = hosts
 }
 
 func (monitoringState *MonitoringState) toTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
@@ -134,15 +133,16 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 	if metricDefinitions == nil {
 		return monitoredServices, inventoryServices
 	}
-	for i, service := range host.services {
-		if metricDefinition, has := metricDefinitions[service.name]; has {
-			serviceName := connectors.Name(service.name, metricDefinition.CustomName)
+	i := 0
+	for serviceName, service := range host.services {
+		if metricDefinition, has := metricDefinitions[serviceName]; has {
+			customServiceName := connectors.Name(serviceName, metricDefinition.CustomName)
 
-			inventoryService := connectors.CreateInventoryService(serviceName, host.name)
+			inventoryService := connectors.CreateInventoryService(customServiceName, host.name)
 			inventoryServices[i] = inventoryService
 
 			metricBuilder := connectors.MetricBuilder{
-				Name:       service.name,
+				Name:       serviceName,
 				CustomName: metricDefinition.CustomName,
 				Value:      service.hits,
 				UnitType:   transit.UnitCounter,
@@ -156,13 +156,14 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 
 			monitoredService, err := connectors.BuildServiceForMetric(host.name, metricBuilder)
 			if err != nil {
-				log.Error("Error when creating service ", host.name, ":", serviceName)
+				log.Error("Error when creating service ", host.name, ":", customServiceName)
 				log.Error(err)
 			}
 			if monitoredService != nil {
 				monitoredServices[i] = *monitoredService
 			}
 		}
+		i = i + 1
 	}
 	return monitoredServices, inventoryServices
 }
@@ -203,6 +204,7 @@ func (monitoringState *MonitoringState) buildGroups() map[string]map[string]stru
 			groups[groupName][hostName] = struct{}{}
 		}
 	}
+	monitoringState.HostGroups = groups
 	return groups
 }
 
@@ -290,4 +292,43 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 	}
 
 	return gwHosts
+}
+
+func initEsHosts(config ElasticConnectorConfig, esClient *ecClients.EsClient) map[string]monitoringHost {
+	esHosts := make(map[string]monitoringHost)
+
+	hostNameField := config.HostNameField
+	hostGroupField := config.HostGroupField
+	hostBuckets := esClient.GetHosts(hostNameField, hostGroupField)
+
+	if len(hostBuckets) == 0 {
+		if !strings.HasSuffix(hostNameField, ".keyword") || !!strings.HasSuffix(hostGroupField, ".keyword") {
+			if !strings.HasSuffix(hostNameField, ".keyword") {
+				hostNameField = hostNameField + ".keyword"
+			}
+			if !strings.HasSuffix(hostGroupField, ".keyword") {
+				hostGroupField = hostGroupField + ".keyword"
+			}
+			hostBuckets = esClient.GetHosts(hostNameField, hostGroupField)
+		}
+	}
+
+	for _, hostBucket := range hostBuckets {
+		hostName := hostBucket.Key
+		hostGroupBuckets := hostBucket.HostGroupBuckets.Buckets
+		var hostGroups []string
+		if hostGroupBuckets != nil {
+			for _, hostGroupBucket := range hostGroupBuckets {
+				hostGroupName := hostGroupBucket.Key
+				hostGroups = append(hostGroups, hostGroupName)
+			}
+		}
+		host := monitoringHost{
+			name:       hostName,
+			hostGroups: hostGroups,
+		}
+		esHosts[hostName] = host
+	}
+
+	return esHosts
 }
