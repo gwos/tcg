@@ -123,6 +123,13 @@ $ go build .
 $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 ```
 
+### Building Connectors:
+
+```
+$ cd connectors/<connector>
+$ go build -ldflags "-X main.buildTime=`date -u '+%Y-%m-%d_%I:%M:%S %p'`"
+```
+
 
 ### or use Makefiles
 

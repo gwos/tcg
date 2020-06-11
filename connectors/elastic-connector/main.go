@@ -9,8 +9,11 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"net/http"
+	"strings"
 	"time"
 )
+
+var buildTime = "Build time not provided"
 
 func main() {
 	connectors.ControlCHandler()
@@ -64,6 +67,14 @@ func main() {
 			Method: "Get",
 			Handler: func(c *gin.Context) {
 				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+		services.Entrypoint{
+			Url:    "/version",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.Version{Number: elasticConnectorVersion,
+					BuildTimestamp: strings.ReplaceAll(buildTime, "_", " ")})
 			},
 		},
 	); err != nil {
