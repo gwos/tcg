@@ -11,6 +11,7 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -18,6 +19,8 @@ import (
 const (
 	DefaultCacheTimer = 1
 )
+
+var buildTime = "Build time not provided"
 
 // @title TCG API Documentation
 // @version 1.0
@@ -71,6 +74,14 @@ func main() {
 				} else {
 					c.JSON(http.StatusOK, []transit.MetricDefinition{})
 				}
+			},
+		},
+		services.Entrypoint{
+			Url:    "/version",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.Version{Number: serverConnectorVersion,
+					BuildTimestamp: strings.ReplaceAll(buildTime, "_", " ")})
 			},
 		},
 	); err != nil {

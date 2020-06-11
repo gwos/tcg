@@ -562,3 +562,8 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 	}
 	return h.Sum(nil), nil
 }
+
+type Version struct {
+	Number         string `json:"number"`
+	BuildTimestamp string `json:"buildTimestamp"`
+}
