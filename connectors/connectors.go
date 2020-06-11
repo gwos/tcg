@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -69,7 +70,16 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
+	for i, _ := range request.Resources {
+		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
+		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
+	}
+
 	b, err = json.Marshal(request)
+
+	// log.Error(string(b))
+
 	if err != nil {
 		return err
 	}
@@ -516,6 +526,63 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 		}
 	}
 	return transit.ServiceOk
+}
+
+func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
+	var result []transit.MonitoredService
+	vars := make(map[string]interface{})
+
+	for _, service := range services {
+		for _, metric := range service.Metrics {
+			if metric.MetricComputeType != transit.Synthetic {
+				switch metric.Value.ValueType {
+				case transit.IntegerType:
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = float64(metric.Value.IntegerValue)
+				case transit.DoubleType:
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.DoubleValue
+				}
+			}
+		}
+		result = append(result, service)
+	}
+
+	for i, _ := range result {
+		for _, metric := range result[i].Metrics {
+			fmt.Println(metric.MetricComputeType)
+			if metric.MetricComputeType == transit.Synthetic {
+				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
+					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
+					continue
+				} else {
+					result[i] = transit.MonitoredService{
+						Name:          result[i].Name,
+						Type:          transit.Service,
+						Owner:         result[i].Owner,
+						Status:        "SERVICE_OK",
+						LastPlugInOutput: fmt.Sprintf(" ExpressionToSuggest: %s", metric.MetricExpression),
+						LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+						NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
+						Metrics: []transit.TimeSeries{
+							{
+								MetricName: metric.MetricName,
+								SampleType: transit.Value,
+								Interval: &transit.TimeInterval{
+									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
+									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+								},
+								Value: &transit.TypedValue{
+									ValueType:    metric.Value.ValueType,
+									IntegerValue: int64(value),
+									DoubleValue:  value,
+								},
+							},
+						},
+					}
+				}
+			}
+		}
+	}
+	return result
 }
 
 func ControlCHandler() {
