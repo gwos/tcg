@@ -77,7 +77,6 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 	return &inventoryResource
 }
 
-// TODO: update cache
 // CollectMetrics method gather metrics data for necessary processes
 func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredResource {
 	hostStat, err := host.Info()
@@ -421,8 +420,8 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 		} else {
 			processesMap[name] = values{
 				value:         -1,
-				criticalValue: -1,
-				warningValue:  -1,
+				criticalValue: pr.CriticalThreshold,
+				warningValue:  pr.WarningThreshold,
 				computeType:   transit.Synthetic,
 				expression:    pr.Expression,
 			}
@@ -474,6 +473,8 @@ func updateCache() {
 	cache.ProcessesCache.SetDefault("processes", collectProcesses())
 }
 
+// initializeEntrypoints - function for setting entrypoints,
+// that will be available through the Server Connector API
 func initializeEntrypoints() []services.Entrypoint {
 	var entrypoints []services.Entrypoint
 

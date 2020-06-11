@@ -1,5 +1,5 @@
 connector:
-  agentId: 76AE2920-0F88-44A5-BF1D-1B6B61B842C2
+  agentId: ""
   appName: SERVER
   appType: SERVER
   controllerAddr: 0.0.0.0:8099
