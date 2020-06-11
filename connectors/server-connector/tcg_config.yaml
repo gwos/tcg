@@ -1,5 +1,5 @@
 connector:
-  agentId: ***REMOVED***
+  agentId: ""
   appName: SERVER
   appType: SERVER
   controllerAddr: 0.0.0.0:8099
