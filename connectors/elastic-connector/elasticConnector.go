@@ -10,6 +10,7 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel/api/trace"
+	"sort"
 	"strings"
 )
 
@@ -34,7 +35,7 @@ func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) err
 	if err != nil {
 		return err
 	}
-	monitoringState := initMonitoringState(connector.monitoringState, config)
+	monitoringState := initMonitoringState(connector.monitoringState, config, &esClient)
 
 	connector.config = config
 	connector.kibanaClient = kibanaClient
@@ -60,7 +61,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 		}()
 	}
 
-	monitoringState := initMonitoringState(connector.monitoringState, connector.config)
+	monitoringState := initMonitoringState(connector.monitoringState, connector.config, &connector.esClient)
 	connector.monitoringState = monitoringState
 	if services.GetTransitService().TelemetryProvider != nil {
 		spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
@@ -126,12 +127,32 @@ func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
 		}
 	}
 	if monitoringState.Metrics != nil {
-		for metricName := range monitoringState.Metrics {
-			metrics = append(metrics, metricName)
+		for metricName, metric := range monitoringState.Metrics {
+			name := connectors.Name(metricName, metric.CustomName)
+			metrics = append(metrics, name)
 		}
 	}
-	hostGroups = monitoringState.buildGroups()
-	return connectors.Hashsum(hosts, metrics, hostGroups)
+	sort.Strings(hosts)
+	sort.Strings(metrics)
+
+	hostGroups = monitoringState.HostGroups
+	groupNames := make([]string, 0, len(hostGroups))
+	for groupName := range hostGroups {
+		groupNames = append(groupNames, groupName)
+	}
+	sort.Strings(groupNames)
+
+	groupsSorted := make(map[string][]string, len(hostGroups))
+	for _, groupName := range groupNames {
+		hosts := hostGroups[groupName]
+		hostNames := make([]string, 0, len(hosts))
+		for hostName := range hosts {
+			hostNames = append(hostNames, hostName)
+		}
+		sort.Strings(hostNames)
+		groupsSorted[groupName] = hostNames
+	}
+	return connectors.Hashsum(hosts, metrics, groupsSorted)
 }
 
 func initClients(config ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
@@ -161,18 +182,18 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 			storedQuery.Attributes.TimeFilter = &connector.config.CustomTimeFilter
 		}
 		indexes := connector.kibanaClient.RetrieveIndexTitles(storedQuery)
-
-		hits, err := connector.esClient.RetrieveHits(indexes, storedQuery)
-		// error happens only if could not initialize elasticsearch client - no sense to continue
-		if err != nil {
-			log.Error("Unable to proceed as ES client could not be initialized.")
-			return err
+		query := clients.BuildSearchQueryFromStoredQuery(storedQuery)
+		timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
+		for hostName := range connector.monitoringState.Hosts {
+			hits, err := connector.esClient.CountHitsForHost(hostName, connector.config.HostNameField, indexes, query)
+			// error happens only if could not initialize elasticsearch client - no sense to continue
+			if err != nil {
+				log.Error("Unable to proceed as ES client could not be initialized.")
+				return err
+			}
+			connector.monitoringState.updateHost(hostName, storedQuery.Attributes.Title,
+				hits, timeInterval)
 		}
-		if hits == nil {
-			log.Info("No Hits found for query: ", storedQuery.Attributes.Title)
-			continue
-		}
-		connector.parseStoredQueryHits(storedQuery, hits)
 	}
 
 	return nil
@@ -188,27 +209,4 @@ func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.
 		}
 	}
 	return services
-}
-
-func (connector *ElasticConnector) parseStoredQueryHits(storedQuery clients.SavedObject, hits []clients.Hit) {
-	timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
-	for _, hit := range hits {
-		hostName := extractLabelValue(connector.config.HostNameLabelPath, hit.Source)
-		hostGroupName := extractLabelValue(connector.config.HostGroupLabelPath, hit.Source)
-		connector.monitoringState.updateHosts(hostName, storedQuery.Attributes.Title,
-			hostGroupName, timeInterval)
-	}
-}
-
-func extractLabelValue(labelsHierarchy []string, source map[string]interface{}) string {
-	var value string
-	for i, label := range labelsHierarchy {
-		if i != len(labelsHierarchy)-1 {
-			source = source[label].(map[string]interface{})
-			continue
-		} else {
-			value = source[label].(string)
-		}
-	}
-	return value
 }
