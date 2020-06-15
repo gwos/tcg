@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	elasticConnectorVersion = "8.1.0"
 	// default config values
 	defaultProtocol                 = "http"
 	defaultElasticServer            = "http://localhost:9200"

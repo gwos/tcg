@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -17,7 +18,13 @@ const (
 	DefaultCacheTimer = 1
 )
 
-var buildTime = "Build time not provided"
+// Variables to control connector version and build time.
+// Can be overridden during the build step.
+// See README for details.
+var (
+	buildTime = "Build time not provided"
+	buildTag  = "8.1.0"
+)
 
 // @title TCG API Documentation
 // @version 1.0
@@ -31,6 +38,8 @@ func main() {
 	var transitService = services.GetTransitService()
 	var cfg ServerConnectorConfig
 	var chksum []byte
+
+	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")

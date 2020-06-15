@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="http://www.gwos.com/" target="blank"><img src="https://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
+  <a href="http://www.gwos.com/" target="blank"><img src="http://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
 </p>
 
 # Tcg
@@ -123,15 +123,14 @@ $ go build .
 $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 ```
 
+#### or use Makefiles
+
 ### Building Connectors:
 
 ```
 $ cd connectors/<connector>
-$ go build -ldflags "-X main.buildTime=`date -u '+%Y-%m-%d_%I:%M:%S %p'`"
+$ go build -ldflags "-X 'main.buildTime=`date --rfc-3339=s`' -X main.buildTag=<TAG>"
 ```
-
-
-### or use Makefiles
 
 <a name="running"></a>
 ## Running
