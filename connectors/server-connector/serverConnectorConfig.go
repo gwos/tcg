@@ -9,8 +9,6 @@ import (
 
 // keys for extensions
 const (
-	serverConnectorVersion = "8.1.0"
-
 	defaultHostGroupName = "Servers"
 
 	extensionsKeyProcesses = "processes"

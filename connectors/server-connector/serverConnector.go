@@ -525,8 +525,8 @@ func initializeEntrypoints() []services.Entrypoint {
 			Url:    "/version",
 			Method: "Get",
 			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.Version{Number: serverConnectorVersion,
-					BuildTimestamp: strings.ReplaceAll(buildTime, "_", " ")})
+				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
+					Time: buildTime})
 			},
 		})
 
