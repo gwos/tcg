@@ -88,8 +88,7 @@ type BulkGetRequest struct {
 }
 
 type SearchBody struct {
-	Query       *Query        `json:"query,omitempty"`
-	SearchAfter []interface{} `json:"search_after,omitempty"`
+	Query *Query `json:"query,omitempty"`
 }
 
 type Query struct {
@@ -115,28 +114,6 @@ type Exists struct {
 	Field string `json:"field,omitempty"`
 }
 
-type SearchResponse struct {
-	Took int  `json:"took"`
-	Hits Hits `json:"hits"`
-}
-
-type Hits struct {
-	Total TotalHits `json:"total"`
-	Hits  []Hit     `json:"hits"`
-}
-
-type Hit struct {
-	Index  string                 `json:"_index"`
-	Type   string                 `json:"_type"`
-	ID     string                 `json:"_id"`
-	Score  float64                `json:"_score"`
-	Source map[string]interface{} `json:"_source"`
-}
-
-type TotalHits struct {
-	Value int `json:"value"`
-}
-
 // Extracts indexes's ids linked to stored query's filters
 func (storedQuery *SavedObject) ExtractIndexIds() []string {
 	indexIdsSet := make(map[string]struct{})
@@ -152,24 +129,66 @@ func (storedQuery *SavedObject) ExtractIndexIds() []string {
 	return indexIds
 }
 
+// Builds search request query for a specific host
+func (searchBody *SearchBody) ForHost(hostName string, hostNameField string) {
+	if searchBody.Query == nil {
+		searchBody.Query = &Query{}
+	}
+	match := map[string]interface{}{
+		hostNameField: hostName,
+	}
+	clause := Clause{Match: &match}
+	searchBody.Query.appendClause(mustClause, clause)
+}
+
+func copyQuery(query *Query) *Query {
+	if query != nil {
+		queryCopy := &Query{}
+		if query.Bool.Must != nil {
+			queryCopy.Bool.Must = make([]Clause, len(query.Bool.Must))
+			copy(queryCopy.Bool.Must, query.Bool.Must)
+		}
+		if query.Bool.MustNot != nil {
+			queryCopy.Bool.MustNot = make([]Clause, len(query.Bool.MustNot))
+			copy(queryCopy.Bool.MustNot, query.Bool.MustNot)
+		}
+		if query.Bool.Should != nil {
+			queryCopy.Bool.Should = make([]Clause, len(query.Bool.Should))
+			copy(queryCopy.Bool.Should, query.Bool.Should)
+		}
+		if query.Bool.Filter != nil {
+			queryCopy.Bool.Filter = make([]Clause, len(query.Bool.Filter))
+			copy(queryCopy.Bool.Filter, query.Bool.Filter)
+		}
+		queryCopy.Bool.MinimumShouldMatch = query.Bool.MinimumShouldMatch
+		return queryCopy
+	}
+	return nil
+}
+
 // Builds search request query corresponding to the stored query's filters
-func (searchBody *SearchBody) FromStoredQuery(storedQuery SavedObject) {
+func BuildSearchQueryFromStoredQuery(storedQuery SavedObject) *Query {
+	var query *Query
+	// add clauses as stored query filters
 	for _, filter := range storedQuery.Attributes.Filters {
+		if query == nil {
+			query = &Query{}
+		}
 		if filter.Meta.Disabled {
 			continue
 		}
 		switch filter.Meta.Type {
 		case typePhrase:
-			searchBody.addPhraseFilterClause(filter)
+			query.addPhraseFilterClause(filter)
 			break
 		case typePhrases:
-			searchBody.addPhrasesFilterClause(filter)
+			query.addPhrasesFilterClause(filter)
 			break
 		case typeRange:
-			searchBody.addRangeFilterClause(filter)
+			query.addRangeFilterClause(filter)
 			break
 		case typeExist:
-			searchBody.addExistsFilterClause(filter)
+			query.addExistsFilterClause(filter)
 			break
 		default:
 			log.Error("Could not add query clause. Unknown filterClause type: ", filter.Meta.Type)
@@ -178,19 +197,17 @@ func (searchBody *SearchBody) FromStoredQuery(storedQuery SavedObject) {
 	}
 
 	if storedQuery.Attributes.TimeFilter != nil {
-		searchBody.withTimeFilter(storedQuery)
+		if query == nil {
+			query = &Query{}
+		}
+		query.withTimeFilter(storedQuery)
 	}
-}
 
-// Sets "search after" with a single value to request body
-func (searchBody *SearchBody) WithSingleSearchAfter(v interface{}) {
-	var searchAfter []interface{}
-	searchAfter = append(searchAfter, v)
-	searchBody.SearchAfter = searchAfter
+	return query
 }
 
 // Adds query clause corresponding to the "is", "is not" filter to search request body
-func (searchBody *SearchBody) addPhraseFilterClause(filter Filter) {
+func (query *Query) addPhraseFilterClause(filter Filter) {
 	match := map[string]interface{}{
 		filter.Meta.Key: filter.Meta.Value,
 	}
@@ -201,11 +218,11 @@ func (searchBody *SearchBody) addPhraseFilterClause(filter Filter) {
 	} else {
 		clauseType = mustNotClause
 	}
-	searchBody.appendClause(clauseType, clause)
+	query.appendClause(clauseType, clause)
 }
 
 // Adds query clause corresponding to the "is one of", "is not one of" filter to search request body
-func (searchBody *SearchBody) addPhrasesFilterClause(filter Filter) {
+func (query *Query) addPhrasesFilterClause(filter Filter) {
 	var key = filter.Meta.Key
 	params := filter.Meta.Params.([]interface{})
 	if filter.Meta.Negate {
@@ -216,7 +233,7 @@ func (searchBody *SearchBody) addPhrasesFilterClause(filter Filter) {
 				key: param,
 			}
 			clause := Clause{Match: &match}
-			searchBody.appendClause(mustNotClause, clause)
+			query.appendClause(mustNotClause, clause)
 		}
 	} else {
 		// if filterClause is "is one of" that means that if value is just one of them that's fine
@@ -231,12 +248,12 @@ func (searchBody *SearchBody) addPhrasesFilterClause(filter Filter) {
 		minimumShouldMatch := 1
 		boolClause := Bool{Should: clauses, MinimumShouldMatch: &minimumShouldMatch}
 		clause := Clause{Bool: &boolClause}
-		searchBody.appendClause(mustClause, clause)
+		query.appendClause(mustClause, clause)
 	}
 }
 
 // Adds query clause corresponding to the "range" filter to search request body
-func (searchBody *SearchBody) addRangeFilterClause(filter Filter) {
+func (query *Query) addRangeFilterClause(filter Filter) {
 	var key = filter.Meta.Key
 	var rangeClause map[string]interface{}
 	// time ranges mustClause be adjusted to timezone, other kinds of ranges can be simply copied
@@ -262,11 +279,11 @@ func (searchBody *SearchBody) addRangeFilterClause(filter Filter) {
 	} else {
 		clauseType = mustNotClause
 	}
-	searchBody.appendClause(clauseType, clause)
+	query.appendClause(clauseType, clause)
 }
 
 // Adds query clause corresponding to the "exists" filter to search request body
-func (searchBody *SearchBody) addExistsFilterClause(filter Filter) {
+func (query *Query) addExistsFilterClause(filter Filter) {
 	exists := Exists{Field: filter.Meta.Key}
 	clause := Clause{
 		Exists: &exists,
@@ -277,11 +294,11 @@ func (searchBody *SearchBody) addExistsFilterClause(filter Filter) {
 	} else {
 		clauseType = mustNotClause
 	}
-	searchBody.appendClause(clauseType, clause)
+	query.appendClause(clauseType, clause)
 }
 
 // Adds query clause corresponding to the time filter to request body
-func (searchBody *SearchBody) withTimeFilter(savedObject SavedObject) {
+func (query *Query) withTimeFilter(savedObject SavedObject) {
 	if savedObject.Attributes.TimeFilter == nil {
 		return
 	}
@@ -293,42 +310,38 @@ func (searchBody *SearchBody) withTimeFilter(savedObject SavedObject) {
 		"@timestamp": timestamp.toAbsoluteUtcTime(),
 	}
 	clause := Clause{Range: &rangeClause}
-	searchBody.appendClause(filterClause, clause)
+	query.appendClause(filterClause, clause)
 }
 
 // Adds query clause of appropriate type to request body
-func (searchBody *SearchBody) appendClause(clauseType clauseType, clause Clause) {
-	var query Query
-	if searchBody.Query == nil {
-		searchBody.Query = &query
-	}
+func (query *Query) appendClause(clauseType clauseType, clause Clause) {
 	switch clauseType {
 	case mustClause:
-		if searchBody.Query.Bool.Must == nil {
-			searchBody.Query.Bool.Must = []Clause{clause}
+		if query.Bool.Must == nil {
+			query.Bool.Must = []Clause{clause}
 		} else {
-			searchBody.Query.Bool.Must = append(searchBody.Query.Bool.Must, clause)
+			query.Bool.Must = append(query.Bool.Must, clause)
 		}
 		break
 	case mustNotClause:
-		if searchBody.Query.Bool.MustNot == nil {
-			searchBody.Query.Bool.MustNot = []Clause{clause}
+		if query.Bool.MustNot == nil {
+			query.Bool.MustNot = []Clause{clause}
 		} else {
-			searchBody.Query.Bool.MustNot = append(searchBody.Query.Bool.MustNot, clause)
+			query.Bool.MustNot = append(query.Bool.MustNot, clause)
 		}
 		break
 	case shouldClause:
-		if searchBody.Query.Bool.Should == nil {
-			searchBody.Query.Bool.Should = []Clause{clause}
+		if query.Bool.Should == nil {
+			query.Bool.Should = []Clause{clause}
 		} else {
-			searchBody.Query.Bool.Should = append(searchBody.Query.Bool.Should, clause)
+			query.Bool.Should = append(query.Bool.Should, clause)
 		}
 		break
 	case filterClause:
-		if searchBody.Query.Bool.Filter == nil {
-			searchBody.Query.Bool.Filter = []Clause{clause}
+		if query.Bool.Filter == nil {
+			query.Bool.Filter = []Clause{clause}
 		} else {
-			searchBody.Query.Bool.Filter = append(searchBody.Query.Bool.Filter, clause)
+			query.Bool.Filter = append(query.Bool.Filter, clause)
 		}
 		break
 	default:

@@ -20,8 +20,8 @@ const (
 	defaultTimeFilterFrom           = "now-$interval"
 	defaultTimeFilterTo             = "now"
 	defaultAlwaysOverrideTimeFilter = false
-	defaultHostNameLabel            = "container.name"
-	defaultHostGroupLabel           = "container.labels.com_docker_compose_project"
+	defaultHostNameLabel            = "container.name.keyword"
+	defaultHostGroupLabel           = "container.labels.com_docker_compose_project.keyword"
 
 	// keys for extensions
 	extensionsKeyKibana             = "kibana"
@@ -50,8 +50,8 @@ type ElasticConnectorConfig struct {
 	Views              map[string]map[string]transit.MetricDefinition
 	CustomTimeFilter   clients.TimeFilter
 	OverrideTimeFilter bool
-	HostNameLabelPath  []string
-	HostGroupLabelPath []string
+	HostNameField      string
+	HostGroupField     string
 	Timer              int64
 	Ownership          transit.HostOwnershipType
 	GWConnections      config.GWConnections
@@ -83,8 +83,8 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			To:   defaultTimeFilterTo,
 		},
 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
-		HostNameLabelPath:  strings.Split(defaultHostNameLabel, "."),
-		HostGroupLabelPath: strings.Split(defaultHostGroupLabel, "."),
+		HostNameField:      defaultHostNameLabel,
+		HostGroupField:     defaultHostGroupLabel,
 		Timer:              connectors.DefaultTimer,
 		Ownership:          transit.Yield,
 		GWConnections:      gwConnections,
@@ -139,12 +139,12 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 
 			// host name labels
 			if value, has := monitorConnection.Extensions[extensionsKeyHostNameLabelPath]; has {
-				connectorConfig.HostNameLabelPath = strings.Split(value.(string), ".")
+				connectorConfig.HostNameField = value.(string)
 			}
 
 			// host group labels
 			if value, has := monitorConnection.Extensions[extensionsKeyHostGroupLabelPath]; has {
-				connectorConfig.HostGroupLabelPath = strings.Split(value.(string), ".")
+				connectorConfig.HostGroupField = value.(string)
 			}
 
 			// Timer
