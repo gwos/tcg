@@ -104,7 +104,7 @@ func (connector *ElasticConnector) ListSuggestions(view string, name string) []s
 	case string(StoredQueries):
 		storedQueries := connector.kibanaClient.RetrieveStoredQueries(nil)
 		for _, query := range storedQueries {
-			if strings.Contains(query.Attributes.Title, name) {
+			if name == "" || strings.Contains(query.Attributes.Title, name) {
 				suggestions = append(suggestions, query.Attributes.Title)
 			}
 		}
