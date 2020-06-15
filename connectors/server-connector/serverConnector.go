@@ -1,16 +1,20 @@
 package main
 
 import (
+	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -127,6 +131,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 		monitoredResource.Services = append(monitoredResource.Services, *monitoredService)
 	}
+
+	updateCache()
 
 	return monitoredResource
 }
@@ -361,6 +367,8 @@ type localProcess struct {
 
 type values struct {
 	value         float64
+	computeType   transit.ComputeType
+	expression    string
 	criticalValue int
 	warningValue  int
 }
@@ -401,17 +409,21 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 		if pr.CustomName != "" {
 			name = pr.CustomName
 		}
-		if _, exists := m[pr.Name]; exists {
+		if _, exists := m[pr.Name]; exists && pr.ComputeType != transit.Synthetic {
 			processesMap[name] = values{
 				value:         m[pr.Name],
 				criticalValue: pr.CriticalThreshold,
 				warningValue:  pr.WarningThreshold,
+				computeType:   pr.ComputeType,
+				expression:    "",
 			}
 		} else {
 			processesMap[name] = values{
 				value:         -1,
-				criticalValue: -1,
-				warningValue:  -1,
+				criticalValue: pr.CriticalThreshold,
+				warningValue:  pr.WarningThreshold,
+				computeType:   transit.Synthetic,
+				expression:    pr.Expression,
 			}
 		}
 	}
@@ -423,25 +435,100 @@ func listSuggestions(name string) []string {
 	hostProcesses, _ := cache.ProcessesCache.Get("processes")
 
 	var processes []string
-	for _, hostProcess := range hostProcesses.([]string) {
-		if strings.Contains(hostProcess, name) {
-			processes = append(processes, hostProcess)
+	for n, _ := range hostProcesses.(map[string]float64) {
+		if strings.Contains(n, name) {
+			processes = append(processes, n)
 		}
 	}
 
 	return processes
 }
 
-func collectProcessesNames() []string {
-	var processes []string
+func collectProcesses() map[string]float64 {
+	processes := make(map[string]float64)
 	hostProcesses, _ := process.Processes()
 
 	for _, hostProcess := range hostProcesses {
-		if name, err := hostProcess.Name(); err == nil {
-			processes = append(processes, name)
-		} else {
-			log.Error(err)
+		cpuUsed, _ := hostProcess.CPUPercent()
+		name, _ := hostProcess.Name()
+		processes[strings.ReplaceAll(name, ".", "_")] = cpuUsed
+	}
+
+	for name, function := range processToFuncMap {
+		monitoredService := function.(func(int, int, string) *transit.MonitoredService)(-1, -1, "")
+		if monitoredService != nil {
+			if monitoredService.Metrics[0].Value.ValueType == transit.DoubleType {
+				processes[strings.ReplaceAll(name, ".", "_")] = monitoredService.Metrics[0].Value.DoubleValue
+			}
+			if monitoredService.Metrics[0].Value.ValueType == transit.IntegerType {
+				processes[strings.ReplaceAll(name, ".", "_")] = float64(monitoredService.Metrics[0].Value.IntegerValue)
+			}
 		}
 	}
+
 	return processes
+}
+
+func updateCache() {
+	cache.ProcessesCache.SetDefault("processes", collectProcesses())
+}
+
+// initializeEntrypoints - function for setting entrypoints,
+// that will be available through the Server Connector API
+func initializeEntrypoints() []services.Entrypoint {
+	var entrypoints []services.Entrypoint
+
+	entrypoints = append(entrypoints,
+		services.Entrypoint{
+			Url:    "/suggest/:viewName/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				if c.Param("viewName") == string(transit.Process) {
+					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
+				} else {
+					c.JSON(http.StatusOK, []transit.MetricDefinition{})
+				}
+			},
+		},
+		services.Entrypoint{
+			Url:    "/expressions/suggest/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
+		services.Entrypoint{
+			Url:    "/expressions/evaluate",
+			Method: "Post",
+			Handler: func(c *gin.Context) {
+				var expression connectors.ExpressionToEvaluate
+				body, err := c.GetRawData()
+				if err != nil {
+					c.JSON(http.StatusBadRequest, err.Error())
+					return
+				}
+				err = json.Unmarshal(body, &expression)
+				if err != nil {
+					c.JSON(http.StatusBadRequest, err.Error())
+					return
+				}
+				result, err := connectors.EvaluateExpression(expression, c.Request.URL.Query().Get("override") == "true")
+				if err == nil {
+					c.JSON(http.StatusOK, result)
+					return
+				}
+				log.Error("[Server Connector]: " + err.Error())
+				c.IndentedJSON(http.StatusBadRequest, err.Error())
+			},
+		},
+		services.Entrypoint{
+			Url:    "/version",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.Version{Number: serverConnectorVersion,
+					BuildTimestamp: strings.ReplaceAll(buildTime, "_", " ")})
+			},
+		})
+
+	return entrypoints
 }

@@ -3,6 +3,7 @@ module github.com/gwos/tcg
 go 1.13
 
 require (
+	github.com/PaesslerAG/gval v1.0.1
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/antonfisher/nested-logrus-formatter v1.0.2
@@ -48,7 +49,7 @@ require (
 	go.opentelemetry.io/otel/exporters/trace/jaeger v0.6.0
 	golang.org/x/crypto v0.0.0-20191112222119-e1110fd1c708
 	golang.org/x/net v0.0.0-20191209160850-c0dbc17a3553 // indirect
-	golang.org/x/sys v0.0.0-20191009170203-06d7bd2c5f4f // indirect
+	golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980 // indirect
 	golang.org/x/tools v0.0.0-20200114052453-d31a08c2edf2 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20191010095647-fc94e3f71652

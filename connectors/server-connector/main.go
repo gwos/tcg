@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -10,8 +9,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
-	"strings"
 	"time"
 )
 
@@ -64,27 +61,7 @@ func main() {
 	}
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(
-		services.Entrypoint{
-			Url:    "/suggest/:viewName/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				if c.Param("viewName") == string(transit.Process) {
-					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
-				} else {
-					c.JSON(http.StatusOK, []transit.MetricDefinition{})
-				}
-			},
-		},
-		services.Entrypoint{
-			Url:    "/version",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.Version{Number: serverConnectorVersion,
-					BuildTimestamp: strings.ReplaceAll(buildTime, "_", " ")})
-			},
-		},
-	); err != nil {
+	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
 		log.Error(err)
 		return
 	}
@@ -100,16 +77,18 @@ func main() {
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics),
 			}); err != nil {
-				log.Error(err.Error())
+				monitoredResource := CollectMetrics(cfg.MetricsProfile.Metrics)
+				monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
+				err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
+				if err != nil {
+					log.Error(err.Error())
+				}
 			}
+			time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 		}
-		time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 	}
 }
 
 func handleCache() {
-	for {
-		cache.ProcessesCache.SetDefault("processes", collectProcessesNames())
-		time.Sleep(DefaultCacheTimer * time.Minute)
-	}
+	cache.ProcessesCache.SetDefault("processes", collectProcesses())
 }
