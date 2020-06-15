@@ -60,6 +60,13 @@ func main() {
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
 		services.Entrypoint{
+			Url:    "/suggest/:viewName",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), ""))
+			},
+		},
+		services.Entrypoint{
 			Url:    "/suggest/:viewName/:name",
 			Method: "Get",
 			Handler: func(c *gin.Context) {

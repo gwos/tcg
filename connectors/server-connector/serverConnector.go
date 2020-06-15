@@ -436,7 +436,7 @@ func listSuggestions(name string) []string {
 
 	var processes []string
 	for n, _ := range hostProcesses.(map[string]float64) {
-		if strings.Contains(n, name) {
+		if name == "" || strings.Contains(n, name) {
 			processes = append(processes, n)
 		}
 	}
@@ -479,6 +479,17 @@ func initializeEntrypoints() []services.Entrypoint {
 	var entrypoints []services.Entrypoint
 
 	entrypoints = append(entrypoints,
+		services.Entrypoint{
+			Url:    "/suggest/:viewName",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				if c.Param("viewName") == string(transit.Process) {
+					c.JSON(http.StatusOK, listSuggestions(""))
+				} else {
+					c.JSON(http.StatusOK, []transit.MetricDefinition{})
+				}
+			},
+		},
 		services.Entrypoint{
 			Url:    "/suggest/:viewName/:name",
 			Method: "Get",
