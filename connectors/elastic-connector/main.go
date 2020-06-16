@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -12,10 +13,20 @@ import (
 	"time"
 )
 
+// Variables to control connector version and build time.
+// Can be overridden during the build step.
+// See README for details.
+var (
+	buildTime = "Build time not provided"
+	buildTag  = "8.1.0"
+)
+
 func main() {
 	connectors.ControlCHandler()
 
 	var transitService = services.GetTransitService()
+
+	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", buildTag, buildTime))
 
 	var connector ElasticConnector
 
@@ -64,6 +75,14 @@ func main() {
 			Method: "Get",
 			Handler: func(c *gin.Context) {
 				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+		services.Entrypoint{
+			Url:    "/version",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
+					Time: buildTime})
 			},
 		},
 	); err != nil {
