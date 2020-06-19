@@ -93,8 +93,9 @@ func main() {
 					log.Error(err.Error())
 				}
 			}
-			time.Sleep(time.Duration(connectors.Timer * int64(time.Second)))
 		}
+		log.Debug("sleeping for ...", connectors.Timer)
+		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
 	}
 }
 
