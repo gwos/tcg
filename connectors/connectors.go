@@ -630,6 +630,13 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
+func Max(x, y int64) int64 {
+	if x < y {
+		return y
+	}
+	return x
+}
+
 type BuildVersion struct {
 	Tag  string `json:"tag"`
 	Time string `json:"time"`
