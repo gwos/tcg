@@ -1,0 +1,19 @@
+language: bash
+
+script:
+  - export DOCKER_HUB_USERNAME=groundworkbot
+  - export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
+  - make --warn-undefined-variables -f travis.Makefile trigger-docker-hub-build
+
+notifications:
+  slack:
+    rooms:
+      - gwos:qKDnrmd5j8m6ebPpkalow24w#bot-noise
+    on_pull_requests: true
+
+  webhooks:
+    on_success: always # default: always
+    on_failure: always # default: always
+    on_start: always   # default: never
+    on_cancel: always # default: always
+    on_error: always # default: always
