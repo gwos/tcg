@@ -127,10 +127,19 @@ $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit
 
 ### Building Connectors:
 
+LINUX:
 ```
 $ cd connectors/<connector>
 $ go build -ldflags "-X 'main.buildTime=`date --rfc-3339=s`' -X main.buildTag=<TAG>"
 ```
+
+OS X:
+```
+$ cd connectors/<connector>
+$ go build -ldflags "-X 'main.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X main.buildTag=<TAG>"
+```
+
+
 
 <a name="running"></a>
 ## Running
