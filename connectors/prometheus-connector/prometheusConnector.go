@@ -2,9 +2,7 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
@@ -19,11 +17,12 @@ import (
 )
 
 var chksum []byte
+var inventory transit.InventoryResource
 
 var parser expfmt.TextParser
 
 func Synchronize() *transit.InventoryResource {
-	return nil
+	return &inventory
 }
 
 func parsePrometheusBody(body []byte) (*transit.MonitoredResource, error) {
@@ -88,20 +87,30 @@ func parsePrometheusBody(body []byte) (*transit.MonitoredResource, error) {
 	return monitoredResource, nil
 }
 
-func validateMonitoredResource(resource *transit.MonitoredResource) bool {
-
-	//TODO: improve validation
-	chk, err := connectors.Hashsum(resource)
-	if err != nil || !bytes.Equal(chksum, chk) {
-		chksum = chk
+func validateInventory(inventory *[]transit.InventoryResource) bool {
+	if chksum != nil {
+		chk, err := connectors.Hashsum(inventory)
+		if err != nil || !bytes.Equal(chksum, chk) {
+			chksum = chk
+			return false
+		}
+		return true
+	} else {
+		chksum, _ = connectors.Hashsum(inventory)
 		return false
 	}
-	return true
 }
 
 func buildInventory(resource *transit.MonitoredResource) *[]transit.InventoryResource {
+	var inventoryServices []transit.InventoryService
+	for _, service := range resource.Services {
+		inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
+			service.Owner))
+	}
 
-	return nil
+	inventoryResource := connectors.CreateInventoryResource(resource.Owner, inventoryServices)
+	inventory = inventoryResource
+	return &[]transit.InventoryResource{inventoryResource}
 }
 
 // initializeEntrypoints - function for setting entrypoints,
@@ -129,15 +138,14 @@ func receiverHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	b, _ := json.Marshal(monitoredResource)
-	fmt.Println(string(b))
-	if validateMonitoredResource(monitoredResource) {
+	inventory := buildInventory(monitoredResource)
+	if validateInventory(inventory) {
 		err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 		if err != nil {
 			log.Error(err.Error())
 		}
 	} else {
-		err := connectors.SendInventory(*buildInventory(monitoredResource), []transit.ResourceGroup{}, "")
+		err := connectors.SendInventory(*inventory, []transit.ResourceGroup{}, "")
 		if err != nil {
 			log.Error(err.Error())
 		}
