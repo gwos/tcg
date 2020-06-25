@@ -7,7 +7,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"time"
 )
 
@@ -41,7 +40,7 @@ func main() {
 			if err != nil || !bytes.Equal(chksum, chk) {
 				log.Info("[Prometheus Connector]: Sending inventory ...")
 				_ = connectors.SendInventory(
-					[]transit.InventoryResource{*Synchronize()},
+					*Synchronize(),
 					cfg.Groups,
 					cfg.Ownership,
 				)

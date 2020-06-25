@@ -8,13 +8,13 @@ import (
 
 const (
 	defaultHostGroupName = "Servers"
-	extensionsKeyGroups    = "groups"
-	extensionsKeyName      = "name"
-	extensionsKeyType      = "type"
+	extensionsKeyGroups  = "groups"
+	extensionsKeyName    = "name"
+	extensionsKeyType    = "type"
 )
 
 type PrometheusConnectorConfig struct {
-	Services      []string
+	Services       []string
 	Groups         []transit.ResourceGroup
 	MetricsProfile transit.MetricsProfile
 	Ownership      transit.HostOwnershipType
