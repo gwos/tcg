@@ -2,6 +2,7 @@ package clients
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
@@ -10,8 +11,15 @@ import (
 )
 
 // SendRequest wraps HTTP methods
-func SendRequest(httpMethod string, requestURL string, headers map[string]string, formValues map[string]string,
-	byteBody []byte) (int, []byte, error) {
+func SendRequest(httpMethod string, requestURL string,
+	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
+	return SendRequestWithContext(nil, httpMethod, requestURL, headers, formValues, byteBody)
+}
+
+// SendRequestWithContext wraps HTTP methods
+func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
+	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}

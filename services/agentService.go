@@ -19,6 +19,7 @@ import (
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"go.opentelemetry.io/otel/api/kv"
+	"go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -365,14 +366,14 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 			service.makeDispatcherOption(
 				fmt.Sprintf("#%s#%s#", SubjSendEvents, gwClient.HostName),
 				SubjSendEvents,
-				func(b []byte) error {
+				func(ctx context.Context, b []byte) error {
 					var err error
 					if bytes.HasSuffix(b, []byte(eventsAckSuffix)) {
-						_, err = gwClientRef.SendEventsAck(bytes.TrimSuffix(b, []byte(eventsAckSuffix)))
+						_, err = gwClientRef.SendEventsAck(ctx, bytes.TrimSuffix(b, []byte(eventsAckSuffix)))
 					} else if bytes.HasSuffix(b, []byte(eventsUnackSuffix)) {
-						_, err = gwClientRef.SendEventsUnack(bytes.TrimSuffix(b, []byte(eventsUnackSuffix)))
+						_, err = gwClientRef.SendEventsUnack(ctx, bytes.TrimSuffix(b, []byte(eventsUnackSuffix)))
 					} else {
-						_, err = gwClientRef.SendEvents(b)
+						_, err = gwClientRef.SendEvents(ctx, b)
 					}
 					return err
 				},
@@ -380,16 +381,16 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 			service.makeDispatcherOption(
 				fmt.Sprintf("#%s#%s#", SubjSendResourceWithMetrics, gwClient.HostName),
 				SubjSendResourceWithMetrics,
-				func(b []byte) error {
-					_, err := gwClientRef.SendResourcesWithMetrics(service.fixTracerContext(b))
+				func(ctx context.Context, b []byte) error {
+					_, err := gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(b))
 					return err
 				},
 			),
 			service.makeDispatcherOption(
 				fmt.Sprintf("#%s#%s#", SubjSynchronizeInventory, gwClient.HostName),
 				SubjSynchronizeInventory,
-				func(b []byte) error {
-					_, err := gwClientRef.SynchronizeInventory(service.fixTracerContext(b))
+				func(ctx context.Context, b []byte) error {
+					_, err := gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(b))
 					return err
 				},
 			),
@@ -398,15 +399,19 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func([]byte) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func(context.Context, []byte) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
 		DurableName: durableName,
 		Subject:     subj,
 		Handler: func(b []byte) error {
-			var err error
+			var (
+				ctx  context.Context
+				err  error
+				span trace.Span
+			)
 			if service.TelemetryProvider != nil {
 				tr := service.TelemetryProvider.Tracer("services")
-				_, span := tr.Start(context.Background(), subj)
+				ctx, span = tr.Start(context.Background(), subj)
 				defer func() {
 					span.SetAttribute("error", err)
 					span.SetAttribute("payloadLen", len(b))
@@ -416,7 +421,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			}
 
 			// TODO: filter the message by rules per gwClient
-			err = subjFn(b)
+			err = subjFn(ctx, b)
 			if err == nil {
 				service.statsChan <- statsCounter{
 					bytesSent: len(b),
