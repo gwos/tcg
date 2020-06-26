@@ -17,6 +17,8 @@ import (
 type GWOperations interface {
 	Connect() error
 	Disconnect() error
+	GetServicesByAgent(agentID string) ([]byte, error)
+	GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error)
 	ValidateToken(appName, apiToken string) error
 	SendEvents(ctx context.Context, payload []byte) ([]byte, error)
 	SendEventsAck(ctx context.Context, payload []byte) ([]byte, error)
@@ -38,7 +40,7 @@ const (
 	GWEntrypointServices                = "/api/services"
 	GWEntrypointHostgroups              = "/api/hostgroups"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
-	NAGIOS_APP                          = "NAGIOS"
+	NagiosApp                           = "NAGIOS"
 )
 
 // GWClient implements GWOperations interface
@@ -84,7 +86,7 @@ func (client *GWClient) Connect() error {
 		/* token already changed */
 		return nil
 	}
-	isInternalConnector := client.AppType == NAGIOS_APP && client.IsChild == false
+	isInternalConnector := client.AppType == NagiosApp && client.IsChild == false
 	if isInternalConnector {
 		return client.connectLocal()
 	}
@@ -345,15 +347,17 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 	return client.sendData(ctx, client.uriSendEventsUnack, payload)
 }
 
-func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
+// GetServicesByAgent implements GWOperations.GetServicesByAgent.
+func (client *GWClient) GetServicesByAgent(agentID string) ([]byte, error) {
 	params := make(map[string]string)
-	params["query"] = "agentid = '" + agentId + "'"
+	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqUrl := client.uriServices + BuildQueryParams(params)
-	return client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	reqURL := client.uriServices + BuildQueryParams(params)
+	return client.sendRequest(nil, http.MethodGet, reqURL, nil)
 }
 
+// GetHostGroupsByHostNamesAndAppType implements GWOperations.GetHostGroupsByHostNamesAndAppType.
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
 	if hostNames == nil || len(hostNames) == 0 {
 		return nil, errors.New("unable to get host groups of host: host names are not provided")
@@ -372,8 +376,8 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	params["query"] = query
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqUrl := client.uriHostGroups + BuildQueryParams(params)
-	return client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	reqURL := client.uriHostGroups + BuildQueryParams(params)
+	return client.sendRequest(nil, http.MethodGet, reqURL, nil)
 }
 
 func (client *GWClient) sendData(ctx context.Context, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
@@ -411,7 +415,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	logEntryLevel := log.InfoLevel
 
 	if statusCode == 401 {
-		logEntry.Log(logEntryLevel, "GWClient: sendData: reconnect")
+		logEntry.Log(logEntryLevel, "GWClient: sendRequest: reconnect")
 
 		if err := client.Connect(); err != nil {
 			log.With(log.Fields{"error": err}).
@@ -434,7 +438,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	}
 
 	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: sendData")
+		logEntry.Log(logEntryLevel, "GWClient: sendRequest")
 	}()
 
 	if err != nil {
@@ -459,7 +463,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		isInternalConnector := client.AppType == NAGIOS_APP && client.IsChild == false
+		isInternalConnector := client.AppType == NagiosApp && client.IsChild == false
 		if !isInternalConnector {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
