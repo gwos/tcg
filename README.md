@@ -139,7 +139,40 @@ $ cd connectors/<connector>
 $ go build -ldflags "-X 'main.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X main.buildTag=<TAG>"
 ```
 
+## Building Connectors for OS Targets (Cross Compiling)
+```
+env GOOS=linux GOARCH=386 go build -ldflags "-X 'main.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X main.buildTag=8.1.0.1" .
+```
 
+## Installing as a service 
+To enable:      
+```
+sudo systemctl enable tcg-elastic
+```
+To start:       
+```
+sudo systemctl start tcg-elastic
+```
+Show status:    
+```
+sudo systemctl status tcg-elastic
+```
+To stop:        
+```
+sudo systemctl stop tcg-elastic
+```
+To disable:     
+```
+sudo systemctl disable tcg-elastic
+```
+To reconfigure: 
+```
+sudo systemctl daemon-reload
+```
+To tail:
+```
+journalctl -f -u tcg-elastic
+```
 
 <a name="running"></a>
 ## Running
