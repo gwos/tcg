@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,11 +18,11 @@ type GWOperations interface {
 	Connect() error
 	Disconnect() error
 	ValidateToken(appName, apiToken string) error
-	SendEvents(payload []byte) ([]byte, error)
-	SendEventsAck(payload []byte) ([]byte, error)
-	SendEventsUnack(payload []byte) ([]byte, error)
-	SendResourcesWithMetrics(payload []byte) ([]byte, error)
-	SynchronizeInventory(payload []byte) ([]byte, error)
+	SendEvents(ctx context.Context, payload []byte) ([]byte, error)
+	SendEventsAck(ctx context.Context, payload []byte) ([]byte, error)
+	SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error)
+	SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error)
+	SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error)
 }
 
 // Define entrypoints for GWOperations
@@ -275,73 +276,73 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 }
 
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
-func (client *GWClient) SynchronizeInventory(payload []byte) ([]byte, error) {
+func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(client.uriSynchronizeInventory, payload,
+		return client.sendData(ctx, client.uriSynchronizeInventory, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	return client.sendData(client.uriSynchronizeInventory, payload)
+	return client.sendData(ctx, client.uriSynchronizeInventory, payload)
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
-func (client *GWClient) SendResourcesWithMetrics(payload []byte) ([]byte, error) {
+func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(client.uriSendResourceWithMetrics, payload,
+		return client.sendData(ctx, client.uriSendResourceWithMetrics, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	return client.sendData(client.uriSendResourceWithMetrics, payload)
+	return client.sendData(ctx, client.uriSendResourceWithMetrics, payload)
 }
 
 // SendEvents implements GWOperations.SendEvents.
-func (client *GWClient) SendEvents(payload []byte) ([]byte, error) {
+func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(client.uriSendEvents, payload,
+		return client.sendData(ctx, client.uriSendEvents, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	return client.sendData(client.uriSendEvents, payload)
+	return client.sendData(ctx, client.uriSendEvents, payload)
 }
 
 // SendEventsAck implements GWOperations.SendEventsAck.
-func (client *GWClient) SendEventsAck(payload []byte) ([]byte, error) {
+func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(client.uriSendEventsAck, payload,
+		return client.sendData(ctx, client.uriSendEventsAck, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	return client.sendData(client.uriSendEventsAck, payload)
+	return client.sendData(ctx, client.uriSendEventsAck, payload)
 }
 
 // SendEventsUnack implements GWOperations.SendEventsUnack.
-func (client *GWClient) SendEventsUnack(payload []byte) ([]byte, error) {
+func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(client.uriSendEventsUnack, payload,
+		return client.sendData(ctx, client.uriSendEventsUnack, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	return client.sendData(client.uriSendEventsUnack, payload)
+	return client.sendData(ctx, client.uriSendEventsUnack, payload)
 }
 
 func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
@@ -350,7 +351,7 @@ func (client *GWClient) GetServicesByAgent(agentId string) ([]byte, error) {
 	params["depth"] = "Shallow"
 	client.buildURIs()
 	reqUrl := client.uriServices + BuildQueryParams(params)
-	return client.sendRequest(http.MethodGet, reqUrl, nil)
+	return client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 }
 
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
@@ -372,11 +373,11 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	params["depth"] = "Shallow"
 	client.buildURIs()
 	reqUrl := client.uriHostGroups + BuildQueryParams(params)
-	return client.sendRequest(http.MethodGet, reqUrl, nil)
+	return client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 }
 
-func (client *GWClient) sendData(reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
-	return client.sendRequest(http.MethodPost, reqURL, payload, additionalHeaders...)
+func (client *GWClient) sendData(ctx context.Context, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
+	return client.sendRequest(ctx, http.MethodPost, reqURL, payload, additionalHeaders...)
 }
 
 type header struct {
@@ -384,7 +385,7 @@ type header struct {
 	value string
 }
 
-func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
+func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
 	headers := map[string]string{
 		"Accept":         "application/json",
 		"Content-Type":   "application/json",
@@ -396,7 +397,7 @@ func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []
 		headers[header.key] = header.value
 	}
 
-	statusCode, byteResponse, err := SendRequest(httpMethod, reqURL, headers, nil, payload)
+	statusCode, byteResponse, err := SendRequestWithContext(ctx, httpMethod, reqURL, headers, nil, payload)
 
 	logEntry := log.With(log.Fields{
 		"error":      err,
@@ -419,7 +420,7 @@ func (client *GWClient) sendRequest(httpMethod string, reqURL string, payload []
 		}
 
 		headers["GWOS-API-TOKEN"] = client.token
-		statusCode, byteResponse, err = SendRequest(http.MethodPost, reqURL, headers, nil, payload)
+		statusCode, byteResponse, err = SendRequestWithContext(ctx, http.MethodPost, reqURL, headers, nil, payload)
 
 		logEntry = log.With(log.Fields{
 			"error":      err,
