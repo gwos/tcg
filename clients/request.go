@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"go.opentelemetry.io/otel/plugin/httptrace"
 )
 
 // SendRequest wraps HTTP methods
@@ -57,19 +59,25 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 		}
 	}
 
+	if ctx != nil {
+		ctx, request = httptrace.W3C(ctx, request)
+		httptrace.Inject(ctx, request)
+	}
+
 	response, err = client.Do(request)
 	if err != nil {
 		return -1, nil, err
 	}
 
+	defer response.Body.Close()
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return -1, nil, err
 	}
-	defer response.Body.Close()
 	return response.StatusCode, responseBody, nil
 }
 
+// BuildQueryParams makes the query parameters string
 func BuildQueryParams(params map[string]string) string {
 	var query string
 	for paramName, paramValue := range params {
