@@ -2,16 +2,26 @@ package clients
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"go.opentelemetry.io/otel/plugin/httptrace"
 )
 
 // SendRequest wraps HTTP methods
-func SendRequest(httpMethod string, requestURL string, headers map[string]string, formValues map[string]string,
-	byteBody []byte) (int, []byte, error) {
+func SendRequest(httpMethod string, requestURL string,
+	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
+	return SendRequestWithContext(nil, httpMethod, requestURL, headers, formValues, byteBody)
+}
+
+// SendRequestWithContext wraps HTTP methods
+func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
+	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
+
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -49,19 +59,25 @@ func SendRequest(httpMethod string, requestURL string, headers map[string]string
 		}
 	}
 
+	if ctx != nil {
+		ctx, request = httptrace.W3C(ctx, request)
+		httptrace.Inject(ctx, request)
+	}
+
 	response, err = client.Do(request)
 	if err != nil {
 		return -1, nil, err
 	}
 
+	defer response.Body.Close()
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return -1, nil, err
 	}
-	defer response.Body.Close()
 	return response.StatusCode, responseBody, nil
 }
 
+// BuildQueryParams makes the query parameters string
 func BuildQueryParams(params map[string]string) string {
 	var query string
 	for paramName, paramValue := range params {
