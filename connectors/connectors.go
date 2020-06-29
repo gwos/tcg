@@ -379,6 +379,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 		Type:   transit.Service,
 		Owner:  owner,
 		Status: transit.ServiceOk,
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -402,8 +404,8 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		Name:          name,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{},
-		NextCheckTime: milliseconds.MillisecondTimestamp{},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
