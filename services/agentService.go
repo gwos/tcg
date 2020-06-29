@@ -255,9 +255,9 @@ func (service *AgentService) StopTransport() error {
 // Stats implements AgentServices.Stats interface
 func (service *AgentService) Stats() AgentIdentityStats {
 	return AgentIdentityStats{AgentIdentity{
-		AgentID: controller.Connector.AgentID,
-		AppName: controller.Connector.AppName,
-		AppType: controller.Connector.AppType,
+		AgentID: service.Connector.AgentID,
+		AppName: service.Connector.AppName,
+		AppType: service.Connector.AppType,
 	},
 		*service.agentStats,
 	}
