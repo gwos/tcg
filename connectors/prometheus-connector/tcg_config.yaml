@@ -1,0 +1,14 @@
+connector:
+  agentId: ""
+  appName: PROMETHEUS
+  appType: PROMETHEUS
+  controllerAddr: 0.0.0.0:8099
+  natsAckWait: 30
+  natsMaxInflight: 2147483647 # math.MaxInt32
+  natsFilestoreDir: nats/datastore
+  natsStoreType: FILE
+  natsHost: 127.0.0.1:4222
+  logConsPeriod: 0 # seconds; 0 - off consolidation
+  logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
+dsConnection:
+  hostName: ""
