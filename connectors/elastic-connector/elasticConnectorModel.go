@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -220,22 +220,17 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		err := gwClient.Connect()
 		if err != nil {
 			log.Error("Unable to connect to GW to get hosts to initialize state: ", err)
-			return gwHosts
+			continue
 		}
-		response, err := gwClient.GetServicesByAgent(agentId)
-		if err != nil {
-			log.Error("Unable to get GW hosts to initialize state: ", err)
-			return gwHosts
-		}
-		var gwServices struct {
-			Services []struct {
-				HostName string `json:"hostName"`
-			} `json:"services"`
-		}
-		err = json.Unmarshal(response, &gwServices)
-		if err != nil {
-			log.Error("Unable to parse received GW hosts to initialize state: ", err)
-			return gwHosts
+		gwServices, err := gwClient.GetServicesByAgent(agentId)
+		if err != nil || gwServices == nil {
+			log.Error("Unable to get GW hosts to initialize state.")
+			if err != nil {
+				log.Error(err)
+			} else {
+				log.Error("Response is nil.")
+			}
+			continue
 		}
 		var hostNames []string
 		for _, gwService := range gwServices.Services {
@@ -250,28 +245,15 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		}
 
 		if hostNames != nil && len(hostNames) > 0 {
-			response, err = gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
-			if err != nil {
-				log.Error("Unable to get GW host groups to initialize state: ", err)
-				return gwHosts
-			}
-			if response == nil {
+			gwHostGroups, err := gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
+			if err != nil || gwHostGroups == nil {
 				log.Error("Unable to get GW host groups to initialize state.")
-				return gwHosts
-			}
-
-			var gwHostGroups struct {
-				HostGroups []struct {
-					Name  string `json:"name"`
-					Hosts []struct {
-						HostName string `json:"hostName"`
-					} `json:"hosts"`
-				} `json:"hostGroups"`
-			}
-			err = json.Unmarshal(response, &gwHostGroups)
-			if err != nil {
-				log.Error("Unable to parse received GW host groups to initialize state: ", err)
-				return gwHosts
+				if err != nil {
+					log.Error(err)
+				} else {
+					log.Error("Response is nil.")
+				}
+				continue
 			}
 
 			for _, gwHostGroup := range gwHostGroups.HostGroups {
@@ -286,9 +268,9 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 			}
 		}
 
-		if len(gwHosts) > 0 {
-			break
-		}
+		// set count hosts to which services of curr agent are already assigned in GWOS
+		// as "last sent hosts count" in cache to not duplicate his when check license before send inventory
+		cache.LastSentHostsCountCache.SetDefault(gwConnection.HostName, len(hostNames))
 	}
 
 	return gwHosts
