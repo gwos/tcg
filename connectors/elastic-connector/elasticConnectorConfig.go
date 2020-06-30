@@ -157,6 +157,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 		// Views
 		for _, metric := range metricsProfile.Metrics {
 			// temporary solution, will be removed
+			// TODO: push down into connectors - metric.Monitored breaks synthetics
 			if templateMetricName == metric.Name || !metric.Monitored {
 				continue
 			}
