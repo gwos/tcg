@@ -142,12 +142,14 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 			inventoryServices[i] = inventoryService
 
 			metricBuilder := connectors.MetricBuilder{
-				Name:       serviceName,
-				CustomName: metricDefinition.CustomName,
-				Value:      service.hits,
-				UnitType:   transit.UnitCounter,
-				Warning:    metricDefinition.WarningThreshold,
-				Critical:   metricDefinition.CriticalThreshold,
+				Name:        serviceName,
+				CustomName:  metricDefinition.CustomName,
+				ComputeType: metricDefinition.ComputeType,
+				Expression:  metricDefinition.Expression,
+				Value:       service.hits,
+				UnitType:    transit.UnitCounter,
+				Warning:     metricDefinition.WarningThreshold,
+				Critical:    metricDefinition.CriticalThreshold,
 			}
 			if service.timeInterval != nil {
 				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
