@@ -112,6 +112,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 		metricBuilder := connectors.MetricBuilder{
 			Name:           processName,
 			Value:          processValues.value,
+			ComputeType:    processValues.computeType,
+			Expression:     processValues.expression,
 			UnitType:       transit.PercentCPU,
 			Warning:        int64(processValues.warningValue),
 			Critical:       int64(processValues.criticalValue),
@@ -148,6 +150,7 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalDiskAllocatedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Total / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -176,6 +179,7 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 	metricBuilder := connectors.MetricBuilder{
 		Name:           DiskUsedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Used / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -204,6 +208,7 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 	metricBuilder := connectors.MetricBuilder{
 		Name:           DiskFreeServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Free / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -232,6 +237,7 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalMemoryUsageAllocatedName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Total / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -260,6 +266,7 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 	metricBuilder := connectors.MetricBuilder{
 		Name:           MemoryUsedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Used / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -288,6 +295,7 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 	metricBuilder := connectors.MetricBuilder{
 		Name:           MemoryFreeServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Free / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -316,6 +324,7 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 	metricBuilder := connectors.MetricBuilder{
 		Name:           ProcessesNumberServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(hostStat.Procs),
 		UnitType:       transit.UnitCounter,
 		Warning:        int64(warningThresholdValue),
@@ -338,6 +347,7 @@ func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, cus
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalCPUUsageServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          getCPUUsage(),
 		UnitType:       transit.PercentCPU,
 		Warning:        int64(warningThresholdValue),
