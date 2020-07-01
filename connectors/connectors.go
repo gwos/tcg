@@ -370,6 +370,21 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
 }
 
+func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+	metrics := make([]transit.TimeSeries, len(metricBuilders))
+	for index, metricBuilder := range metricBuilders {
+		metric, err := BuildMetric(metricBuilder)
+		if err != nil {
+			log.Error("Error creating metric for process: ", metricBuilder.Name)
+			log.Error(err)
+			return nil, errors.New("cannot create service with metric due to metric creation failure")
+		}
+		metrics[index] = *metric
+	}
+	gwServiceName := Name(serviceName, customName)
+	return CreateService(gwServiceName, hostName, metrics)
+}
+
 // Create Service
 // required params: name, owner(resource)
 // optional params: metrics
