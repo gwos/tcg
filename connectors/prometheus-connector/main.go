@@ -65,8 +65,9 @@ func main() {
 		return
 	}
 
-	log.Info("[Prometheus Connector]: Waiting for metrics ...")
+	log.Info("[Prometheus Connector]: Waiting for configuration ...")
 	for {
-		time.Sleep(1 * time.Minute)
+		pull(cfg.Resources)
+		time.Sleep(time.Duration(cfg.Timer * int64(time.Second)))
 	}
 }

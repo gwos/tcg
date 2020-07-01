@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const DefaultTimer = int64(120)
+const DefaultTimer = int64(10)
 
 // will come from extensions field
 var Timer = DefaultTimer
@@ -369,6 +369,20 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
+}
+
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+	var timeSeries []transit.TimeSeries
+	for _, metricBuilder := range metricBuilders {
+		metric, err := BuildMetric(metricBuilder)
+		if err != nil {
+			log.Error("Error creating metric for process: ", serviceName,
+				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
+			return nil, errors.New("cannot create service with metric due to metric creation failure")
+		}
+		timeSeries = append(timeSeries, *metric)
+	}
+	return CreateService(serviceName, hostName, timeSeries)
 }
 
 // Create Service
