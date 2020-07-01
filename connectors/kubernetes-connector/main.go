@@ -84,7 +84,7 @@ func main() {
 	// fudge up some metrics
 	cfg.Views = make(map[KubernetesView	]map[string]transit.MetricDefinition)
 	cfg.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
-	cfg.Views[ViewPods] =  make(map[string]transit.MetricDefinition) // TODO: pods snext
+	cfg.Views[ViewPods] =  fudgeUpPodMetricDefinitions()
 	inventory, monitored, groups := connector.Collect(&cfg)
 	fmt.Println(len(inventory), len(monitored), len(groups))
 	// TODO: connectors.SendInventory
@@ -160,6 +160,30 @@ func fudgeUpNodeMetricDefinitions() map[string]transit.MetricDefinition {
 		Graphed:           true,
 		ComputeType:       transit.Query,
 		ServiceType:       "Node",
+		WarningThreshold:  -1,
+		CriticalThreshold: -1,
+	}
+	// TODO: storage is not supported yet
+	return metrics
+}
+
+func fudgeUpPodMetricDefinitions() map[string]transit.MetricDefinition {
+	metrics := make(map[string]transit.MetricDefinition)
+	metrics["cpu"] = transit.MetricDefinition{
+		Name:              "cpu",
+		Monitored:         true,
+		Graphed:           true,
+		ComputeType:       transit.Query,
+		ServiceType:       "Pod",
+		WarningThreshold:  -1,
+		CriticalThreshold: -1,
+	}
+	metrics["memory"] = transit.MetricDefinition{
+		Name:              "memory",
+		Monitored:         true,
+		Graphed:           true,
+		ComputeType:       transit.Query,
+		ServiceType:       "Pod",
 		WarningThreshold:  -1,
 		CriticalThreshold: -1,
 	}
