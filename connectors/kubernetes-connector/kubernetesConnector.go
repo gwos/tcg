@@ -13,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"strings"
@@ -27,7 +26,10 @@ const (
 )
 
 const (
-	ClusterHostGroup = "KubernetesCluster" // TODO: add actual clustername
+	ClusterHostGroup = "cluster-"
+	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
+	PodsHostGroup    = "pods-"
+	NamespaceDefault = "default"
 )
 
 type KubernetesConnector struct {
@@ -112,12 +114,17 @@ func (connector *KubernetesConnector) Shutdown() {
 func (connector *KubernetesConnector) Collect(cfg *KubernetesConnectorConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 
 	// gather inventory and Metrics
+	metricsPerContainer := false
 	monitoredState := make(map[string]KubernetesResource)
 	groups := make(map[string]transit.ResourceGroup)
 	connector.collectNodeInventory(monitoredState, groups, cfg)
-	connector.collectPodInventory(monitoredState, groups, cfg)
+	connector.collectPodInventory(monitoredState, groups, cfg, metricsPerContainer)
 	connector.collectNodeMetrics(monitoredState, cfg)
-	// TODO: collectPodMetrics
+	if (metricsPerContainer) {
+		connector.collectPodMetricsPerContainer(monitoredState, cfg)
+	} else {
+		connector.collectPodMetricsPerReplica(monitoredState, cfg)
+	}
 
 	// convert to arrays as expected by TCG
 	inventory := make([]transit.InventoryResource, len(monitoredState))
@@ -161,7 +168,7 @@ func (connector *KubernetesConnector) Collect(cfg *KubernetesConnectorConfig) ([
 		fmt.Println(resource.Name)
 	}
 	index = 0
-	for _, group := range hostGroups {
+	for _, group := range groups {
 		hostGroups[index] = group
 		index = index + 1
 	}
@@ -182,8 +189,9 @@ func (connector *KubernetesConnector) Collect(cfg *KubernetesConnectorConfig) ([
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 18242267924,
 func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *KubernetesConnectorConfig) {
 	nodes, _ := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{}) // TODO: ListOptions can filter by label
-	groups[ClusterHostGroup] = transit.ResourceGroup{
-		GroupName: ClusterHostGroup,
+	clusterHostGroupName := connector.makeClusterName(nodes)
+	groups[clusterHostGroupName] = transit.ResourceGroup{
+		GroupName: clusterHostGroupName,
 		Resources: make([]transit.MonitoredResourceRef, len(nodes.Items)),
 	}
 	index := 0
@@ -239,7 +247,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 		}
 		// add to default Cluster group
-		groups[ClusterHostGroup].Resources[index] = transit.MonitoredResourceRef{
+		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
 			Name: resource.Name,
 			Type: transit.Host,
 		}
@@ -249,31 +257,64 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 // Pod Inventory also retrieves status
 // inventory also contains status, pod counts, capacity and allocation metrics
-func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *KubernetesConnectorConfig) {
+func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *KubernetesConnectorConfig, metricsPerContainer bool) {
 	// TODO: filter pods by namespace(s)
+	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
 		// TODO:
 	}
 	for _, pod := range pods.Items {
-		labels := make(map[string]transit.TypedValue)
+		labels := make(map[string]string)
 		for key, element := range pod.Labels {
-			labels[key] = transit.TypedValue{
-				ValueType:   transit.StringType,
-				StringValue: element,
-			}
+			labels[key] = element
 		}
-		//resource := transit.InventoryResource{
-		//	Name:       pod.Name,
-		//	Type:       transit.Container,
-		//	Properties: labels,
-		//}
-		// TODO: continue here
+		podName :=  pod.Name
+		if metricsPerContainer {
+			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
+		}
+		fmt.Println("podName : " + podName)
+		monitorStatus, message := connector.calculatePodStatus(&pod)
+		resource := KubernetesResource{
+			Name:       podName,
+			Type:       transit.Container,
+			Status:     monitorStatus,
+			Message:    message,
+			Labels: 	labels,
+			Services:   make(map[string]transit.MonitoredService),
+		}
+		monitoredState[resource.Name] = resource
+		// no services to process at this stage
+
+		// add to namespace group for starters, need to consider namespace filtering
+		podHostGroup := PodsHostGroup + pod.Namespace
+		if _, found := groupsMap[resource.Name]; found {
+			continue
+		}
+		groupsMap[resource.Name] = true
+		if group, ok := groups[podHostGroup]; ok {
+			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+				Name: resource.Name,
+				Type: transit.Container,
+			})
+			groups[podHostGroup] = group
+		} else {
+			group = transit.ResourceGroup{
+				GroupName:   podHostGroup,
+				Resources: make([]transit.MonitoredResourceRef, 0),
+			}
+			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+				Name: resource.Name,
+				Type: transit.Container,
+			})
+			groups[podHostGroup] = group
+		}
 	}
+
 }
 
 func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *KubernetesConnectorConfig) {
-	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{})
+	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
 		// TODO:
 	}
@@ -311,7 +352,120 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				}
 			}
 		} else {
-			log.Error("Node not found in metrics collection: " + node.Name)
+			log.Error("Node not found in monitored state: " + node.Name)
+		}
+	}
+}
+
+func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource, cfg *KubernetesConnectorConfig) {
+	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
+	if err != nil {
+		// TODO:
+	}
+	for _, pod := range pods.Items {
+		if resource, ok := monitoredState[pod.Name]; ok {
+			for index, container := range pod.Containers {
+				metricBuilders := make([]connectors.MetricBuilder, 0)
+				for key, metricDefinition := range cfg.Views[ViewPods] {
+					var value int64 = 0
+					switch key {
+					case "cpu":
+						value = pod.Containers[index].Usage.Cpu().Value()
+					case "memory":
+						value = pod.Containers[index].Usage.Memory().Value()
+					default:
+						continue
+					}
+					metricBuilder := connectors.MetricBuilder{
+						Name: metricDefinition.Name,
+						// CustomName: metricDefinition.CustomName,
+						Value:    value,
+						UnitType: transit.UnitCounter,
+						Warning:  metricDefinition.WarningThreshold,
+						Critical: metricDefinition.CriticalThreshold,
+					}
+					// TODO: validate these times are correct
+					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilders = append(metricBuilders, metricBuilder)
+					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
+					if err != nil {
+						log.Error("Error when creating service ", pod.Name, ":", metricDefinition.Name)
+						log.Error(err)
+					}
+					if monitoredService != nil {
+						resource.Services[metricBuilder.Name] = *monitoredService
+					}
+				}
+			}
+		} else {
+			log.Error("Pod not found in monitored state: " + pod.Name)
+		}
+	}
+}
+
+// treat each container uniquely -- store multi-metrics per pod replica for each node
+func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource, cfg *KubernetesConnectorConfig) {
+	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
+	if err != nil {
+		// TODO:
+	}
+	builderMap := make(map[string][]connectors.MetricBuilder)
+	serviceMap := make(map[string]transit.MonitoredService)
+	for key, metricDefinition := range cfg.Views[ViewPods] {
+		for _, pod := range pods.Items {
+			for _, container := range pod.Containers {
+				if resource, ok := monitoredState[container.Name]; ok {
+					var value int64 = 0
+					switch key {
+					case "cpu":
+						value = container.Usage.Cpu().Value()
+					case "memory":
+						value = container.Usage.Memory().Value()
+					default:
+						continue
+					}
+					splits := strings.Split(pod.Name, "-")
+					suffix := ""
+					if len(splits) > 1 {
+						suffix = splits[len(splits)-1]
+					}
+					metricBuilder := connectors.MetricBuilder{
+						Name: metricDefinition.Name + "-" + suffix,
+						// CustomName: metricDefinition.CustomName,
+						Value:    value,
+						UnitType: transit.UnitCounter,
+						Warning:  metricDefinition.WarningThreshold,
+						Critical: metricDefinition.CriticalThreshold,
+					}
+					// TODO: validate these times are correct
+					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					var builders []connectors.MetricBuilder
+					if result, found := builderMap[resource.Name]; found {
+						builders = result
+					} else {
+						builders = make([]connectors.MetricBuilder, 0)
+						builderMap[resource.Name] = builders
+					}
+					builders = append(builders, metricBuilder)
+					smKey := key + "-" + resource.Name
+					var monitoredService *transit.MonitoredService
+					if result, found := serviceMap[smKey]; found {
+						monitoredService = &result
+						metric, _ := connectors.BuildMetric(metricBuilder)
+						monitoredService.Metrics = append(monitoredService.Metrics, *metric)
+					} else {
+						monitoredService, _ = connectors.BuildServiceForMultiMetric(resource.Name, metricDefinition.Name, metricDefinition.CustomName, builders)
+						serviceMap[smKey] = *monitoredService
+					}
+					if monitoredService != nil {
+						resource.Services[metricDefinition.Name] = *monitoredService
+					}
+				} else {
+						log.Error("Pod not found in monitored state: " + pod.Name)
+				}
+			}
 		}
 	}
 }
@@ -352,6 +506,32 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 	return status, message.String()
 }
 
-func (connector *KubernetesConnector) calculatePodStatus(node v1beta1.NodeMetrics) transit.MonitorStatus {
-	return transit.HostUp // TODO: calculate based on conditions
+func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.MonitorStatus, string) {
+	var message strings.Builder
+	var upMessage string = "Pod is healthy"
+	var status transit.MonitorStatus = transit.HostUp
+	for _, condition := range pod.Status.Conditions {
+		if condition.Status != v1.ConditionTrue {
+			if message.Len() > 0 {
+				message.WriteString(", ")
+			}
+			message.WriteString(condition.Message)
+			status = transit.HostUnscheduledDown
+		}
+	}
+	if status == transit.HostUp {
+		message.WriteString(upMessage)
+	}
+	return status, message.String()
+}
+
+func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string {
+	if len(nodes.Items) > 0 {
+		for key, value := range nodes.Items[0].Labels {
+			if key == ClusterNameLabel {
+				return ClusterHostGroup + value
+			}
+		}
+	}
+	return ClusterHostGroup + "1"
 }
