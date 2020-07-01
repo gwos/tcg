@@ -190,6 +190,8 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 type MetricBuilder struct {
 	Name           string
 	CustomName     string
+	ComputeType    transit.ComputeType
+	Expression     string
 	Value          interface{}
 	UnitType       interface{}
 	Warning        interface{}
@@ -220,6 +222,9 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	if err != nil {
 		return metric, err
 	}
+
+	metric.MetricComputeType = metricBuilder.ComputeType
+	metric.MetricExpression = metricBuilder.Expression
 
 	var thresholds []transit.ThresholdValue
 	if metricBuilder.Warning != nil {
@@ -375,10 +380,12 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
 	service := transit.MonitoredService{
-		Name:   name,
-		Type:   transit.Service,
-		Owner:  owner,
-		Status: transit.ServiceOk,
+		Name:          name,
+		Type:          transit.Service,
+		Owner:         owner,
+		Status:        transit.ServiceOk,
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -402,8 +409,8 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		Name:          name,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{},
-		NextCheckTime: milliseconds.MillisecondTimestamp{},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
