@@ -114,7 +114,7 @@ func (connector *KubernetesConnector) Shutdown() {
 func (connector *KubernetesConnector) Collect(cfg *KubernetesConnectorConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 
 	// gather inventory and Metrics
-	metricsPerContainer := false
+	metricsPerContainer := true
 	monitoredState := make(map[string]KubernetesResource)
 	groups := make(map[string]transit.ResourceGroup)
 	connector.collectNodeInventory(monitoredState, groups, cfg)
@@ -192,6 +192,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 	clusterHostGroupName := connector.makeClusterName(nodes)
 	groups[clusterHostGroupName] = transit.ResourceGroup{
 		GroupName: clusterHostGroupName,
+		Type: transit.HostGroup,
 		Resources: make([]transit.MonitoredResourceRef, len(nodes.Items)),
 	}
 	index := 0
@@ -227,11 +228,17 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			default:
 				continue
 			}
+  			if value > 4000000 { // TODO: how do we handle longs
+				value = value / 1000
+			}
 			metricBuilder := connectors.MetricBuilder{
 				Name:       key,
 				CustomName: metricDefinition.CustomName,
 				Value:      value,
 				UnitType:   transit.UnitCounter,
+				// TODO: add these after merge
+				//ComputeType: metricDefinition.ComputeType,
+				//Expression:  metricDefinition.Expression,
 				Warning:    metricDefinition.WarningThreshold,
 				Critical:   metricDefinition.CriticalThreshold,
 			}
@@ -249,6 +256,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		// add to default Cluster group
 		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
 			Name: resource.Name,
+			Owner: clusterHostGroupName,
 			Type: transit.Host,
 		}
 		index = index + 1
@@ -277,7 +285,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
 			Name:       podName,
-			Type:       transit.Container,
+			Type:       transit.Host,
 			Status:     monitorStatus,
 			Message:    message,
 			Labels: 	labels,
@@ -295,17 +303,20 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		if group, ok := groups[podHostGroup]; ok {
 			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name: resource.Name,
-				Type: transit.Container,
+				Owner: group.GroupName,
+				Type: transit.Host,
 			})
 			groups[podHostGroup] = group
 		} else {
 			group = transit.ResourceGroup{
 				GroupName:   podHostGroup,
+				Type: transit.HostGroup,
 				Resources: make([]transit.MonitoredResourceRef, 0),
 			}
-			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+				group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name: resource.Name,
-				Type: transit.Container,
+				Owner: group.GroupName,
+				Type: transit.Host,
 			})
 			groups[podHostGroup] = group
 		}
@@ -333,6 +344,9 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				metricBuilder := connectors.MetricBuilder{
 					Name:       key,
 					CustomName: metricDefinition.CustomName,
+					// TODO: add these after merge
+					//ComputeType: metricDefinition.ComputeType,
+					//Expression:  metricDefinition.Expression,
 					Value:      value,
 					UnitType:   transit.UnitCounter,
 					Warning:    metricDefinition.WarningThreshold,
@@ -379,6 +393,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					metricBuilder := connectors.MetricBuilder{
 						Name: metricDefinition.Name,
 						// CustomName: metricDefinition.CustomName,
+						// TODO: add these after merge
+						//ComputeType: metricDefinition.ComputeType,
+						//Expression:  metricDefinition.Expression,
 						Value:    value,
 						UnitType: transit.UnitCounter,
 						Warning:  metricDefinition.WarningThreshold,
@@ -433,6 +450,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					metricBuilder := connectors.MetricBuilder{
 						Name: metricDefinition.Name + "-" + suffix,
 						// CustomName: metricDefinition.CustomName,
+						// TODO: add these after merge
+						//ComputeType: metricDefinition.ComputeType,
+						//Expression:  metricDefinition.Expression,
 						Value:    value,
 						UnitType: transit.UnitCounter,
 						Warning:  metricDefinition.WarningThreshold,
