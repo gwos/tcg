@@ -197,6 +197,8 @@ func FillGroupWithResources(group transit.ResourceGroup, resources []transit.Inv
 type MetricBuilder struct {
 	Name           string
 	CustomName     string
+	ComputeType    transit.ComputeType
+	Expression     string
 	Value          interface{}
 	UnitType       interface{}
 	Warning        interface{}
@@ -227,6 +229,9 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	if err != nil {
 		return metric, err
 	}
+
+	metric.MetricComputeType = metricBuilder.ComputeType
+	metric.MetricExpression = metricBuilder.Expression
 
 	var thresholds []transit.ThresholdValue
 	if metricBuilder.Warning != nil {

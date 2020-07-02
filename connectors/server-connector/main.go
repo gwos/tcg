@@ -91,12 +91,7 @@ func main() {
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics),
 			}); err != nil {
-				monitoredResource := CollectMetrics(cfg.MetricsProfile.Metrics)
-				monitoredResource.Services = connectors.EvaluateExpressions(monitoredResource.Services)
-				err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
-				if err != nil {
-					log.Error(err.Error())
-				}
+				log.Error(err.Error())
 			}
 		}
 		log.Debug("sleeping for ...", connectors.Timer)
