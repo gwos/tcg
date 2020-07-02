@@ -54,9 +54,14 @@ func main() {
 			)
 			if err != nil || !bytes.Equal(chksum, chk) {
 				log.Info("[Server Connector]: Sending inventory ...")
+				resources := []transit.InventoryResource{*Synchronize(cfg.MetricsProfile.Metrics)}
+				groups := cfg.Groups
+				for i, group := range groups {
+					groups[i] = connectors.FillGroupWithResources(group, resources)
+				}
 				_ = connectors.SendInventory(
-					[]transit.InventoryResource{*Synchronize(cfg.MetricsProfile.Metrics)},
-					cfg.Groups,
+					resources,
+					groups,
 					cfg.Ownership,
 				)
 			}
