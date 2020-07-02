@@ -1,14 +1,35 @@
 connector:
-  agentId: ""
-  appName: "KUBERNETES"
-  appType: "KUBERNETES"
-  controllerAddr: "0.0.0.0:8099"
-  natsAckWait: 30
-  natsMaxInflight: 2147483647 # math.MaxInt32
-  natsFilestoreDir: "nats/datastore"
-  natsStoreType: "FILE"
-  natsHost: "127.0.0.1:4222"
-  logConsPeriod: 0 # seconds; 0 - off consolidation
-  logLevel: 2
+    agentId: e165f96e-68bf-4828-b397-4d79764b1e04
+    appName: SERVER
+    appType: SERVER
+    controllerAddr: 0.0.0.0:8099
+    controllerCertFile: ""
+    controllerKeyFile: ""
+    natsAckWait: 30
+    natsMaxInflight: 2147483647
+    natsFilestoreDir: nats/datastore
+    natsStoreType: FILE
+    natsHost: 127.0.0.1:4222
+    logConsPeriod: 0
+    logFile: ""
+    logLevel: 2
+    enabled: true
 dsConnection:
-  hostName: ""
+    hostName: localhost
+gwConnections:
+  - id: 1
+    hostName: https://localhost
+    userName: remote
+    password: remote
+    enabled: true
+    isChild: false
+    displayName: Local Groundwork
+    mergeHosts: false
+    localConnection: true
+    deferOwnership: Yield
+    prefixResourceNames: false
+    resourceNamePrefix: ""
+    sendAllInventory: true
+telemetry:
+    hostName: ""
+    tags: {}

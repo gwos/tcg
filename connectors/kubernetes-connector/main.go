@@ -1,13 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"time"
 )
 
 // Variables to control connector version and build time.
@@ -23,7 +22,7 @@ func main() {
 
 	var transitService = services.GetTransitService()
 	var cfg KubernetesConnectorConfig
-	var chksum []byte
+	// var chksum []byte
 	var connector KubernetesConnector
 
 	log.Info(fmt.Sprintf("[Kubernetes Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
@@ -33,23 +32,28 @@ func main() {
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
 			cfg = *c
-			chk, err := connectors.Hashsum(
-				config.GetConfig().Connector.AgentID,
-				config.GetConfig().GWConnections,
-				cfg,
-			)
-			if err != nil || !bytes.Equal(chksum, chk) {
-				log.Info("[Kubernetes Connector]: Sending inventory ...")
-				_ = connectors.SendInventory(
-					//*GatherInventory(),
-					nil, // TODO:
-					cfg.Groups,
-					cfg.Ownership,
-				)
-			}
-			if err == nil {
-				chksum = chk
-			}
+			// TODO: refactor re-enable
+			// TODO: can we push 90% of this logic down to connectors? seems its redundant in each connector
+			//chk, err := connectors.Hashsum(
+			//	config.GetConfig().Connector.AgentID,
+			//	config.GetConfig().GWConnections,
+			//	cfg,
+			//)
+			//if err != nil || !bytes.Equal(chksum, chk) {
+			//	log.Info("[Kubernetes Connector]: Sending inventory ...")
+			//	_ = connectors.SendInventory(
+			//		//*GatherInventory(),
+			//		nil, // TODO:
+			//		cfg.Groups,
+			//		cfg.Ownership,
+			//	)
+			//}
+			//if err == nil {
+			//	chksum = chk
+			//}
+
+			connector.Initialize(cfg) // TODO: handle error
+
 		} else {
 			log.Error("[Kubernetes Connector]: Error during parsing config. Aborting ...")
 			return
@@ -68,26 +72,26 @@ func main() {
 	}
 
 	log.Info("[Kubernetes1 Connector]: Starting metric connection ...")
-	// TODO: this if block is temporary code - should be removed as impl matures
-	if connector.kapi == nil {
-		cfg = KubernetesConnectorConfig{
-			EndPoint:  "gwos.bluesunrise.com:8001",
-			Ownership: transit.Yield,
-			Views:     nil,
-			Groups:    nil,
-		}
-		err := connector.Initialize(cfg)
-		if err != nil {
-			panic(err)
-		}
-	}
-	// fudge up some metrics
+	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
 	cfg.Views = make(map[KubernetesView	]map[string]transit.MetricDefinition)
 	cfg.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
 	cfg.Views[ViewPods] =  fudgeUpPodMetricDefinitions()
-	inventory, monitored, groups := connector.Collect(&cfg)
-	fmt.Println(len(inventory), len(monitored), len(groups))
-	// TODO: connectors.SendInventory
+	count := 0
+	for {
+		if connector.kapi != nil {
+			inventory, monitored, groups := connector.Collect(&cfg)
+			fmt.Println(len(inventory), len(monitored), len(groups))
+			if  count == 0 {
+				error1 := connectors.SendInventory(inventory, groups, cfg.Ownership)
+				fmt.Println(error1)
+				time.Sleep(3 * time.Second)
+				count = count + 1
+			}
+			error2 := connectors.SendMetrics(monitored)
+			fmt.Println(error2)
+		}
+		time.Sleep(60 * time.Second)
+	}
 }
 
 // initializeEntrypoints - function for setting entrypoints,
