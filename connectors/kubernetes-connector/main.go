@@ -33,7 +33,7 @@ func main() {
 			c := InitConfig(monitorConn, profile, gwConnections)
 			cfg = *c
 			// TODO: refactor re-enable
-			// TODO: can we push 90% of this logic down to connectors? seems its redundant in each connector
+			// TODO: can we push 90% of this logic down to connectors? seems its redundant in each connectors
 			//chk, err := connectors.Hashsum(
 			//	config.GetConfig().Connector.AgentID,
 			//	config.GetConfig().GWConnections,
@@ -90,7 +90,7 @@ func main() {
 			error2 := connectors.SendMetrics(monitored)
 			fmt.Println(error2)
 		}
-		time.Sleep(60 * time.Second)
+		time.Sleep(300 * time.Second)
 	}
 }
 
