@@ -14,20 +14,28 @@ const (
 )
 
 type KubernetesConnectorConfig struct {
+	AppType        string
+	AppName        string
+	AgentID        string
 	EndPoint 	   string
 	Ownership      transit.HostOwnershipType
 	Views          map[KubernetesView]map[string]transit.MetricDefinition
 	Groups         []transit.ResourceGroup
-	// TODO: complete implementation
 }
 
 func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *transit.MetricsProfile,
 	gwConnections config.GWConnections) *KubernetesConnectorConfig {
 
+
 	// Init config with default values
 	connectorConfig := KubernetesConnectorConfig{
-		EndPoint: monitorConnection.Server,
-		Ownership:      transit.Yield,
+		AppType:  config.GetConfig().Connector.AppType,
+		AppName:  config.GetConfig().Connector.AppName,
+		AgentID:  config.GetConfig().Connector.AgentID,
+		EndPoint: "gwos.bluesunrise.com:8001", // TODO: hardcoded
+		Ownership: transit.Yield,
+		Views:     nil,
+		Groups:    nil,
 	}
 
 	// Update config with received values if presented
@@ -50,7 +58,9 @@ func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *tr
 			} else {
 				metrics := make(map[string]transit.MetricDefinition)
 				metrics[metric.Name] = metric
-				connectorConfig.Views[KubernetesView(metric.ServiceType)] = metrics
+				if connectorConfig.Views != nil {
+					connectorConfig.Views[KubernetesView(metric.ServiceType)] = metrics
+				}
 			}
 		}
 	}
