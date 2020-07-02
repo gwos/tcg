@@ -100,6 +100,10 @@ func setCheckTimes(resources []transit.MonitoredResource) {
 }
 
 func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	// refresh licenses in cache for all GW connections
+	hostsToSendCount := len(resources)
+	services.GetTransitService().CheckLicences(hostsToSendCount)
+
 	var b []byte
 	var err error
 	if services.GetTransitService().TelemetryProvider != nil {
@@ -125,7 +129,10 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 	}
 
 	err = services.GetTransitService().SynchronizeInventory(b)
-
+	if err != nil {
+		// if curr inventory was not sent revert LastSentHostsCount to prev in cache
+		services.GetTransitService().RevertLastSentHostsCountCache()
+	}
 	return err
 }
 
