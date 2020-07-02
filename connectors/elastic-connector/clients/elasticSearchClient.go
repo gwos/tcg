@@ -170,20 +170,26 @@ type AggregationsBody struct {
 			Terms struct {
 				Field string `json:"field"`
 			} `json:"terms"`
-			Aggs struct {
-				ByHostgroup struct {
-					Terms struct {
-						Field string `json:"field"`
-					} `json:"terms"`
-				} `json:"_by_hostgroup"`
-			} `json:"aggs"`
+			Aggs *AggsByHostGroup `json:"aggs,omitempty"`
 		} `json:"_by_hostname"`
 	} `json:"aggs"`
 }
 
+type AggsByHostGroup struct {
+	ByHostgroup struct {
+		Terms struct {
+			Field string `json:"field"`
+		} `json:"terms"`
+	} `json:"_by_hostgroup"`
+}
+
 func (body *AggregationsBody) byHostNameAndHostGroup(hostField string, hostGroupField string) {
 	body.Aggs.ByHostname.Terms.Field = hostField
-	body.Aggs.ByHostname.Aggs.ByHostgroup.Terms.Field = hostGroupField
+	if hostGroupField != "" {
+		var aggsByHostGroup AggsByHostGroup
+		aggsByHostGroup.ByHostgroup.Terms.Field = hostGroupField
+		body.Aggs.ByHostname.Aggs = &aggsByHostGroup
+	}
 }
 
 // ElasticSearch _search aggregated by hostname keyword response
@@ -196,12 +202,14 @@ type AggregationsResponse struct {
 }
 
 type HostBucket struct {
-	Key              string `json:"key"`
-	HostGroupBuckets struct {
-		Buckets []struct {
-			Key string `json:"key"`
-		} `json:"buckets"`
-	} `json:"_by_hostgroup"`
+	Key              string            `json:"key"`
+	HostGroupBuckets *HostGroupBuckets `json:"_by_hostgroup,omitempty"`
+}
+
+type HostGroupBuckets struct {
+	Buckets []struct {
+		Key string `json:"key"`
+	} `json:"buckets"`
 }
 
 type SearchResponse struct {

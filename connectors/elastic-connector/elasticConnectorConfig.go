@@ -21,6 +21,7 @@ const (
 	defaultAlwaysOverrideTimeFilter = false
 	defaultHostNameLabel            = "container.name.keyword"
 	defaultHostGroupLabel           = "container.labels.com_docker_compose_project.keyword"
+	defaultGroupNameByUser          = false
 
 	// keys for extensions
 	extensionsKeyKibana             = "kibana"
@@ -33,6 +34,7 @@ const (
 	extensionsKeyOverride           = "override"
 	extensionsKeyHostNameLabelPath  = "hostNameLabelPath"
 	extensionsKeyHostGroupLabelPath = "hostGroupLabelPath"
+	extensionsKeyGroupNameByUser    = "hostGroupNameByUser"
 
 	intervalTemplate      = "$interval"
 	intervalPeriodSeconds = "s"
@@ -51,6 +53,7 @@ type ElasticConnectorConfig struct {
 	OverrideTimeFilter bool
 	HostNameField      string
 	HostGroupField     string
+	GroupNameByUser    bool
 	Timer              int64
 	Ownership          transit.HostOwnershipType
 	GWConnections      config.GWConnections
@@ -84,6 +87,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
 		HostNameField:      defaultHostNameLabel,
 		HostGroupField:     defaultHostGroupLabel,
+		GroupNameByUser:    defaultGroupNameByUser,
 		Timer:              connectors.DefaultTimer,
 		Ownership:          transit.Yield,
 		GWConnections:      gwConnections,
@@ -144,6 +148,11 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			// host group labels
 			if value, has := monitorConnection.Extensions[extensionsKeyHostGroupLabelPath]; has {
 				connectorConfig.HostGroupField = value.(string)
+			}
+
+			// host group labels
+			if value, has := monitorConnection.Extensions[extensionsKeyGroupNameByUser]; has {
+				connectorConfig.GroupNameByUser = value.(bool)
 			}
 
 			// Timer

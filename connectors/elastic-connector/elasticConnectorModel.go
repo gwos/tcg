@@ -301,14 +301,19 @@ func initEsHosts(config ElasticConnectorConfig, esClient *ecClients.EsClient) ma
 
 	hostNameField := config.HostNameField
 	hostGroupField := config.HostGroupField
-	hostBuckets := esClient.GetHosts(hostNameField, hostGroupField)
+	groupNameByUser := config.GroupNameByUser
+
+	if groupNameByUser {
+		hostGroupField = ""
+	}
+	hostBuckets := esClient.GetHosts(config.HostNameField, hostGroupField)
 
 	if len(hostBuckets) == 0 {
 		if !strings.HasSuffix(hostNameField, ".keyword") || !!strings.HasSuffix(hostGroupField, ".keyword") {
 			if !strings.HasSuffix(hostNameField, ".keyword") {
 				hostNameField = hostNameField + ".keyword"
 			}
-			if !strings.HasSuffix(hostGroupField, ".keyword") {
+			if !groupNameByUser && !strings.HasSuffix(hostGroupField, ".keyword") {
 				hostGroupField = hostGroupField + ".keyword"
 			}
 			hostBuckets = esClient.GetHosts(hostNameField, hostGroupField)
@@ -317,12 +322,16 @@ func initEsHosts(config ElasticConnectorConfig, esClient *ecClients.EsClient) ma
 
 	for _, hostBucket := range hostBuckets {
 		hostName := hostBucket.Key
-		hostGroupBuckets := hostBucket.HostGroupBuckets.Buckets
+		hostGroupBuckets := hostBucket.HostGroupBuckets
 		var hostGroups []string
 		if hostGroupBuckets != nil {
-			for _, hostGroupBucket := range hostGroupBuckets {
+			for _, hostGroupBucket := range hostGroupBuckets.Buckets {
 				hostGroupName := hostGroupBucket.Key
 				hostGroups = append(hostGroups, hostGroupName)
+			}
+		} else {
+			if groupNameByUser {
+				hostGroups = append(hostGroups, config.HostGroupField)
 			}
 		}
 		host := monitoringHost{
