@@ -112,20 +112,6 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		}()
 	}
 
-	var monitoredResourceRefs []transit.MonitoredResourceRef
-	for _, resource := range resources {
-		monitoredResourceRefs = append(monitoredResourceRefs,
-			transit.MonitoredResourceRef{
-				Name: resource.Name,
-				Type: transit.Host,
-			},
-		)
-	}
-
-	for i := range resourceGroups {
-		resourceGroups[i].Resources = monitoredResourceRefs
-	}
-
 	inventoryRequest := transit.InventoryRequest{
 		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
@@ -182,6 +168,20 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 	for _, r := range resources {
 		group.Resources = append(group.Resources, r)
 	}
+	return group
+}
+
+func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
+	var monitoredResourceRefs []transit.MonitoredResourceRef
+	for _, resource := range resources {
+		monitoredResourceRefs = append(monitoredResourceRefs,
+			transit.MonitoredResourceRef{
+				Name: resource.Name,
+				Type: resource.Type,
+			},
+		)
+	}
+	group.Resources = monitoredResourceRefs
 	return group
 }
 
@@ -375,10 +375,10 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
 	service := transit.MonitoredService{
-		Name:   name,
-		Type:   transit.Service,
-		Owner:  owner,
-		Status: transit.ServiceOk,
+		Name:          name,
+		Type:          transit.Service,
+		Owner:         owner,
+		Status:        transit.ServiceOk,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 	}
