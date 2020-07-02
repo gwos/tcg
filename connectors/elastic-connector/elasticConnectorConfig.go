@@ -21,6 +21,7 @@ const (
 	defaultAlwaysOverrideTimeFilter = false
 	defaultHostNameLabel            = "container.name.keyword"
 	defaultHostGroupLabel           = "container.labels.com_docker_compose_project.keyword"
+	defaultHostGroupName            = "Elastic"
 	defaultGroupNameByUser          = false
 
 	// keys for extensions
@@ -86,11 +87,15 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 		},
 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
 		HostNameField:      defaultHostNameLabel,
-		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
 		Timer:              connectors.DefaultTimer,
 		Ownership:          transit.Yield,
 		GWConnections:      gwConnections,
+	}
+	if connectorConfig.GroupNameByUser {
+		connectorConfig.HostGroupField = defaultHostGroupName
+	} else {
+		connectorConfig.HostGroupField = defaultHostGroupLabel
 	}
 
 	// update config with received values if presented
