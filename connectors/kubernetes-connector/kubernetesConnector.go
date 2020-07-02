@@ -165,7 +165,6 @@ func (connector *KubernetesConnector) Collect(cfg *KubernetesConnectorConfig) ([
 			Services:         mServices,
 		}
 		index = index + 1
-		fmt.Println(resource.Name)
 	}
 	index = 0
 	for _, group := range groups {
@@ -281,7 +280,6 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		if metricsPerContainer {
 			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
 		}
-		fmt.Println("podName : " + podName)
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
 			Name:       podName,
