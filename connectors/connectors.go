@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const DefaultTimer = int64(10)
+const DefaultTimer = int64(120)
 
 // will come from extensions field
 var Timer = DefaultTimer

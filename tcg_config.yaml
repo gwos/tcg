@@ -1,35 +1,14 @@
 connector:
-    agentId: 693cd30a-6810-44f5-b50a-2f0b5d149f17
-    appName: SERVER
-    appType: SERVER
-    controllerAddr: 0.0.0.0:8099
-    controllerCertFile: ""
-    controllerKeyFile: ""
-    natsAckWait: 30
-    natsMaxInflight: 2147483647
-    natsFilestoreDir: nats/datastore
-    natsStoreType: FILE
-    natsHost: 127.0.0.1:4222
-    logConsPeriod: 0
-    logFile: ""
-    logLevel: 3
-    enabled: true
+  agentId: "***REMOVED***"
+  appName: "tcg"
+  appType: "VEMA"
+  controllerAddr: "0.0.0.0:8099"
+  natsAckWait: 30
+  natsMaxInflight: 2147483647 # math.MaxInt32
+  natsFilestoreDir: "nats/datastore"
+  natsStoreType: "FILE"
+  natsHost: "127.0.0.1:4222"
+  logConsPeriod: 0 # seconds; 0 - off consolidation
+  logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
-    hostName: localhost
-gwConnections:
-  - id: 1
-    hostName: https://localhost
-    userName: root
-    password: root
-    enabled: true
-    isChild: false
-    displayName: Local Groundwork
-    mergeHosts: false
-    localConnection: true
-    deferOwnership: Yield
-    prefixResourceNames: false
-    resourceNamePrefix: ""
-    sendAllInventory: true
-telemetry:
-    hostName: ""
-    tags: {}
+  hostName: ""

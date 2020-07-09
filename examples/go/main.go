@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	defaultResource = "prometheus-example"
-	defaultGroup    = "Prometheus"
+	defaultResource = "golang-server"
+	defaultGroup    = "Prometheus-Go"
 	defaultWarning  = "400"
 	defaultCritical = "800"
 	defaultUnitType = "MB"
