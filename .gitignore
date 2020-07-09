@@ -61,3 +61,7 @@ install/*
 # Temp NATS store
 gw-transit/natsstore/
 natsstore/
+
+target
+
+node_modules

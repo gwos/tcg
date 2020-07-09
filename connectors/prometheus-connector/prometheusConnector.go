@@ -134,6 +134,8 @@ func value(serviceName string, metricType *dto.MetricType, metric *dto.Metric) m
 		result[serviceName] = metric.GetCounter().GetValue()
 	case dto.MetricType_UNTYPED:
 		result[serviceName] = metric.GetUntyped().GetValue()
+	case dto.MetricType_GAUGE:
+		result[serviceName] = metric.GetGauge().GetValue()
 	case dto.MetricType_HISTOGRAM:
 		if metric.GetHistogram().SampleSum != nil {
 			result[serviceName+"_sample_sum"] = metric.GetHistogram().GetSampleSum()
@@ -158,7 +160,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 		}
 		values := value(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
-			log.Error("[Prometheus Connector]: Metric value can not be empty")
+			log.Error(fmt.Sprintf("[Prometheus Connector]:  Value for metric '%s' can not be empty", *prometheusService.Name))
 			continue
 		}
 
@@ -264,7 +266,8 @@ func receiverHandler(c *gin.Context) {
 
 func pull(resources []Resource) {
 	for _, resource := range resources {
-		statusCode, byteResponse, err := clients.SendRequest("Get", resource.url, resource.headers, nil, nil)
+		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.url, resource.headers, nil, nil)
+
 		if err != nil {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
 				resource.url, err.Error()))
