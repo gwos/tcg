@@ -686,7 +686,7 @@ func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 	hostName := config.GetConfig().Telemetry.HostName
 	if len(hostName) == 0 {
 		err := fmt.Errorf("Telemetry not configured")
-		log.Warn(err.Error())
+		log.Debug(err.Error())
 		return nil, nil, err
 	}
 
