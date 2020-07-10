@@ -101,7 +101,7 @@ type LicenseCheck struct {
 // Returns whether it is OK to send inventory according to the latest license check result
 // (false only if the latest license check was failure with "Device allocation over hard limit" message
 // i.e. if license check is failure but because of license expired or something else it is still OK to send inventory)
-func (license LicenseCheck) IsOkToSendInventory() bool {
+func (license LicenseCheck) isOkToSendInventory() bool {
 	if license.Success {
 		return true
 	} else {
@@ -323,13 +323,39 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		hostName = client.GWConnection.HostName
 	}
 
-	if license, exists := cache.LicenseChecksCache.Get(client.GWConnection.HostName); exists {
-		isOkToSend := license.(*LicenseCheck).IsOkToSendInventory()
-		if !isOkToSend {
-			return nil, errors.New("host allocation over hard limit at " + hostName)
-		}
+	// retrieve count of resources (hosts) to be sent and agentID
+	var payloadResources struct {
+		Context struct {
+			AgentID string `json:"agentId"`
+		} `json:"context"`
+		Resources []interface{} `json:"resources"`
+	}
+	err := json.Unmarshal(payload, &payloadResources)
+	if err != nil {
+		log.Error("Unable to parse SynchronizeInventory payload: ", err)
+	}
+	currentHostsCount := len(payloadResources.Resources)
+
+	// get count of hosts sent last time from cache
+	// (if doesn't exist in cache count hosts owned curr agent in GWOS
+	// for a case if connector was stopped and then restarted)
+	lastSentHostsCount := 0
+	if lastSentHostsCountCache, exists := cache.LastSentHostsCountCache.Get(hostName); exists {
+		lastSentHostsCount = lastSentHostsCountCache.(int)
 	} else {
-		return nil, errors.New("failed to check license at " + hostName)
+		lastSentHostsCount = client.getLastSentHostsCount(payloadResources.Context.AgentID)
+		cache.LastSentHostsCountCache.SetDefault(hostName, lastSentHostsCount)
+	}
+
+	// count diff between curr hosts to send count and last i.e. how many hosts gonna be added
+	hostsToAllocate := currentHostsCount - lastSentHostsCount
+	// if gonna ad hosts
+	if hostsToAllocate > 0 {
+		// check whether license allows to allocate count of hosts
+		licenseCheckPassed, err := client.checkLicenseForHostLimit(hostsToAllocate)
+		if !licenseCheckPassed {
+			return nil, err
+		}
 	}
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -340,7 +366,11 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 			},
 		)
 	}
-	return client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	response, err := client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	if err == nil {
+		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
+	}
+	return response, err
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
@@ -453,7 +483,7 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	return &gwHostGroups, nil
 }
 
-func (client *GWClient) CheckLicense(hostsToAllocate int) (*LicenseCheck, error) {
+func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, error) {
 	host := "unknown"
 	if client.GWConnection != nil {
 		host = client.GWConnection.HostName
@@ -467,15 +497,38 @@ func (client *GWClient) CheckLicense(hostsToAllocate int) (*LicenseCheck, error)
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
 		log.Error("Unable to check license at ", host, ": ", err)
-		return nil, err
+		return false, errors.New("failed to check license at " + host)
 	}
 	var license LicenseCheck
 	err = json.Unmarshal(response, &license)
 	if err != nil {
 		log.Error("Unable to parse received license at ", host, ": ", err)
-		return nil, err
+		return false, errors.New("failed to check license at " + host)
 	}
-	return &license, nil
+	if !license.isOkToSendInventory() {
+		return false, errors.New("host allocation over hard limit at " + host)
+	}
+	return true, nil
+}
+
+func (client *GWClient) getLastSentHostsCount(agentID string) int {
+	gwServices, err := client.GetServicesByAgent(agentID)
+	if err != nil || gwServices == nil {
+		log.Error("Unable to get GW hosts to init  last hosts sent count.")
+		if err != nil {
+			log.Error(err)
+		} else {
+			log.Error("Response is nil.")
+		}
+		return 0
+	}
+	hostNames := make(map[string]struct{})
+	for _, gwService := range gwServices.Services {
+		if _, exists := hostNames[gwService.HostName]; !exists {
+			hostNames[gwService.HostName] = struct{}{}
+		}
+	}
+	return len(hostNames)
 }
 
 func (client *GWClient) sendData(ctx context.Context, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
