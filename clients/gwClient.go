@@ -94,8 +94,11 @@ type GwHostGroups struct {
 }
 
 type LicenseCheck struct {
-	Success bool   `json:"success"`
-	Message string `json:"message"`
+	Success          bool   `json:"success"`
+	Message          string `json:"message"`
+	DevicesRequested int    `json:"devicesRequested"`
+	LimitDevices     int    `json:"hardLimitDevices"`
+	Devices          int    `json:"devices"`
 }
 
 // Returns whether it is OK to send inventory according to the latest license check result
@@ -497,16 +500,27 @@ func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, err
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
 		log.Error("Unable to check license at ", host, ": ", err)
-		return false, errors.New("failed to check license at " + host)
+		return false, errors.New("failed to check license at " + host + ": unable to get license")
 	}
 	var license LicenseCheck
 	err = json.Unmarshal(response, &license)
 	if err != nil {
 		log.Error("Unable to parse received license at ", host, ": ", err)
-		return false, errors.New("failed to check license at " + host)
+		return false, errors.New("failed to check license at " + host + ": unable to get license")
 	}
 	if !license.isOkToSendInventory() {
-		return false, errors.New("host allocation over hard limit at " + host)
+		hostSpace := license.LimitDevices - license.Devices
+		if hostSpace < 0 {
+			hostSpace = 0
+		}
+		log.Error("host allocation over hard limit at " + host +
+			": hosts limit " + strconv.Itoa(license.LimitDevices) +
+			", hosts monitored " + strconv.Itoa(license.Devices) +
+			", license space for " + strconv.Itoa(hostSpace) + " hosts" +
+			", hosts to allocate " + strconv.Itoa(hostsToAllocate))
+		return false, errors.New("host allocation over hard limit at " + host +
+			": hosts to allocate " + strconv.Itoa(hostsToAllocate) +
+			" but only license space for " + strconv.Itoa(hostSpace))
 	}
 	return true, nil
 }
