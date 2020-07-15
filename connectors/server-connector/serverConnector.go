@@ -115,8 +115,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 			ComputeType:    processValues.computeType,
 			Expression:     processValues.expression,
 			UnitType:       transit.PercentCPU,
-			Warning:        int64(processValues.warningValue),
-			Critical:       int64(processValues.criticalValue),
+			Warning:        float64(processValues.warningValue),
+			Critical:       float64(processValues.criticalValue),
 			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 		}
