@@ -541,14 +541,6 @@ func initializeEntrypoints() []services.Entrypoint {
 				log.Error("[Server Connector]: " + err.Error())
 				c.IndentedJSON(http.StatusBadRequest, err.Error())
 			},
-		},
-		services.Entrypoint{
-			Url:    "/version",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
-					Time: buildTime})
-			},
 		})
 
 	return entrypoints
