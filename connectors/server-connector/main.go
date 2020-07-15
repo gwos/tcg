@@ -39,7 +39,10 @@ func main() {
 	var cfg ServerConnectorConfig
 	var chksum []byte
 
-	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
+
+	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")

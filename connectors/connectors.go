@@ -553,7 +553,6 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 
 	for i, _ := range result {
 		for _, metric := range result[i].Metrics {
-			fmt.Println(metric.MetricComputeType)
 			if metric.MetricComputeType == transit.Synthetic {
 				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
@@ -640,9 +639,4 @@ func Max(x, y int64) int64 {
 		return y
 	}
 	return x
-}
-
-type BuildVersion struct {
-	Tag  string `json:"tag"`
-	Time string `json:"time"`
 }
