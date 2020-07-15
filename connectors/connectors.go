@@ -78,8 +78,6 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 	b, err = json.Marshal(request)
 
-	// log.Error(string(b))
-
 	if err != nil {
 		return err
 	}
