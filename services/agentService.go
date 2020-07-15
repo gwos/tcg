@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"sync"
@@ -383,6 +384,11 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				SubjSendResourceWithMetrics,
 				func(ctx context.Context, b []byte) error {
 					_, err := gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(b))
+					if errors.Is(err, clients.ErrUnauthorized) {
+						/* it looks like an issue with credentialed user
+						so, wait for configuration update */
+						_ = service.StopTransport()
+					}
 					return err
 				},
 			),
@@ -391,6 +397,11 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				SubjSynchronizeInventory,
 				func(ctx context.Context, b []byte) error {
 					_, err := gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(b))
+					if errors.Is(err, clients.ErrUnauthorized) {
+						/* it looks like an issue with credentialed user
+						so, wait for configuration update */
+						_ = service.StopTransport()
+					}
 					return err
 				},
 			),
