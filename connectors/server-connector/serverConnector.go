@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/connectors"
@@ -63,6 +62,9 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 
 	var services []transit.InventoryService
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -91,6 +93,9 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 	var notDefaultProcesses []transit.MetricDefinition
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -415,6 +420,9 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 
 	processesMap := make(map[string]values)
 	for _, pr := range monitoredProcesses {
+		if !pr.Monitored {
+			continue
+		}
 		name := pr.Name
 		if pr.CustomName != "" {
 			name = pr.CustomName
@@ -519,28 +527,9 @@ func initializeEntrypoints() []services.Entrypoint {
 			},
 		},
 		services.Entrypoint{
-			Url:    "/expressions/evaluate",
-			Method: "Post",
-			Handler: func(c *gin.Context) {
-				var expression connectors.ExpressionToEvaluate
-				body, err := c.GetRawData()
-				if err != nil {
-					c.JSON(http.StatusBadRequest, err.Error())
-					return
-				}
-				err = json.Unmarshal(body, &expression)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, err.Error())
-					return
-				}
-				result, err := connectors.EvaluateExpression(expression, c.Request.URL.Query().Get("override") == "true")
-				if err == nil {
-					c.JSON(http.StatusOK, result)
-					return
-				}
-				log.Error("[Server Connector]: " + err.Error())
-				c.IndentedJSON(http.StatusBadRequest, err.Error())
-			},
+			Url:     "/expressions/evaluate",
+			Method:  "Post",
+			Handler: connectors.EvaluateExpressionHandler,
 		},
 		services.Entrypoint{
 			Url:    "/version",
