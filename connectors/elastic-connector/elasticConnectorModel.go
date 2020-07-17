@@ -40,7 +40,9 @@ func initMonitoringState(previousState MonitoringState, config ElasticConnectorC
 
 	for _, metrics := range config.Views {
 		for metricName, metric := range metrics {
-			currentState.Metrics[metricName] = metric
+			if metric.Monitored {
+				currentState.Metrics[metricName] = metric
+			}
 		}
 	}
 
