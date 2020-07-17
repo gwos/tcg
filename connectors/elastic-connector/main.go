@@ -92,6 +92,18 @@ func main() {
 					Time: buildTime})
 			},
 		},
+		services.Entrypoint{
+			Url:    "/expressions/suggest/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
+		services.Entrypoint{
+			Url:     "/expressions/evaluate",
+			Method:  "Post",
+			Handler: connectors.EvaluateExpressionHandler,
+		},
 	); err != nil {
 		log.Error(err)
 		return

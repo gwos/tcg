@@ -1,10 +1,14 @@
 package connectors
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/PaesslerAG/gval"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/log"
+	"net/http"
 	"regexp"
 	"strings"
 )
@@ -486,6 +490,31 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	} else {
 		return -1, err
 	}
+}
+
+func SuggestExpressionHandler() {
+
+}
+
+func EvaluateExpressionHandler(c *gin.Context) {
+	var expression ExpressionToEvaluate
+	body, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = json.Unmarshal(body, &expression)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := EvaluateExpression(expression, c.Request.URL.Query().Get("override") == "true")
+	if err == nil {
+		c.JSON(http.StatusOK, result)
+		return
+	}
+	log.Error("[Server Connector]: " + err.Error())
+	c.IndentedJSON(http.StatusBadRequest, err.Error())
 }
 
 type ExpressionToSuggest struct {
