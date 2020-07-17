@@ -63,6 +63,9 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 
 	var services []transit.InventoryService
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -91,6 +94,9 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 	var notDefaultProcesses []transit.MetricDefinition
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -415,6 +421,9 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 
 	processesMap := make(map[string]values)
 	for _, pr := range monitoredProcesses {
+		if !pr.Monitored {
+			continue
+		}
 		name := pr.Name
 		if pr.CustomName != "" {
 			name = pr.CustomName
