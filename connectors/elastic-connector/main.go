@@ -136,7 +136,7 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
+		log.Debug("[Elastic Connector]: Sleeping for ", cfg.Timer)
+		time.Sleep(time.Duration(cfg.Timer * int64(time.Second)))
 	}
 }

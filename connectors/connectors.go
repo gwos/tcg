@@ -20,7 +20,8 @@ import (
 	"time"
 )
 
-const DefaultTimer = int64(120)
+// Default timer in minutes
+const DefaultTimer = int64(2)
 
 // will come from extensions field
 var Timer = DefaultTimer
@@ -644,13 +645,6 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return h.Sum(nil), nil
-}
-
-func Max(x, y int64) int64 {
-	if x < y {
-		return y
-	}
-	return x
 }
 
 type BuildVersion struct {
