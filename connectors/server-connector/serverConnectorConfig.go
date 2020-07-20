@@ -43,7 +43,9 @@ func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *tr
 	// update config with received values if presented
 	if monitorConnection != nil && monitorConnection.Extensions != nil {
 		if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
-			connectorConfig.Timer = int64(value.(float64) * 60)
+			if value.(float64) >= 1 {
+				connectorConfig.Timer = int64(value.(float64) * 60)
+			}
 		}
 
 		if value, present := monitorConnection.Extensions[extensionsKeyProcesses]; present {
