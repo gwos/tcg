@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -16,9 +18,10 @@ import (
 var (
 	defaultResource = "golang-server"
 	defaultGroup    = "Prometheus-Go"
-	defaultWarning  = "400"
-	defaultCritical = "800"
+	defaultWarning  = fmt.Sprintf("%f", rand.Float64())
+	defaultCritical = fmt.Sprintf("%f", rand.Float64())
 	defaultUnitType = "MB"
+	defaultPort     = ":2222"
 )
 
 func initMeter() {
@@ -30,7 +33,7 @@ func initMeter() {
 	http.HandleFunc("/", exporter.ServeHTTP)
 
 	go func() {
-		_ = http.ListenAndServe(":2222", nil)
+		_ = http.ListenAndServe(defaultPort, nil)
 	}()
 }
 
@@ -57,20 +60,20 @@ func main() {
 	ctx := context.Background()
 
 	(*observerLock).Lock()
-	*observerValueToReport = 1.0
+	*observerValueToReport = rand.Float64()
 	*observerLabelsToReport = commonLabels
 	(*observerLock).Unlock()
 	meter.RecordBatch(
 		ctx,
 		commonLabels,
-		valueRecorder.Measurement(2.0),
-		counter.Measurement(12.0),
+		valueRecorder.Measurement(rand.Float64()),
+		counter.Measurement(rand.Float64()),
 	)
 
 	time.Sleep(5 * time.Second)
 
 	(*observerLock).Lock()
-	*observerValueToReport = 1.0
+	*observerValueToReport = rand.Float64()
 	*observerLabelsToReport = notSoCommonLabels
 	(*observerLock).Unlock()
 	meter.RecordBatch(
@@ -81,16 +84,15 @@ func main() {
 	time.Sleep(5 * time.Second)
 
 	(*observerLock).Lock()
-	*observerValueToReport = 13.0
+	*observerValueToReport = rand.Float64()
 	*observerLabelsToReport = commonLabels
 	(*observerLock).Unlock()
 	meter.RecordBatch(
 		ctx,
 		commonLabels,
-		valueRecorder.Measurement(12.0),
-		counter.Measurement(13.0),
+		valueRecorder.Measurement(rand.Float64()),
+		counter.Measurement(rand.Float64()),
 	)
 
 	time.Sleep(100 * time.Second)
 }
-
