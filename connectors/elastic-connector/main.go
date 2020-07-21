@@ -26,7 +26,10 @@ func main() {
 
 	var transitService = services.GetTransitService()
 
-	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", buildTag, buildTime))
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
+
+	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
 	var connector ElasticConnector
 
@@ -84,14 +87,6 @@ func main() {
 			},
 		},
 		services.Entrypoint{
-			Url:    "/version",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
-					Time: buildTime})
-			},
-		},
-		services.Entrypoint{
 			Url:    "/expressions/suggest/:name",
 			Method: "Get",
 			Handler: func(c *gin.Context) {
@@ -103,7 +98,7 @@ func main() {
 			Method:  "Post",
 			Handler: connectors.EvaluateExpressionHandler,
 		},
-	); err != nil {
+  ); err != nil {
 		log.Error(err)
 		return
 	}

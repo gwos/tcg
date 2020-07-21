@@ -25,7 +25,10 @@ func main() {
 	var cfg PrometheusConnectorConfig
 	var chksum []byte
 
-	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
+
+	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
 	transitService.ConfigHandler = func(data []byte) {
 		log.Info("[Prometheus Connector]: Configuration received")
