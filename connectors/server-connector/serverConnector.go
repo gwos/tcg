@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/connectors"
