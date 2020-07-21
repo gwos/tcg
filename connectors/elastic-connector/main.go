@@ -41,7 +41,6 @@ func main() {
 			c := InitConfig(config.GetConfig().Connector.AppType, config.GetConfig().Connector.AgentID,
 				monitorConn, profile, gwConnections)
 			cfg = *c
-			connectors.Timer = cfg.Timer
 			chk, err := connectors.Hashsum(
 				config.GetConfig().GWConnections,
 				cfg,
@@ -87,7 +86,19 @@ func main() {
 				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
 			},
 		},
-	); err != nil {
+		services.Entrypoint{
+			Url:    "/expressions/suggest/:name",
+			Method: "Get",
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
+		services.Entrypoint{
+			Url:     "/expressions/evaluate",
+			Method:  "Post",
+			Handler: connectors.EvaluateExpressionHandler,
+		},
+  ); err != nil {
 		log.Error(err)
 		return
 	}
@@ -97,7 +108,7 @@ func main() {
 		return
 	}
 
-	for {
+	for range time.Tick(cfg.Timer * time.Minute) {
 		if len(connector.monitoringState.Metrics) > 0 {
 			metrics, inventory, groups := connector.CollectMetrics()
 
@@ -119,7 +130,5 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
 	}
 }

@@ -104,7 +104,7 @@ type Bool struct {
 }
 
 type Clause struct {
-	Match  *map[string]interface{} `json:"match,omitempty"`
+	Match  *map[string]interface{} `json:"match_phrase,omitempty"`
 	Range  *map[string]interface{} `json:"range,omitempty"`
 	Exists *Exists                 `json:"exists,omitempty"`
 	Bool   *Bool                   `json:"bool,omitempty"`
