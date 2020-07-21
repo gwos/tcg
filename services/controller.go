@@ -409,6 +409,21 @@ func (controller *Controller) status(c *gin.Context) {
 	c.JSON(http.StatusOK, statusDTO)
 }
 
+//
+// @Description The following API endpoint can be used to return actual TCG connector version.
+// @Tags    agent, connector
+// @Accept  json
+// @Produce json
+// @Success 200 {object} config.BuildVersion
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /version [get]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) version(c *gin.Context) {
+	c.JSON(http.StatusOK, config.BuildVersion{Tag: config.Version.Tag,
+		Time: config.Version.Time})
+}
+
 func (controller *Controller) validateToken(c *gin.Context) {
 	// check local pin
 	pin := controller.Connector.ControllerPin
@@ -455,6 +470,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.Use(controller.validateToken)
 
 	apiV1Config.POST("", controller.config)
+	apiV1Group.GET("/version", controller.version)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
