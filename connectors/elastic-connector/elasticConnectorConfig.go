@@ -7,6 +7,7 @@ import (
 	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -55,7 +56,7 @@ type ElasticConnectorConfig struct {
 	HostNameField      string
 	HostGroupField     string
 	GroupNameByUser    bool
-	Timer              int64
+	Timer              time.Duration
 	Ownership          transit.HostOwnershipType
 	GWConnections      config.GWConnections
 }
@@ -167,7 +168,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 
 			// Timer
 			if monitorConnection.Extensions[connectors.ExtensionsKeyTimer] != nil {
-				connectorConfig.Timer = int64(monitorConnection.Extensions[connectors.ExtensionsKeyTimer].(float64) * 60)
+				connectorConfig.Timer = time.Duration(int64(monitorConnection.Extensions[connectors.ExtensionsKeyTimer].(float64)))
 			}
 		}
 	}
@@ -207,8 +208,8 @@ func (connectorConfig *ElasticConnectorConfig) replaceIntervalTemplates() {
 		connectorConfig.Timer)
 }
 
-func replaceIntervalTemplate(templateString string, intervalValue int64) string {
-	interval := strconv.Itoa(int(intervalValue)) + intervalPeriodSeconds
+func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
+	interval := strconv.Itoa(int(intervalValue.Minutes())) + intervalPeriodSeconds
 	if strings.Contains(templateString, intervalTemplate) {
 		templateString = strings.ReplaceAll(templateString, intervalTemplate, interval)
 	}

@@ -20,7 +20,8 @@ import (
 	"time"
 )
 
-const DefaultTimer = int64(120)
+// Default timer in minutes
+const DefaultTimer  = time.Duration(2) * time.Minute
 
 // will come from extensions field
 var Timer = DefaultTimer
@@ -371,6 +372,20 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
 }
 
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+	var timeSeries []transit.TimeSeries
+	for _, metricBuilder := range metricBuilders {
+		metric, err := BuildMetric(metricBuilder)
+		if err != nil {
+			log.Error("Error creating metric for process: ", serviceName,
+				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
+			return nil, errors.New("cannot create service with metric due to metric creation failure")
+		}
+		timeSeries = append(timeSeries, *metric)
+	}
+	return CreateService(serviceName, hostName, timeSeries)
+}
+
 // Create Service
 // required params: name, owner(resource)
 // optional params: metrics
@@ -572,6 +587,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 								},
+								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
 									IntegerValue: int64(value),
@@ -630,13 +646,6 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return h.Sum(nil), nil
-}
-
-func Max(x, y int64) int64 {
-	if x < y {
-		return y
-	}
-	return x
 }
 
 type BuildVersion struct {
