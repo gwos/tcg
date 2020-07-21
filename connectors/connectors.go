@@ -587,6 +587,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 								},
+								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
 									IntegerValue: int64(value),
