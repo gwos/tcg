@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/connectors"
@@ -63,6 +62,9 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 
 	var services []transit.InventoryService
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -91,6 +93,9 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 	var notDefaultProcesses []transit.MetricDefinition
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -115,8 +120,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 			ComputeType:    processValues.computeType,
 			Expression:     processValues.expression,
 			UnitType:       transit.PercentCPU,
-			Warning:        int64(processValues.warningValue),
-			Critical:       int64(processValues.criticalValue),
+			Warning:        float64(processValues.warningValue),
+			Critical:       float64(processValues.criticalValue),
 			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 		}
@@ -415,6 +420,9 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 
 	processesMap := make(map[string]values)
 	for _, pr := range monitoredProcesses {
+		if !pr.Monitored {
+			continue
+		}
 		name := pr.Name
 		if pr.CustomName != "" {
 			name = pr.CustomName
@@ -542,6 +550,5 @@ func initializeEntrypoints() []services.Entrypoint {
 				c.IndentedJSON(http.StatusBadRequest, err.Error())
 			},
 		})
-
 	return entrypoints
 }

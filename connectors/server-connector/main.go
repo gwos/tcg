@@ -13,11 +13,6 @@ import (
 	"time"
 )
 
-// Default values for 'Group' and loop 'Timer'
-const (
-	DefaultCacheTimer = 1
-)
-
 // Variables to control connector version and build time.
 // Can be overridden during the build step.
 // See README for details.
@@ -49,7 +44,6 @@ func main() {
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
 			cfg = *c
-			connectors.Timer = cfg.Timer
 			chk, err := connectors.Hashsum(
 				config.GetConfig().Connector.AgentID,
 				config.GetConfig().GWConnections,
@@ -88,7 +82,7 @@ func main() {
 		return
 	}
 
-	for {
+	for range time.Tick(cfg.Timer * time.Minute) {
 		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
@@ -97,8 +91,6 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
 	}
 }
 

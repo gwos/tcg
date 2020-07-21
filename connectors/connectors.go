@@ -20,7 +20,8 @@ import (
 	"time"
 )
 
-const DefaultTimer = int64(120)
+// Default timer in minutes
+const DefaultTimer  = time.Duration(2) * time.Minute
 
 // will come from extensions field
 var Timer = DefaultTimer
@@ -77,8 +78,6 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	}
 
 	b, err = json.Marshal(request)
-
-	// log.Error(string(b))
 
 	if err != nil {
 		return err
@@ -373,6 +372,20 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
 }
 
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+	var timeSeries []transit.TimeSeries
+	for _, metricBuilder := range metricBuilders {
+		metric, err := BuildMetric(metricBuilder)
+		if err != nil {
+			log.Error("Error creating metric for process: ", serviceName,
+				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
+			return nil, errors.New("cannot create service with metric due to metric creation failure")
+		}
+		timeSeries = append(timeSeries, *metric)
+	}
+	return CreateService(serviceName, hostName, timeSeries)
+}
+
 // Create Service
 // required params: name, owner(resource)
 // optional params: metrics
@@ -563,7 +576,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Type:             transit.Service,
 						Owner:            result[i].Owner,
 						Status:           "SERVICE_OK",
-						LastPlugInOutput: fmt.Sprintf(" ExpressionToSuggest: %s", metric.MetricExpression),
+						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
 						Metrics: []transit.TimeSeries{
@@ -574,6 +587,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 								},
+								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
 									IntegerValue: int64(value),
@@ -639,4 +653,9 @@ func Max(x, y int64) int64 {
 		return y
 	}
 	return x
+}
+
+type BuildVersion struct {
+	Tag  string `json:"tag"`
+	Time string `json:"time"`
 }
