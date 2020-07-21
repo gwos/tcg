@@ -21,7 +21,7 @@ import (
 )
 
 // Default timer in minutes
-const DefaultTimer = int64(2)
+const DefaultTimer  = time.Duration(2) * time.Minute
 
 // will come from extensions field
 var Timer = DefaultTimer
