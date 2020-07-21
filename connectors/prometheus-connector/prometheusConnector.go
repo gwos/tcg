@@ -127,7 +127,7 @@ func validatePrometheusService(service *dto.MetricFamily) error {
 	return nil
 }
 
-func value(serviceName string, metricType *dto.MetricType, metric *dto.Metric) map[string]interface{} {
+func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metric) map[string]interface{} {
 	result := make(map[string]interface{})
 	switch *metricType {
 	case dto.MetricType_COUNTER:
@@ -158,7 +158,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 		if metric.TimestampMs != nil {
 			timestamp = time.Unix(*metric.TimestampMs, 0)
 		}
-		values := value(*prometheusService.Name, prometheusService.Type, metric)
+		values := makeValue(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
 			log.Error(fmt.Sprintf("[Prometheus Connector]:  Value for metric '%s' can not be empty", *prometheusService.Name))
 			continue

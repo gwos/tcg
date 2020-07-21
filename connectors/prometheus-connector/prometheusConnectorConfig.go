@@ -5,6 +5,7 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/transit"
+	"time"
 )
 
 const (
@@ -22,7 +23,7 @@ type PrometheusConnectorConfig struct {
 	Groups         []transit.ResourceGroup
 	Resources      []Resource
 	MetricsProfile transit.MetricsProfile
-	Timer          int64
+	Timer          time.Duration
 	Ownership      transit.HostOwnershipType
 }
 
@@ -44,7 +45,7 @@ func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *tr
 	// Update config with received values if presented
 	if monitorConnection != nil && monitorConnection.Extensions != nil {
 		if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
-			connectorConfig.Timer = int64(value.(float64) * 60)
+			connectorConfig.Timer = time.Duration(int64(value.(float64)))
 		}
 
 		if value, present := monitorConnection.Extensions[extensionsKeyGroups]; present {

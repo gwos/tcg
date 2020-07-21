@@ -66,9 +66,7 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	for {
+	for range time.Tick(cfg.Timer * time.Minute) {
 		pull(cfg.Resources)
-		log.Debug("[Server Connector]: Sleeping for ", cfg.Timer)
-		time.Sleep(time.Duration(cfg.Timer * int64(time.Second)))
 	}
 }
