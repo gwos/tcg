@@ -634,11 +634,15 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func Max(x, y int64) int64 {
-	if x < y {
-		return y
+// MaxInt64 returns maximum value
+func MaxInt64(x int64, rest ...int64) int64 {
+	m := x
+	for _, y := range rest[:] {
+		if m < y {
+			m = y
+		}
 	}
-	return x
+	return m
 }
 
 type BuildVersion struct {
