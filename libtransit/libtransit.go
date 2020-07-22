@@ -32,11 +32,12 @@ import (
 func main() {
 }
 
-func min(args ...int) int {
-	m := args[0]
-	for _, arg := range args[1:] {
-		if m > arg {
-			m = arg
+// min returns minimum value
+func min(x int, rest ...int) int {
+	m := x
+	for _, y := range rest[:] {
+		if m > y {
+			m = y
 		}
 	}
 	return m
