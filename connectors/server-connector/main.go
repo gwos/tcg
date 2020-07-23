@@ -10,7 +10,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 // Default values for 'Group' and loop 'Timer'
@@ -85,7 +84,7 @@ func main() {
 		return
 	}
 
-	for {
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
 		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
@@ -94,9 +93,7 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
-	}
+	})
 }
 
 func handleCache() {
