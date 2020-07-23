@@ -1,11 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/transit"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -39,7 +39,6 @@ const (
 	extensionsKeyGroupNameByUser    = "hostGroupNameByUser"
 
 	intervalTemplate      = "$interval"
-	intervalPeriodSeconds = "s"
 
 	// temporary solution, will be removed
 	templateMetricName = "$view_Template#"
@@ -167,8 +166,11 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			}
 
 			// Timer
-			if monitorConnection.Extensions[connectors.ExtensionsKeyTimer] != nil {
-				connectorConfig.Timer = time.Duration(int64(monitorConnection.Extensions[connectors.ExtensionsKeyTimer].(float64)))
+			if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
+				if value.(float64) >= 1 {
+					connectorConfig.Timer = time.Duration(int64(value.(float64))) * time.Minute
+					connectors.Timer = connectorConfig.Timer
+				}
 			}
 		}
 	}
@@ -209,7 +211,7 @@ func (connectorConfig *ElasticConnectorConfig) replaceIntervalTemplates() {
 }
 
 func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
-	interval := strconv.Itoa(int(intervalValue.Minutes())) + intervalPeriodSeconds
+	interval := fmt.Sprintf("%ds", int64(intervalValue.Seconds()))
 	if strings.Contains(templateString, intervalTemplate) {
 		templateString = strings.ReplaceAll(templateString, intervalTemplate, interval)
 	}
