@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/transit"
-	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -38,7 +39,6 @@ const (
 	extensionsKeyGroupNameByUser    = "hostGroupNameByUser"
 
 	intervalTemplate      = "$interval"
-	intervalPeriodSeconds = "s"
 
 	// temporary solution, will be removed
 	templateMetricName = "$view_Template#"
@@ -55,7 +55,7 @@ type ElasticConnectorConfig struct {
 	HostNameField      string
 	HostGroupField     string
 	GroupNameByUser    bool
-	Timer              int64
+	Timer              time.Duration
 	Ownership          transit.HostOwnershipType
 	GWConnections      config.GWConnections
 }
@@ -166,8 +166,11 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			}
 
 			// Timer
-			if monitorConnection.Extensions[connectors.ExtensionsKeyTimer] != nil {
-				connectorConfig.Timer = int64(monitorConnection.Extensions[connectors.ExtensionsKeyTimer].(float64) * 60)
+			if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
+				if value.(float64) >= 1 {
+					connectorConfig.Timer = time.Duration(int64(value.(float64))) * time.Minute
+					connectors.Timer = connectorConfig.Timer
+				}
 			}
 		}
 	}
@@ -207,8 +210,8 @@ func (connectorConfig *ElasticConnectorConfig) replaceIntervalTemplates() {
 		connectorConfig.Timer)
 }
 
-func replaceIntervalTemplate(templateString string, intervalValue int64) string {
-	interval := strconv.Itoa(int(intervalValue)) + intervalPeriodSeconds
+func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
+	interval := fmt.Sprintf("%ds", int64(intervalValue.Seconds()))
 	if strings.Contains(templateString, intervalTemplate) {
 		templateString = strings.ReplaceAll(templateString, intervalTemplate, interval)
 	}
