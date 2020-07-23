@@ -20,12 +20,13 @@ import (
 	"time"
 )
 
-// Default timer in minutes
+// DefaultTimer defines interval in minutes
 const DefaultTimer = time.Duration(2) * time.Minute
 
-// will come from extensions field
+// Timer comes from extensions field
 var Timer = DefaultTimer
 
+// ExtensionsKeyTimer defines field name
 const ExtensionsKeyTimer = "checkIntervalMinutes"
 
 func Start() error {
@@ -73,7 +74,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	}
 	for i, _ := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(Timer)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
@@ -87,7 +88,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 func setCheckTimes(resources []transit.MonitoredResource) {
 	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
+	nextCheckTime := lastCheckTime.Add(Timer)
 	for i := range resources {
 		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
 		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
@@ -578,7 +579,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Status:           "SERVICE_OK",
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(Timer)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
