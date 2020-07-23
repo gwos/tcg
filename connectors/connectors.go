@@ -21,7 +21,7 @@ import (
 )
 
 // Default timer in minutes
-const DefaultTimer  = time.Duration(2) * time.Minute
+const DefaultTimer = time.Duration(2) * time.Minute
 
 // will come from extensions field
 var Timer = DefaultTimer
@@ -657,6 +657,36 @@ func MaxInt64(x int64, rest ...int64) int64 {
 		}
 	}
 	return m
+}
+
+// MaxDuration returns maximum value
+func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
+	m := x
+	for _, y := range rest[:] {
+		if m < y {
+			m = y
+		}
+	}
+	return m
+}
+
+// StartPeriodic starts periodic event loop
+// with 1 minute (not often) guard
+// loop can be cancelled via context argument
+func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
+	ticker := time.NewTicker(MaxDuration(t, time.Minute))
+	defer ticker.Stop()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go fn()
+		}
+	}
 }
 
 type BuildVersion struct {
