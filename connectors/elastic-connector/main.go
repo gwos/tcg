@@ -10,7 +10,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"net/http"
-	"time"
 )
 
 // Variables to control connector version and build time.
@@ -114,7 +113,7 @@ func main() {
 		return
 	}
 
-	for {
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
 		if len(connector.monitoringState.Metrics) > 0 {
 			metrics, inventory, groups := connector.CollectMetrics()
 
@@ -136,7 +135,5 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
-	}
+	})
 }
