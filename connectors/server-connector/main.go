@@ -10,7 +10,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 // Variables to control connector version and build time.
@@ -82,7 +81,7 @@ func main() {
 		return
 	}
 
-	for range time.Tick(cfg.Timer * time.Minute) {
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
 		if len(cfg.MetricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
@@ -91,7 +90,7 @@ func main() {
 				log.Error(err.Error())
 			}
 		}
-	}
+	})
 }
 
 func handleCache() {
