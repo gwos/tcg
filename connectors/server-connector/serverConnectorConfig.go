@@ -45,7 +45,8 @@ func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *tr
 	if monitorConnection != nil && monitorConnection.Extensions != nil {
 		if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
 			if value.(float64) >= 1 {
-				connectorConfig.Timer = time.Duration(int64(value.(float64)))
+				connectorConfig.Timer = time.Duration(int64(value.(float64))) * time.Minute
+				connectors.Timer = connectorConfig.Timer
 			}
 		}
 

@@ -7,7 +7,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
-	"time"
 )
 
 // Variables to control connector version and build time.
@@ -69,7 +68,7 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	for range time.Tick(cfg.Timer * time.Minute) {
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
 		pull(cfg.Resources)
-	}
+	})
 }
