@@ -184,7 +184,6 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			}
 			if connectorConfig.Views[metric.ServiceType] != nil {
 				connectorConfig.Views[metric.ServiceType][metric.Name] = metric
-				connectorConfig.Views[metric.ServiceType] = connectorConfig.Views[metric.ServiceType]
 			} else {
 				metrics := make(map[string]transit.MetricDefinition)
 				metrics[metric.Name] = metric
