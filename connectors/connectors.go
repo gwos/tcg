@@ -690,8 +690,3 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 		}
 	}
 }
-
-type BuildVersion struct {
-	Tag  string `json:"tag"`
-	Time string `json:"time"`
-}
