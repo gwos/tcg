@@ -21,7 +21,7 @@ var (
 )
 
 func main() {
-	connectors.ControlCHandler()
+	connectors.SigTermHandler()
 
 	var transitService = services.GetTransitService()
 
