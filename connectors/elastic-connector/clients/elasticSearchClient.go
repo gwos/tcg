@@ -21,7 +21,7 @@ func (esClient *EsClient) InitEsClient() error {
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Error(err)
+		log.Error("|elasticSearchClient.go| : [InitEsClient] : ", err)
 	} else {
 		esClient.Client = client
 	}
@@ -32,7 +32,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
-			log.Error("Failed to retrieve hosts from ElasticSearch. ElasticSearch client not initialized")
+			log.Error("|elasticSearchClient.go| : [GetHosts] : Failed to retrieve hosts from ElasticSearch. ElasticSearch client not initialized")
 			return nil
 		}
 	}
@@ -44,7 +44,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	var body bytes.Buffer
 	var err error
 	if err = json.NewEncoder(&body).Encode(aggregationsBody); err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error encoding request body: ", err)
+		log.Error("|elasticSearchClient.go| : [GetHosts] : Failed to retrieve hosts from ElasticSearch. Error encoding request body: ", err)
 		return nil
 	}
 
@@ -56,7 +56,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	)
 
 	if err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error getting response: ", err)
+		log.Error("|elasticSearchClient.go| : [GetHosts] : Failed to retrieve hosts from ElasticSearch. Error getting response: ", err)
 		return nil
 	}
 
@@ -65,10 +65,10 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("Error parsing Search response body: ", err)
+			log.Error("|elasticSearchClient.go| : [GetHosts] : Error parsing Search response body: ", err)
 		} else {
 			// Print the response status and error information.
-			log.Error(response.Status(),
+			log.Error("|elasticSearchClient.go| : [GetHosts] : ", response.Status(),
 				e["error"].(map[string]interface{})["type"],
 				e["error"].(map[string]interface{})["reason"],
 			)
@@ -79,7 +79,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	responseBody, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error reading response body: ", err)
+		log.Error("|elasticSearchClient.go| : [GetHosts] : Failed to retrieve hosts from ElasticSearch. Error reading response body: ", err)
 		return nil
 	}
 	defer response.Body.Close()
@@ -87,7 +87,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []Ho
 	var aggregations AggregationsResponse
 	err = json.Unmarshal(responseBody, &aggregations)
 	if err != nil {
-		log.Error("Error parsing ES Search response body: ", err)
+		log.Error("|elasticSearchClient.go| : [GetHosts] : Error parsing ES Search response body: ", err)
 		return nil
 	}
 
@@ -98,7 +98,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
-			log.Error("ES client was not initialized")
+			log.Error("|elasticSearchClient.go| : [CountHitsForHost] : ES client was not initialized")
 			return 0, err
 		}
 	}
@@ -111,7 +111,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
-		log.Error("Error encoding ES Search Body: ", err)
+		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : Error encoding ES Search Body: ", err)
 		return 0, nil
 	}
 
@@ -126,7 +126,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	)
 
 	if err != nil {
-		log.Error("Error getting Search response: ", err)
+		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : Error getting Search response: ", err)
 		return 0, nil
 	}
 
@@ -135,10 +135,10 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("Error parsing Search response body: ", err)
+			log.Error("|elasticSearchClient.go| : [CountHitsForHost] : Error parsing Search response body: ", err)
 		} else {
 			// Print the response status and error information.
-			log.Error(response.Status(),
+			log.Error("|elasticSearchClient.go| : [CountHitsForHost] : ", response.Status(),
 				e["error"].(map[string]interface{})["type"],
 				e["error"].(map[string]interface{})["reason"],
 			)
@@ -148,7 +148,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Error("Error reading ES Search response body: ", err)
+		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : Error reading ES Search response body: ", err)
 		return 0, nil
 	}
 
@@ -156,7 +156,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 
 	var searchResponse SearchResponse
 	if err := json.Unmarshal(responseBody, &searchResponse); err != nil {
-		log.Error("Error parsing ES Search response body: ", err)
+		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : Error parsing ES Search response body: ", err)
 		return 0, nil
 	}
 

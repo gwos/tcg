@@ -546,7 +546,7 @@ func (service *AgentService) startTransport() error {
 		}
 	}
 	if len(cons) == 0 {
-		log.Warn("StartTransport: empty GWConnections")
+		log.Warn("[StartTransport]: Empty GWConnections")
 		return nil
 	}
 	/* Process clients */
