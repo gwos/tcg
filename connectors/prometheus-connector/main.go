@@ -58,12 +58,12 @@ func main() {
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
-		log.Error(err)
+		log.Error("[Prometheus Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Error("[Prometheus Connector]: ", err)
 		return
 	}
 

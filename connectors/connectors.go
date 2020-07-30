@@ -48,7 +48,7 @@ func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *tran
 
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
-		log.Error("Error parsing common connector data: ", err)
+		log.Error("|connectors.go| : [RetrieveCommonConnectorInfo] : Error parsing common connector data: ", err)
 		return nil, nil, nil, err
 	}
 
@@ -211,7 +211,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		}
 		args = append(args, timeInterval)
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
-		log.Error("Error creating time interval for metric ", metricBuilder.Name,
+		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
 			": either start time or end time is not provided")
 	}
 
@@ -229,7 +229,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
 			metricBuilder.Warning)
 		if err != nil {
-			log.Error("Error creating warning threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric]: Error creating warning threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *warningThreshold)
@@ -238,7 +238,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
 			metricBuilder.Critical)
 		if err != nil {
-			log.Error("Error creating critical threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric] : Error creating critical threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *criticalThreshold)
@@ -365,8 +365,8 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
-		log.Error("Error creating metric for process: ", metricBuilder.Name)
-		log.Error(err)
+		log.Error("|connectors.go| : [BuildServiceForMetric] : Error creating metric for process: ", metricBuilder.Name,
+			" Reason: ", err)
 		return nil, errors.New("cannot create service with metric due to metric creation failure")
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -378,7 +378,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
-			log.Error("Error creating metric for process: ", serviceName,
+			log.Error("|connectors.go| : [BuildServiceForMetrics]: Error creating metric for process: ", serviceName,
 				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
 			return nil, errors.New("cannot create service with metric due to metric creation failure")
 		}
@@ -612,13 +612,13 @@ func SigTermHandler() {
 		<-c
 		fmt.Println("\r- SIGTERM received")
 		if err := services.GetTransitService().StopTransport(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		if err := services.GetTransitService().StopNats(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		if err := services.GetTransitService().StopController(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		os.Exit(0)
 	}()

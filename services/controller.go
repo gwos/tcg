@@ -136,14 +136,14 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Info("[Controller]: start listen TLS: ", addr)
+			log.Info("[Controller]: Start listen TLS: ", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error: ", err)
+				log.Error("[Controller]: Start error: ", err)
 			}
 		} else {
-			log.Info("[Controller]: start listen: ", addr)
+			log.Info("[Controller]: Start listen: ", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error: ", err)
+				log.Error("[Controller]: Start error: ", err)
 			}
 		}
 
@@ -166,18 +166,18 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 // overrides AgentService implementation
 func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
-	log.Info("Controller: shutdown ...")
+	log.Info("[Controller]: Shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Error("Controller: shutdown error:", err)
+		log.Error("[Controller]: Shutdown error:", err)
 	}
 	// catching ctx.Done() timeout
 	select {
 	case <-ctx.Done():
-		log.Warn("Controller: shutdown: timeout")
+		log.Warn("[Controller]: Shutdown: timeout")
 	}
-	log.Warn("Controller: exiting")
+	log.Warn("[Controller]: Exiting")
 	controller.srv = nil
 	return nil
 }
@@ -200,7 +200,7 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(value, &dto); err != nil {
-		log.Error(err)
+		log.Error("|controller.go| : [config] : ", err)
 		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
 		return
 	}

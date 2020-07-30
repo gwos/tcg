@@ -72,12 +72,12 @@ func main() {
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
-		log.Error(err)
+		log.Error("[Server Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Error("[Server Connector]: ", err)
 		return
 	}
 
@@ -87,7 +87,7 @@ func main() {
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
 				*CollectMetrics(cfg.MetricsProfile.Metrics),
 			}); err != nil {
-				log.Error(err.Error())
+				log.Error("[Server Connector]: ", err)
 			}
 		}
 	})

@@ -310,7 +310,7 @@ func GetConfig() *Config {
 func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
 	if err := json.Unmarshal(data, &dto); err != nil {
-		log.Error(err.Error())
+		log.Error("|config.go| : [loadConnector] : ", err.Error())
 		return nil, err
 	}
 	cfg.Connector.AgentID = dto.AgentID
@@ -336,7 +336,7 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 		} `json:"advanced,omitempty"`
 	}
 	if err := json.Unmarshal(data, &s); err != nil {
-		log.Error(err.Error())
+		log.Error("|config.go| : [loadAdvancedPrefixes] : ", err.Error())
 		return err
 	}
 	for _, c := range cfg.GWConnections {
