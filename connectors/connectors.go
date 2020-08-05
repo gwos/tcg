@@ -604,12 +604,13 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 	return result
 }
 
-func ControlCHandler() {
+// SigTermHandler gracefully handles syscall
+func SigTermHandler() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
-		fmt.Println("\r- Ctrl+C pressed in Terminal")
+		fmt.Println("\r- SIGTERM received")
 		if err := services.GetTransitService().StopTransport(); err != nil {
 			log.Error(err.Error())
 		}
