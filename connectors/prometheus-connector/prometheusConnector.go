@@ -179,14 +179,14 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 				case "resource":
 					*hostName = *label.Value
 				case "warning":
-					if value, err := strconv.Atoi(*label.Value); err == nil {
-						metricBuilder.Warning = float64(value)
+					if value, err := strconv.ParseFloat(*label.Value, 64); err == nil {
+						metricBuilder.Warning = value
 					} else {
 						metricBuilder.Warning = -1
 					}
 				case "critical":
-					if value, err := strconv.Atoi(*label.Value); err == nil {
-						metricBuilder.Critical = float64(value)
+					if value, err := strconv.ParseFloat(*label.Value, 64); err == nil {
+						metricBuilder.Critical = value
 					} else {
 						metricBuilder.Warning = -1
 					}
@@ -244,7 +244,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 func initializeEntrypoints() []services.Entrypoint {
 	return append(make([]services.Entrypoint, 1),
 		services.Entrypoint{
-			Url:     "/receiver",
+			Url:     "/metrics/job/:name",
 			Method:  "Post",
 			Handler: receiverHandler,
 		},
