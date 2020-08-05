@@ -72,6 +72,7 @@ const (
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
 const statsLastErrorsLim = 10
+const defaultDeadlineTimer = 9 * time.Second
 const traceOnDemandAgentID = "#traceOnDemandAgentID#"
 const traceOnDemandAppType = "#traceOnDemandAppType#"
 
@@ -293,13 +294,22 @@ func (service *AgentService) ctrlPushSync(data interface{}, subj ctrlSubj) error
 }
 
 func (service *AgentService) listenCtrlChan() {
+	deadlineTimer := time.NewTimer(defaultDeadlineTimer)
+	deadlineTimer.Stop()
+	var subject ctrlSubj
+	go deadlineTimerHandler(deadlineTimer, &subject)
 	for {
 		ctrl := <-service.ctrlChan
-		log.With(log.Fields{
+		logEntry := log.With(log.Fields{
 			"Idx":  ctrl.Idx,
 			"Subj": ctrl.Subj,
 			// "Data": string(ctrl.Data),
-		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
+		})
+		logEntry.Log(log.DebugLevel, "#AgentService.ctrlChan")
+		subject = ctrl.Subj
+
+		deadlineTimer.Reset(defaultDeadlineTimer)
+
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
@@ -318,7 +328,9 @@ func (service *AgentService) listenCtrlChan() {
 		case ctrlSubjStopTransport:
 			err = service.stopTransport()
 		}
-		// TODO: provide timeout
+
+		deadlineTimer.Stop()
+
 		if ctrl.SyncChan != nil {
 			ctrl.SyncChan <- err
 		}
@@ -628,4 +640,13 @@ func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
+}
+
+func deadlineTimerHandler(deadlineTimer *time.Timer, subject *ctrlSubj) {
+	for {
+		select {
+		case <-deadlineTimer.C:
+			log.Error("#AgentService.ctrlChan timed over:", *subject)
+		}
+	}
 }
