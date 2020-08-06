@@ -1,0 +1,74 @@
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/services"
+)
+
+// Variables to control connector version and build time.
+// Can be overridden during the build step.
+// See README for details.
+var (
+	buildTime = "Build time not provided"
+	buildTag  = "8.1.0"
+)
+
+// @title TCG API Documentation
+// @version 1.0
+
+// @host localhost:8099
+// @BasePath /api/v1
+func main() {
+	connectors.SigTermHandler()
+
+	var transitService = services.GetTransitService()
+	var cfg CheckerConnectorConfig
+	var chksum []byte
+
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
+
+	log.Info(fmt.Sprintf("[Checker Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
+
+	transitService.ConfigHandler = func(data []byte) {
+		log.Info("[Checker Connector]: Configuration received")
+		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
+			c := InitConfig(monitorConn, profile, gwConnections)
+			cfg = *c
+			chk, err := connectors.Hashsum(
+				config.GetConfig().Connector.AgentID,
+				config.GetConfig().GWConnections,
+				cfg,
+			)
+			if err != nil || !bytes.Equal(chksum, chk) {
+				log.Info("[Checker Connector]: Sending inventory ...")
+				// TODO
+			}
+			if err == nil {
+				chksum = chk
+			}
+		} else {
+			log.Error("[Checker Connector]: Error during parsing config. Aborting ...")
+			return
+		}
+	}
+
+	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
+	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+		log.Error(err)
+		return
+	}
+
+	if err := connectors.Start(); err != nil {
+		log.Error(err)
+		return
+	}
+
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
+		// TODO
+	})
+}
