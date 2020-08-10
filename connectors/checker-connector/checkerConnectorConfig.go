@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 	"time"
 )
@@ -13,5 +14,9 @@ type CheckerConnectorConfig struct {
 func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *transit.MetricsProfile,
 	gwConnections config.GWConnections) *CheckerConnectorConfig {
 
-	return nil
+	connectorConfig := CheckerConnectorConfig{
+		Timer: connectors.DefaultTimer,
+	}
+
+	return &connectorConfig
 }
