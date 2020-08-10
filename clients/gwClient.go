@@ -618,6 +618,10 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		logEntryLevel = log.WarnLevel
 		return nil, fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
 	}
+	if statusCode == 503 {
+		logEntryLevel = log.WarnLevel
+		return nil, fmt.Errorf("%w: %v", ErrSynchronizer, string(byteResponse))
+	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
 		return nil, fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))

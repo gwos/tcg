@@ -228,7 +228,7 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 		"message": msg,
 	})
 
-	if errors.Is(err, clients.ErrGateway) {
+	if errors.Is(err, clients.ErrGateway) || errors.Is(err, clients.ErrSynchronizer) {
 		ckRetry := opt.DurableName
 		retry := DispatcherRetry{
 			LastError: nil,
