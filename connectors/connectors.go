@@ -436,6 +436,13 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 	return &resource, nil
 }
 
+func CalculateResourceStatus(services []transit.MonitoredService) transit.MonitorStatus {
+
+	// TODO: implement logic
+
+	return transit.HostUp
+}
+
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
 	previousStatus := transit.ServiceOk
 	for _, metric := range *metrics {
