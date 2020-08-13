@@ -48,9 +48,26 @@ func receiverHandler(c *gin.Context) {
 }
 
 func processMetrics(body []byte) error {
-	_, err := parseBody(body)
+	monitoredResources, err := parseBody(body)
 	if err != nil {
 		return err
+	}
+	inventoryResources := connectors.BuildInventory(monitoredResources)
+	if connectors.ValidateInventory(inventoryResources) {
+		err := connectors.SendMetrics(*monitoredResources)
+		if err != nil {
+			return err
+		}
+	} else {
+		err := connectors.SendInventory(*inventoryResources, nil, transit.Yield)
+		if err != nil {
+			return err
+		}
+		time.Sleep(2 * time.Second)
+		err = connectors.SendMetrics(*monitoredResources)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -74,12 +91,9 @@ func parseBody(body []byte) (*[]transit.MonitoredResource, error) {
 		monitoredResources = append(monitoredResources, transit.MonitoredResource{
 			Name:             key,
 			Type:             transit.Host,
-			Owner:            "",
 			Status:           connectors.CalculateResourceStatus(value),
 			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultTimer)},
-			LastPlugInOutput: "",
-			Properties:       nil,
 			Services:         value,
 		})
 	}
@@ -170,7 +184,6 @@ func getServices(metricsMap map[string][]transit.TimeSeries, metricsLines []stri
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
 			LastPlugInOutput: arr[5],
-			Properties:       nil,
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
 		})
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -19,14 +18,11 @@ import (
 	"time"
 )
 
-var chksum []byte
-var inventory = make(map[string]transit.InventoryResource)
-
 var parser expfmt.TextParser
 
 func Synchronize() *[]transit.InventoryResource {
 	var inventoryResources []transit.InventoryResource
-	for _, resource := range inventory {
+	for _, resource := range connectors.Inventory {
 		inventoryResources = append(inventoryResources, resource)
 	}
 	return &inventoryResources
@@ -57,39 +53,13 @@ func parsePrometheusBody(body []byte) (*transit.MonitoredResource, *[]transit.Re
 	return monitoredResource, &resourceGroups, nil
 }
 
-func validateInventory(inventory *[]transit.InventoryResource) bool {
-	if chksum != nil {
-		chk, err := connectors.Hashsum(inventory)
-		if err != nil || !bytes.Equal(chksum, chk) {
-			chksum = chk
-			return false
-		}
-		return true
-	} else {
-		chksum, _ = connectors.Hashsum(inventory)
-		return false
-	}
-}
-
-func buildInventory(resource *transit.MonitoredResource) *[]transit.InventoryResource {
-	var inventoryServices []transit.InventoryService
-	for _, service := range resource.Services {
-		inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
-			service.Owner))
-	}
-
-	inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
-	inventory[inventoryResource.Name] = inventoryResource
-	return &[]transit.InventoryResource{inventoryResource}
-}
-
 func processMetrics(body []byte) error {
 	monitoredResource, groups, err := parsePrometheusBody(body)
 	if err != nil {
 		return err
 	}
-	inventory := buildInventory(monitoredResource)
-	if validateInventory(inventory) {
+	inventory := connectors.BuildInventory(&[]transit.MonitoredResource{*monitoredResource})
+	if connectors.ValidateInventory(inventory) {
 		err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 		if err != nil {
 			return err
