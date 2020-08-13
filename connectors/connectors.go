@@ -32,6 +32,23 @@ const ExtensionsKeyTimer = "checkIntervalMinutes"
 var Inventory = make(map[string]transit.InventoryResource)
 var chksum []byte
 
+// MonitorConnection overrides transit.MonitorConnection
+// TODO: update and use transit.MonitorConnection instead
+type MonitorConnection struct {
+	transit.MonitorConnection `json:"monitorConnection"`
+	Extensions                 interface{} `json:"extensions"`
+}
+
+// UnmarshalConfig updates args with data
+// TODO: update and use transit.MonitorConnection instead
+func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *MonitorConnection) error {
+	cfg := struct {
+		MetricsProfile    *transit.MetricsProfile `json:"metricsProfile"`
+		MonitorConnection *MonitorConnection      `json:"monitorConnection"`
+	}{metricsProfile, monitorConnection}
+	return json.Unmarshal(data, &cfg)
+}
+
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
 		return err
@@ -42,6 +59,8 @@ func Start() error {
 	return nil
 }
 
+// RetrieveCommonConnectorInfo deprecated
+// use UnmarshalConfig instead
 func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *transit.MetricsProfile, config.GWConnections, error) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
@@ -645,12 +664,24 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 }
 
 // SigTermHandler gracefully handles syscall
-func SigTermHandler() {
+func SigTermHandler(handlers ...func()) {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
 		fmt.Println("\r- SIGTERM received")
+		for _, handler := range handlers {
+			/* wrap handlers with recover */
+			go func(fn func()) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Error(err)
+					}
+				}()
+				fn()
+			}(handler)
+		}
+
 		if err := services.GetTransitService().StopTransport(); err != nil {
 			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
