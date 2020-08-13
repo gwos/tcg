@@ -29,6 +29,9 @@ var Timer = DefaultTimer
 // ExtensionsKeyTimer defines field name
 const ExtensionsKeyTimer = "checkIntervalMinutes"
 
+var Inventory = make(map[string]transit.InventoryResource)
+var chksum []byte
+
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
 		return err
@@ -465,6 +468,36 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 		}
 	}
 	return previousStatus, nil
+}
+
+func BuildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
+	var inventoryResources []transit.InventoryResource
+	for _, resource := range *resources {
+		var inventoryServices []transit.InventoryService
+		for _, service := range resource.Services {
+			inventoryServices = append(inventoryServices, CreateInventoryService(service.Name,
+				service.Owner))
+		}
+
+		inventoryResource := CreateInventoryResource(resource.Name, inventoryServices)
+		Inventory[inventoryResource.Name] = inventoryResource
+		inventoryResources = append(inventoryResources, inventoryResource)
+	}
+	return &inventoryResources
+}
+
+func ValidateInventory(inventory *[]transit.InventoryResource) bool {
+	if chksum != nil {
+		chk, err := Hashsum(inventory)
+		if err != nil || !bytes.Equal(chksum, chk) {
+			chksum = chk
+			return false
+		}
+		return true
+	} else {
+		chksum, _ = Hashsum(inventory)
+		return false
+	}
 }
 
 // Weight of Monitor Status for multi-state comparison
