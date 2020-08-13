@@ -20,6 +20,29 @@ var (
 	re = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
 )
 
+// ScheduleTask defines command
+type ScheduleTask struct {
+	CombinedOutput bool     `json:"combinedOutput,omitempty"`
+	Command        []string `json:"command"`
+	Cron           string   `json:"cron"`
+	Environment    []string `json:"environment,omitempty"`
+}
+
+// ExtConfig defines the MonitorConnection extensions configuration
+type ExtConfig struct {
+	Schedule []ScheduleTask `json:"schedule"`
+}
+
+// Validate validates value
+func (cfg ExtConfig) Validate() error {
+	for _, task := range cfg.Schedule {
+		if len(task.Command) == 0 {
+			return fmt.Errorf("ExtConfig Schedule item error: Command is empty")
+		}
+	}
+	return nil
+}
+
 func initializeEntrypoints() []services.Entrypoint {
 	var entrypoints []services.Entrypoint
 

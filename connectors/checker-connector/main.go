@@ -7,6 +7,9 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/robfig/cron/v3"
+	"os/exec"
 )
 
 // Variables to control connector version and build time.
@@ -14,7 +17,22 @@ import (
 // See README for details.
 var (
 	buildTime = "Build time not provided"
-	buildTag  = "8.1.0"
+	buildTag  = "8.x.x"
+
+	extConfig         = &ExtConfig{}
+	metricsProfile    = &transit.MetricsProfile{}
+	monitorConnection = &connectors.MonitorConnection{
+		Extensions: extConfig,
+	}
+	chksum []byte
+
+	sch = cron.New(
+		cron.WithSeconds(),
+		cron.WithChain(
+			cron.Recover(cron.DefaultLogger),
+			cron.SkipIfStillRunning(cron.DefaultLogger),
+		),
+	)
 )
 
 // @title TCG API Documentation
@@ -23,52 +41,83 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	connectors.SigTermHandler()
-
-	var transitService = services.GetTransitService()
-	var cfg CheckerConnectorConfig
-	var chksum []byte
-
 	config.Version.Tag = buildTag
 	config.Version.Time = buildTime
-
 	log.Info(fmt.Sprintf("[Checker Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
-	transitService.ConfigHandler = func(data []byte) {
-		log.Info("[Checker Connector]: Configuration received")
-		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
-			c := InitConfig(monitorConn, profile, gwConnections)
-			cfg = *c
-			chk, err := connectors.Hashsum(
-				config.GetConfig().Connector.AgentID,
-				config.GetConfig().GWConnections,
-				cfg,
-			)
-			if err != nil || !bytes.Equal(chksum, chk) {
-				log.Info("[Checker Connector]: Sending inventory ...")
-				// TODO
-			}
-			if err == nil {
-				chksum = chk
-			}
-		} else {
-			log.Error("[Checker Connector]: Error during parsing config. Aborting ...")
-			return
+	connectors.SigTermHandler(func() {
+		if sch != nil {
+			sch.Stop()
 		}
-	}
+	})
+
+	transitService := services.GetTransitService()
+	transitService.ConfigHandler = configHandler
 
 	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
 		log.Error(err)
 		return
 	}
-
 	if err := connectors.Start(); err != nil {
 		log.Error(err)
 		return
 	}
 
-	connectors.StartPeriodic(nil, cfg.Timer, func() {
-		// TODO
-	})
+	/* prevent return */
+	<-make(chan bool, 1)
+}
+
+func configHandler(data []byte) {
+	log.Info("[Checker Connector]: Configuration received")
+	tExt, tMetProf := &ExtConfig{}, &transit.MetricsProfile{}
+	tMonConn := &connectors.MonitorConnection{Extensions: tExt}
+	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
+		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		return
+	}
+	if err := tExt.Validate(); err != nil {
+		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		return
+	}
+	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	monitorConnection.Extensions = extConfig
+
+	chk, err := connectors.Hashsum(extConfig)
+	if err != nil || !bytes.Equal(chksum, chk) {
+		restartScheduler(sch, extConfig.Schedule)
+	}
+	if err == nil {
+		chksum = chk
+	}
+}
+
+func restartScheduler(sch *cron.Cron, tasks []ScheduleTask) {
+	for _, entry := range sch.Entries() {
+		sch.Remove(entry.ID)
+	}
+	for _, task := range tasks {
+		sch.AddFunc(task.Cron, taskHandler(task))
+	}
+	if len(sch.Entries()) > 0 {
+		sch.Start()
+	}
+}
+
+func taskHandler(task ScheduleTask) func() {
+	return func() {
+		cmd := exec.Command(task.Command[0], task.Command[1:]...)
+		cmd.Env = task.Environment
+		var (
+			res []byte
+			err error
+		)
+		if task.CombinedOutput {
+			res, err = cmd.CombinedOutput()
+		} else {
+			res, err = cmd.Output()
+		}
+		// TODO: parse output, check inventory changes
+		fmt.Printf("###\n%v\n%s\n%v\n", cmd, res, err)
+	}
 }
