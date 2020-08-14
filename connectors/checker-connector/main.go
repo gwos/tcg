@@ -109,15 +109,24 @@ func taskHandler(task ScheduleTask) func() {
 		cmd := exec.Command(task.Command[0], task.Command[1:]...)
 		cmd.Env = task.Environment
 		var (
-			res []byte
-			err error
+			handler func() ([]byte, error)
+			err     error
+			res     []byte
 		)
 		if task.CombinedOutput {
-			res, err = cmd.CombinedOutput()
+			handler = cmd.CombinedOutput
 		} else {
-			res, err = cmd.Output()
+			handler = cmd.Output
 		}
-		// TODO: parse output, check inventory changes
-		fmt.Printf("###\n%v\n%s\n%v\n", cmd, res, err)
+		res, err = handler()
+		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
+		if err != nil {
+			logEntry.Warn("[Checker Connector]: Error running command:", err.Error())
+			return
+		}
+		logEntry.Debug("[Checker Connector]: Success in command execution")
+		if err = processMetrics(res); err != nil {
+			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
+		}
 	}
 }
