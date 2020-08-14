@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -97,7 +98,7 @@ func processMetrics(body []byte) error {
 }
 
 func parseBody(body []byte) (*[]transit.MonitoredResource, error) {
-	metricsLines := strings.Split(string(body), "\n")
+	metricsLines := strings.Split(string(bytes.Trim(body, " \n\r")), "\n")
 	var monitoredResources []transit.MonitoredResource
 
 	serviceNameToMetricsMap, err := getMetrics(metricsLines)
@@ -112,12 +113,12 @@ func parseBody(body []byte) (*[]transit.MonitoredResource, error) {
 
 	for key, value := range resourceNameToServicesMap {
 		monitoredResources = append(monitoredResources, transit.MonitoredResource{
-			Name:             key,
-			Type:             transit.Host,
-			Status:           connectors.CalculateResourceStatus(value),
-			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultTimer)},
-			Services:         value,
+			Name:          key,
+			Type:          transit.Host,
+			Status:        connectors.CalculateResourceStatus(value),
+			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultTimer)},
+			Services:      value,
 		})
 	}
 
@@ -137,7 +138,7 @@ func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
 func getStatus(str string) (transit.MonitorStatus, error) {
 	switch str {
 	case "0":
-		return transit.HostUp, nil
+		return transit.ServiceOk, nil
 	default:
 		return "nil", errors.New("unknown status provided")
 	}
