@@ -20,7 +20,7 @@ import (
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"go.opentelemetry.io/otel/api/kv"
-	"go.opentelemetry.io/otel/api/trace"
+	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -39,7 +39,7 @@ type AgentService struct {
 	ConfigHandler         func([]byte)
 	DemandConfigHandler   func() bool
 	DemandConfigMutex     sync.Mutex
-	TelemetryProvider     *sdktrace.Provider
+	TelemetryProvider     apitrace.Provider
 	TelemetryFlushHandler func()
 }
 
@@ -430,7 +430,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			var (
 				ctx  context.Context
 				err  error
-				span trace.Span
+				span apitrace.Span
 			)
 			if service.TelemetryProvider != nil {
 				tr := service.TelemetryProvider.Tracer("services")
@@ -613,8 +613,8 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 	)
 }
 
-// initTelemetryProvider creates a new provider instance and registers it as global provider
-func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
+// initTelemetryProvider creates a new provider instance
+func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	address := config.GetConfig().Jaegertracing.Address
 	if len(address) == 0 {
 		err := fmt.Errorf("telemetry not configured")
@@ -637,7 +637,6 @@ func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 			ServiceName: serviceName,
 			Tags:        tags,
 		}),
-		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
 }
