@@ -227,7 +227,7 @@ func parseJSON(filePath string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = jsonFile.Close() }()
+	defer jsonFile.Close()
 
 	byteValue, err := ioutil.ReadAll(jsonFile)
 	if err != nil {

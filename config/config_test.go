@@ -48,18 +48,18 @@ gwConnections:
     password: ""
 `)
 
-	tmpfile, err := ioutil.TempFile("", "config")
-	defer os.Remove(tmpfile.Name())
+	tmpFile, err := ioutil.TempFile("", "config")
 	assert.NoError(t, err)
-	_, err = tmpfile.Write(configYAML)
+	defer os.Remove(tmpFile.Name())
+	_, err = tmpFile.Write(configYAML)
 	assert.NoError(t, err)
-	err = tmpfile.Close()
+	err = tmpFile.Close()
 	assert.NoError(t, err)
 
-	os.Setenv(string(ConfigEnv), tmpfile.Name())
-	os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
-	os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
+	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	_ = os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
+	_ = os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 
 	expected := &Config{
 		Connector: &Connector{
@@ -86,12 +86,12 @@ gwConnections:
 }
 
 func TestLoadConnectorDTO(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "config")
+	tmpFile, err := ioutil.TempFile("", "config")
 	assert.NoError(t, err)
-	err = tmpfile.Close()
+	err = tmpFile.Close()
 	assert.NoError(t, err)
-	defer os.Remove(tmpfile.Name())
-	os.Setenv(string(ConfigEnv), tmpfile.Name())
+	defer os.Remove(tmpFile.Name())
+	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
 
 	expected := &Config{
 		Connector: &Connector{
@@ -182,7 +182,7 @@ func TestLoadConnectorDTO(t *testing.T) {
 	// ss, err := json.Marshal(GetConfig())
 	// t.Logf("%v", ss)
 
-	data, err := ioutil.ReadFile(tmpfile.Name())
+	data, err := ioutil.ReadFile(tmpFile.Name())
 	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
 }
 
@@ -200,8 +200,8 @@ gwConnections:
     password: _v1_fc0546f02af1c34298d207468a78bc38cda6bd480d3357c8220580883747505d7971c3c43610cea1bc1df9e3292cb935
 `)
 
-	os.Setenv(string(SecKeyEnv), "SECRET")
-	defer os.Unsetenv(string(SecKeyEnv))
+	_ = os.Setenv(SecKeyEnv, "SECRET")
+	defer os.Unsetenv(SecKeyEnv)
 
 	var cfg Config
 	assert.NoError(t, yaml.Unmarshal(configYAML, &cfg))

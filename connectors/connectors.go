@@ -72,7 +72,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
-	for i, _ := range request.Resources {
+	for i := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(Timer)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
@@ -482,17 +482,17 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.IntegerValue == -1 {
+		if critical == nil && (warning != nil && warning.IntegerValue == -1) {
 			if value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.IntegerValue == -1 && critical.IntegerValue == -1 {
+		if (warning != nil && warning.IntegerValue == -1) && (critical != nil && critical.IntegerValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
-		if warning.IntegerValue > critical.IntegerValue {
+		if (warning != nil && critical != nil) && warning.IntegerValue > critical.IntegerValue {
 			if value.IntegerValue <= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
@@ -501,10 +501,10 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		} else {
-			if value.IntegerValue >= critical.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.IntegerValue >= warning.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
@@ -516,13 +516,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.DoubleValue == -1 {
+		if critical == nil && (warning != nil && warning.DoubleValue == -1) {
 			if value.DoubleValue >= warning.DoubleValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.DoubleValue == -1 || critical.DoubleValue == -1 {
+		if (warning != nil && critical != nil) && (warning.DoubleValue == -1 || critical.DoubleValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
@@ -565,7 +565,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		result = append(result, service)
 	}
 
-	for i, _ := range result {
+	for i := range result {
 		for _, metric := range result[i].Metrics {
 			if metric.MetricComputeType == transit.Synthetic {
 				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
@@ -648,17 +648,6 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 		return nil, err
 	}
 	return h.Sum(nil), nil
-}
-
-// MaxInt64 returns maximum value
-func MaxInt64(x int64, rest ...int64) int64 {
-	m := x
-	for _, y := range rest[:] {
-		if m < y {
-			m = y
-		}
-	}
-	return m
 }
 
 // MaxDuration returns maximum value

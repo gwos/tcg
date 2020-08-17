@@ -70,6 +70,7 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	defer response.Body.Close()
+
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return -1, nil, err

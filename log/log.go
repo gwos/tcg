@@ -114,29 +114,31 @@ func With(fields Fields) *Entry {
 
 // WithDebug adds a struct of fields to the log entry
 func (entry *Entry) WithDebug(fields Fields) *Entry {
+	entryWithDebug := entry
 	if logger.IsLevelEnabled(DebugLevel) {
-		entry = &Entry{
+		entryWithDebug = &Entry{
 			entry.WithFields(logrus.Fields(fields)),
 		}
 	}
-	return entry
+	return entryWithDebug
 }
 
 // WithInfo adds a struct of fields to the log entry
 func (entry *Entry) WithInfo(fields Fields) *Entry {
+	entryWithDebug := entry
 	if logger.IsLevelEnabled(InfoLevel) {
-		entry = &Entry{
+		entryWithDebug = &Entry{
 			entry.WithFields(logrus.Fields(fields)),
 		}
 	}
-	return entry
+	return entryWithDebug
 }
 
 func fnOnEvicted(w io.Writer) func(string, interface{}) {
 	return func(ck string, i interface{}) {
 		v := i.(uint16)
 		if v > 0 {
-			fmt.Fprintf(w, "%s [consolidate: %d more entries last %d seconds] %s\n",
+			_, _ = fmt.Fprintf(w, "%s [consolidate: %d more entries last %d seconds] %s\n",
 				time.Now().Format(timestampFormat),
 				v, logger.consPeriod, ck)
 		}
@@ -169,14 +171,14 @@ func (h *ckHook) Fire(entry *logrus.Entry) error {
 	h.cache.DeleteExpired()
 	/* inc hits if cached */
 	if _, ok := h.cache.Get(ck); ok {
-		h.cache.Increment(ck, 1)
+		_ = h.cache.Increment(ck, 1)
 	} else {
 		/* skip caching if consolidation off */
 		if logger.consPeriod > 0 {
-			h.cache.Add(string(protectData(ck)), uint16(0), time.Duration(logger.consPeriod)*time.Second)
+			_ = h.cache.Add(string(protectData(ck)), uint16(0), time.Duration(logger.consPeriod)*time.Second)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-		h.writer.Write(protectData(string(output)))
+		_, _ = h.writer.Write(protectData(string(output)))
 	}
 	/* debug hits */
 	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
