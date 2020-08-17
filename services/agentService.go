@@ -617,7 +617,7 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 	hostName := config.GetConfig().Telemetry.HostName
 	if len(hostName) == 0 {
-		err := fmt.Errorf("Telemetry not configured")
+		err := fmt.Errorf("telemetry not configured")
 		log.Debug(err.Error())
 		return nil, nil, err
 	}

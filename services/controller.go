@@ -214,7 +214,7 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
-	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
+	_, _ = controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
 	c.JSON(http.StatusOK, nil)
 }
 

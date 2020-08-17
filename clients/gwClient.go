@@ -156,9 +156,8 @@ func (client *GWClient) connectLocal() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectLocal")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -202,9 +201,8 @@ func (client *GWClient) connectRemote() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectRemote")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -227,12 +225,12 @@ func (client *GWClient) connectRemote() error {
 		"errorCode": error2,
 	})
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(error2))
+		return fmt.Errorf("%w: %v", ErrGateway, error2)
 	}
 	if statusCode == 401 {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(error2))
+	return fmt.Errorf("%w: %v", ErrUndecided, error2)
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -258,9 +256,8 @@ func (client *GWClient) Disconnect() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: disconnect")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
 
 	if err != nil {
 		return err
@@ -301,9 +298,8 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: validate token")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
 
 	if err == nil {
 		if statusCode == 200 {
@@ -602,9 +598,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		})
 	}
 
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: sendRequest")
-	}()
+	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel

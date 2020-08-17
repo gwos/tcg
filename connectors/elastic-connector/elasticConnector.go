@@ -63,6 +63,9 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 
 	monitoringState := initMonitoringState(connector.monitoringState, connector.config, &connector.esClient)
 	connector.monitoringState = monitoringState
+	if spanMonitoringState == nil {
+		return nil, nil, nil
+	}
 	if services.GetTransitService().TelemetryProvider != nil {
 		spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
 		spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
@@ -200,13 +203,13 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 }
 
 func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.MetricDefinition) []string {
-	var services []string
+	var srvs []string
 	if metrics != nil {
 		for _, metric := range metrics {
 			if metric.ServiceType == string(view) && metric.Monitored {
-				services = append(services, metric.Name)
+				srvs = append(srvs, metric.Name)
 			}
 		}
 	}
-	return services
+	return srvs
 }

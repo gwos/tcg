@@ -61,7 +61,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 
 	hostName = hostStat.Hostname
 
-	var services []transit.InventoryService
+	var srvs []transit.InventoryService
 	for _, pr := range processes {
 		if !pr.Monitored {
 			continue
@@ -72,10 +72,10 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 		}
 		service := connectors.CreateInventoryService(connectors.Name(pr.Name, pr.CustomName),
 			hostName)
-		services = append(services, service)
+		srvs = append(srvs, service)
 	}
 
-	inventoryResource := connectors.CreateInventoryResource(hostName, services)
+	inventoryResource := connectors.CreateInventoryResource(hostName, srvs)
 
 	return &inventoryResource
 }
@@ -454,7 +454,7 @@ func listSuggestions(name string) []string {
 	hostProcesses, _ := cache.ProcessesCache.Get("processes")
 
 	var processes []string
-	for n, _ := range hostProcesses.(map[string]float64) {
+	for n := range hostProcesses.(map[string]float64) {
 		if name == "" || strings.Contains(n, name) {
 			processes = append(processes, n)
 		}
