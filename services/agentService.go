@@ -615,8 +615,8 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 
 // initTelemetryProvider creates a new provider instance and registers it as global provider
 func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
-	hostName := config.GetConfig().Telemetry.HostName
-	if len(hostName) == 0 {
+	address := config.GetConfig().Jaegertracing.Address
+	if len(address) == 0 {
 		err := fmt.Errorf("telemetry not configured")
 		log.Debug(err.Error())
 		return nil, nil, err
@@ -628,11 +628,11 @@ func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
 	tags := []kv.KeyValue{
 		kv.String("runtime", "golang"),
 	}
-	for k, v := range config.GetConfig().Telemetry.Tags {
+	for k, v := range config.GetConfig().Jaegertracing.Tags {
 		tags = append(tags, kv.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
-		jaeger.WithAgentEndpoint(hostName),
+		jaeger.WithAgentEndpoint(address),
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: serviceName,
 			Tags:        tags,
