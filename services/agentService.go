@@ -615,16 +615,23 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 
 // initTelemetryProvider creates a new provider instance
 func initTelemetryProvider() (apitrace.Provider, func(), error) {
-	address := config.GetConfig().Jaegertracing.Address
-	if len(address) == 0 {
+	var jaegerEndpoint jaeger.EndpointOption
+	jaegerAgent := config.GetConfig().Jaegertracing.Agent
+	jaegerCollector := config.GetConfig().Jaegertracing.Collector
+	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
 		err := fmt.Errorf("telemetry not configured")
 		log.Debug(err.Error())
 		return nil, nil, err
 	}
+	if len(jaegerAgent) == 0 {
+		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)
+	} else {
+		jaegerEndpoint = jaeger.WithAgentEndpoint(jaegerAgent)
+	}
 
-	agentConnector := config.GetConfig().Connector
+	connector := config.GetConfig().Connector
 	serviceName := fmt.Sprintf("%s:%s:%s",
-		agentConnector.AppType, agentConnector.AppName, agentConnector.AgentID)
+		connector.AppType, connector.AppName, connector.AgentID)
 	tags := []kv.KeyValue{
 		kv.String("runtime", "golang"),
 	}
@@ -632,7 +639,7 @@ func initTelemetryProvider() (apitrace.Provider, func(), error) {
 		tags = append(tags, kv.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
-		jaeger.WithAgentEndpoint(address),
+		jaegerEndpoint,
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: serviceName,
 			Tags:        tags,
