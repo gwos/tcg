@@ -134,7 +134,7 @@ type GWConnection struct {
 func (con GWConnection) MarshalYAML() (interface{}, error) {
 	type plain GWConnection
 	c := plain(con)
-	if s := os.Getenv(string(SecKeyEnv)); s != "" {
+	if s := os.Getenv(SecKeyEnv); s != "" {
 		encrypted, err := Encrypt([]byte(c.Password), []byte(s))
 		if err != nil {
 			return nil, err
@@ -152,7 +152,7 @@ func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error 
 		return err
 	}
 	if strings.HasPrefix(con.Password, SecVerPrefix) {
-		s := os.Getenv(string(SecKeyEnv))
+		s := os.Getenv(SecKeyEnv)
 		if s == "" {
 			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
 		}
@@ -310,7 +310,7 @@ func GetConfig() *Config {
 func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
 	if err := json.Unmarshal(data, &dto); err != nil {
-		log.Error(err.Error())
+		log.Error("|config.go| : [loadConnector] : ", err.Error())
 		return nil, err
 	}
 	cfg.Connector.AgentID = dto.AgentID
@@ -336,7 +336,7 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 		} `json:"advanced,omitempty"`
 	}
 	if err := json.Unmarshal(data, &s); err != nil {
-		log.Error(err.Error())
+		log.Error("|config.go| : [loadAdvancedPrefixes] : ", err.Error())
 		return err
 	}
 	for _, c := range cfg.GWConnections {
@@ -367,7 +367,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 
 	if cfg.IsConfiguringPMC() {
-		cfg.Connector.InstallationMode = string(InstallationModePMC)
+		cfg.Connector.InstallationMode = InstallationModePMC
 	}
 
 	if output, err := yaml.Marshal(cfg); err != nil {
@@ -392,8 +392,8 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 
 // IsConfiguringPMC checks configuration stage
 func (cfg *Config) IsConfiguringPMC() bool {
-	return os.Getenv(string(InstallationModeEnv)) == string(InstallationModePMC) &&
-		cfg.Connector.InstallationMode != string(InstallationModePMC)
+	return os.Getenv(InstallationModeEnv) == InstallationModePMC &&
+		cfg.Connector.InstallationMode != InstallationModePMC
 }
 
 // Decrypt decrypts small messages
@@ -401,7 +401,7 @@ func (cfg *Config) IsConfiguringPMC() bool {
 func Decrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
 	var secretKey [32]byte
-	secretKey = sha256.Sum256([]byte(secret))
+	secretKey = sha256.Sum256(secret)
 	copy(nonce[:], message[:24])
 	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
 	if !ok {
@@ -415,7 +415,7 @@ func Decrypt(message, secret []byte) ([]byte, error) {
 func Encrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
 	var secretKey [32]byte
-	secretKey = sha256.Sum256([]byte(secret))
+	secretKey = sha256.Sum256(secret)
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 		return nil, err
 	}

@@ -156,9 +156,8 @@ func (client *GWClient) connectLocal() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectLocal")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -202,9 +201,8 @@ func (client *GWClient) connectRemote() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectRemote")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -227,12 +225,12 @@ func (client *GWClient) connectRemote() error {
 		"errorCode": error2,
 	})
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(error2))
+		return fmt.Errorf("%w: %v", ErrGateway, error2)
 	}
 	if statusCode == 401 {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(error2))
+	return fmt.Errorf("%w: %v", ErrUndecided, error2)
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -258,9 +256,8 @@ func (client *GWClient) Disconnect() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: disconnect")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
 
 	if err != nil {
 		return err
@@ -301,9 +298,8 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: validate token")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
 
 	if err == nil {
 		if statusCode == 200 {
@@ -335,7 +331,7 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 	}
 	err := json.Unmarshal(payload, &payloadResources)
 	if err != nil {
-		log.Error("Unable to parse SynchronizeInventory payload: ", err)
+		log.Error("|gwClient.go| : [SynchronizeInventory] : Unable to parse SynchronizeInventory payload: ", err)
 	}
 	currentHostsCount := len(payloadResources.Resources)
 
@@ -441,13 +437,13 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	reqUrl := client.uriServices + BuildQueryParams(params)
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
-		log.Error("Unable to get GW services: ", err)
+		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
 		return nil, err
 	}
 	var gwServices GwServices
 	err = json.Unmarshal(response, &gwServices)
 	if err != nil {
-		log.Error("Unable to parse received GW services: ", err)
+		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to parse received GW services: ", err)
 		return nil, err
 	}
 	return &gwServices, nil
@@ -474,13 +470,13 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	reqUrl := client.uriHostGroups + BuildQueryParams(params)
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
-		log.Error("Unable to get GW host groups: ", err)
+		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to get GW host groups: ", err)
 		return nil, err
 	}
 	var gwHostGroups GwHostGroups
 	err = json.Unmarshal(response, &gwHostGroups)
 	if err != nil {
-		log.Error("Unable to parse received GW host groups: ", err)
+		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to parse received GW host groups: ", err)
 		return nil, err
 	}
 	return &gwHostGroups, nil
@@ -499,13 +495,13 @@ func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, err
 	reqUrl := client.uriLicenseCheck + BuildQueryParams(params)
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
-		log.Error("Unable to check license at ", host, ": ", err)
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to check license at ", host, ": ", err)
 		return false, errors.New("failed to check license at " + host + ": unable to get license")
 	}
 	var license LicenseCheck
 	err = json.Unmarshal(response, &license)
 	if err != nil {
-		log.Error("Unable to parse received license at ", host, ": ", err)
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to parse received license at ", host, ": ", err)
 		return false, errors.New("failed to check license at " + host + ": unable to get license")
 	}
 	if !license.isOkToSendInventory() {
@@ -513,7 +509,7 @@ func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, err
 		if hostSpace < 0 {
 			hostSpace = 0
 		}
-		log.Error("host allocation over hard limit at " + host +
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Host allocation over hard limit at " + host +
 			": hosts limit " + strconv.Itoa(license.LimitDevices) +
 			", hosts monitored " + strconv.Itoa(license.Devices) +
 			", license space for " + strconv.Itoa(hostSpace) + " hosts" +
@@ -528,11 +524,11 @@ func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, err
 func (client *GWClient) getLastSentHostsCount(agentID string) int {
 	gwServices, err := client.GetServicesByAgent(agentID)
 	if err != nil || gwServices == nil {
-		log.Error("Unable to get GW hosts to init  last hosts sent count.")
+		log.Error("|gwClient.go| : [getLastSentHostsCount] : Unable to get GW hosts to init  last hosts sent count.")
 		if err != nil {
-			log.Error(err)
+			log.Error("|gwClient.go| : [getLastSentHostsCount] : ", err)
 		} else {
-			log.Error("Response is nil.")
+			log.Error("|gwClient.go| : [getLastSentHostsCount] : Response is nil.")
 		}
 		return 0
 	}
@@ -602,9 +598,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		})
 	}
 
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: sendRequest")
-	}()
+	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel

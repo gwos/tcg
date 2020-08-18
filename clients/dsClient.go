@@ -63,9 +63,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"reqURL":  entrypoint.String(),
 	})
 	logEntryLevel := log.DebugLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
-	}()
+	defer logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
 
 	if err == nil {
 		if statusCode == 201 {
@@ -104,9 +102,8 @@ func (client *DSClient) Reload(agentID string) error {
 		"reqURL":  reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "DSClient: Reload")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "DSClient: Reload")
 
 	if statusCode == 404 {
 		logEntry.WithField("Hint", "Check AgentAI")

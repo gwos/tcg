@@ -46,13 +46,13 @@ func main() {
 			)
 			if err != nil || !bytes.Equal(cfgChksum, chk) {
 				if err := connector.LoadConfig(cfg); err != nil {
-					log.Error("Cannot reload ElasticConnector config: ", err)
+					log.Error("[Elastic Connector]: Cannot reload ElasticConnector config: ", err)
 				} else {
 					_, inventory, groups := connector.CollectMetrics()
 					log.Info("[Elastic Connector]: Sending inventory ...")
 					err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
 					if err != nil {
-						log.Error(err.Error())
+						log.Error("[Elastic Connector]: ", err.Error())
 					}
 					iChk, iChkErr := connector.getInventoryHashSum()
 					if iChkErr == nil {
@@ -98,12 +98,12 @@ func main() {
 			Handler: connectors.EvaluateExpressionHandler,
 		},
 	); err != nil {
-		log.Error(err)
+		log.Error("[Elastic Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Error("[Elastic Connector]: ", err)
 		return
 	}
 
@@ -116,7 +116,7 @@ func main() {
 				log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
 				err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
 				if err != nil {
-					log.Error(err.Error())
+					log.Error("[Elastic Connector]: ", err.Error())
 				}
 			}
 			if chkErr == nil {
@@ -126,7 +126,7 @@ func main() {
 			log.Info("[Elastic Connector]: Monitoring resources ...")
 			err := connectors.SendMetrics(metrics)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error("[Elastic Connector]: ", err.Error())
 			}
 		}
 	})

@@ -63,6 +63,9 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 
 	monitoringState := initMonitoringState(connector.monitoringState, connector.config, &connector.esClient)
 	connector.monitoringState = monitoringState
+	if spanMonitoringState == nil {
+		return nil, nil, nil
+	}
 	if services.GetTransitService().TelemetryProvider != nil {
 		spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
 		spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
@@ -83,7 +86,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 			break
 		}
 		if err != nil {
-			log.Error("Collection interrupted.")
+			log.Error("|elasticConnector.go| : [CollectMetrics] : Collection interrupted.")
 			break
 		}
 
@@ -164,7 +167,7 @@ func initClients(config ElasticConnectorConfig) (clients.KibanaClient, clients.E
 	esClient := clients.EsClient{Servers: config.Servers}
 	err := esClient.InitEsClient()
 	if err != nil {
-		log.Error("Cannot initialize ES client.")
+		log.Error("|elasticConnector.go| : [initClients] : Cannot initialize ES client.")
 		return kibanaClient, esClient, errors.New("cannot initialize ES client")
 	}
 	return kibanaClient, esClient, nil
@@ -188,7 +191,7 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 			hits, err := connector.esClient.CountHitsForHost(hostName, connector.config.HostNameField, indexes, query)
 			// error happens only if could not initialize elasticsearch client - no sense to continue
 			if err != nil {
-				log.Error("Unable to proceed as ES client could not be initialized.")
+				log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] : Unable to proceed as ES client could not be initialized.")
 				return err
 			}
 			connector.monitoringState.updateHost(hostName, storedQuery.Attributes.Title,
@@ -200,13 +203,13 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 }
 
 func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.MetricDefinition) []string {
-	var services []string
+	var srvs []string
 	if metrics != nil {
 		for _, metric := range metrics {
 			if metric.ServiceType == string(view) && metric.Monitored {
-				services = append(services, metric.Name)
+				srvs = append(srvs, metric.Name)
 			}
 		}
 	}
-	return services
+	return srvs
 }
