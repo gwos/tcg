@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -173,7 +174,7 @@ func (client *GWClient) connectLocal() error {
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
 	}
-	if statusCode == 401 {
+	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
 	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
@@ -227,7 +228,7 @@ func (client *GWClient) connectRemote() error {
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, error2)
 	}
-	if statusCode == 401 {
+	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
 	return fmt.Errorf("%w: %v", ErrUndecided, error2)
