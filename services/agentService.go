@@ -20,7 +20,7 @@ import (
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"go.opentelemetry.io/otel/api/kv"
-	"go.opentelemetry.io/otel/api/trace"
+	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -39,7 +39,7 @@ type AgentService struct {
 	ConfigHandler         func([]byte)
 	DemandConfigHandler   func() bool
 	DemandConfigMutex     sync.Mutex
-	TelemetryProvider     *sdktrace.Provider
+	TelemetryProvider     apitrace.Provider
 	TelemetryFlushHandler func()
 }
 
@@ -430,7 +430,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			var (
 				ctx  context.Context
 				err  error
-				span trace.Span
+				span apitrace.Span
 			)
 			if service.TelemetryProvider != nil {
 				tr := service.TelemetryProvider.Tracer("services")
@@ -613,31 +613,37 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 	)
 }
 
-// initTelemetryProvider creates a new provider instance and registers it as global provider
-func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
-	hostName := config.GetConfig().Telemetry.HostName
-	if len(hostName) == 0 {
+// initTelemetryProvider creates a new provider instance
+func initTelemetryProvider() (apitrace.Provider, func(), error) {
+	var jaegerEndpoint jaeger.EndpointOption
+	jaegerAgent := config.GetConfig().Jaegertracing.Agent
+	jaegerCollector := config.GetConfig().Jaegertracing.Collector
+	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
 		err := fmt.Errorf("telemetry not configured")
 		log.Debug(err.Error())
 		return nil, nil, err
 	}
+	if len(jaegerAgent) == 0 {
+		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)
+	} else {
+		jaegerEndpoint = jaeger.WithAgentEndpoint(jaegerAgent)
+	}
 
-	agentConnector := config.GetConfig().Connector
+	connector := config.GetConfig().Connector
 	serviceName := fmt.Sprintf("%s:%s:%s",
-		agentConnector.AppType, agentConnector.AppName, agentConnector.AgentID)
+		connector.AppType, connector.AppName, connector.AgentID)
 	tags := []kv.KeyValue{
 		kv.String("runtime", "golang"),
 	}
-	for k, v := range config.GetConfig().Telemetry.Tags {
+	for k, v := range config.GetConfig().Jaegertracing.Tags {
 		tags = append(tags, kv.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
-		jaeger.WithAgentEndpoint(hostName),
+		jaegerEndpoint,
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: serviceName,
 			Tags:        tags,
 		}),
-		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
 }
