@@ -59,15 +59,6 @@ type DispatcherRetry struct {
 	Retry     int
 }
 
-// Connect returns connection
-func Connect(clientID string) (stan.Conn, error) {
-	return stan.Connect(
-		ClusterID,
-		clientID,
-		stan.NatsURL(natsURL),
-	)
-}
-
 // StartServer runs NATS
 func StartServer(config Config) error {
 	var err error
@@ -106,7 +97,7 @@ func StartServer(config Config) error {
 // StopServer shutdowns NATS
 func StopServer() {
 	if connPublisher != nil {
-		connPublisher.Close()
+		_ = connPublisher.Close()
 		connPublisher = nil
 	}
 	stanServer.Shutdown()
@@ -259,7 +250,7 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 			go func() {
 				ckWorker := opt.DurableName
 				cache.DispatcherWorkersCache.Delete(ckWorker)
-				subscription.Close()
+				_ = subscription.Close()
 				time.Sleep(delay)
 				ctrlChan <- opt
 			}()

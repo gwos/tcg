@@ -48,7 +48,7 @@ func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *tran
 
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
-		log.Error("Error parsing common connector data: ", err)
+		log.Error("|connectors.go| : [RetrieveCommonConnectorInfo] : Error parsing common connector data: ", err)
 		return nil, nil, nil, err
 	}
 
@@ -72,7 +72,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
-	for i, _ := range request.Resources {
+	for i := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
 		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(Timer)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
@@ -211,7 +211,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		}
 		args = append(args, timeInterval)
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
-		log.Error("Error creating time interval for metric ", metricBuilder.Name,
+		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
 			": either start time or end time is not provided")
 	}
 
@@ -229,7 +229,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
 			metricBuilder.Warning)
 		if err != nil {
-			log.Error("Error creating warning threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric]: Error creating warning threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *warningThreshold)
@@ -238,7 +238,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
 			metricBuilder.Critical)
 		if err != nil {
-			log.Error("Error creating critical threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric] : Error creating critical threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *criticalThreshold)
@@ -365,8 +365,8 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
-		log.Error("Error creating metric for process: ", metricBuilder.Name)
-		log.Error(err)
+		log.Error("|connectors.go| : [BuildServiceForMetric] : Error creating metric for process: ", metricBuilder.Name,
+			" Reason: ", err)
 		return nil, errors.New("cannot create service with metric due to metric creation failure")
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -378,7 +378,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
-			log.Error("Error creating metric for process: ", serviceName,
+			log.Error("|connectors.go| : [BuildServiceForMetrics]: Error creating metric for process: ", serviceName,
 				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
 			return nil, errors.New("cannot create service with metric due to metric creation failure")
 		}
@@ -482,17 +482,17 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.IntegerValue == -1 {
+		if critical == nil && (warning != nil && warning.IntegerValue == -1) {
 			if value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.IntegerValue == -1 && critical.IntegerValue == -1 {
+		if (warning != nil && warning.IntegerValue == -1) && (critical != nil && critical.IntegerValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
-		if warning.IntegerValue > critical.IntegerValue {
+		if (warning != nil && critical != nil) && warning.IntegerValue > critical.IntegerValue {
 			if value.IntegerValue <= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
@@ -501,10 +501,10 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		} else {
-			if value.IntegerValue >= critical.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.IntegerValue >= warning.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
@@ -516,13 +516,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.DoubleValue == -1 {
+		if critical == nil && (warning != nil && warning.DoubleValue == -1) {
 			if value.DoubleValue >= warning.DoubleValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.DoubleValue == -1 || critical.DoubleValue == -1 {
+		if (warning != nil && critical != nil) && (warning.DoubleValue == -1 || critical.DoubleValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
@@ -565,7 +565,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		result = append(result, service)
 	}
 
-	for i, _ := range result {
+	for i := range result {
 		for _, metric := range result[i].Metrics {
 			if metric.MetricComputeType == transit.Synthetic {
 				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
@@ -612,13 +612,13 @@ func SigTermHandler() {
 		<-c
 		fmt.Println("\r- SIGTERM received")
 		if err := services.GetTransitService().StopTransport(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		if err := services.GetTransitService().StopNats(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		if err := services.GetTransitService().StopController(); err != nil {
-			log.Error(err.Error())
+			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
 		}
 		os.Exit(0)
 	}()
@@ -650,17 +650,6 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-// MaxInt64 returns maximum value
-func MaxInt64(x int64, rest ...int64) int64 {
-	m := x
-	for _, y := range rest[:] {
-		if m < y {
-			m = y
-		}
-	}
-	return m
-}
-
 // MaxDuration returns maximum value
 func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
 	m := x
@@ -689,9 +678,4 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 			go fn()
 		}
 	}
-}
-
-type BuildVersion struct {
-	Tag  string `json:"tag"`
-	Time string `json:"time"`
 }

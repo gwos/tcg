@@ -254,7 +254,7 @@ func initializeEntrypoints() []services.Entrypoint {
 func receiverHandler(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("|prometheusConnector.go| : [receiverHandler] : ", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}

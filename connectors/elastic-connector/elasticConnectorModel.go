@@ -50,7 +50,7 @@ func initMonitoringState(previousState MonitoringState, config ElasticConnectorC
 		log.Info("Initializing state with GW hosts for agent ", config.AgentId)
 		// add hosts form GW to current state
 		if config.GWConnections == nil || len(config.GWConnections) == 0 {
-			log.Error("Unable to get GW hosts to initialize state: GW connections are not set.")
+			log.Error("|elasticConnectorModel.go| : [initMonitoringState] : Unable to get GW hosts to initialize state: GW connections are not set.")
 		} else {
 			gwHosts := initGwHosts(config.AppType, config.AgentId, config.GWConnections)
 			if gwHosts != nil {
@@ -100,7 +100,7 @@ func (monitoringState *MonitoringState) updateHost(hostName string, serviceName 
 		}
 		monitoringState.Hosts[hostName] = host
 	} else {
-		log.Error("[Elastic Connector]: Host not found in monitoring state: ", hostName)
+		log.Error("|elasticConnectorModel.go| : [updateHost] : Host not found in monitoring state: ", hostName)
 	}
 }
 
@@ -117,8 +117,7 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.Monitore
 
 		monitoredResource, err := connectors.CreateResource(host.name, monitoredServices)
 		if err != nil {
-			log.Error("Error when creating resource ", host.name)
-			log.Error(err)
+			log.Error("|elasticConnectorModel.go| : [toTransitResources] : Error when creating resource ", host.name, " Reason: ", err)
 		}
 		if monitoredResource != nil {
 			mrs[i] = *monitoredResource
@@ -160,8 +159,8 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 
 			monitoredService, err := connectors.BuildServiceForMetric(host.name, metricBuilder)
 			if err != nil {
-				log.Error("Error when creating service ", host.name, ":", customServiceName)
-				log.Error(err)
+				log.Error("|elasticConnectorModel.go| : [toTransitResources] : Error when creating service ",
+					host.name, ":", customServiceName, " Reason: ", err)
 			}
 			if monitoredService != nil {
 				monitoredServices[i] = *monitoredService
@@ -223,16 +222,16 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		}
 		err := gwClient.Connect()
 		if err != nil {
-			log.Error("Unable to connect to GW to get hosts to initialize state: ", err)
+			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to connect to GW to get hosts to initialize state: ", err)
 			continue
 		}
 		gwServices, err := gwClient.GetServicesByAgent(agentId)
 		if err != nil || gwServices == nil {
-			log.Error("Unable to get GW hosts to initialize state.")
+			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to get GW hosts to initialize state.")
 			if err != nil {
-				log.Error(err)
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : ", err)
 			} else {
-				log.Error("Response is nil.")
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : Response is nil.")
 			}
 			continue
 		}
@@ -251,11 +250,11 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		if hostNames != nil && len(hostNames) > 0 {
 			gwHostGroups, err := gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
 			if err != nil || gwHostGroups == nil {
-				log.Error("Unable to get GW host groups to initialize state.")
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to get GW host groups to initialize state.")
 				if err != nil {
-					log.Error(err)
+					log.Error("|elasticConnectorModel.go| : [initGwHosts] : ", err)
 				} else {
-					log.Error("Response is nil.")
+					log.Error("|elasticConnectorModel.go| : [initGwHosts] : Response is nil.")
 				}
 				continue
 			}
