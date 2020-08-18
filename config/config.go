@@ -245,20 +245,27 @@ func (con *DSConnection) Decode(value string) error {
 	return nil
 }
 
-// Telemetry defines   configuration
-type Telemetry struct {
-	// HostName accepts value for combined "host:port"
-	// used as `url.URL{HostName}`
-	HostName string            `yaml:"hostName"`
-	Tags     map[string]string `yaml:"tags"`
+// Jaegertracing defines the configuration of telemetry provider
+type Jaegertracing struct {
+	// Agent defines address for communicating via UDP,
+	// like jaeger-agent:6831
+	// Is ignored if the Collector is specified
+	Agent string `yaml:"agent"`
+	// Collector defines traces endpoint,
+	// in case the client should connect directly to the Collector,
+	// like http://jaeger-collector:14268/api/traces
+	// If specified, the AgentAddress is ignored
+	Collector string `yaml:"collector"`
+	// Tags defines tracer-level tags, which get added to all reported spans
+	Tags map[string]string `yaml:"tags"`
 }
 
 // Config defines TCG Agent configuration
 type Config struct {
-	Connector     *Connector    `yaml:"connector"`
-	DSConnection  *DSConnection `yaml:"dsConnection"`
-	GWConnections GWConnections `yaml:"gwConnections"`
-	Telemetry     *Telemetry    `yaml:"telemetry"`
+	Connector     *Connector     `yaml:"connector"`
+	DSConnection  *DSConnection  `yaml:"dsConnection"`
+	GWConnections GWConnections  `yaml:"gwConnections"`
+	Jaegertracing *Jaegertracing `yaml:"jaegertracing"`
 }
 
 // GetConfig implements Singleton pattern
@@ -276,8 +283,8 @@ func GetConfig() *Config {
 				NatsStoreType:    "FILE",
 				NatsHost:         "127.0.0.1:4222",
 			},
-			DSConnection: &DSConnection{},
-			Telemetry:    &Telemetry{},
+			DSConnection:  &DSConnection{},
+			Jaegertracing: &Jaegertracing{},
 		}
 
 		configPath := os.Getenv(string(ConfigEnv))
