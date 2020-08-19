@@ -12,12 +12,12 @@
     $ go build
     $ ./prometheus-connector
     
-### Prometheus PUSH tool:
+### Prometheus Golang PUSH tool:
 
     $ cd examples/prometheus/push/go
     $ go build
     $ ./go -foundationUrl=http://... -user=RESTAPIUSER -password=**** -gwosAppName=GW8
     
-### Prometheus PUSH tool HELP:
+### Prometheus Golang PUSH tool HELP:
 
     $ ./go -h
