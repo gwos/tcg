@@ -10,6 +10,7 @@ tcg
 test_libtransit
 connectors/server-connector/server-connector
 connectors/elastic-connector/elastic-connector
+connectors/prometheus-connector/prometheus-connector
 
 # Temporary files
 ,*
