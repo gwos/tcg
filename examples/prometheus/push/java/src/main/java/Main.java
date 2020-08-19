@@ -7,7 +7,16 @@ import org.apache.commons.math3.util.Precision;
 public class Main {
 
     public static void main(String[] args) throws Exception {
+        if (args.length != 4) {
+            System.out.println("Invalid count of provided arguments. Please check README for details");
+            return;
+        }
+        GWClient client = new GWClient(args[0], args[1], args[2], args[3]);
+        client.login();
+        CustomHttpConnectionFactory.GWOS_APP_NAME = client.getGwosAppName();
+        CustomHttpConnectionFactory.GWOS_API_TOKEN = client.getGwosApiToken();
         executeBatchJob();
+        client.logout();
     }
 
     static void executeBatchJob() throws Exception {
