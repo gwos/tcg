@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -15,8 +16,8 @@ const (
 
 var (
 	headers = map[string]string{
-		"GWOS-APP-NAME":  "GW8",
-		"GWOS-API-TOKEN": "6aeece7b-e8c3-4aa2-8e12-a7c22382c9b5",
+		"GWOS-APP-NAME":  "default",
+		"GWOS-API-TOKEN": "default",
 	}
 	completionTime = prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "db_backup_last_completion_timestamp_seconds",
@@ -71,7 +72,35 @@ func performBackup() (int, error) {
 	return rand.Int(), nil
 }
 
+type options struct {
+	foundationUrl string
+	user          string
+	password      string
+	gwosAppName   string
+}
+
+func getOptions() *options {
+	foundationUrl := flag.String("foundationUrl", "http://localhost", "Foundation server url to connect")
+	user := flag.String("user", "defaultUser", "User for Authentication")
+	password := flag.String("password", "defaultPassword", "Password for Authentication")
+	gwosAppName := flag.String("gwosAppName", "gw8", "GWOS Application Name for token registration")
+
+	flag.Parse()
+
+	return &options{*foundationUrl, *user, *password, *gwosAppName}
+}
+
 func main() {
+	options := getOptions()
+	credentials, err := login(options.foundationUrl, options.user, options.password, options.gwosAppName)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	headers["GWOS-APP-NAME"] = credentials.gwosAppName
+	headers["GWOS-API-TOKEN"] = credentials.gwosApiToken
+	defer logout(options.foundationUrl, credentials.gwosAppName, credentials.gwosApiToken)
+
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(completionTime, duration, records)
 	// Note that successTime is not registered.
