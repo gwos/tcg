@@ -128,6 +128,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 				Value:          value,
 				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: timestamp},
 				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: timestamp},
+				Graphed:        true,
 			}
 
 			for _, label := range metric.GetLabel() {

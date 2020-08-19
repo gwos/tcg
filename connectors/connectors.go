@@ -33,7 +33,7 @@ var inventoryChksum []byte
 // TODO: update and use transit.MonitorConnection instead
 type MonitorConnection struct {
 	transit.MonitorConnection `json:"monitorConnection"`
-	Extensions                 interface{} `json:"extensions"`
+	Extensions                interface{} `json:"extensions"`
 }
 
 // UnmarshalConfig updates args with data
@@ -215,6 +215,7 @@ type MetricBuilder struct {
 	Critical       interface{}
 	StartTimestamp *milliseconds.MillisecondTimestamp
 	EndTimestamp   *milliseconds.MillisecondTimestamp
+	Graphed        bool
 }
 
 // Creates metric based on data provided with metricBuilder
@@ -389,7 +390,11 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 		return nil, errors.New("cannot create service with metric due to metric creation failure")
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
-	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric})
+
+	serviceProperties := make(map[string]interface{})
+	serviceProperties["isGraphed"] = metricBuilder.Graphed
+
+	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
 }
 
 func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
@@ -422,6 +427,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 		switch arg.(type) {
 		case []transit.TimeSeries:
 			service.Metrics = arg.([]transit.TimeSeries)
+		case map[string]interface{}:
+			service.CreateProperties(arg.(map[string]interface{}))
 		default:
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
 		}
