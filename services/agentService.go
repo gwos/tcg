@@ -30,7 +30,7 @@ type AgentService struct {
 	*config.Connector
 	agentStats            *AgentStats
 	agentStatus           *AgentStatus
-	DSClient              *clients.DSClient
+	dsClient              *clients.DSClient
 	gwClients             []*clients.GWClient
 	ctrlIdx               uint8
 	ctrlChan              chan *CtrlAction
@@ -127,7 +127,7 @@ func GetAgentService() *AgentService {
 			"AppType":        agentService.AppType,
 			"AppName":        agentService.AppName,
 			"ControllerAddr": agentService.ControllerAddr,
-			"DsClient":       agentService.DSClient.HostName,
+			"DSClient":       agentService.dsClient.HostName,
 		}).Log(log.DebugLevel, "#AgentService Config")
 	})
 
@@ -144,14 +144,14 @@ func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
 		// expect the config api call
 		return nil
 	}
-	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
 		log.Info("[Demand Config]: Config Server is not configured")
 		// expect the config api call
 		return nil
 	}
 
 	for {
-		if err := service.DSClient.Reload(service.AgentID); err != nil {
+		if err := service.dsClient.Reload(service.AgentID); err != nil {
 			log.With(log.Fields{"error": err}).
 				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
 			time.Sleep(time.Duration(20) * time.Second)
