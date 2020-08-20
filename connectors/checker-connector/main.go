@@ -52,7 +52,7 @@ func main() {
 	})
 
 	transitService := services.GetTransitService()
-	transitService.ConfigHandler = configHandler
+	transitService.RegisterConfigHandler(configHandler)
 
 	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {

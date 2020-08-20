@@ -37,7 +37,7 @@ type AgentService struct {
 	ctrlChan              chan *CtrlAction
 	statsChan             chan statsCounter
 	tracerToken           []byte
-	ConfigHandler         func([]byte)
+	configHandler         func([]byte)
 	demandConfigHandler   func() bool
 	telemetryFlushHandler func()
 	TelemetryProvider     apitrace.Provider
@@ -199,14 +199,14 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 // usefull for process extensions
 func (service *TransitService) RegisterConfigHandler(fn func([]byte)) {
 	service.Mutex.Lock()
-	service.ConfigHandler = fn
+	service.configHandler = fn
 	service.Mutex.Unlock()
 }
 
 // RemoveConfigHandler removes callback
 func (service *TransitService) RemoveConfigHandler() {
 	service.Mutex.Lock()
-	service.ConfigHandler = nil
+	service.configHandler = nil
 	service.Mutex.Unlock()
 }
 
@@ -497,12 +497,12 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	service.Mutex.Lock()
 	// custom connector may provide additional handler for extended fields
-	if service.ConfigHandler != nil {
-		service.ConfigHandler(data)
+	if service.configHandler != nil {
+		service.configHandler(data)
 	}
 	// notify C-API config change
-	service.Mutex.Lock()
 	if service.demandConfigHandler != nil {
 		if success := service.demandConfigHandler(); !success {
 			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")

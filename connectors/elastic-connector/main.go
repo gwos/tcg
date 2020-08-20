@@ -34,7 +34,7 @@ func main() {
 
 	var cfg ElasticConnectorConfig
 	var cfgChksum, iChksum []byte
-	transitService.ConfigHandler = func(data []byte) {
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Elastic Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(config.GetConfig().Connector.AppType, config.GetConfig().Connector.AgentID,
@@ -67,7 +67,7 @@ func main() {
 			log.Error("[Elastic Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
