@@ -77,7 +77,7 @@ func processMetrics(body []byte) error {
 		return err
 	}
 	inventoryResources := connectors.BuildInventory(monitoredResources)
-	if connectors.ValidateInventory(inventoryResources) {
+	if connectors.ValidateInventory(*inventoryResources) {
 		err := connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err

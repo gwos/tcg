@@ -30,7 +30,7 @@ var Timer = DefaultTimer
 const ExtensionsKeyTimer = "checkIntervalMinutes"
 
 var Inventory = make(map[string]transit.InventoryResource)
-var chksum []byte
+var inventoryChksum []byte
 
 // MonitorConnection overrides transit.MonitorConnection
 // TODO: update and use transit.MonitorConnection instead
@@ -505,16 +505,16 @@ func BuildInventory(resources *[]transit.MonitoredResource) *[]transit.Inventory
 	return &inventoryResources
 }
 
-func ValidateInventory(inventory *[]transit.InventoryResource) bool {
-	if chksum != nil {
+func ValidateInventory(inventory []transit.InventoryResource) bool {
+	if inventoryChksum != nil {
 		chk, err := Hashsum(inventory)
-		if err != nil || !bytes.Equal(chksum, chk) {
-			chksum = chk
+		if err != nil || !bytes.Equal(inventoryChksum, chk) {
+			inventoryChksum= chk
 			return false
 		}
 		return true
 	} else {
-		chksum, _ = Hashsum(inventory)
+		inventoryChksum, _ = Hashsum(inventory)
 		return false
 	}
 }
