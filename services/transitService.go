@@ -38,15 +38,3 @@ func (service *TransitService) SynchronizeInventory(payload []byte) error {
 	}
 	return nats.Publish(SubjSynchronizeInventory, res)
 }
-
-func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
-	service.DemandConfigMutex.Lock()
-	service.DemandConfigHandler = fn
-	service.DemandConfigMutex.Unlock()
-}
-
-func (service *TransitService) RemoveDemandConfigHandler() {
-	service.DemandConfigMutex.Lock()
-	service.DemandConfigHandler = nil
-	service.DemandConfigMutex.Unlock()
-}
