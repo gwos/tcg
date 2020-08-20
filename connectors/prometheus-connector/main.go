@@ -29,7 +29,7 @@ func main() {
 
 	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
-	transitService.ConfigHandler = func(data []byte) {
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Prometheus Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
@@ -54,7 +54,7 @@ func main() {
 			log.Error("[Prometheus Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
