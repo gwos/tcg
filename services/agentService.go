@@ -27,6 +27,7 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
+	*sync.Mutex
 	*config.Connector
 	agentStats            *AgentStats
 	agentStatus           *AgentStatus
@@ -37,10 +38,9 @@ type AgentService struct {
 	statsChan             chan statsCounter
 	tracerToken           []byte
 	ConfigHandler         func([]byte)
-	DemandConfigHandler   func() bool
-	DemandConfigMutex     sync.Mutex
+	demandConfigHandler   func() bool
+	telemetryFlushHandler func()
 	TelemetryProvider     apitrace.Provider
-	TelemetryFlushHandler func()
 }
 
 // CtrlAction defines queued controll action
@@ -97,6 +97,7 @@ func GetAgentService() *AgentService {
 
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
+			&sync.Mutex{},
 			agentConnector,
 			&AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -114,9 +115,8 @@ func GetAgentService() *AgentService {
 			tracerToken,
 			nil,
 			nil,
-			sync.Mutex{},
-			telemetryProvider,
 			telemetryFlushHandler,
+			telemetryProvider,
 		}
 
 		go agentService.listenCtrlChan()
@@ -193,6 +193,35 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
+}
+
+// RegisterConfigHandler sets callback
+// usefull for process extensions
+func (service *TransitService) RegisterConfigHandler(fn func([]byte)) {
+	service.Mutex.Lock()
+	service.ConfigHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveConfigHandler removes callback
+func (service *TransitService) RemoveConfigHandler() {
+	service.Mutex.Lock()
+	service.ConfigHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterDemandConfigHandler sets callback
+func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
+	service.Mutex.Lock()
+	service.demandConfigHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveDemandConfigHandler removes callback
+func (service *TransitService) RemoveDemandConfigHandler() {
+	service.Mutex.Lock()
+	service.demandConfigHandler = nil
+	service.Mutex.Unlock()
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -473,23 +502,25 @@ func (service *AgentService) config(data []byte) error {
 		service.ConfigHandler(data)
 	}
 	// notify C-API config change
-	service.DemandConfigMutex.Lock()
-	if service.DemandConfigHandler != nil {
-		if success := service.DemandConfigHandler(); !success {
+	service.Mutex.Lock()
+	if service.demandConfigHandler != nil {
+		if success := service.demandConfigHandler(); !success {
 			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
 		}
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
-	service.DemandConfigMutex.Unlock()
+	service.Mutex.Unlock()
 	// stop nats processing
-	// flush uploading telemetry and configure provider while processing stopped
 	_ = service.stopTransport()
-	if service.TelemetryFlushHandler != nil {
-		service.TelemetryFlushHandler()
+	// flush uploading telemetry and configure provider while processing stopped
+	service.Mutex.Lock()
+	if service.telemetryFlushHandler != nil {
+		service.telemetryFlushHandler()
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
-	service.TelemetryFlushHandler = telemetryFlushHandler
+	service.telemetryFlushHandler = telemetryFlushHandler
 	service.TelemetryProvider = telemetryProvider
+	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
