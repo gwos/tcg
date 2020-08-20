@@ -160,7 +160,7 @@ func TestInitFullConfig(t *testing.T) {
 			Password:   "eccTestKibanaPass",
 		},
 		Views: expectedViews,
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: "now-60s",
 			To:   "now",
 		},
@@ -185,7 +185,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 			Username:   defaultKibanaUsername,
 			Password:   defaultKibanaPassword,
 		},
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: "now-120s",
 			To:   defaultTimeFilterTo,
 		},
@@ -218,7 +218,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 			Username:   defaultKibanaUsername,
 			Password:   defaultKibanaPassword,
 		},
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: "now-120s",
 			To:   defaultTimeFilterTo,
 		},
@@ -265,7 +265,7 @@ func TestInitConfigWithPresentedAsNilValues(t *testing.T) {
 			Username:   defaultKibanaUsername,
 			Password:   defaultKibanaPassword,
 		},
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: "now-120s",
 			To:   defaultTimeFilterTo,
 		},

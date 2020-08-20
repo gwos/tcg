@@ -38,7 +38,7 @@ const (
 	extensionsKeyHostGroupLabelPath = "hostGroupLabelPath"
 	extensionsKeyGroupNameByUser    = "hostGroupNameByUser"
 
-	intervalTemplate      = "$interval"
+	intervalTemplate = "$interval"
 
 	// temporary solution, will be removed
 	templateMetricName = "$view_Template#"
@@ -50,7 +50,7 @@ type ElasticConnectorConfig struct {
 	Servers            []string
 	Kibana             Kibana
 	Views              map[string]map[string]transit.MetricDefinition
-	CustomTimeFilter   clients.TimeFilter
+	CustomTimeFilter   clients.KTimeFilter
 	OverrideTimeFilter bool
 	HostNameField      string
 	HostGroupField     string
@@ -81,7 +81,7 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			Password:   defaultKibanaPassword,
 		},
 		Views: make(map[string]map[string]transit.MetricDefinition),
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: defaultTimeFilterFrom,
 			To:   defaultTimeFilterTo,
 		},
