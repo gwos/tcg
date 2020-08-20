@@ -34,7 +34,7 @@ func parsePrometheusBody(body []byte) (*transit.MonitoredResource, *[]transit.Re
 		return nil, nil, err
 	}
 	var hostName string
-	var groups []string
+	groups := make(map[string][]transit.MonitoredResourceRef)
 
 	monitoredServices, err := parsePrometheusServices(prometheusServices, &hostName, &groups)
 	if err != nil {
@@ -59,7 +59,7 @@ func processMetrics(body []byte) error {
 		return err
 	}
 	inventory := connectors.BuildInventory(&[]transit.MonitoredResource{*monitoredResource})
-	if connectors.ValidateInventory(inventory) {
+	if connectors.ValidateInventory(*inventory) {
 		err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
 		if err != nil {
 			return err
@@ -76,18 +76,6 @@ func processMetrics(body []byte) error {
 		}
 	}
 	return nil
-}
-
-func removeDuplicates(intSlice []string) []string {
-	keys := make(map[string]bool)
-	list := []string{}
-	for _, entry := range intSlice {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			list = append(list, entry)
-		}
-	}
-	return list
 }
 
 func validatePrometheusService(service *dto.MetricFamily) error {
@@ -120,7 +108,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 	return result
 }
 
-func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *string, groups *[]string) []connectors.MetricBuilder {
+func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) []connectors.MetricBuilder {
 	var metricBuilders []connectors.MetricBuilder
 
 	for _, metric := range prometheusService.GetMetric() {
@@ -160,8 +148,16 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 					} else {
 						metricBuilder.Warning = -1
 					}
-				case "group":
-					*groups = append(*groups, *label.Value)
+				}
+
+				for _, label := range metric.GetLabel() {
+					switch *label.Name {
+					case "group":
+						(*groups)[*label.Value] = append((*groups)[*label.Value], transit.MonitoredResourceRef{
+							Name: *hostName,
+							Type: transit.Host,
+						})
+					}
 				}
 			}
 			metricBuilders = append(metricBuilders, metricBuilder)
@@ -170,19 +166,19 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 	return metricBuilders
 }
 
-func constructResourceGroups(groupNames []string) []transit.ResourceGroup {
-	groupNames = removeDuplicates(groupNames)
+func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) []transit.ResourceGroup {
 	var resourceGroups []transit.ResourceGroup
-	for _, name := range groupNames {
+	for groupName, resources := range groups {
 		resourceGroups = append(resourceGroups, transit.ResourceGroup{
-			GroupName: name,
+			GroupName: groupName,
 			Type:      transit.HostGroup,
+			Resources: resources,
 		})
 	}
 	return resourceGroups
 }
 
-func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, hostName *string, groups *[]string) (*[]transit.MonitoredService, error) {
+func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) (*[]transit.MonitoredService, error) {
 	var monitoredServices []transit.MonitoredService
 	for _, prometheusService := range prometheusServices {
 		if len(prometheusService.GetMetric()) == 0 {
