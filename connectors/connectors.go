@@ -12,11 +12,8 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"hash/fnv"
-	"os"
-	"os/signal"
 	"reflect"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -661,38 +658,6 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		}
 	}
 	return result
-}
-
-// SigTermHandler gracefully handles syscall
-func SigTermHandler(handlers ...func()) {
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		fmt.Println("\r- SIGTERM received")
-		for _, handler := range handlers {
-			/* wrap handlers with recover */
-			go func(fn func()) {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Error(err)
-					}
-				}()
-				fn()
-			}(handler)
-		}
-
-		if err := services.GetTransitService().StopTransport(); err != nil {
-			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
-		}
-		if err := services.GetTransitService().StopNats(); err != nil {
-			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
-		}
-		if err := services.GetTransitService().StopController(); err != nil {
-			log.Error("|connectors.go| : [ControlCHandler]", err.Error())
-		}
-		os.Exit(0)
-	}()
 }
 
 func Name(defaultName string, customName string) string {

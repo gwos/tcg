@@ -18,8 +18,6 @@ var (
 )
 
 func main() {
-	connectors.SigTermHandler()
-
 	var transitService = services.GetTransitService()
 	var cfg PrometheusConnectorConfig
 	var chksum []byte

@@ -21,8 +21,6 @@ var (
 )
 
 func main() {
-	connectors.SigTermHandler()
-
 	var transitService = services.GetTransitService()
 
 	config.Version.Tag = buildTag
