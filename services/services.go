@@ -80,6 +80,12 @@ type ConnectorStatusDTO struct {
 type AgentServices interface {
 	DemandConfig(entrypoints ...Entrypoint) error
 	MakeTracerContext() *transit.TracerContext
+	RegisterConfigHandler(func([]byte))
+	RemoveConfigHandler()
+	RegisterDemandConfigHandler(func() bool)
+	RemoveDemandConfigHandler()
+	RegisterExitHandler(func())
+	RemoveExitHandler()
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)
 	StartNatsAsync(chan error) (*CtrlAction, error)

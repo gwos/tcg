@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gwos/tcg/cache"
@@ -27,20 +30,21 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
+	*sync.Mutex
 	*config.Connector
 	agentStats            *AgentStats
 	agentStatus           *AgentStatus
-	DSClient              *clients.DSClient
+	dsClient              *clients.DSClient
 	gwClients             []*clients.GWClient
 	ctrlIdx               uint8
 	ctrlChan              chan *CtrlAction
 	statsChan             chan statsCounter
 	tracerToken           []byte
-	ConfigHandler         func([]byte)
-	DemandConfigHandler   func() bool
-	DemandConfigMutex     sync.Mutex
+	configHandler         func([]byte)
+	demandConfigHandler   func() bool
+	exitHandler           func()
+	telemetryFlushHandler func()
 	TelemetryProvider     apitrace.Provider
-	TelemetryFlushHandler func()
 }
 
 // CtrlAction defines queued controll action
@@ -97,6 +101,7 @@ func GetAgentService() *AgentService {
 
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
+			&sync.Mutex{},
 			agentConnector,
 			&AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -114,20 +119,21 @@ func GetAgentService() *AgentService {
 			tracerToken,
 			nil,
 			nil,
-			sync.Mutex{},
-			telemetryProvider,
+			nil,
 			telemetryFlushHandler,
+			telemetryProvider,
 		}
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+		agentService.handleExit()
 
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
 			"AppName":        agentService.AppName,
 			"ControllerAddr": agentService.ControllerAddr,
-			"DsClient":       agentService.DSClient.HostName,
+			"DSClient":       agentService.dsClient.HostName,
 		}).Log(log.DebugLevel, "#AgentService Config")
 	})
 
@@ -144,14 +150,14 @@ func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
 		// expect the config api call
 		return nil
 	}
-	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
 		log.Info("[Demand Config]: Config Server is not configured")
 		// expect the config api call
 		return nil
 	}
 
 	for {
-		if err := service.DSClient.Reload(service.AgentID); err != nil {
+		if err := service.dsClient.Reload(service.AgentID); err != nil {
 			log.With(log.Fields{"error": err}).
 				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
 			time.Sleep(time.Duration(20) * time.Second)
@@ -193,6 +199,49 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
+}
+
+// RegisterConfigHandler sets callback
+// usefull for process extensions
+func (service *TransitService) RegisterConfigHandler(fn func([]byte)) {
+	service.Mutex.Lock()
+	service.configHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveConfigHandler removes callback
+func (service *TransitService) RemoveConfigHandler() {
+	service.Mutex.Lock()
+	service.configHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterDemandConfigHandler sets callback
+func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
+	service.Mutex.Lock()
+	service.demandConfigHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveDemandConfigHandler removes callback
+func (service *TransitService) RemoveDemandConfigHandler() {
+	service.Mutex.Lock()
+	service.demandConfigHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterExitHandler sets callback
+func (service *TransitService) RegisterExitHandler(fn func()) {
+	service.Mutex.Lock()
+	service.exitHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveExitHandler removes callback
+func (service *TransitService) RemoveExitHandler() {
+	service.Mutex.Lock()
+	service.exitHandler = nil
+	service.Mutex.Unlock()
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -468,28 +517,30 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	service.Mutex.Lock()
 	// custom connector may provide additional handler for extended fields
-	if service.ConfigHandler != nil {
-		service.ConfigHandler(data)
+	if service.configHandler != nil {
+		service.configHandler(data)
 	}
 	// notify C-API config change
-	service.DemandConfigMutex.Lock()
-	if service.DemandConfigHandler != nil {
-		if success := service.DemandConfigHandler(); !success {
+	if service.demandConfigHandler != nil {
+		if success := service.demandConfigHandler(); !success {
 			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
 		}
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
-	service.DemandConfigMutex.Unlock()
+	service.Mutex.Unlock()
 	// stop nats processing
-	// flush uploading telemetry and configure provider while processing stopped
 	_ = service.stopTransport()
-	if service.TelemetryFlushHandler != nil {
-		service.TelemetryFlushHandler()
+	// flush uploading telemetry and configure provider while processing stopped
+	service.Mutex.Lock()
+	if service.telemetryFlushHandler != nil {
+		service.telemetryFlushHandler()
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
-	service.TelemetryFlushHandler = telemetryFlushHandler
+	service.telemetryFlushHandler = telemetryFlushHandler
 	service.TelemetryProvider = telemetryProvider
+	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -611,6 +662,40 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		[]byte(traceOnDemandAgentID),
 		[]byte(service.Connector.AgentID),
 	)
+}
+
+// handleExit gracefully handles syscalls
+func (service AgentService) handleExit() {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := <-c
+		fmt.Printf("\n- Signal %s received, exiting\n", s)
+		service.Mutex.Lock()
+		if service.exitHandler != nil {
+			/* wrap exitHandler with recover */
+			go func(fn func()) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Error("[handleExit]", err)
+					}
+				}()
+				fn()
+			}(service.exitHandler)
+		}
+		service.Mutex.Unlock()
+
+		if err := service.StopController(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopTransport(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopNats(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		os.Exit(0)
+	}()
 }
 
 // initTelemetryProvider creates a new provider instance
