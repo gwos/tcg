@@ -18,8 +18,26 @@ import (
 	"time"
 )
 
+// Resource defines Prometheus Source
+type Resource struct {
+	Headers map[string]string `json:"headers"`
+	URL     string            `json:"url"`
+}
+
+// ExtConfig defines the MonitorConnection extensions configuration
+type ExtConfig struct {
+	Groups    []transit.ResourceGroup   `json:"groups"`
+	Resources []Resource                `json:"resources"`
+	Services  []string                  `json:"services"`
+	Timer     time.Duration             `json:"timer"`
+	Ownership transit.HostOwnershipType `json:"ownership,omitempty"`
+}
+
+const defaultHostGroupName = "Servers"
+
 var parser expfmt.TextParser
 
+// Synchronize makes InventoryResource
 func Synchronize() *[]transit.InventoryResource {
 	var inventoryResources []transit.InventoryResource
 	for _, resource := range connectors.Inventory {
@@ -232,16 +250,16 @@ func receiverHandler(c *gin.Context) {
 
 func pull(resources []Resource) {
 	for _, resource := range resources {
-		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.url, resource.headers, nil, nil)
+		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.URL, resource.Headers, nil, nil)
 
 		if err != nil {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.url, err.Error()))
+				resource.URL, err.Error()))
 			continue
 		}
 		if !(statusCode == 200 || statusCode == 201) {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.url, string(byteResponse)))
+				resource.URL, string(byteResponse)))
 			continue
 		}
 		err = processMetrics(byteResponse)
