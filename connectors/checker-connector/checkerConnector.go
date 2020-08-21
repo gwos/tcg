@@ -139,6 +139,13 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 	switch str {
 	case "0":
 		return transit.ServiceOk, nil
+	case "1":
+		return transit.ServiceWarning, nil
+	case "2":
+		return transit.ServiceUnscheduledCritical, nil
+	case "3":
+		return transit.ServiceUnknown, nil
+
 	default:
 		return "nil", errors.New("unknown status provided")
 	}
