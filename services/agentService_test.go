@@ -70,5 +70,5 @@ func TestAgentService_DemandConfig(t *testing.T) {
 	assert.Equal(t, "", agentService.Connector.AgentID)
 	_ = agentService.config(dto)
 	assert.Equal(t, "99998888-7777-6666-a3b0-b14622f7dd39", agentService.Connector.AgentID)
-	assert.Equal(t, "gw-host-xxx", agentService.DSClient.HostName)
+	assert.Equal(t, "gw-host-xxx", agentService.dsClient.HostName)
 }

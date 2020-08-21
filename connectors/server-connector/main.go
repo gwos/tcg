@@ -26,7 +26,6 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	connectors.SigTermHandler()
 	go handleCache()
 
 	var transitService = services.GetTransitService()
@@ -38,7 +37,7 @@ func main() {
 
 	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
-	transitService.ConfigHandler = func(data []byte) {
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Server Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
@@ -68,7 +67,7 @@ func main() {
 			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {

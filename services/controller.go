@@ -209,7 +209,7 @@ func (controller *Controller) config(c *gin.Context) {
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
-	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
+	err = controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
@@ -446,7 +446,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
+		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
