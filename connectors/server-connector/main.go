@@ -26,7 +26,6 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	connectors.SigTermHandler()
 	go handleCache()
 
 	var transitService = services.GetTransitService()

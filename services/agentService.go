@@ -8,7 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gwos/tcg/cache"
@@ -39,6 +42,7 @@ type AgentService struct {
 	tracerToken           []byte
 	configHandler         func([]byte)
 	demandConfigHandler   func() bool
+	exitHandler           func()
 	telemetryFlushHandler func()
 	TelemetryProvider     apitrace.Provider
 }
@@ -115,12 +119,14 @@ func GetAgentService() *AgentService {
 			tracerToken,
 			nil,
 			nil,
+			nil,
 			telemetryFlushHandler,
 			telemetryProvider,
 		}
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+		agentService.handleExit()
 
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
@@ -221,6 +227,20 @@ func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
 func (service *TransitService) RemoveDemandConfigHandler() {
 	service.Mutex.Lock()
 	service.demandConfigHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterExitHandler sets callback
+func (service *TransitService) RegisterExitHandler(fn func()) {
+	service.Mutex.Lock()
+	service.exitHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveExitHandler removes callback
+func (service *TransitService) RemoveExitHandler() {
+	service.Mutex.Lock()
+	service.exitHandler = nil
 	service.Mutex.Unlock()
 }
 
@@ -642,6 +662,40 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		[]byte(traceOnDemandAgentID),
 		[]byte(service.Connector.AgentID),
 	)
+}
+
+// handleExit gracefully handles syscalls
+func (service AgentService) handleExit() {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := <-c
+		fmt.Printf("\n- Signal %s received, exiting\n", s)
+		service.Mutex.Lock()
+		if service.exitHandler != nil {
+			/* wrap exitHandler with recover */
+			go func(fn func()) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Error("[handleExit]", err)
+					}
+				}()
+				fn()
+			}(service.exitHandler)
+		}
+		service.Mutex.Unlock()
+
+		if err := service.StopController(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopTransport(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopNats(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		os.Exit(0)
+	}()
 }
 
 // initTelemetryProvider creates a new provider instance
