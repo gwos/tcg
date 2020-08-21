@@ -19,6 +19,16 @@ import (
 	"time"
 )
 
+// ExtConfig defines the MonitorConnection extensions configuration
+type ExtConfig struct {
+	Groups    []transit.ResourceGroup
+	Processes []string
+	Timer     time.Duration
+	Ownership transit.HostOwnershipType
+}
+
+const defaultHostGroupName = "Servers"
+
 // Default processes names
 const (
 	TotalDiskAllocatedServiceName = "total.disk.allocated"
@@ -31,9 +41,8 @@ const (
 	ProcessesNumberServiceName    = "processes.number"
 )
 
-const (
-	MB uint64 = 1048576
-)
+// MB defines the divisor for conversion
+const MB uint64 = 1048576
 
 var processToFuncMap = map[string]interface{}{
 	TotalDiskAllocatedServiceName: getTotalDiskUsageService,
