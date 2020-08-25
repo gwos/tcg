@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gwos/tcg/cache"
@@ -18,28 +22,29 @@ import (
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
-	"go.opentelemetry.io/otel/api/kv"
-	"go.opentelemetry.io/otel/api/trace"
+	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/label"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
 // AgentService implements AgentServices interface
 type AgentService struct {
+	*sync.Mutex
 	*config.Connector
 	agentStats            *AgentStats
 	agentStatus           *AgentStatus
-	DSClient              *clients.DSClient
+	dsClient              *clients.DSClient
 	gwClients             []*clients.GWClient
 	ctrlIdx               uint8
 	ctrlChan              chan *CtrlAction
 	statsChan             chan statsCounter
 	tracerToken           []byte
-	ConfigHandler         func([]byte)
-	DemandConfigHandler   func() bool
-	DemandConfigMutex     sync.Mutex
-	TelemetryProvider     *sdktrace.Provider
-	TelemetryFlushHandler func()
+	configHandler         func([]byte)
+	demandConfigHandler   func() bool
+	exitHandler           func()
+	telemetryFlushHandler func()
+	TelemetryProvider     apitrace.Provider
 }
 
 // CtrlAction defines queued controll action
@@ -71,6 +76,7 @@ const (
 const ctrlLimit = 9
 const ckTraceToken = "ckTraceToken"
 const statsLastErrorsLim = 10
+const defaultDeadlineTimer = 9 * time.Second
 const traceOnDemandAgentID = "#traceOnDemandAgentID#"
 const traceOnDemandAppType = "#traceOnDemandAppType#"
 
@@ -95,6 +101,7 @@ func GetAgentService() *AgentService {
 
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
+			&sync.Mutex{},
 			agentConnector,
 			&AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
@@ -112,20 +119,21 @@ func GetAgentService() *AgentService {
 			tracerToken,
 			nil,
 			nil,
-			sync.Mutex{},
-			telemetryProvider,
+			nil,
 			telemetryFlushHandler,
+			telemetryProvider,
 		}
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+		agentService.handleExit()
 
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
 			"AppName":        agentService.AppName,
 			"ControllerAddr": agentService.ControllerAddr,
-			"DsClient":       agentService.DSClient.HostName,
+			"DSClient":       agentService.dsClient.HostName,
 		}).Log(log.DebugLevel, "#AgentService Config")
 	})
 
@@ -142,14 +150,14 @@ func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
 		// expect the config api call
 		return nil
 	}
-	if len(service.AgentID) == 0 || len(service.DSClient.HostName) == 0 {
+	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
 		log.Info("[Demand Config]: Config Server is not configured")
 		// expect the config api call
 		return nil
 	}
 
 	for {
-		if err := service.DSClient.Reload(service.AgentID); err != nil {
+		if err := service.dsClient.Reload(service.AgentID); err != nil {
 			log.With(log.Fields{"error": err}).
 				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
 			time.Sleep(time.Duration(20) * time.Second)
@@ -191,6 +199,49 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
+}
+
+// RegisterConfigHandler sets callback
+// usefull for process extensions
+func (service *TransitService) RegisterConfigHandler(fn func([]byte)) {
+	service.Mutex.Lock()
+	service.configHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveConfigHandler removes callback
+func (service *TransitService) RemoveConfigHandler() {
+	service.Mutex.Lock()
+	service.configHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterDemandConfigHandler sets callback
+func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
+	service.Mutex.Lock()
+	service.demandConfigHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveDemandConfigHandler removes callback
+func (service *TransitService) RemoveDemandConfigHandler() {
+	service.Mutex.Lock()
+	service.demandConfigHandler = nil
+	service.Mutex.Unlock()
+}
+
+// RegisterExitHandler sets callback
+func (service *TransitService) RegisterExitHandler(fn func()) {
+	service.Mutex.Lock()
+	service.exitHandler = fn
+	service.Mutex.Unlock()
+}
+
+// RemoveExitHandler removes callback
+func (service *TransitService) RemoveExitHandler() {
+	service.Mutex.Lock()
+	service.exitHandler = nil
+	service.Mutex.Unlock()
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -292,13 +343,22 @@ func (service *AgentService) ctrlPushSync(data interface{}, subj ctrlSubj) error
 }
 
 func (service *AgentService) listenCtrlChan() {
+	deadlineTimer := time.NewTimer(defaultDeadlineTimer)
+	deadlineTimer.Stop()
+	var subject ctrlSubj
+	go deadlineTimerHandler(deadlineTimer, &subject)
 	for {
 		ctrl := <-service.ctrlChan
-		log.With(log.Fields{
+		logEntry := log.With(log.Fields{
 			"Idx":  ctrl.Idx,
 			"Subj": ctrl.Subj,
 			// "Data": string(ctrl.Data),
-		}).Log(log.DebugLevel, "#AgentService.ctrlChan")
+		})
+		logEntry.Log(log.DebugLevel, "#AgentService.ctrlChan")
+		subject = ctrl.Subj
+
+		deadlineTimer.Reset(defaultDeadlineTimer)
+
 		service.agentStatus.Ctrl = ctrl
 		var err error
 		switch ctrl.Subj {
@@ -317,7 +377,9 @@ func (service *AgentService) listenCtrlChan() {
 		case ctrlSubjStopTransport:
 			err = service.stopTransport()
 		}
-		// TODO: provide timeout
+
+		deadlineTimer.Stop()
+
 		if ctrl.SyncChan != nil {
 			ctrl.SyncChan <- err
 		}
@@ -383,6 +445,11 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				SubjSendResourceWithMetrics,
 				func(ctx context.Context, b []byte) error {
 					_, err := gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(b))
+					if errors.Is(err, clients.ErrUnauthorized) {
+						/* it looks like an issue with credentialed user
+						so, wait for configuration update */
+						_ = service.StopTransport()
+					}
 					return err
 				},
 			),
@@ -391,6 +458,11 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 				SubjSynchronizeInventory,
 				func(ctx context.Context, b []byte) error {
 					_, err := gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(b))
+					if errors.Is(err, clients.ErrUnauthorized) {
+						/* it looks like an issue with credentialed user
+						so, wait for configuration update */
+						_ = service.StopTransport()
+					}
 					return err
 				},
 			),
@@ -407,7 +479,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			var (
 				ctx  context.Context
 				err  error
-				span trace.Span
+				span apitrace.Span
 			)
 			if service.TelemetryProvider != nil {
 				tr := service.TelemetryProvider.Tracer("services")
@@ -445,28 +517,30 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	service.Mutex.Lock()
 	// custom connector may provide additional handler for extended fields
-	if service.ConfigHandler != nil {
-		service.ConfigHandler(data)
+	if service.configHandler != nil {
+		service.configHandler(data)
 	}
 	// notify C-API config change
-	service.DemandConfigMutex.Lock()
-	if service.DemandConfigHandler != nil {
-		if success := service.DemandConfigHandler(); !success {
+	if service.demandConfigHandler != nil {
+		if success := service.demandConfigHandler(); !success {
 			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
 		}
 		// TODO: add logic to avoid processing previous inventory in case of callback fails
 	}
-	service.DemandConfigMutex.Unlock()
+	service.Mutex.Unlock()
 	// stop nats processing
-	// flush uploading telemetry and configure provider while processing stopped
 	_ = service.stopTransport()
-	if service.TelemetryFlushHandler != nil {
-		service.TelemetryFlushHandler()
+	// flush uploading telemetry and configure provider while processing stopped
+	service.Mutex.Lock()
+	if service.telemetryFlushHandler != nil {
+		service.telemetryFlushHandler()
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
-	service.TelemetryFlushHandler = telemetryFlushHandler
+	service.telemetryFlushHandler = telemetryFlushHandler
 	service.TelemetryProvider = telemetryProvider
+	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -523,7 +597,7 @@ func (service *AgentService) startTransport() error {
 		}
 	}
 	if len(cons) == 0 {
-		log.Warn("StartTransport: empty GWConnections")
+		log.Warn("[StartTransport]: Empty GWConnections")
 		return nil
 	}
 	/* Process clients */
@@ -590,31 +664,80 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 	)
 }
 
-// initTelemetryProvider creates a new provider instance and registers it as global provider
-func initTelemetryProvider() (*sdktrace.Provider, func(), error) {
-	hostName := config.GetConfig().Telemetry.HostName
-	if len(hostName) == 0 {
-		err := fmt.Errorf("Telemetry not configured")
-		log.Warn(err.Error())
+// handleExit gracefully handles syscalls
+func (service AgentService) handleExit() {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		s := <-c
+		fmt.Printf("\n- Signal %s received, exiting\n", s)
+		service.Mutex.Lock()
+		if service.exitHandler != nil {
+			/* wrap exitHandler with recover */
+			go func(fn func()) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Error("[handleExit]", err)
+					}
+				}()
+				fn()
+			}(service.exitHandler)
+		}
+		service.Mutex.Unlock()
+
+		if err := service.StopController(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopTransport(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		if err := service.StopNats(); err != nil {
+			log.Error("[handleExit]", err.Error())
+		}
+		os.Exit(0)
+	}()
+}
+
+// initTelemetryProvider creates a new provider instance
+func initTelemetryProvider() (apitrace.Provider, func(), error) {
+	var jaegerEndpoint jaeger.EndpointOption
+	jaegerAgent := config.GetConfig().Jaegertracing.Agent
+	jaegerCollector := config.GetConfig().Jaegertracing.Collector
+	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
+		err := fmt.Errorf("telemetry not configured")
+		log.Debug(err.Error())
 		return nil, nil, err
 	}
-
-	agentConnector := config.GetConfig().Connector
-	serviceName := fmt.Sprintf("%s:%s:%s",
-		agentConnector.AppType, agentConnector.AppName, agentConnector.AgentID)
-	tags := []kv.KeyValue{
-		kv.String("runtime", "golang"),
+	if len(jaegerAgent) == 0 {
+		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)
+	} else {
+		jaegerEndpoint = jaeger.WithAgentEndpoint(jaegerAgent)
 	}
-	for k, v := range config.GetConfig().Telemetry.Tags {
-		tags = append(tags, kv.String(k, v))
+
+	connector := config.GetConfig().Connector
+	serviceName := fmt.Sprintf("%s:%s:%s",
+		connector.AppType, connector.AppName, connector.AgentID)
+	tags := []label.KeyValue{
+		label.String("runtime", "golang"),
+	}
+	for k, v := range config.GetConfig().Jaegertracing.Tags {
+		tags = append(tags, label.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
-		jaeger.WithAgentEndpoint(hostName),
+		jaegerEndpoint,
 		jaeger.WithProcess(jaeger.Process{
 			ServiceName: serviceName,
 			Tags:        tags,
 		}),
-		jaeger.RegisterAsGlobal(),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
+}
+
+func deadlineTimerHandler(deadlineTimer *time.Timer, subject *ctrlSubj) {
+	for {
+		select {
+		case <-deadlineTimer.C:
+			log.Error("#AgentService.ctrlChan timed over:", *subject)
+		}
+	}
 }

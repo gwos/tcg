@@ -1,10 +1,12 @@
 package clients
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 	"net/http"
@@ -39,6 +41,7 @@ const (
 	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
 	GWEntrypointServices                = "/api/services"
 	GWEntrypointHostgroups              = "/api/hostgroups"
+	GWEntrypointLicenseCheck            = "/api/license/check"
 	GWEntrypointValidateToken           = "/api/auth/validatetoken"
 	NagiosApp                           = "NAGIOS"
 )
@@ -60,6 +63,7 @@ type GWClient struct {
 	uriSynchronizeInventory    string
 	uriServices                string
 	uriHostGroups              string
+	uriLicenseCheck            string
 	uriValidateToken           string
 }
 
@@ -73,6 +77,45 @@ type AuthPayload struct {
 type UserResponse struct {
 	Name        string `json:"name"`
 	AccessToken string `json:"accessToken"`
+}
+
+type GwServices struct {
+	Services []struct {
+		HostName string `json:"hostName"`
+	} `json:"services"`
+}
+
+type GwHostGroups struct {
+	HostGroups []struct {
+		Name  string `json:"name"`
+		Hosts []struct {
+			HostName string `json:"hostName"`
+		} `json:"hosts"`
+	} `json:"hostGroups"`
+}
+
+type LicenseCheck struct {
+	Success          bool   `json:"success"`
+	Message          string `json:"message"`
+	DevicesRequested int    `json:"devicesRequested"`
+	LimitDevices     int    `json:"hardLimitDevices"`
+	Devices          int    `json:"devices"`
+}
+
+// Returns whether it is OK to send inventory according to the latest license check result
+// (false only if the latest license check was failure with "Device allocation over hard limit" message
+// i.e. if license check is failure but because of license expired or something else it is still OK to send inventory)
+func (license LicenseCheck) isOkToSendInventory() bool {
+	if license.Success {
+		return true
+	} else {
+		// if license is for example simply expired or anything - that shouldn't prevent to send inventory
+		// we care only about device limit
+		if license.Message == "Device allocation over hard limit" {
+			return false
+		}
+		return true
+	}
 }
 
 // Connect implements GWOperations.Connect.
@@ -114,9 +157,8 @@ func (client *GWClient) connectLocal() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectLocal")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -132,7 +174,7 @@ func (client *GWClient) connectLocal() error {
 	if statusCode == 502 || statusCode == 504 {
 		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
 	}
-	if statusCode == 401 {
+	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
 	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
@@ -160,9 +202,8 @@ func (client *GWClient) connectRemote() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: connectRemote")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -185,12 +226,12 @@ func (client *GWClient) connectRemote() error {
 		"errorCode": error2,
 	})
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(error2))
+		return fmt.Errorf("%w: %v", ErrGateway, error2)
 	}
-	if statusCode == 401 {
+	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
 		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(error2))
+	return fmt.Errorf("%w: %v", ErrUndecided, error2)
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -216,9 +257,8 @@ func (client *GWClient) Disconnect() error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: disconnect")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
 
 	if err != nil {
 		return err
@@ -259,9 +299,8 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: validate token")
-	}()
+
+	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
 
 	if err == nil {
 		if statusCode == 200 {
@@ -279,6 +318,45 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
+	hostName := "unknown"
+	if client.GWConnection != nil {
+		hostName = client.GWConnection.HostName
+	}
+
+	// retrieve count of resources (hosts) to be sent and agentID
+	var payloadResources struct {
+		Context struct {
+			AgentID string `json:"agentId"`
+		} `json:"context"`
+		Resources []interface{} `json:"resources"`
+	}
+	err := json.Unmarshal(payload, &payloadResources)
+	if err != nil {
+		log.Error("|gwClient.go| : [SynchronizeInventory] : Unable to parse SynchronizeInventory payload: ", err)
+	}
+	currentHostsCount := len(payloadResources.Resources)
+
+	// get count of hosts sent last time from cache
+	// (if doesn't exist in cache count hosts owned curr agent in GWOS
+	// for a case if connector was stopped and then restarted)
+	lastSentHostsCount := 0
+	if lastSentHostsCountCache, exists := cache.LastSentHostsCountCache.Get(hostName); exists {
+		lastSentHostsCount = lastSentHostsCountCache.(int)
+	} else {
+		lastSentHostsCount = client.getLastSentHostsCount(payloadResources.Context.AgentID)
+		cache.LastSentHostsCountCache.SetDefault(hostName, lastSentHostsCount)
+	}
+
+	// count diff between curr hosts to send count and last i.e. how many hosts gonna be added
+	hostsToAllocate := currentHostsCount - lastSentHostsCount
+	// if gonna ad hosts
+	if hostsToAllocate > 0 {
+		// check whether license allows to allocate count of hosts
+		licenseCheckPassed, err := client.checkLicenseForHostLimit(hostsToAllocate)
+		if !licenseCheckPassed {
+			return nil, err
+		}
+	}
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendData(ctx, client.uriSynchronizeInventory, payload,
@@ -288,7 +366,11 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 			},
 		)
 	}
-	return client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	response, err := client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	if err == nil {
+		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
+	}
+	return response, err
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
@@ -348,17 +430,27 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 }
 
 // GetServicesByAgent implements GWOperations.GetServicesByAgent.
-func (client *GWClient) GetServicesByAgent(agentID string) ([]byte, error) {
+func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) {
 	params := make(map[string]string)
 	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqURL := client.uriServices + BuildQueryParams(params)
-	return client.sendRequest(nil, http.MethodGet, reqURL, nil)
+	reqUrl := client.uriServices + BuildQueryParams(params)
+	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	if err != nil {
+		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
+		return nil, err
+	}
+	var gwServices GwServices
+	err = json.Unmarshal(response, &gwServices)
+	if err != nil {
+		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to parse received GW services: ", err)
+		return nil, err
+	}
+	return &gwServices, nil
 }
 
-// GetHostGroupsByHostNamesAndAppType implements GWOperations.GetHostGroupsByHostNamesAndAppType.
-func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error) {
+func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) (*GwHostGroups, error) {
 	if hostNames == nil || len(hostNames) == 0 {
 		return nil, errors.New("unable to get host groups of host: host names are not provided")
 	}
@@ -376,8 +468,78 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	params["query"] = query
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqURL := client.uriHostGroups + BuildQueryParams(params)
-	return client.sendRequest(nil, http.MethodGet, reqURL, nil)
+	reqUrl := client.uriHostGroups + BuildQueryParams(params)
+	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	if err != nil {
+		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to get GW host groups: ", err)
+		return nil, err
+	}
+	var gwHostGroups GwHostGroups
+	err = json.Unmarshal(response, &gwHostGroups)
+	if err != nil {
+		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to parse received GW host groups: ", err)
+		return nil, err
+	}
+	return &gwHostGroups, nil
+}
+
+func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, error) {
+	host := "unknown"
+	if client.GWConnection != nil {
+		host = client.GWConnection.HostName
+	}
+	log.Info("Checking license at ", host)
+
+	params := make(map[string]string)
+	params["allocate"] = strconv.Itoa(hostsToAllocate)
+	client.buildURIs()
+	reqUrl := client.uriLicenseCheck + BuildQueryParams(params)
+	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	if err != nil {
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to check license at ", host, ": ", err)
+		return false, errors.New("failed to check license at " + host + ": unable to get license")
+	}
+	var license LicenseCheck
+	err = json.Unmarshal(response, &license)
+	if err != nil {
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to parse received license at ", host, ": ", err)
+		return false, errors.New("failed to check license at " + host + ": unable to get license")
+	}
+	if !license.isOkToSendInventory() {
+		hostSpace := license.LimitDevices - license.Devices
+		if hostSpace < 0 {
+			hostSpace = 0
+		}
+		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Host allocation over hard limit at " + host +
+			": hosts limit " + strconv.Itoa(license.LimitDevices) +
+			", hosts monitored " + strconv.Itoa(license.Devices) +
+			", license space for " + strconv.Itoa(hostSpace) + " hosts" +
+			", hosts to allocate " + strconv.Itoa(hostsToAllocate))
+		return false, errors.New("host allocation over hard limit at " + host +
+			": hosts to allocate " + strconv.Itoa(hostsToAllocate) +
+			" but only license space for " + strconv.Itoa(hostSpace))
+	}
+	return true, nil
+}
+
+func (client *GWClient) getLastSentHostsCount(agentID string) int {
+	gwServices, err := client.GetServicesByAgent(agentID)
+	if err != nil || gwServices == nil {
+		log.Error("|gwClient.go| : [getLastSentHostsCount] : Unable to get GW hosts to init  last hosts sent count.")
+		if err != nil {
+			log.Error("|gwClient.go| : [getLastSentHostsCount] : ", err)
+		} else {
+			log.Error("|gwClient.go| : [getLastSentHostsCount] : Response is nil.")
+		}
+		return 0
+	}
+	hostNames := make(map[string]struct{})
+	for _, gwService := range gwServices.Services {
+		if _, exists := hostNames[gwService.HostName]; !exists {
+			hostNames[gwService.HostName] = struct{}{}
+		}
+	}
+	return len(hostNames)
 }
 
 func (client *GWClient) sendData(ctx context.Context, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
@@ -437,9 +599,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		})
 	}
 
-	defer func() {
-		logEntry.Log(logEntryLevel, "GWClient: sendRequest")
-	}()
+	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -452,6 +612,10 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	if statusCode == 502 || statusCode == 504 {
 		logEntryLevel = log.WarnLevel
 		return nil, fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+	}
+	if statusCode == 503 {
+		logEntryLevel = log.WarnLevel
+		return nil, fmt.Errorf("%w: %v", ErrSynchronizer, string(byteResponse))
 	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
@@ -475,6 +639,7 @@ func (client *GWClient) buildURIs() {
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
 		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
 		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
+		uriLicenseCheck := buildURI(client.GWConnection.HostName, GWEntrypointLicenseCheck)
 		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
@@ -486,6 +651,7 @@ func (client *GWClient) buildURIs() {
 		client.uriSynchronizeInventory = uriSynchronizeInventory
 		client.uriServices = uriServices
 		client.uriHostGroups = uriHostGroups
+		client.uriLicenseCheck = uriLicenseCheck
 		client.uriValidateToken = uriValidateToken
 		client.Mutex.Unlock()
 	})

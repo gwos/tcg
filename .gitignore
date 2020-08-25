@@ -8,8 +8,10 @@
 *.iml
 tcg
 test_libtransit
-connectors/server-connector/server-connector
+connectors/checker-connector/checker-connector
 connectors/elastic-connector/elastic-connector
+connectors/prometheus-connector/prometheus-connector
+connectors/server-connector/server-connector
 
 # Temporary files
 ,*
@@ -61,3 +63,7 @@ install/*
 # Temp NATS store
 gw-transit/natsstore/
 natsstore/
+
+target
+
+node_modules

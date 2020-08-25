@@ -21,102 +21,148 @@ func (esClient *EsClient) InitEsClient() error {
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Error(err)
+		log.Error("|elasticSearchClient.go| : [InitEsClient] : ", err)
 	} else {
 		esClient.Client = client
 	}
 	return err
 }
 
-func (esClient *EsClient) GetHosts(hostField string, hostGroupField string) []HostBucket {
-	if esClient.Client == nil {
-		err := esClient.InitEsClient()
-		if err != nil {
-			log.Error("Failed to retrieve hosts from ElasticSearch. ElasticSearch client not initialized")
-			return nil
+func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]EsAggregationKey, error) {
+	searchBody := EsSearchBody{
+		Aggs: BuildAggregationsByHostNameAndHostGroup(hostField, hostGroupField),
+	}
+	response, err := esClient.doSearchRequest(searchBody, nil)
+	if err != nil {
+		return nil, err
+	}
+	searchResponse := parseSearchResponse(response)
+	if searchResponse == nil {
+		log.Error("|elasticSearchClient.go| : [GetHosts] : response is nil")
+		return nil, nil
+	}
+
+	var keys []EsAggregationKey
+	if searchResponse.Aggregations.Aggregation.Buckets != nil {
+		for _, bucket := range searchResponse.Aggregations.Aggregation.Buckets {
+			keys = append(keys, bucket.Key)
 		}
 	}
-	client := esClient.Client
 
-	var aggregationsBody AggregationsBody
-	aggregationsBody.byHostNameAndHostGroup(hostField, hostGroupField)
-
-	var body bytes.Buffer
-	var err error
-	if err = json.NewEncoder(&body).Encode(aggregationsBody); err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error encoding request body: ", err)
-		return nil
-	}
-
-	log.Debug("Retrieving hosts from ElasticSearch. Performing ES search request with body: ", body.String())
-	response, err := client.Search(
-		client.Search.WithContext(context.Background()),
-		client.Search.WithSize(0),
-		client.Search.WithBody(&body),
-	)
-
-	if err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error getting response: ", err)
-		return nil
-	}
-
-	log.Debug("ES Search response: ", response)
-
-	if response.IsError() {
-		var e map[string]interface{}
-		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("Error parsing Search response body: ", err)
-		} else {
-			// Print the response status and error information.
-			log.Error(response.Status(),
-				e["error"].(map[string]interface{})["type"],
-				e["error"].(map[string]interface{})["reason"],
-			)
+	afterKey := getAfterKey(searchResponse)
+	for afterKey != nil {
+		searchBody.Aggs.Agg.Composite.After = afterKey
+		response, err = esClient.doSearchRequest(searchBody, nil)
+		searchResponse := parseSearchResponse(response)
+		if searchResponse == nil {
+			log.Error("|elasticSearchClient.go| : [GetHosts] : response is nil")
+			afterKey = nil
+			break
 		}
-		return nil
+		if searchResponse.Aggregations.Aggregation.Buckets != nil {
+			for _, bucket := range searchResponse.Aggregations.Aggregation.Buckets {
+				keys = append(keys, bucket.Key)
+			}
+		}
+		afterKey = getAfterKey(searchResponse)
 	}
 
-	responseBody, err := ioutil.ReadAll(response.Body)
-
-	if err != nil {
-		log.Error("Failed to retrieve hosts from ElasticSearch. Error reading response body: ", err)
-		return nil
-	}
-	defer response.Body.Close()
-
-	var aggregations AggregationsResponse
-	err = json.Unmarshal(responseBody, &aggregations)
-	if err != nil {
-		log.Error("Error parsing ES Search response body: ", err)
-		return nil
-	}
-
-	return aggregations.Aggregations.HostBuckets.Buckets
+	return keys, err
 }
 
-func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string, indexes []string, query *Query) (int, error) {
+func (esClient EsClient) CountHits(hostField string, indexes []string, query *EsQuery) (map[string]int, error) {
+	searchBody := EsSearchBody{
+		Query: query,
+		Aggs:  BuildAggregationsByHostNameAndHostGroup(hostField, nil),
+	}
+
+	response, err := esClient.doSearchRequest(searchBody, indexes)
+	if err != nil {
+		return nil, err
+	}
+	searchResponse := parseSearchResponse(response)
+	if searchResponse == nil {
+		log.Error("|elasticSearchClient.go| : [CountHits] : response is nil")
+		return nil, nil
+	}
+
+	result := make(map[string]int)
+	if searchResponse.Aggregations.Aggregation.Buckets != nil {
+		for _, bucket := range searchResponse.Aggregations.Aggregation.Buckets {
+			result[bucket.Key.Host] = bucket.DocsCount
+		}
+	}
+
+	afterKey := getAfterKey(searchResponse)
+	for afterKey != nil {
+		searchBody.Aggs.Agg.Composite.After = afterKey
+		response, err = esClient.doSearchRequest(searchBody, indexes)
+		searchResponse := parseSearchResponse(response)
+		if searchResponse == nil {
+			log.Error("|elasticSearchClient.go| : [CountHits] : response is nil")
+			afterKey = nil
+			break
+		}
+		if searchResponse.Aggregations.Aggregation.Buckets != nil {
+			for _, bucket := range searchResponse.Aggregations.Aggregation.Buckets {
+				result[bucket.Key.Host] = bucket.DocsCount
+			}
+		}
+		afterKey = getAfterKey(searchResponse)
+	}
+
+	return result, err
+}
+
+func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string, indexes []string, query *EsQuery) (int, error) {
+	queryCopy := copyQuery(query)
+	queryCopy.Bool.Filter = append(queryCopy.Bool.Filter, buildMatchPhraseFilter(hostNameField, hostName))
+	searchBody := EsSearchBody{
+		Query: queryCopy,
+	}
+	response, err := esClient.doSearchRequest(searchBody, indexes)
+	if err != nil {
+		return 0, err
+	}
+	searchResponse := parseSearchResponse(response)
+	if searchResponse == nil {
+		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : response is nil")
+		return 0, nil
+	}
+	return searchResponse.Hits.Total.Value, nil
+}
+
+func getAfterKey(searchResponse *EsSearchResponse) *EsAggregationKey {
+	var afterKey *EsAggregationKey
+	if searchResponse != nil {
+		if searchResponse.Aggregations.Aggregation.AfterKey != nil {
+			afterKey = searchResponse.Aggregations.Aggregation.AfterKey
+		} else {
+			if searchResponse.Aggregations.Aggregation.Buckets != nil && len(searchResponse.Aggregations.Aggregation.Buckets) > 0 {
+				afterKey = &searchResponse.Aggregations.Aggregation.Buckets[len(searchResponse.Aggregations.Aggregation.Buckets)-1].Key
+			}
+		}
+	}
+	return afterKey
+}
+
+func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []string) (*esapi.Response, error) {
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
-			log.Error("ES client was not initialized")
-			return 0, err
+			log.Error("|elasticSearchClient.go| : [doSearchRequest] : ES client was not initialized")
+			return nil, err
 		}
 	}
 	client := esClient.Client
-
-	searchBody := SearchBody{
-		Query: copyQuery(query),
-	}
-	searchBody.ForHost(hostName, hostNameField)
-
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
-		log.Error("Error encoding ES Search Body: ", err)
-		return 0, nil
+		log.Error("|elasticSearchClient.go| : [doSearchRequest] : Error encoding ES Search Body: ", err)
+		return nil, nil
 	}
 
 	log.Debug("Performing ES search request with body: ", body.String())
-	var response *esapi.Response
+
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
 		client.Search.WithIndex(indexes...),
@@ -126,8 +172,17 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	)
 
 	if err != nil {
-		log.Error("Error getting Search response: ", err)
-		return 0, nil
+		log.Error("|elasticSearchClient.go| : [doSearchRequest] : Error getting Search response: ", err)
+		return nil, nil
+	}
+
+	return response, nil
+}
+
+func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
+	if response == nil {
+		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : ES Search response is nil")
+		return nil
 	}
 
 	log.Debug("ES Search response: ", response)
@@ -135,79 +190,120 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("Error parsing Search response body: ", err)
+			log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error parsing Search response body: ", err)
 		} else {
 			// Print the response status and error information.
-			log.Error(response.Status(),
+			log.Error("|elasticSearchClient.go| : [parseSearchResponse] : ", response.Status(),
 				e["error"].(map[string]interface{})["type"],
 				e["error"].(map[string]interface{})["reason"],
 			)
 		}
-		return 0, nil
+		return nil
 	}
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Error("Error reading ES Search response body: ", err)
-		return 0, nil
+		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error reading ES Search response body: ", err)
+		return nil
 	}
 
 	defer response.Body.Close()
 
-	var searchResponse SearchResponse
+	var searchResponse EsSearchResponse
 	if err := json.Unmarshal(responseBody, &searchResponse); err != nil {
-		log.Error("Error parsing ES Search response body: ", err)
-		return 0, nil
+		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error parsing ES Search response body: ", err)
+		return nil
 	}
 
-	return searchResponse.Hits.Total.Value, nil
+	return &searchResponse
 }
 
-// ElasticSearch _search aggregated by hostname keyword request
-type AggregationsBody struct {
-	Aggs struct {
-		ByHostname struct {
-			Terms struct {
-				Field string `json:"field"`
-			} `json:"terms"`
-			Aggs struct {
-				ByHostgroup struct {
-					Terms struct {
-						Field string `json:"field"`
-					} `json:"terms"`
-				} `json:"_by_hostgroup"`
-			} `json:"aggs"`
-		} `json:"_by_hostname"`
-	} `json:"aggs"`
-}
+func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	for _, fieldName := range fieldNames {
+		result[fieldName] = false
+	}
 
-func (body *AggregationsBody) byHostNameAndHostGroup(hostField string, hostGroupField string) {
-	body.Aggs.ByHostname.Terms.Field = hostField
-	body.Aggs.ByHostname.Aggs.ByHostgroup.Terms.Field = hostGroupField
-}
+	if esClient.Client == nil {
+		err := esClient.InitEsClient()
+		if err != nil {
+			log.Error("|elasticSearchClient.go| : [doSearchRequest] : ES client was not initialized")
+			return result, err
+		}
+	}
+	client := esClient.Client
 
-// ElasticSearch _search aggregated by hostname keyword response
-type AggregationsResponse struct {
-	Aggregations struct {
-		HostBuckets struct {
-			Buckets []HostBucket `json:"buckets"`
-		} `json:"_by_hostname"`
-	} `json:"aggregations"`
-}
+	log.Debug("Performing ES FieldCaps request for fields: ", fieldNames)
 
-type HostBucket struct {
-	Key              string `json:"key"`
-	HostGroupBuckets struct {
-		Buckets []struct {
-			Key string `json:"key"`
-		} `json:"buckets"`
-	} `json:"_by_hostgroup"`
-}
+	response, err := client.FieldCaps(
+		client.FieldCaps.WithFields(fieldNames...),
+		client.FieldCaps.WithIndex(),
+	)
+	if err != nil {
+		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error getting ES FieldCaps response: ", err)
+		return result, nil
+	}
 
-type SearchResponse struct {
-	Hits struct {
-		Total struct {
-			Value int `json:"value"`
-		} `json:"total"`
-	} `json:"hits"`
+	if response == nil {
+		log.Error("|elasticSearchClient.go| : [isAggregatable] : ES FieldCaps response is nil")
+		return result, nil
+	}
+
+	log.Debug("ES FieldCaps response: ", response)
+	if response.IsError() {
+		var e map[string]interface{}
+		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
+			log.Error("|elasticSearchClient.go| : [isAggregatable] : Error parsing ES FieldCaps response body: ", err)
+		} else {
+			// Print the response status and error information.
+			log.Error("|elasticSearchClient.go| : [isAggregatable] : ", response.Status(),
+				e["error"].(map[string]interface{})["type"],
+				e["error"].(map[string]interface{})["reason"],
+			)
+		}
+		return result, nil
+	}
+
+	responseBody, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error reading ES FieldCaps response body: ", err)
+		return result, nil
+	}
+
+	defer response.Body.Close()
+
+	var fieldCapsResponse EsFieldCapsResponse
+	if err := json.Unmarshal(responseBody, &fieldCapsResponse); err != nil {
+		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error parsing ES FieldCaps response body: ", err)
+		return result, nil
+	}
+
+	// TODO improve this parsing once link metrics to index patterns
+	if fieldCapsResponse.Fields != nil {
+		for _, fieldName := range fieldNames {
+			if field, exists := fieldCapsResponse.Fields[fieldName]; exists {
+				switch field.(type) {
+				case map[string]interface{}:
+					fieldCaps := field.(map[string]interface{})
+					for _, v := range fieldCaps {
+						switch v.(type) {
+						case map[string]interface{}:
+							fieldCap := v.(map[string]interface{})
+							if aggregatable, exists := fieldCap["aggregatable"]; exists {
+								switch aggregatable.(type) {
+								case bool:
+									if aggregatable.(bool) {
+										result[fieldName] = true
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return result, nil
 }

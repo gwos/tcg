@@ -1,11 +1,12 @@
 package services
 
 import (
-	"github.com/gwos/tcg/config"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"os"
 	"testing"
+
+	"github.com/gwos/tcg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {
@@ -45,7 +46,7 @@ func TestAgentService_DemandConfig(t *testing.T) {
 	err = tmpfile.Close()
 	assert.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
-	os.Setenv(string(config.ConfigEnv), tmpfile.Name())
+	_ = os.Setenv(string(config.ConfigEnv), tmpfile.Name())
 
 	dto := []byte(`
 {
@@ -68,7 +69,7 @@ func TestAgentService_DemandConfig(t *testing.T) {
 
 	agentService := GetAgentService()
 	assert.Equal(t, "", agentService.Connector.AgentID)
-	agentService.config(dto)
+	_ = agentService.config(dto)
 	assert.Equal(t, "99998888-7777-6666-a3b0-b14622f7dd39", agentService.Connector.AgentID)
-	assert.Equal(t, "gw-host-xxx", agentService.DSClient.HostName)
+	assert.Equal(t, "gw-host-xxx", agentService.dsClient.HostName)
 }

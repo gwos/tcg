@@ -5,6 +5,7 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/transit"
+	"time"
 )
 
 // keys for extensions
@@ -21,7 +22,7 @@ type ServerConnectorConfig struct {
 	Processes      []string
 	Groups         []transit.ResourceGroup
 	MetricsProfile transit.MetricsProfile
-	Timer          int64
+	Timer          time.Duration
 	Ownership      transit.HostOwnershipType
 }
 
@@ -43,7 +44,10 @@ func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *tr
 	// update config with received values if presented
 	if monitorConnection != nil && monitorConnection.Extensions != nil {
 		if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
-			connectorConfig.Timer = int64(value.(float64) * 60)
+			if value.(float64) >= 1 {
+				connectorConfig.Timer = time.Duration(int64(value.(float64))) * time.Minute
+				connectors.Timer = connectorConfig.Timer
+			}
 		}
 
 		if value, present := monitorConnection.Extensions[extensionsKeyProcesses]; present {

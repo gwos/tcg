@@ -198,7 +198,7 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	}
 
 	if mustExist && (response.HostName != TestHostName || response.MonitorStatus != mustHasStatus) {
-		return fmt.Errorf("Host from database = (Name: %s, Status: %s), want = (Name: %s, Status: %s)",
+		return fmt.Errorf("host from database = (Name: %s, Status: %s), want = (Name: %s, Status: %s)",
 			response.HostName, response.MonitorStatus, TestHostName, mustHasStatus)
 	}
 

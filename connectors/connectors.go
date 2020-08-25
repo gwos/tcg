@@ -12,20 +12,39 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"hash/fnv"
-	"os"
-	"os/signal"
 	"reflect"
 	"strings"
-	"syscall"
 	"time"
 )
 
-const DefaultTimer = int64(120)
+// DefaultTimer defines interval in minutes
+const DefaultTimer = time.Duration(2) * time.Minute
 
-// will come from extensions field
+// Timer comes from extensions field
 var Timer = DefaultTimer
 
+// ExtensionsKeyTimer defines field name
 const ExtensionsKeyTimer = "checkIntervalMinutes"
+
+var Inventory = make(map[string]transit.InventoryResource)
+var inventoryChksum []byte
+
+// MonitorConnection overrides transit.MonitorConnection
+// TODO: update and use transit.MonitorConnection instead
+type MonitorConnection struct {
+	transit.MonitorConnection `json:"monitorConnection"`
+	Extensions                interface{} `json:"extensions"`
+}
+
+// UnmarshalConfig updates args with data
+// TODO: update and use transit.MonitorConnection instead
+func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *MonitorConnection) error {
+	cfg := struct {
+		MetricsProfile    *transit.MetricsProfile `json:"metricsProfile"`
+		MonitorConnection *MonitorConnection      `json:"monitorConnection"`
+	}{metricsProfile, monitorConnection}
+	return json.Unmarshal(data, &cfg)
+}
 
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
@@ -37,6 +56,8 @@ func Start() error {
 	return nil
 }
 
+// RetrieveCommonConnectorInfo deprecated
+// use UnmarshalConfig instead
 func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *transit.MetricsProfile, config.GWConnections, error) {
 	var connector = struct {
 		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
@@ -46,7 +67,7 @@ func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *tran
 
 	err := json.Unmarshal(data, &connector)
 	if err != nil {
-		log.Error("Error parsing common connector data: ", err)
+		log.Error("|connectors.go| : [RetrieveCommonConnectorInfo] : Error parsing common connector data: ", err)
 		return nil, nil, nil, err
 	}
 
@@ -70,15 +91,13 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
-	for i, _ := range request.Resources {
+	for i := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(time.Second * time.Duration(Timer))}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(Timer)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
 	b, err = json.Marshal(request)
-
-	// log.Error(string(b))
 
 	if err != nil {
 		return err
@@ -88,7 +107,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 func setCheckTimes(resources []transit.MonitoredResource) {
 	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(time.Second * time.Duration(Timer))
+	nextCheckTime := lastCheckTime.Add(Timer)
 	for i := range resources {
 		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
 		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
@@ -124,9 +143,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		return err
 	}
 
-	err = services.GetTransitService().SynchronizeInventory(b)
-
-	return err
+	return services.GetTransitService().SynchronizeInventory(b)
 }
 
 // Inventory Constructors
@@ -190,6 +207,8 @@ func FillGroupWithResources(group transit.ResourceGroup, resources []transit.Inv
 type MetricBuilder struct {
 	Name           string
 	CustomName     string
+	ComputeType    transit.ComputeType
+	Expression     string
 	Value          interface{}
 	UnitType       interface{}
 	Warning        interface{}
@@ -211,7 +230,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		}
 		args = append(args, timeInterval)
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
-		log.Error("Error creating time interval for metric ", metricBuilder.Name,
+		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
 			": either start time or end time is not provided")
 	}
 
@@ -221,12 +240,15 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		return metric, err
 	}
 
+	metric.MetricComputeType = metricBuilder.ComputeType
+	metric.MetricExpression = metricBuilder.Expression
+
 	var thresholds []transit.ThresholdValue
 	if metricBuilder.Warning != nil {
 		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
 			metricBuilder.Warning)
 		if err != nil {
-			log.Error("Error creating warning threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric]: Error creating warning threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *warningThreshold)
@@ -235,7 +257,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
 			metricBuilder.Critical)
 		if err != nil {
-			log.Error("Error creating critical threshold for metric ", metricBuilder.Name,
+			log.Error("|connectors.go| : [BuildMetric] : Error creating critical threshold for metric ", metricBuilder.Name,
 				": ", err)
 		}
 		thresholds = append(thresholds, *criticalThreshold)
@@ -362,8 +384,8 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
-		log.Error("Error creating metric for process: ", metricBuilder.Name)
-		log.Error(err)
+		log.Error("|connectors.go| : [BuildServiceForMetric] : Error creating metric for process: ", metricBuilder.Name,
+			" Reason: ", err)
 		return nil, errors.New("cannot create service with metric due to metric creation failure")
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -383,6 +405,20 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 	}
 	gwServiceName := Name(serviceName, customName)
 	return CreateService(gwServiceName, hostName, metrics)
+}
+
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+	var timeSeries []transit.TimeSeries
+	for _, metricBuilder := range metricBuilders {
+		metric, err := BuildMetric(metricBuilder)
+		if err != nil {
+			log.Error("|connectors.go| : [BuildServiceForMetrics]: Error creating metric for process: ", serviceName,
+				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
+			return nil, errors.New("cannot create service with metric due to metric creation failure")
+		}
+		timeSeries = append(timeSeries, *metric)
+	}
+	return CreateService(serviceName, hostName, timeSeries)
 }
 
 // Create Service
@@ -434,6 +470,13 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 	return &resource, nil
 }
 
+func CalculateResourceStatus(services []transit.MonitoredService) transit.MonitorStatus {
+
+	// TODO: implement logic
+
+	return transit.HostUp
+}
+
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
 	previousStatus := transit.ServiceOk
 	for _, metric := range *metrics {
@@ -458,6 +501,36 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 	return previousStatus, nil
 }
 
+func BuildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
+	var inventoryResources []transit.InventoryResource
+	for _, resource := range *resources {
+		var inventoryServices []transit.InventoryService
+		for _, service := range resource.Services {
+			inventoryServices = append(inventoryServices, CreateInventoryService(service.Name,
+				service.Owner))
+		}
+
+		inventoryResource := CreateInventoryResource(resource.Name, inventoryServices)
+		Inventory[inventoryResource.Name] = inventoryResource
+		inventoryResources = append(inventoryResources, inventoryResource)
+	}
+	return &inventoryResources
+}
+
+func ValidateInventory(inventory []transit.InventoryResource) bool {
+	if inventoryChksum != nil {
+		chk, err := Hashsum(inventory)
+		if err != nil || !bytes.Equal(inventoryChksum, chk) {
+			inventoryChksum = chk
+			return false
+		}
+		return true
+	} else {
+		inventoryChksum, _ = Hashsum(inventory)
+		return false
+	}
+}
+
 // Weight of Monitor Status for multi-state comparison
 var monitorStatusWeightService = map[transit.MonitorStatus]int{
 	transit.ServiceOk:                  0,
@@ -480,17 +553,17 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.IntegerValue == -1 {
+		if critical == nil && (warning != nil && warning.IntegerValue == -1) {
 			if value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.IntegerValue == -1 && critical.IntegerValue == -1 {
+		if (warning != nil && warning.IntegerValue == -1) && (critical != nil && critical.IntegerValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
-		if warning.IntegerValue > critical.IntegerValue {
+		if (warning != nil && critical != nil) && warning.IntegerValue > critical.IntegerValue {
 			if value.IntegerValue <= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
@@ -499,10 +572,10 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		} else {
-			if value.IntegerValue >= critical.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= critical.IntegerValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.IntegerValue >= warning.IntegerValue {
+			if (warning != nil && critical != nil) && value.IntegerValue >= warning.IntegerValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
@@ -514,13 +587,13 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && warning.DoubleValue == -1 {
+		if critical == nil && (warning != nil && warning.DoubleValue == -1) {
 			if value.DoubleValue >= warning.DoubleValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if warning.DoubleValue == -1 || critical.DoubleValue == -1 {
+		if (warning != nil && critical != nil) && (warning.DoubleValue == -1 || critical.DoubleValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
@@ -563,7 +636,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		result = append(result, service)
 	}
 
-	for i, _ := range result {
+	for i := range result {
 		for _, metric := range result[i].Metrics {
 			if metric.MetricComputeType == transit.Synthetic {
 				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
@@ -575,9 +648,9 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Type:             transit.Service,
 						Owner:            result[i].Owner,
 						Status:           "SERVICE_OK",
-						LastPlugInOutput: fmt.Sprintf(" ExpressionToSuggest: %s", metric.MetricExpression),
+						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(time.Duration(Timer) * time.Second)},
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(Timer)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
@@ -586,6 +659,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
 									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 								},
+								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
 									ValueType:    metric.Value.ValueType,
 									IntegerValue: int64(value),
@@ -599,25 +673,6 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 		}
 	}
 	return result
-}
-
-func ControlCHandler() {
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-c
-		fmt.Println("\r- Ctrl+C pressed in Terminal")
-		if err := services.GetTransitService().StopTransport(); err != nil {
-			log.Error(err.Error())
-		}
-		if err := services.GetTransitService().StopNats(); err != nil {
-			log.Error(err.Error())
-		}
-		if err := services.GetTransitService().StopController(); err != nil {
-			log.Error(err.Error())
-		}
-		os.Exit(0)
-	}()
 }
 
 func Name(defaultName string, customName string) string {
@@ -646,14 +701,32 @@ func Hashsum(args ...interface{}) ([]byte, error) {
 	return h.Sum(nil), nil
 }
 
-func Max(x, y int64) int64 {
-	if x < y {
-		return y
+// MaxDuration returns maximum value
+func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
+	m := x
+	for _, y := range rest[:] {
+		if m < y {
+			m = y
+		}
 	}
-	return x
+	return m
 }
 
-type BuildVersion struct {
-	Tag  string `json:"tag"`
-	Time string `json:"time"`
+// StartPeriodic starts periodic event loop
+// with 1 minute (not often) guard
+// loop can be cancelled via context argument
+func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
+	ticker := time.NewTicker(MaxDuration(t, time.Minute))
+	defer ticker.Stop()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			go fn()
+		}
+	}
 }

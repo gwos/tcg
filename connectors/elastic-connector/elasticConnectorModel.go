@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -32,25 +32,27 @@ type monitoringHost struct {
 	hostGroups []string
 }
 
-func initMonitoringState(previousState MonitoringState, config ElasticConnectorConfig, esClient *ecClients.EsClient) MonitoringState {
+func (connectorConfig *ElasticConnectorConfig) initMonitoringState(previousState MonitoringState, esClient *ecClients.EsClient) MonitoringState {
 	currentState := MonitoringState{
 		Metrics: make(map[string]transit.MetricDefinition),
 		Hosts:   make(map[string]monitoringHost),
 	}
 
-	for _, metrics := range config.Views {
+	for _, metrics := range connectorConfig.Views {
 		for metricName, metric := range metrics {
-			currentState.Metrics[metricName] = metric
+			if metric.Monitored {
+				currentState.Metrics[metricName] = metric
+			}
 		}
 	}
 
 	doOnce.Do(func() {
-		log.Info("Initializing state with GW hosts for agent ", config.AgentId)
+		log.Info("Initializing state with GW hosts for agent ", connectorConfig.AgentId)
 		// add hosts form GW to current state
-		if config.GWConnections == nil || len(config.GWConnections) == 0 {
-			log.Error("Unable to get GW hosts to initialize state: GW connections are not set.")
+		if connectorConfig.GWConnections == nil || len(connectorConfig.GWConnections) == 0 {
+			log.Error("|elasticConnectorModel.go| : [initMonitoringState] : Unable to get GW hosts to initialize state: GW connections are not set.")
 		} else {
-			gwHosts := initGwHosts(config.AppType, config.AgentId, config.GWConnections)
+			gwHosts := initGwHosts(connectorConfig.AppType, connectorConfig.AgentId, connectorConfig.GWConnections)
 			if gwHosts != nil {
 				currentState.Hosts = gwHosts
 			} else {
@@ -65,7 +67,7 @@ func initMonitoringState(previousState MonitoringState, config ElasticConnectorC
 	}
 
 	// update with hosts extracted from ES right now
-	esHosts := initEsHosts(config, esClient)
+	esHosts := connectorConfig.initEsHosts(esClient)
 	for _, host := range esHosts {
 		currentState.Hosts[host.name] = host
 	}
@@ -98,7 +100,7 @@ func (monitoringState *MonitoringState) updateHost(hostName string, serviceName 
 		}
 		monitoringState.Hosts[hostName] = host
 	} else {
-		log.Error("[Elastic Connector]: Host not found in monitoring state: ", hostName)
+		log.Error("|elasticConnectorModel.go| : [updateHost] : Host not found in monitoring state: ", hostName)
 	}
 }
 
@@ -115,8 +117,7 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.Monitore
 
 		monitoredResource, err := connectors.CreateResource(host.name, monitoredServices)
 		if err != nil {
-			log.Error("Error when creating resource ", host.name)
-			log.Error(err)
+			log.Error("|elasticConnectorModel.go| : [toTransitResources] : Error when creating resource ", host.name, " Reason: ", err)
 		}
 		if monitoredResource != nil {
 			mrs[i] = *monitoredResource
@@ -142,12 +143,14 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 			inventoryServices[i] = inventoryService
 
 			metricBuilder := connectors.MetricBuilder{
-				Name:       serviceName,
-				CustomName: metricDefinition.CustomName,
-				Value:      service.hits,
-				UnitType:   transit.UnitCounter,
-				Warning:    metricDefinition.WarningThreshold,
-				Critical:   metricDefinition.CriticalThreshold,
+				Name:        serviceName,
+				CustomName:  metricDefinition.CustomName,
+				ComputeType: metricDefinition.ComputeType,
+				Expression:  metricDefinition.Expression,
+				Value:       service.hits,
+				UnitType:    transit.UnitCounter,
+				Warning:     metricDefinition.WarningThreshold,
+				Critical:    metricDefinition.CriticalThreshold,
 			}
 			if service.timeInterval != nil {
 				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
@@ -156,8 +159,8 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 
 			monitoredService, err := connectors.BuildServiceForMetric(host.name, metricBuilder)
 			if err != nil {
-				log.Error("Error when creating service ", host.name, ":", customServiceName)
-				log.Error(err)
+				log.Error("|elasticConnectorModel.go| : [toTransitResources] : Error when creating service ",
+					host.name, ":", customServiceName, " Reason: ", err)
 			}
 			if monitoredService != nil {
 				monitoredServices[i] = *monitoredService
@@ -219,23 +222,18 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		}
 		err := gwClient.Connect()
 		if err != nil {
-			log.Error("Unable to connect to GW to get hosts to initialize state: ", err)
-			return gwHosts
+			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to connect to GW to get hosts to initialize state: ", err)
+			continue
 		}
-		response, err := gwClient.GetServicesByAgent(agentId)
-		if err != nil {
-			log.Error("Unable to get GW hosts to initialize state: ", err)
-			return gwHosts
-		}
-		var gwServices struct {
-			Services []struct {
-				HostName string `json:"hostName"`
-			} `json:"services"`
-		}
-		err = json.Unmarshal(response, &gwServices)
-		if err != nil {
-			log.Error("Unable to parse received GW hosts to initialize state: ", err)
-			return gwHosts
+		gwServices, err := gwClient.GetServicesByAgent(agentId)
+		if err != nil || gwServices == nil {
+			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to get GW hosts to initialize state.")
+			if err != nil {
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : ", err)
+			} else {
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : Response is nil.")
+			}
+			continue
 		}
 		var hostNames []string
 		for _, gwService := range gwServices.Services {
@@ -250,28 +248,15 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 		}
 
 		if hostNames != nil && len(hostNames) > 0 {
-			response, err = gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
-			if err != nil {
-				log.Error("Unable to get GW host groups to initialize state: ", err)
-				return gwHosts
-			}
-			if response == nil {
-				log.Error("Unable to get GW host groups to initialize state.")
-				return gwHosts
-			}
-
-			var gwHostGroups struct {
-				HostGroups []struct {
-					Name  string `json:"name"`
-					Hosts []struct {
-						HostName string `json:"hostName"`
-					} `json:"hosts"`
-				} `json:"hostGroups"`
-			}
-			err = json.Unmarshal(response, &gwHostGroups)
-			if err != nil {
-				log.Error("Unable to parse received GW host groups to initialize state: ", err)
-				return gwHosts
+			gwHostGroups, err := gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
+			if err != nil || gwHostGroups == nil {
+				log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to get GW host groups to initialize state.")
+				if err != nil {
+					log.Error("|elasticConnectorModel.go| : [initGwHosts] : ", err)
+				} else {
+					log.Error("|elasticConnectorModel.go| : [initGwHosts] : Response is nil.")
+				}
+				continue
 			}
 
 			for _, gwHostGroup := range gwHostGroups.HostGroups {
@@ -286,48 +271,96 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 			}
 		}
 
-		if len(gwHosts) > 0 {
-			break
-		}
+		// set count hosts to which services of curr agent are already assigned in GWOS
+		// as "last sent hosts count" in cache to not duplicate his when check license before send inventory
+		cache.LastSentHostsCountCache.SetDefault(gwConnection.HostName, len(hostNames))
 	}
 
 	return gwHosts
 }
 
-func initEsHosts(config ElasticConnectorConfig, esClient *ecClients.EsClient) map[string]monitoringHost {
+func (connectorConfig *ElasticConnectorConfig) initEsHosts(esClient *ecClients.EsClient) map[string]monitoringHost {
 	esHosts := make(map[string]monitoringHost)
 
-	hostNameField := config.HostNameField
-	hostGroupField := config.HostGroupField
-	hostBuckets := esClient.GetHosts(hostNameField, hostGroupField)
+	hostNameField := connectorConfig.HostNameField
+	hostGroupField := &connectorConfig.HostGroupField
+	groupNameByUser := connectorConfig.GroupNameByUser
 
-	if len(hostBuckets) == 0 {
-		if !strings.HasSuffix(hostNameField, ".keyword") || !!strings.HasSuffix(hostGroupField, ".keyword") {
-			if !strings.HasSuffix(hostNameField, ".keyword") {
-				hostNameField = hostNameField + ".keyword"
-			}
-			if !strings.HasSuffix(hostGroupField, ".keyword") {
-				hostGroupField = hostGroupField + ".keyword"
-			}
-			hostBuckets = esClient.GetHosts(hostNameField, hostGroupField)
+	if groupNameByUser {
+		hostGroupField = nil
+	}
+	fieldNames := []string{hostNameField}
+	if hostGroupField != nil {
+		fieldNames = append(fieldNames, *hostGroupField)
+	}
+
+	isAggregatable, err := esClient.IsAggregatable(fieldNames, nil)
+	if err != nil {
+		log.Error("|elasticConnectorModel.go| : [initEsHosts] : Cannot retrieve ES hosts ")
+		return esHosts
+	}
+	allAggregatable := true
+	if !isAggregatable[hostNameField] && !strings.HasSuffix(hostNameField, ".keyword") {
+		allAggregatable = false
+		hostNameField = hostNameField + ".keyword"
+	}
+	if hostGroupField != nil {
+		if !isAggregatable[*hostGroupField] && !strings.HasSuffix(*hostGroupField, ".keyword") {
+			allAggregatable = false
+			newHostGroupField := *hostGroupField + ".keyword"
+			hostGroupField = &newHostGroupField
 		}
 	}
 
-	for _, hostBucket := range hostBuckets {
-		hostName := hostBucket.Key
-		hostGroupBuckets := hostBucket.HostGroupBuckets.Buckets
-		var hostGroups []string
-		if hostGroupBuckets != nil {
-			for _, hostGroupBucket := range hostGroupBuckets {
-				hostGroupName := hostGroupBucket.Key
-				hostGroups = append(hostGroups, hostGroupName)
+	if !allAggregatable {
+		fieldNames = []string{hostNameField}
+		if hostGroupField != nil {
+			fieldNames = append(fieldNames, *hostGroupField)
+		}
+		isAggregatable, err = esClient.IsAggregatable(fieldNames, nil)
+		if isAggregatable[hostNameField] && (hostGroupField == nil || isAggregatable[*hostGroupField]) {
+			allAggregatable = true
+		}
+	}
+
+	if !allAggregatable {
+		log.Error("|elasticConnectorModel.go| : [initEsHosts] : Cannot retrieve ES hosts:"+
+			" Not all fields are aggregatable: ", fieldNames)
+		return esHosts
+	}
+
+	connectorConfig.HostNameField = hostNameField
+	if !groupNameByUser && hostGroupField != nil {
+		connectorConfig.HostGroupField = *hostGroupField
+	}
+
+	keys, err := esClient.GetHosts(connectorConfig.HostNameField, hostGroupField)
+
+	for _, key := range keys {
+		hostNameKey := key.Host
+		hostGroupKey := key.HostGroup
+		if esHost, exists := esHosts[hostNameKey]; exists {
+			if !groupNameByUser && hostGroupKey != nil {
+				esHostGroups := esHost.hostGroups
+				esHostGroups = append(esHostGroups, *hostGroupKey)
+				esHost.hostGroups = esHostGroups
+				esHosts[hostNameKey] = esHost
 			}
+		} else {
+			var hostGroups []string
+			if groupNameByUser {
+				hostGroups = []string{connectorConfig.HostGroupField}
+			} else {
+				if hostGroupKey != nil {
+					hostGroups = []string{*hostGroupKey}
+				}
+			}
+			host := monitoringHost{
+				name:       hostNameKey,
+				hostGroups: hostGroups,
+			}
+			esHosts[hostNameKey] = host
 		}
-		host := monitoringHost{
-			name:       hostName,
-			hostGroups: hostGroups,
-		}
-		esHosts[hostName] = host
 	}
 
 	return esHosts

@@ -7,7 +7,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
-	"time"
 )
 
 // Variables to control connector version and build time.
@@ -19,15 +18,16 @@ var (
 )
 
 func main() {
-	connectors.ControlCHandler()
-
 	var transitService = services.GetTransitService()
 	var cfg PrometheusConnectorConfig
 	var chksum []byte
 
-	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
 
-	transitService.ConfigHandler = func(data []byte) {
+	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
+
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Prometheus Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
@@ -52,21 +52,21 @@ func main() {
 			log.Error("[Prometheus Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
-		log.Error(err)
+		log.Error("[Prometheus Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Error("[Prometheus Connector]: ", err)
 		return
 	}
 
-	log.Info("[Prometheus Connector]: Waiting for metrics ...")
-	for {
-		time.Sleep(1 * time.Minute)
-	}
+	log.Info("[Prometheus Connector]: Waiting for configuration ...")
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
+		pull(cfg.Resources)
+	})
 }

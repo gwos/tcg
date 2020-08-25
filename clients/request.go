@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"go.opentelemetry.io/otel/plugin/httptrace"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace"
 )
 
 // SendRequest wraps HTTP methods
@@ -70,6 +70,7 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	defer response.Body.Close()
+
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return -1, nil, err
