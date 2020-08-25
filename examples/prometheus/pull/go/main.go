@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/api/global"
-	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/api/metric"
 	"go.opentelemetry.io/otel/exporters/metric/prometheus"
+	"go.opentelemetry.io/otel/label"
 )
 
 var (
@@ -43,19 +43,19 @@ func main() {
 	meter := global.Meter("groundwork")
 	observerLock := new(sync.RWMutex)
 	observerValueToReport := new(float64)
-	observerLabelsToReport := new([]kv.KeyValue)
+	observerLabelsToReport := new([]label.KeyValue)
 
 	valueRecorder := metric.Must(meter).NewFloat64ValueRecorder("gw.service.one")
 	counter := metric.Must(meter).NewFloat64Counter("gw.service.two")
 
-	commonLabels := []kv.KeyValue{
-		kv.String("resource", defaultResource),
-		kv.String("group", defaultGroup),
-		kv.String("warning", defaultWarning),
-		kv.String("critical", defaultCritical),
-		kv.String("unitType", defaultUnitType),
+	commonLabels := []label.KeyValue{
+		label.String("resource", defaultResource),
+		label.String("group", defaultGroup),
+		label.String("warning", defaultWarning),
+		label.String("critical", defaultCritical),
+		label.String("unitType", defaultUnitType),
 	}
-	var notSoCommonLabels []kv.KeyValue
+	var notSoCommonLabels []label.KeyValue
 
 	ctx := context.Background()
 

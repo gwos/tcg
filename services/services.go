@@ -1,9 +1,10 @@
 package services
 
 import (
+	"time"
+
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 // Define NATS subjects

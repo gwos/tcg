@@ -3,17 +3,18 @@ package nats
 import (
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/log"
-	stan "github.com/nats-io/go-nats-streaming"
-	stand "github.com/nats-io/nats-streaming-server/server"
-	"github.com/nats-io/nats-streaming-server/stores"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/log"
+	stand "github.com/nats-io/nats-streaming-server/server"
+	"github.com/nats-io/nats-streaming-server/stores"
+	"github.com/nats-io/stan.go"
 )
 
 // Define NATS IDs
