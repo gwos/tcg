@@ -10,66 +10,53 @@ import (
 	"time"
 )
 
-type FilterType string
-
-const (
-	typePhrase  FilterType = "phrase"
-	typePhrases FilterType = "phrases"
-	typeRange   FilterType = "range"
-	typeExist   FilterType = "exists"
-)
-
-type clauseType string
-
-const (
-	mustClause    clauseType = "must"
-	mustNotClause clauseType = "must_not"
-	shouldClause  clauseType = "should"
-	filterClause  clauseType = "filter"
-)
-
 const (
 	layout = "2006-01-02T15:04:05.000Z"
 	now    = "now"
 )
 
-type SavedObjectsResponse struct {
-	Page         int           `json:"page"`
-	PerPage      int           `json:"per_page"`
-	Total        int           `json:"total"`
-	SavedObjects []SavedObject `json:"saved_objects"`
+type KBulkGetRequest struct {
+	Type string `json:"type"`
+	Id   string `json:"id"`
 }
 
-type SavedObject struct {
-	Type       string     `json:"type"`
-	ID         string     `json:"id"`
-	Attributes Attributes `json:"attributes"`
+type KSavedObjectsResponse struct {
+	Page         int            `json:"page"`
+	PerPage      int            `json:"per_page"`
+	Total        int            `json:"total"`
+	SavedObjects []KSavedObject `json:"saved_objects"`
 }
 
-type Attributes struct {
-	Title       string      `json:"title"`
-	Description string      `json:"description"`
-	Filters     []Filter    `json:"filters,omitempty"`
-	TimeFilter  *TimeFilter `json:"timefilter,omitempty"`
+type KSavedObject struct {
+	Type       string       `json:"type"`
+	ID         string       `json:"id"`
+	Attributes *KAttributes `json:"attributes,omitempty"`
 }
 
-type Filter struct {
-	Meta  Meta   `json:"meta"`
-	Range *Range `json:"range,omitempty"`
+type KAttributes struct {
+	Title       string       `json:"title"`
+	Description string       `json:"description"`
+	Filters     []KFilter    `json:"filters,omitempty"`
+	TimeFilter  *KTimeFilter `json:"timefilter,omitempty"`
 }
 
-type Meta struct {
-	Index    string      `json:"index"`
-	Negate   bool        `json:"negate"`
-	Disabled bool        `json:"disabled"`
-	Type     FilterType  `json:"type"`
-	Key      string      `json:"key"`
-	Value    interface{} `json:"value"`
-	Params   interface{} `json:"params"`
+type KFilter struct {
+	Meta   *KMeta      `json:"meta,omitempty"`
+	Query  interface{} `json:"query,omitempty"`
+	Exists interface{} `json:"exists,omitempty"`
+	Range  interface{} `json:"range,omitempty"`
 }
 
-type Range struct {
-	Timestamp *Timestamp `json:"@timestamp,omitempty"`
+type KMeta struct {
+	Index    *string `json:"index,omitempty"`
+	Negate   *bool   `json:"negate,omitempty"`
+	Disabled *bool   `json:"disabled,omitempty"`
+	Type     *string `json:"type,omitempty"`
+}
+
+type KTimeFilter struct {
+	From string `json:"from"`
+	To   string `json:"to"`
 }
 
 type Timestamp struct {
@@ -77,49 +64,94 @@ type Timestamp struct {
 	To   string `json:"lt"`
 }
 
-type TimeFilter struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+type EsSearchBody struct {
+	Query *EsQuery `json:"query,omitempty"`
+	Aggs  *EsAggs  `json:"aggs,omitempty"`
 }
 
-type BulkGetRequest struct {
-	Type string `json:"type"`
-	Id   string `json:"id"`
+type EsQuery struct {
+	Bool EsQueryBool `json:"bool"`
 }
 
-type SearchBody struct {
-	Query *Query `json:"query,omitempty"`
+type EsQueryBool struct {
+	Must    []interface{} `json:"must"`
+	Filter  []interface{} `json:"filter"`
+	Should  []interface{} `json:"should"`
+	MustNot []interface{} `json:"must_not"`
 }
 
-type Query struct {
-	Bool Bool `json:"bool"`
+type EsAggs struct {
+	Agg EsAggByHost `json:"_by_host"`
 }
 
-type Bool struct {
-	Must               []Clause `json:"must,omitempty"`
-	MustNot            []Clause `json:"must_not,omitempty"`
-	Should             []Clause `json:"should,omitempty"`
-	Filter             []Clause `json:"filter,omitempty"`
-	MinimumShouldMatch *int     `json:"minimum_should_match,omitempty"`
+type EsAggByHost struct {
+	Composite EsAggComposite `json:"composite"`
 }
 
-type Clause struct {
-	Match  *map[string]interface{} `json:"match_phrase,omitempty"`
-	Range  *map[string]interface{} `json:"range,omitempty"`
-	Exists *Exists                 `json:"exists,omitempty"`
-	Bool   *Bool                   `json:"bool,omitempty"`
+type EsAggComposite struct {
+	Size    int           `json:"size"`
+	Sources []interface{} `json:"sources"`
+	After   interface{}   `json:"after,omitempty"`
 }
 
-type Exists struct {
-	Field string `json:"field,omitempty"`
+type EsHostAggSource struct {
+	HostTerm EsAggTerm `json:"host"`
+}
+
+type EsHostGroupAggSource struct {
+	HostGroupTerm EsAggTerm `json:"host_group"`
+}
+
+type EsAggTerm struct {
+	Term EsAggTermField `json:"terms"`
+}
+
+type EsAggTermField struct {
+	Field string `json:"field"`
+}
+
+type EsSearchResponse struct {
+	Hits         EsSearchHits        `json:"hits"`
+	Aggregations EsAggregationByHost `json:"aggregations,omitempty"`
+}
+
+type EsSearchHits struct {
+	Total EsSearchHitsTotal `json:"total"`
+}
+
+type EsSearchHitsTotal struct {
+	Value int `json:"value"`
+}
+
+type EsAggregationByHost struct {
+	Aggregation EsAggregation `json:"_by_host"`
+}
+
+type EsAggregation struct {
+	AfterKey *EsAggregationKey     `json:"after_key,omitempty"`
+	Buckets  []EsAggregationBucket `json:"buckets"`
+}
+
+type EsAggregationBucket struct {
+	Key       EsAggregationKey `json:"key"`
+	DocsCount int              `json:"doc_count"`
+}
+
+type EsAggregationKey struct {
+	Host      string  `json:"host"`
+	HostGroup *string `json:"host_group,omitempty"`
+}
+
+type EsFieldCapsResponse struct {
+	Fields map[string]interface{} `json:"fields"`
 }
 
 // Extracts indexes's ids linked to stored query's filters
-func (storedQuery *SavedObject) ExtractIndexIds() []string {
+func (storedQuery *KSavedObject) ExtractIndexIds() []string {
 	indexIdsSet := make(map[string]struct{})
 	for _, filter := range storedQuery.Attributes.Filters {
-		if filter.Meta.Index != "" {
-			indexIdsSet[filter.Meta.Index] = struct{}{}
+		if filter.Meta.Index != nil {
+			indexIdsSet[*filter.Meta.Index] = struct{}{}
 		}
 	}
 	var indexIds []string
@@ -129,225 +161,56 @@ func (storedQuery *SavedObject) ExtractIndexIds() []string {
 	return indexIds
 }
 
-// Builds search request query for a specific host
-func (searchBody *SearchBody) ForHost(hostName string, hostNameField string) {
-	if searchBody.Query == nil {
-		searchBody.Query = &Query{}
+func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupField *string) *EsAggs {
+	sources := []interface{}{EsHostAggSource{
+		HostTerm: EsAggTerm{
+			Term: EsAggTermField{
+				Field: hostNameField,
+			},
+		},
+	}}
+	if hostGroupField != nil {
+		sources = append(sources, EsHostGroupAggSource{
+			HostGroupTerm: EsAggTerm{
+				Term: EsAggTermField{
+					Field: *hostGroupField,
+				},
+			},
+		})
 	}
-	match := map[string]interface{}{
-		hostNameField: hostName,
+
+	return &EsAggs{
+		Agg: EsAggByHost{
+			Composite: EsAggComposite{
+				Size:    1000,
+				Sources: sources,
+			},
+		},
 	}
-	clause := Clause{Match: &match}
-	searchBody.Query.appendClause(mustClause, clause)
 }
 
-func copyQuery(query *Query) *Query {
+func copyQuery(query *EsQuery) *EsQuery {
 	if query != nil {
-		queryCopy := &Query{}
+		queryCopy := &EsQuery{}
 		if query.Bool.Must != nil {
-			queryCopy.Bool.Must = make([]Clause, len(query.Bool.Must))
+			queryCopy.Bool.Must = make([]interface{}, len(query.Bool.Must))
 			copy(queryCopy.Bool.Must, query.Bool.Must)
 		}
 		if query.Bool.MustNot != nil {
-			queryCopy.Bool.MustNot = make([]Clause, len(query.Bool.MustNot))
+			queryCopy.Bool.MustNot = make([]interface{}, len(query.Bool.MustNot))
 			copy(queryCopy.Bool.MustNot, query.Bool.MustNot)
 		}
 		if query.Bool.Should != nil {
-			queryCopy.Bool.Should = make([]Clause, len(query.Bool.Should))
+			queryCopy.Bool.Should = make([]interface{}, len(query.Bool.Should))
 			copy(queryCopy.Bool.Should, query.Bool.Should)
 		}
 		if query.Bool.Filter != nil {
-			queryCopy.Bool.Filter = make([]Clause, len(query.Bool.Filter))
+			queryCopy.Bool.Filter = make([]interface{}, len(query.Bool.Filter))
 			copy(queryCopy.Bool.Filter, query.Bool.Filter)
 		}
-		queryCopy.Bool.MinimumShouldMatch = query.Bool.MinimumShouldMatch
 		return queryCopy
 	}
 	return nil
-}
-
-// Builds search request query corresponding to the stored query's filters
-func BuildSearchQueryFromStoredQuery(storedQuery SavedObject) *Query {
-	var query *Query
-	// add clauses as stored query filters
-	for _, filter := range storedQuery.Attributes.Filters {
-		if query == nil {
-			query = &Query{}
-		}
-		if filter.Meta.Disabled {
-			continue
-		}
-		switch filter.Meta.Type {
-		case typePhrase:
-			query.addPhraseFilterClause(filter)
-			break
-		case typePhrases:
-			query.addPhrasesFilterClause(filter)
-			break
-		case typeRange:
-			query.addRangeFilterClause(filter)
-			break
-		case typeExist:
-			query.addExistsFilterClause(filter)
-			break
-		default:
-			log.Error("Could not add query clause. Unknown filterClause type: ", filter.Meta.Type)
-			break
-		}
-	}
-
-	if storedQuery.Attributes.TimeFilter != nil {
-		if query == nil {
-			query = &Query{}
-		}
-		query.withTimeFilter(storedQuery)
-	}
-
-	return query
-}
-
-// Adds query clause corresponding to the "is", "is not" filter to search request body
-func (query *Query) addPhraseFilterClause(filter Filter) {
-	match := map[string]interface{}{
-		filter.Meta.Key: filter.Meta.Value,
-	}
-	clause := Clause{Match: &match}
-	var clauseType clauseType
-	if !filter.Meta.Negate {
-		clauseType = mustClause
-	} else {
-		clauseType = mustNotClause
-	}
-	query.appendClause(clauseType, clause)
-}
-
-// Adds query clause corresponding to the "is one of", "is not one of" filter to search request body
-func (query *Query) addPhrasesFilterClause(filter Filter) {
-	var key = filter.Meta.Key
-	params := filter.Meta.Params.([]interface{})
-	if filter.Meta.Negate {
-		// if filterClause is "is NOT one of" that means that the value mustClause not be any of them
-		// so add all of them as "mustClause not" clause
-		for _, param := range params {
-			match := map[string]interface{}{
-				key: param,
-			}
-			clause := Clause{Match: &match}
-			query.appendClause(mustNotClause, clause)
-		}
-	} else {
-		// if filterClause is "is one of" that means that if value is just one of them that's fine
-		// so add them to "shouldClause" clause with minimum shouldClause match = 1
-		var clauses []Clause
-		for _, param := range params {
-			match := map[string]interface{}{
-				key: param,
-			}
-			clauses = append(clauses, Clause{Match: &match})
-		}
-		minimumShouldMatch := 1
-		boolClause := Bool{Should: clauses, MinimumShouldMatch: &minimumShouldMatch}
-		clause := Clause{Bool: &boolClause}
-		query.appendClause(mustClause, clause)
-	}
-}
-
-// Adds query clause corresponding to the "range" filter to search request body
-func (query *Query) addRangeFilterClause(filter Filter) {
-	var key = filter.Meta.Key
-	var rangeClause map[string]interface{}
-	// time ranges mustClause be adjusted to timezone, other kinds of ranges can be simply copied
-	if key == "@timestamp" {
-		if filter.Range == nil || filter.Range.Timestamp == nil {
-			log.Error("Could not add range clause for @timestamp: could not retrieve appropriate value from filterClause.")
-			return
-		}
-		timestamp := filter.Range.Timestamp
-		rangeClause = map[string]interface{}{
-			key: timestamp.toAbsoluteUtcTime(),
-		}
-	} else {
-		params := filter.Meta.Params
-		rangeClause = map[string]interface{}{
-			key: params,
-		}
-	}
-	clause := Clause{Range: &rangeClause}
-	var clauseType clauseType
-	if !filter.Meta.Negate {
-		clauseType = mustClause
-	} else {
-		clauseType = mustNotClause
-	}
-	query.appendClause(clauseType, clause)
-}
-
-// Adds query clause corresponding to the "exists" filter to search request body
-func (query *Query) addExistsFilterClause(filter Filter) {
-	exists := Exists{Field: filter.Meta.Key}
-	clause := Clause{
-		Exists: &exists,
-	}
-	var clauseType clauseType
-	if !filter.Meta.Negate {
-		clauseType = mustClause
-	} else {
-		clauseType = mustNotClause
-	}
-	query.appendClause(clauseType, clause)
-}
-
-// Adds query clause corresponding to the time filter to request body
-func (query *Query) withTimeFilter(savedObject SavedObject) {
-	if savedObject.Attributes.TimeFilter == nil {
-		return
-	}
-	timestamp := Timestamp{
-		From: savedObject.Attributes.TimeFilter.From,
-		To:   savedObject.Attributes.TimeFilter.To,
-	}
-	rangeClause := map[string]interface{}{
-		"@timestamp": timestamp.toAbsoluteUtcTime(),
-	}
-	clause := Clause{Range: &rangeClause}
-	query.appendClause(filterClause, clause)
-}
-
-// Adds query clause of appropriate type to request body
-func (query *Query) appendClause(clauseType clauseType, clause Clause) {
-	switch clauseType {
-	case mustClause:
-		if query.Bool.Must == nil {
-			query.Bool.Must = []Clause{clause}
-		} else {
-			query.Bool.Must = append(query.Bool.Must, clause)
-		}
-		break
-	case mustNotClause:
-		if query.Bool.MustNot == nil {
-			query.Bool.MustNot = []Clause{clause}
-		} else {
-			query.Bool.MustNot = append(query.Bool.MustNot, clause)
-		}
-		break
-	case shouldClause:
-		if query.Bool.Should == nil {
-			query.Bool.Should = []Clause{clause}
-		} else {
-			query.Bool.Should = append(query.Bool.Should, clause)
-		}
-		break
-	case filterClause:
-		if query.Bool.Filter == nil {
-			query.Bool.Filter = []Clause{clause}
-		} else {
-			query.Bool.Filter = append(query.Bool.Filter, clause)
-		}
-		break
-	default:
-		log.Error("Could not add query clause. Unknown clause type: ", clauseType)
-		break
-	}
 }
 
 // Modifies timestamp's from/to values to absolute time in UTC time zone
@@ -366,7 +229,7 @@ func (timestamp *Timestamp) toAbsoluteUtcTime() *Timestamp {
 }
 
 // Converts timeFilter's from/to values to Time in local time zone and returns TimeInterval with appropriate StartTime/EndTime
-func (timeFilter *TimeFilter) ToTimeInterval() *transit.TimeInterval {
+func (timeFilter *KTimeFilter) ToTimeInterval() *transit.TimeInterval {
 	startTime, err := toAbsoluteTime(timeFilter.From, true)
 	if err != nil {
 		log.Error("Cannot parse time filter's 'from': ", err)
@@ -405,7 +268,7 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 	}
 	// the last character of the relative part defines period ("y", "M", "w", "d", "h", "m", "s"), everything else is interval
 	interval := relativePart[:len(relativePart)-1]
-	period := relativePart[len(relativePart)-1:]
+	period := strings.ToLower(relativePart[len(relativePart)-1:])
 	i, err := strconv.Atoi(interval)
 	if operator == "-" {
 		i = -i
