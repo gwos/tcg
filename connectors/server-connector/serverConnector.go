@@ -55,24 +55,27 @@ var templateMetricName = "$view_Template#"
 func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Error(err)
+		log.Error("|serverConnector| : [Synchronize] : ", err)
 		return nil
 	}
 
 	hostName = hostStat.Hostname
 
-	var services []transit.InventoryService
+	var srvs []transit.InventoryService
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
 		}
 		service := connectors.CreateInventoryService(connectors.Name(pr.Name, pr.CustomName),
 			hostName)
-		services = append(services, service)
+		srvs = append(srvs, service)
 	}
 
-	inventoryResource := connectors.CreateInventoryResource(hostName, services)
+	inventoryResource := connectors.CreateInventoryResource(hostName, srvs)
 
 	return &inventoryResource
 }
@@ -81,7 +84,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredResource {
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Error(err)
+		log.Error("|serverConnector| : [CollectMetrics] : ", err)
 		return nil
 	}
 
@@ -91,6 +94,9 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 
 	var notDefaultProcesses []transit.MetricDefinition
 	for _, pr := range processes {
+		if !pr.Monitored {
+			continue
+		}
 		// temporary solution, will be removed
 		if pr.Name == templateMetricName {
 			continue
@@ -112,16 +118,18 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 		metricBuilder := connectors.MetricBuilder{
 			Name:           processName,
 			Value:          processValues.value,
+			ComputeType:    processValues.computeType,
+			Expression:     processValues.expression,
 			UnitType:       transit.PercentCPU,
-			Warning:        int64(processValues.warningValue),
-			Critical:       int64(processValues.criticalValue),
+			Warning:        float64(processValues.warningValue),
+			Critical:       float64(processValues.criticalValue),
 			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 		}
 		monitoredService, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 		if err != nil {
-			log.Error("Error when creating service ", hostName, ":", processName)
-			log.Error(err)
+			log.Error("|serverConnector| : [CollectMetrics] : Error when creating service ", hostName, ":",
+				processName, " Reason: ", err)
 			continue
 		}
 
@@ -141,13 +149,14 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getTotalDiskUsageService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalDiskAllocatedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Total / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -158,8 +167,8 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getTotalDiskUsageService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -169,13 +178,14 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getDiskUsedService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           DiskUsedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Used / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -186,8 +196,8 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getDiskUsedService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -197,13 +207,14 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("|serverConnector.go| : [getDiskFreeService] : ", err.Error())
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           DiskFreeServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(diskStats.Free / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -214,8 +225,8 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getDiskFreeService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason", err)
 		return nil
 	}
 	return service
@@ -225,13 +236,14 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("|serverConnector.go| : [getTotalMemoryUsageService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalMemoryUsageAllocatedName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Total / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -242,8 +254,8 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getTotalMemoryUsageService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -253,13 +265,14 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("|serverConnector.go| : [getMemoryUsedService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           MemoryUsedServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Used / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -270,8 +283,8 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getMemoryUsedService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -281,13 +294,14 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
-		log.Error(err.Error())
+		log.Error("|serverConnector.go| : [getMemoryFreeService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           MemoryFreeServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(vmStats.Free / MB),
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
@@ -298,8 +312,8 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getMemoryFreeService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -309,13 +323,14 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 	interval := time.Now()
 	hostStat, err := host.Info()
 	if err != nil {
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getNumberOfProcessesService] : ", err)
 		return nil
 	}
 
 	metricBuilder := connectors.MetricBuilder{
 		Name:           ProcessesNumberServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          int64(hostStat.Procs),
 		UnitType:       transit.UnitCounter,
 		Warning:        int64(warningThresholdValue),
@@ -326,8 +341,8 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getNumberOfProcessesService] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -338,6 +353,7 @@ func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, cus
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalCPUUsageServiceName,
 		CustomName:     customName,
+		ComputeType:    transit.Query,
 		Value:          getCPUUsage(),
 		UnitType:       transit.PercentCPU,
 		Warning:        int64(warningThresholdValue),
@@ -348,8 +364,8 @@ func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, cus
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("Error when creating service ", hostName, ":", connectors.Name(metricBuilder.Name, metricBuilder.CustomName))
-		log.Error(err)
+		log.Error("|serverConnector.go| : [getTotalCPUUsage] : Error when creating service ", hostName, ":",
+			connectors.Name(metricBuilder.Name, metricBuilder.CustomName), ". Reason: ", err)
 		return nil
 	}
 	return service
@@ -383,12 +399,12 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 	for _, hostProcess := range hostProcesses {
 		cpuUsed, err := hostProcess.CPUPercent()
 		if err != nil {
-			log.Error(err)
+			log.Error("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
 		}
 
 		name, err := hostProcess.Name()
 		if err != nil {
-			log.Error(err)
+			log.Error("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
 		}
 
 		processes = append(processes, &localProcess{name, cpuUsed})
@@ -405,6 +421,9 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 
 	processesMap := make(map[string]values)
 	for _, pr := range monitoredProcesses {
+		if !pr.Monitored {
+			continue
+		}
 		name := pr.Name
 		if pr.CustomName != "" {
 			name = pr.CustomName
@@ -435,7 +454,7 @@ func listSuggestions(name string) []string {
 	hostProcesses, _ := cache.ProcessesCache.Get("processes")
 
 	var processes []string
-	for n, _ := range hostProcesses.(map[string]float64) {
+	for n := range hostProcesses.(map[string]float64) {
 		if name == "" || strings.Contains(n, name) {
 			processes = append(processes, n)
 		}
@@ -528,18 +547,9 @@ func initializeEntrypoints() []services.Entrypoint {
 					c.JSON(http.StatusOK, result)
 					return
 				}
-				log.Error("[Server Connector]: " + err.Error())
+				log.Error("[Server Connector]: ", err)
 				c.IndentedJSON(http.StatusBadRequest, err.Error())
 			},
-		},
-		services.Entrypoint{
-			Url:    "/version",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
-					Time: buildTime})
-			},
 		})
-
 	return entrypoints
 }

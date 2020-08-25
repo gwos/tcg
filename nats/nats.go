@@ -3,17 +3,18 @@ package nats
 import (
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/log"
-	stan "github.com/nats-io/go-nats-streaming"
-	stand "github.com/nats-io/nats-streaming-server/server"
-	"github.com/nats-io/nats-streaming-server/stores"
 	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/log"
+	stand "github.com/nats-io/nats-streaming-server/server"
+	"github.com/nats-io/nats-streaming-server/stores"
+	"github.com/nats-io/stan.go"
 )
 
 // Define NATS IDs
@@ -59,15 +60,6 @@ type DispatcherRetry struct {
 	Retry     int
 }
 
-// Connect returns connection
-func Connect(clientID string) (stan.Conn, error) {
-	return stan.Connect(
-		ClusterID,
-		clientID,
-		stan.NatsURL(natsURL),
-	)
-}
-
 // StartServer runs NATS
 func StartServer(config Config) error {
 	var err error
@@ -106,7 +98,7 @@ func StartServer(config Config) error {
 // StopServer shutdowns NATS
 func StopServer() {
 	if connPublisher != nil {
-		connPublisher.Close()
+		_ = connPublisher.Close()
 		connPublisher = nil
 	}
 	stanServer.Shutdown()
@@ -228,7 +220,7 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 		"message": msg,
 	})
 
-	if errors.Is(err, clients.ErrGateway) {
+	if errors.Is(err, clients.ErrGateway) || errors.Is(err, clients.ErrSynchronizer) {
 		ckRetry := opt.DurableName
 		retry := DispatcherRetry{
 			LastError: nil,
@@ -259,7 +251,7 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 			go func() {
 				ckWorker := opt.DurableName
 				cache.DispatcherWorkersCache.Delete(ckWorker)
-				subscription.Close()
+				_ = subscription.Close()
 				time.Sleep(delay)
 				ctrlChan <- opt
 			}()

@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/transit"
-	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 	defaultAlwaysOverrideTimeFilter = false
 	defaultHostNameLabel            = "container.name.keyword"
 	defaultHostGroupLabel           = "container.labels.com_docker_compose_project.keyword"
+	defaultHostGroupName            = "Elastic Search"
+	defaultGroupNameByUser          = false
 
 	// keys for extensions
 	extensionsKeyKibana             = "kibana"
@@ -33,9 +36,9 @@ const (
 	extensionsKeyOverride           = "override"
 	extensionsKeyHostNameLabelPath  = "hostNameLabelPath"
 	extensionsKeyHostGroupLabelPath = "hostGroupLabelPath"
+	extensionsKeyGroupNameByUser    = "hostGroupNameByUser"
 
-	intervalTemplate      = "$interval"
-	intervalPeriodSeconds = "s"
+	intervalTemplate = "$interval"
 
 	// temporary solution, will be removed
 	templateMetricName = "$view_Template#"
@@ -47,11 +50,12 @@ type ElasticConnectorConfig struct {
 	Servers            []string
 	Kibana             Kibana
 	Views              map[string]map[string]transit.MetricDefinition
-	CustomTimeFilter   clients.TimeFilter
+	CustomTimeFilter   clients.KTimeFilter
 	OverrideTimeFilter bool
 	HostNameField      string
 	HostGroupField     string
-	Timer              int64
+	GroupNameByUser    bool
+	Timer              time.Duration
 	Ownership          transit.HostOwnershipType
 	GWConnections      config.GWConnections
 }
@@ -77,13 +81,14 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			Password:   defaultKibanaPassword,
 		},
 		Views: make(map[string]map[string]transit.MetricDefinition),
-		CustomTimeFilter: clients.TimeFilter{
+		CustomTimeFilter: clients.KTimeFilter{
 			From: defaultTimeFilterFrom,
 			To:   defaultTimeFilterTo,
 		},
 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
 		HostNameField:      defaultHostNameLabel,
 		HostGroupField:     defaultHostGroupLabel,
+		GroupNameByUser:    defaultGroupNameByUser,
 		Timer:              connectors.DefaultTimer,
 		Ownership:          transit.Yield,
 		GWConnections:      gwConnections,
@@ -104,9 +109,10 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 
 		if monitorConnection.Extensions != nil {
 			// Kibana
-			if kibana, has := monitorConnection.Extensions[extensionsKeyKibana]; has {
-				if serverName, has := kibana.(map[string]interface{})[extensionsKeyServerName]; has {
-					kibanaServer := serverName.(string)
+			if monitorConnection.Extensions[extensionsKeyKibana] != nil {
+				kibana := monitorConnection.Extensions[extensionsKeyKibana].(map[string]interface{})
+				if kibana[extensionsKeyServerName] != nil {
+					kibanaServer := kibana[extensionsKeyServerName].(string)
 					if !strings.HasSuffix(kibanaServer, "/") {
 						kibanaServer = kibanaServer + "/"
 					}
@@ -115,40 +121,56 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 					}
 					connectorConfig.Kibana.ServerName = kibanaServer
 				}
-				if username, has := kibana.(map[string]interface{})[extensionsKeyUsername]; has {
-					connectorConfig.Kibana.Username = username.(string)
+				if kibana[extensionsKeyUsername] != nil {
+					connectorConfig.Kibana.Username = kibana[extensionsKeyUsername].(string)
 				}
-				if password, has := kibana.(map[string]interface{})[extensionsKeyPassword]; has {
-					connectorConfig.Kibana.Password = password.(string)
+				if kibana[extensionsKeyPassword] != nil {
+					connectorConfig.Kibana.Password = kibana[extensionsKeyPassword].(string)
 				}
 			}
 
 			// Time filter
-			if timeFilterValue, has := monitorConnection.Extensions[extensionsKeyTimeFilter]; has {
-				if value, has := timeFilterValue.(map[string]interface{})[extensionsKeyFrom]; has {
-					connectorConfig.CustomTimeFilter.From = value.(string)
+			if monitorConnection.Extensions[extensionsKeyTimeFilter] != nil {
+				timeFilterValue := monitorConnection.Extensions[extensionsKeyTimeFilter].(map[string]interface{})
+				if timeFilterValue[extensionsKeyFrom] != nil {
+					connectorConfig.CustomTimeFilter.From = timeFilterValue[extensionsKeyFrom].(string)
 				}
-				if value, has := timeFilterValue.(map[string]interface{})[extensionsKeyTo]; has {
-					connectorConfig.CustomTimeFilter.To = value.(string)
+				if timeFilterValue[extensionsKeyTo] != nil {
+					connectorConfig.CustomTimeFilter.To = timeFilterValue[extensionsKeyTo].(string)
 				}
-				if value, has := timeFilterValue.(map[string]interface{})[extensionsKeyOverride]; has {
-					connectorConfig.OverrideTimeFilter = value.(bool)
+				if timeFilterValue[extensionsKeyOverride] != nil {
+					connectorConfig.OverrideTimeFilter = timeFilterValue[extensionsKeyOverride].(bool)
 				}
 			}
 
 			// host name labels
-			if value, has := monitorConnection.Extensions[extensionsKeyHostNameLabelPath]; has {
-				connectorConfig.HostNameField = value.(string)
+			if monitorConnection.Extensions[extensionsKeyHostNameLabelPath] != nil {
+				connectorConfig.HostNameField = monitorConnection.Extensions[extensionsKeyHostNameLabelPath].(string)
+			}
+
+			// host group name by user
+			if monitorConnection.Extensions[extensionsKeyGroupNameByUser] != nil {
+				connectorConfig.GroupNameByUser = monitorConnection.Extensions[extensionsKeyGroupNameByUser].(bool)
 			}
 
 			// host group labels
-			if value, has := monitorConnection.Extensions[extensionsKeyHostGroupLabelPath]; has {
-				connectorConfig.HostGroupField = value.(string)
+			// first update default if group name by user was changed
+			if connectorConfig.GroupNameByUser {
+				connectorConfig.HostGroupField = defaultHostGroupName
+			} else {
+				connectorConfig.HostGroupField = defaultHostGroupLabel
+			}
+			// update with user's value if specified
+			if monitorConnection.Extensions[extensionsKeyHostGroupLabelPath] != nil {
+				connectorConfig.HostGroupField = monitorConnection.Extensions[extensionsKeyHostGroupLabelPath].(string)
 			}
 
 			// Timer
-			if value, has := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; has {
-				connectorConfig.Timer = int64(value.(float64) * 60)
+			if value, present := monitorConnection.Extensions[connectors.ExtensionsKeyTimer]; present {
+				if value.(float64) >= 1 {
+					connectorConfig.Timer = time.Duration(int64(value.(float64))) * time.Minute
+					connectors.Timer = connectorConfig.Timer
+				}
 			}
 		}
 	}
@@ -161,9 +183,8 @@ func InitConfig(appType string, agentId string, monitorConnection *transit.Monit
 			if templateMetricName == metric.Name || !metric.Monitored {
 				continue
 			}
-			if metrics, has := connectorConfig.Views[metric.ServiceType]; has {
-				metrics[metric.Name] = metric
-				connectorConfig.Views[metric.ServiceType] = metrics
+			if connectorConfig.Views[metric.ServiceType] != nil {
+				connectorConfig.Views[metric.ServiceType][metric.Name] = metric
 			} else {
 				metrics := make(map[string]transit.MetricDefinition)
 				metrics[metric.Name] = metric
@@ -189,8 +210,8 @@ func (connectorConfig *ElasticConnectorConfig) replaceIntervalTemplates() {
 		connectorConfig.Timer)
 }
 
-func replaceIntervalTemplate(templateString string, intervalValue int64) string {
-	interval := strconv.Itoa(int(intervalValue)) + intervalPeriodSeconds
+func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
+	interval := fmt.Sprintf("%ds", int64(intervalValue.Seconds()))
 	if strings.Contains(templateString, intervalTemplate) {
 		templateString = strings.ReplaceAll(templateString, intervalTemplate, interval)
 	}

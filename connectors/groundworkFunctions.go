@@ -1,10 +1,14 @@
 package connectors
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/PaesslerAG/gval"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/log"
+	"net/http"
 	"regexp"
 	"strings"
 )
@@ -388,7 +392,7 @@ func EvaluateGroundworkExpression(expression string, vars map[string]interface{}
 			if function, exists := expressionToFuncMap[gwFuncName]; exists {
 				if _, values, err := EvaluateGroundworkExpression(exp, vars, argumentCounter); err == nil {
 					if len(values) != expressionToArgsCountMap[gwFuncName] {
-						return -1, nil, errors.New(fmt.Sprintf("Invalid arguments count for Groundwork function [%s]", gwFuncName))
+						return -1, nil, fmt.Errorf("invalid arguments count for Groundwork function [%s]", gwFuncName)
 					}
 					v := function.(func(...float64) float64)(values...)
 					return v, []float64{v}, nil
@@ -396,7 +400,7 @@ func EvaluateGroundworkExpression(expression string, vars map[string]interface{}
 					return -1, nil, err
 				}
 			} else {
-				return -1, nil, errors.New(fmt.Sprintf("Groundwork function [%s] doesn't exist", gwFuncName))
+				return -1, nil, fmt.Errorf("groundwork function [%s] doesn't exist", gwFuncName)
 			}
 		}
 	} else {
@@ -434,7 +438,7 @@ func EvaluateGroundworkExpression(expression string, vars map[string]interface{}
 				result = append(result, v.(float64))
 				continue
 			} else {
-				return -1, nil, errors.New(fmt.Sprintf("Undefined variable %s", val))
+				return -1, nil, fmt.Errorf("undefined variable %s", val)
 			}
 		}
 		return result[0], result, nil
@@ -486,6 +490,27 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	} else {
 		return -1, err
 	}
+}
+
+func EvaluateExpressionHandler(c *gin.Context) {
+	var expression ExpressionToEvaluate
+	body, err := c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = json.Unmarshal(body, &expression)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := EvaluateExpression(expression, c.Request.URL.Query().Get("override") == "true")
+	if err == nil {
+		c.JSON(http.StatusOK, result)
+		return
+	}
+	log.Error("[Server Connector]: " + err.Error())
+	c.IndentedJSON(http.StatusBadRequest, err.Error())
 }
 
 type ExpressionToSuggest struct {

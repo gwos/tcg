@@ -10,7 +10,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"net/http"
-	"time"
 )
 
 // Variables to control connector version and build time.
@@ -22,36 +21,36 @@ var (
 )
 
 func main() {
-	connectors.ControlCHandler()
-
 	var transitService = services.GetTransitService()
 
-	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", buildTag, buildTime))
+	config.Version.Tag = buildTag
+	config.Version.Time = buildTime
+
+	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
 	var connector ElasticConnector
 
 	var cfg ElasticConnectorConfig
 	var cfgChksum, iChksum []byte
-	transitService.ConfigHandler = func(data []byte) {
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Elastic Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(config.GetConfig().Connector.AppType, config.GetConfig().Connector.AgentID,
 				monitorConn, profile, gwConnections)
 			cfg = *c
-			connectors.Timer = cfg.Timer
 			chk, err := connectors.Hashsum(
 				config.GetConfig().GWConnections,
 				cfg,
 			)
 			if err != nil || !bytes.Equal(cfgChksum, chk) {
 				if err := connector.LoadConfig(cfg); err != nil {
-					log.Error("Cannot reload ElasticConnector config: ", err)
+					log.Error("[Elastic Connector]: Cannot reload ElasticConnector config: ", err)
 				} else {
 					_, inventory, groups := connector.CollectMetrics()
 					log.Info("[Elastic Connector]: Sending inventory ...")
 					err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
 					if err != nil {
-						log.Error(err.Error())
+						log.Error("[Elastic Connector]: ", err.Error())
 					}
 					iChk, iChkErr := connector.getInventoryHashSum()
 					if iChkErr == nil {
@@ -66,7 +65,7 @@ func main() {
 			log.Error("[Elastic Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(
@@ -85,24 +84,28 @@ func main() {
 			},
 		},
 		services.Entrypoint{
-			Url:    "/version",
+			Url:    "/expressions/suggest/:name",
 			Method: "Get",
 			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.BuildVersion{Tag: buildTag,
-					Time: buildTime})
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
 			},
 		},
+		services.Entrypoint{
+			Url:     "/expressions/evaluate",
+			Method:  "Post",
+			Handler: connectors.EvaluateExpressionHandler,
+		},
 	); err != nil {
-		log.Error(err)
+		log.Error("[Elastic Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Error("[Elastic Connector]: ", err)
 		return
 	}
 
-	for {
+	connectors.StartPeriodic(nil, cfg.Timer, func() {
 		if len(connector.monitoringState.Metrics) > 0 {
 			metrics, inventory, groups := connector.CollectMetrics()
 
@@ -111,7 +114,7 @@ func main() {
 				log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
 				err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
 				if err != nil {
-					log.Error(err.Error())
+					log.Error("[Elastic Connector]: ", err.Error())
 				}
 			}
 			if chkErr == nil {
@@ -121,10 +124,8 @@ func main() {
 			log.Info("[Elastic Connector]: Monitoring resources ...")
 			err := connectors.SendMetrics(metrics)
 			if err != nil {
-				log.Error(err.Error())
+				log.Error("[Elastic Connector]: ", err.Error())
 			}
 		}
-		log.Debug("sleeping for ...", connectors.Timer)
-		time.Sleep(time.Duration(connectors.Max(connectors.Timer, 60) * int64(time.Second)))
-	}
+	})
 }

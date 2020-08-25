@@ -18,8 +18,6 @@ var (
 )
 
 func main() {
-	connectors.ControlCHandler()
-
 	var transitService = services.GetTransitService()
 	var cfg KubernetesConnectorConfig
 	// var chksum []byte
@@ -27,7 +25,7 @@ func main() {
 
 	log.Info(fmt.Sprintf("[Kubernetes Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
 
-	transitService.ConfigHandler = func(data []byte) {
+	transitService.RegisterConfigHandler(func(data []byte) {
 		log.Info("[Kubernetes Connector]: Configuration received")
 		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
 			c := InitConfig(monitorConn, profile, gwConnections)
@@ -58,7 +56,7 @@ func main() {
 			log.Error("[Kubernetes Connector]: Error during parsing config. Aborting ...")
 			return
 		}
-	}
+	})
 
 	log.Info("[Kubernetes Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {

@@ -23,6 +23,7 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/services"
 	"os"
 	"unsafe"
@@ -31,11 +32,12 @@ import (
 func main() {
 }
 
-func min(args ...int) int {
-	m := args[0]
-	for _, arg := range args[1:] {
-		if m > arg {
-			m = arg
+// min returns minimum value
+func min(x int, rest ...int) int {
+	m := x
+	for _, y := range rest[:] {
+		if m > y {
+			m = y
 		}
 	}
 	return m
@@ -192,6 +194,12 @@ func DemandConfig(errBuf *C.char, errBufLen C.size_t) bool {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
+	if value, exist := os.LookupEnv("TCG_TAG"); exist {
+		config.Version.Tag = value
+	}
+	if value, exist := os.LookupEnv("TCG_BUILD_TIME"); exist {
+		config.Version.Time = value
+	}
 	return true
 }
 
@@ -234,7 +242,7 @@ func RemoveListMetricsHandler() {
 // RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler
 //export RegisterDemandConfigHandler
 func RegisterDemandConfigHandler(fn C.demandConfigHandler) {
-	services.GetTransitService().RegisterDemandConfigHandler(func() bool{
+	services.GetTransitService().RegisterDemandConfigHandler(func() bool {
 		return bool(C.invokeDemandConfigHandler(fn))
 	})
 }

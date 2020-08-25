@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -13,11 +19,6 @@ import (
 	"github.com/gwos/tcg/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
-	"net/http"
-	"net/http/pprof"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Controller implements AgentServices, Controllers interface
@@ -136,14 +137,14 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 
 		var err error
 		if certFile != "" && keyFile != "" {
-			log.Info("[Controller]: start listen TLS: ", addr)
+			log.Info("[Controller]: Start listen TLS: ", addr)
 			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error: ", err)
+				log.Error("[Controller]: Start error: ", err)
 			}
 		} else {
-			log.Info("[Controller]: start listen: ", addr)
+			log.Info("[Controller]: Start listen: ", addr)
 			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("Controller: start error: ", err)
+				log.Error("[Controller]: Start error: ", err)
 			}
 		}
 
@@ -166,18 +167,18 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 // overrides AgentService implementation
 func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
-	log.Info("Controller: shutdown ...")
+	log.Info("[Controller]: Shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Error("Controller: shutdown error:", err)
+		log.Error("[Controller]: Shutdown error:", err)
 	}
 	// catching ctx.Done() timeout
 	select {
 	case <-ctx.Done():
-		log.Warn("Controller: shutdown: timeout")
+		log.Warn("[Controller]: Shutdown: timeout")
 	}
-	log.Warn("Controller: exiting")
+	log.Warn("[Controller]: Exiting")
 	controller.srv = nil
 	return nil
 }
@@ -200,7 +201,7 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(value, &dto); err != nil {
-		log.Error(err)
+		log.Error("|controller.go| : [config] : ", err)
 		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
 		return
 	}
@@ -209,12 +210,12 @@ func (controller *Controller) config(c *gin.Context) {
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
-	err = controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
+	err = controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
-	controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
+	_, _ = controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
 	c.JSON(http.StatusOK, nil)
 }
 
@@ -409,6 +410,21 @@ func (controller *Controller) status(c *gin.Context) {
 	c.JSON(http.StatusOK, statusDTO)
 }
 
+//
+// @Description The following API endpoint can be used to return actual TCG connector version.
+// @Tags    agent, connector
+// @Accept  json
+// @Produce json
+// @Success 200 {object} config.BuildVersion
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /version [get]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) version(c *gin.Context) {
+	c.JSON(http.StatusOK, config.BuildVersion{Tag: config.Version.Tag,
+		Time: config.Version.Time})
+}
+
 func (controller *Controller) validateToken(c *gin.Context) {
 	// check local pin
 	pin := controller.Connector.ControllerPin
@@ -431,7 +447,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	_, isCached := cache.AuthCache.Get(key)
 	if !isCached {
-		err := controller.DSClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
+		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			return
@@ -455,6 +471,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.Use(controller.validateToken)
 
 	apiV1Config.POST("", controller.config)
+	apiV1Group.GET("/version", controller.version)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
