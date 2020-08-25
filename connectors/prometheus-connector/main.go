@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -30,8 +31,10 @@ func main() {
 	config.Version.Time = buildTime
 	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
+	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
+	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
@@ -45,7 +48,7 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	connectors.StartPeriodic(nil, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
 		pull(extConfig.Resources)
 	})
 }
