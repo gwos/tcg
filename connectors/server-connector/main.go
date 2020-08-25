@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
@@ -39,8 +40,10 @@ func main() {
 	config.Version.Time = buildTime
 	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
+	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
+	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
@@ -53,7 +56,7 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(nil, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
 		if len(metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
