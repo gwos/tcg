@@ -4,6 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -13,11 +19,6 @@ import (
 	"github.com/gwos/tcg/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
-	"net/http"
-	"net/http/pprof"
-	"strings"
-	"sync"
-	"time"
 )
 
 // Controller implements AgentServices, Controllers interface

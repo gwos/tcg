@@ -22,9 +22,9 @@ import (
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
-	"go.opentelemetry.io/otel/api/kv"
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/label"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -717,11 +717,11 @@ func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	connector := config.GetConfig().Connector
 	serviceName := fmt.Sprintf("%s:%s:%s",
 		connector.AppType, connector.AppName, connector.AgentID)
-	tags := []kv.KeyValue{
-		kv.String("runtime", "golang"),
+	tags := []label.KeyValue{
+		label.String("runtime", "golang"),
 	}
 	for k, v := range config.GetConfig().Jaegertracing.Tags {
-		tags = append(tags, kv.String(k, v))
+		tags = append(tags, label.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
 		jaegerEndpoint,
