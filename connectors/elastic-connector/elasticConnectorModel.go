@@ -151,6 +151,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				UnitType:    transit.UnitCounter,
 				Warning:     metricDefinition.WarningThreshold,
 				Critical:    metricDefinition.CriticalThreshold,
+				Graphed:     metricDefinition.Graphed,
 			}
 			if service.timeInterval != nil {
 				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
