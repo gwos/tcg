@@ -14,8 +14,8 @@ func TestUnmarshalConfig(t *testing.T) {
 	expected := ExtConfig{
 		Schedule: []ScheduleTask{
 			{
-				Command: []string{"/_workspace/gwos/loadtest/kahuna/kahuna", "-stdout"},
-				Cron:    "* * * * * *",
+				Command: []string{"kahuna", "-stdout"},
+				Cron:    "1 * * * * *",
 			},
 			{
 				Command:     []string{"sh", "-c", "echo \"S;$(date +%s);${XHOST};${XSERVICE};0;OK - very good| ${XMETRIC}=20;85;95\""},
@@ -38,8 +38,8 @@ func TestUnmarshalConfig(t *testing.T) {
 			"extensions": {
 				"schedule": [
 					{
-						"command": ["/_workspace/gwos/loadtest/kahuna/kahuna", "-stdout"],
-						"cron": "* * * * * *"
+						"command": ["kahuna", "-stdout"],
+						"cron": "1 * * * * *"
 					},
 					{
 						"command": ["sh", "-c", "echo \"S;$(date +%s);${XHOST};${XSERVICE};0;OK - very good| ${XMETRIC}=20;85;95\""],
@@ -75,8 +75,8 @@ func TestExtConfigValidateFails(t *testing.T) {
 			"extensions": {
 				"schedule": [
 					{
-						"command": ["/_workspace/gwos/loadtest/kahuna/kahuna", "-stdout"],
-						"cron": "* * * * * *"
+						"command": ["kahuna", "-stdout"],
+						"cron": "1 * * * * *"
 					},
 					{
 						"cron": "* * * * * *"
