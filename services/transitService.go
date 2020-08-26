@@ -1,8 +1,9 @@
 package services
 
 import (
-	"github.com/gwos/tcg/nats"
 	"sync"
+
+	"github.com/gwos/tcg/nats"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces

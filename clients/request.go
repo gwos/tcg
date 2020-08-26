@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"go.opentelemetry.io/otel/instrumentation/httptrace"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace"
 )
 
 // SendRequest wraps HTTP methods
