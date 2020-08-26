@@ -18,7 +18,19 @@ import (
 )
 
 var (
-	re = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
+	bronxRegexp              = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
+	nscaRegexp               = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
+	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);$`)
+	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);$`)
+	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
+)
+
+type DataFormat string
+
+// Data formats of the received body
+const (
+	NSCA  DataFormat = "NSCA"
+	Bronx            = "Bronx"
 )
 
 // ScheduleTask defines command
@@ -49,16 +61,21 @@ func initializeEntrypoints() []services.Entrypoint {
 
 	entrypoints = append(entrypoints,
 		services.Entrypoint{
-			Url:     "/receiver",
+			Url:     "/bronx",
 			Method:  "Post",
-			Handler: receiverHandler,
+			Handler: bronxHandler,
+		},
+		services.Entrypoint{
+			Url:     "/nsca",
+			Method:  "Post",
+			Handler: nscaHandler,
 		},
 	)
 
 	return entrypoints
 }
 
-func receiverHandler(c *gin.Context) {
+func bronxHandler(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
 		log.Error(err.Error())
@@ -66,16 +83,30 @@ func receiverHandler(c *gin.Context) {
 		return
 	}
 
-	if err := processMetrics(body); err != nil {
+	if err := processMetrics(body, Bronx); err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 	}
 }
 
-func processMetrics(body []byte) error {
-	monitoredResources, err := parseBody(body)
+func nscaHandler(c *gin.Context) {
+	body, err := c.GetRawData()
+	if err != nil {
+		log.Error(err.Error())
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if err := processMetrics(body, NSCA); err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+	}
+}
+
+func processMetrics(body []byte, format DataFormat) error {
+	monitoredResources, err := parseBody(body, format)
 	if err != nil {
 		return err
 	}
+
 	inventoryResources := connectors.BuildInventory(monitoredResources)
 	if connectors.ValidateInventory(*inventoryResources) {
 		err := connectors.SendMetrics(*monitoredResources)
@@ -97,16 +128,36 @@ func processMetrics(body []byte) error {
 	return nil
 }
 
-func parseBody(body []byte) (*[]transit.MonitoredResource, error) {
+func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(body, " \n\r")), "\n")
-	var monitoredResources []transit.MonitoredResource
 
-	serviceNameToMetricsMap, err := getMetrics(metricsLines)
+	var (
+		monitoredResources        []transit.MonitoredResource
+		serviceNameToMetricsMap   map[string][]transit.TimeSeries
+		resourceNameToServicesMap map[string][]transit.MonitoredService
+		err                       error
+	)
+
+	switch format {
+	case Bronx:
+		serviceNameToMetricsMap, err = getBronxMetrics(metricsLines)
+	case NSCA:
+		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
+	default:
+		return nil, errors.New("unknown data format provided")
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	resourceNameToServicesMap, err := getServices(serviceNameToMetricsMap, metricsLines)
+	switch format {
+	case Bronx:
+		resourceNameToServicesMap, err = getBronxServices(serviceNameToMetricsMap, metricsLines)
+	case NSCA:
+		resourceNameToServicesMap, err = getNscaServices(serviceNameToMetricsMap, metricsLines)
+	default:
+		return nil, errors.New("unknown data format provided")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -151,10 +202,98 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 	}
 }
 
-func getMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
+func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
 	metricsMap := make(map[string][]transit.TimeSeries)
 	for _, metric := range metricsLines {
-		arr := re.FindStringSubmatch(metric)[1:]
+		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
+		perfData := arr[len(arr)-1]
+		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
+		for _, metric := range pdArr {
+			var values []string
+			switch len(strings.Split(metric, ";")) {
+			case 4:
+				values = perfDataRegexp.FindStringSubmatch(metric)[1:]
+			case 5:
+				values = perfDataWithMinRegexp.FindStringSubmatch(metric)[1:]
+			case 6:
+				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)[1:]
+			}
+			if values == nil || len(values) < 4 {
+				return nil, errors.New("invalid metric format")
+			}
+			var value, warning, critical float64
+			if v, err := strconv.ParseFloat(values[1], 64); err == nil {
+				value = v
+			}
+			if w, err := strconv.ParseFloat(values[2], 64); err == nil {
+				warning = w
+			}
+			if c, err := strconv.ParseFloat(values[3], 64); err == nil {
+				critical = c
+			}
+
+			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
+				Name:           values[0],
+				ComputeType:    transit.Query,
+				Value:          value,
+				UnitType:       transit.MB,
+				Warning:        warning,
+				Critical:       critical,
+				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
+			})
+			if err != nil {
+				return nil, err
+			}
+			metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])] =
+				append(metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])], *timeSeries)
+		}
+	}
+
+	return metricsMap, nil
+}
+
+func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.MonitoredService, error) {
+	servicesMap := make(map[string][]transit.MonitoredService)
+
+	for _, metric := range metricsLines {
+		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
+
+		var timestamp *milliseconds.MillisecondTimestamp
+		var err error
+		if len(arr) > 5 {
+			timestamp, err = getTime(arr[0])
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		}
+
+		status, err := getStatus(arr[len(arr)-3])
+		if err != nil {
+			return nil, err
+		}
+
+		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.MonitoredService{
+			Name:             arr[len(arr)-4],
+			Type:             transit.Service,
+			Owner:            arr[len(arr)-5],
+			Status:           status,
+			LastCheckTime:    *timestamp,
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
+			LastPlugInOutput: arr[len(arr)-2],
+			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])],
+		})
+	}
+
+	return removeDuplicateServices(servicesMap), nil
+}
+
+func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
+	metricsMap := make(map[string][]transit.TimeSeries)
+	for _, metric := range metricsLines {
+		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
 
 		if len(arr) != 10 {
 			return nil, errors.New("invalid metric format")
@@ -188,10 +327,10 @@ func getMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) 
 	return metricsMap, nil
 }
 
-func getServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.MonitoredService, error) {
+func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.MonitoredService, error) {
 	servicesMap := make(map[string][]transit.MonitoredService)
 	for _, metric := range metricsLines {
-		arr := re.FindStringSubmatch(metric)[1:]
+		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
 
 		if len(arr) != 10 {
 			return nil, errors.New("invalid metric format")
