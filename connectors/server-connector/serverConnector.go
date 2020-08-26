@@ -111,7 +111,7 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 			continue
 		}
 		if function, exists := processToFuncMap[pr.Name]; exists {
-			monitoredService := function.(func(int, int, string) *transit.MonitoredService)(pr.WarningThreshold, pr.CriticalThreshold, pr.CustomName)
+			monitoredService := function.(func(int, int, string, bool) *transit.MonitoredService)(pr.WarningThreshold, pr.CriticalThreshold, pr.CustomName, pr.Graphed)
 			if monitoredService != nil {
 				monitoredResource.Services = append(monitoredResource.Services, *monitoredService)
 			}
@@ -134,6 +134,7 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 			Critical:       float64(processValues.criticalValue),
 			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+			Graphed:        processValues.graphed,
 		}
 		monitoredService, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
 		if err != nil {
@@ -154,7 +155,7 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 	return monitoredResource
 }
 
-func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
@@ -172,6 +173,7 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -183,7 +185,7 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 	return service
 }
 
-func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
@@ -201,6 +203,7 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -212,7 +215,7 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 	return service
 }
 
-func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
@@ -230,6 +233,7 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -241,7 +245,7 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 	return service
 }
 
-func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
@@ -259,6 +263,7 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -270,7 +275,7 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 	return service
 }
 
-func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
@@ -288,6 +293,7 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -299,7 +305,7 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 	return service
 }
 
-func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
@@ -317,6 +323,7 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -328,7 +335,7 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 	return service
 }
 
-func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	hostStat, err := host.Info()
 	if err != nil {
@@ -346,6 +353,7 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -357,7 +365,7 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 	return service
 }
 
-func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, customName string) *transit.MonitoredService {
+func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
 	interval := time.Now()
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalCPUUsageServiceName,
@@ -369,6 +377,7 @@ func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, cus
 		Critical:       int64(criticalThresholdValue),
 		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		Graphed:        graphed,
 	}
 
 	service, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -396,6 +405,7 @@ type values struct {
 	expression    string
 	criticalValue int
 	warningValue  int
+	graphed       bool
 }
 
 // Collects a map of process names to cpu usage, given a list of processes to be monitored
@@ -444,6 +454,7 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 				warningValue:  pr.WarningThreshold,
 				computeType:   pr.ComputeType,
 				expression:    "",
+				graphed:       pr.Graphed,
 			}
 		} else {
 			processesMap[name] = values{
@@ -452,6 +463,7 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 				warningValue:  pr.WarningThreshold,
 				computeType:   transit.Synthetic,
 				expression:    pr.Expression,
+				graphed:       pr.Graphed,
 			}
 		}
 	}
@@ -483,7 +495,7 @@ func collectProcesses() map[string]float64 {
 	}
 
 	for name, function := range processToFuncMap {
-		monitoredService := function.(func(int, int, string) *transit.MonitoredService)(-1, -1, "")
+		monitoredService := function.(func(int, int, string, bool) *transit.MonitoredService)(-1, -1, "", true)
 		if monitoredService != nil {
 			if monitoredService.Metrics[0].Value.ValueType == transit.DoubleType {
 				processes[strings.ReplaceAll(name, ".", "_")] = monitoredService.Metrics[0].Value.DoubleValue
