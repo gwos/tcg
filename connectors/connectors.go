@@ -32,7 +32,7 @@ var inventoryChksum []byte
 // MonitorConnection overrides transit.MonitorConnection
 // TODO: update and use transit.MonitorConnection instead
 type MonitorConnection struct {
-	transit.MonitorConnection `json:"monitorConnection"`
+	transit.MonitorConnection
 	Extensions                interface{} `json:"extensions"`
 }
 
