@@ -207,3 +207,26 @@ func protectData(data string) []byte {
 	}
 	return []byte(data)
 }
+
+type genHook struct {
+	levels []logrus.Level
+	fn     func(Entry) error
+}
+
+// Levels implements logrus.Hook.Level interface
+func (h *genHook) Levels() []logrus.Level {
+	return h.levels
+}
+
+// Fire implements logrus.Hook.Fire interface
+func (h *genHook) Fire(entry *logrus.Entry) error {
+	return h.fn(Entry{entry})
+}
+
+// SetHook adds a hook to the logger hooks
+func SetHook(fn func(Entry) error, levels ...logrus.Level) {
+	if len(levels) == 0 {
+		levels = logrus.AllLevels
+	}
+	logger.AddHook(&genHook{levels, fn})
+}

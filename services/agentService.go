@@ -128,6 +128,15 @@ func GetAgentService() *AgentService {
 		go agentService.listenStatsChan()
 		agentService.handleExit()
 
+		log.SetHook(func(entry log.Entry) error {
+			agentService.statsChan <- statsCounter{
+				bytesSent: 0,
+				lastError: fmt.Errorf("%+v : %s", entry.Data, entry.Message),
+				subject:   "log",
+			}
+			return nil
+		}, log.ErrorLevel)
+
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
@@ -498,12 +507,6 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 				service.statsChan <- statsCounter{
 					bytesSent: len(b),
 					lastError: nil,
-					subject:   subj,
-				}
-			} else {
-				service.statsChan <- statsCounter{
-					bytesSent: 0,
-					lastError: err,
 					subject:   subj,
 				}
 			}
