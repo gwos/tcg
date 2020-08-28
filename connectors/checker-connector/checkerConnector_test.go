@@ -34,7 +34,10 @@ func TestUnmarshalConfig(t *testing.T) {
 	data := []byte(`
 	{
 		"agentId": "99998888-7777-6666-a3b0-b14622f7dd39",
+		"metricsProfile": {"name": "metricsProfile-name"},
 		"monitorConnection": {
+			"id": 11,
+			"connectorId": 111,
 			"extensions": {
 				"schedule": [
 					{
@@ -66,6 +69,9 @@ func TestUnmarshalConfig(t *testing.T) {
 	if !reflect.DeepEqual(*extConfig, expected) {
 		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
 	}
+	assert.Equal(t, "metricsProfile-name", metricsProfile.Name)
+	assert.Equal(t, 11, monitorConnection.ID)
+	assert.Equal(t, 111, monitorConnection.ConnectorID)
 }
 
 func TestExtConfigValidateFails(t *testing.T) {
