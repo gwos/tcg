@@ -27,6 +27,18 @@ type ExtConfig struct {
 	Ownership transit.HostOwnershipType
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
+func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
+	type plain ExtConfig
+	c := plain(*cfg)
+	if err := json.Unmarshal(input, &c); err != nil {
+		return err
+	}
+	c.Timer = c.Timer * time.Minute
+	*cfg = ExtConfig(c)
+	return nil
+}
+
 const defaultHostGroupName = "Servers"
 
 // Default processes names
