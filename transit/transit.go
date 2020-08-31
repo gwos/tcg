@@ -780,15 +780,15 @@ func (groundworkEvent GroundworkEvent) String() string {
 
 // MonitorConnection describes the connection to the monitored system
 type MonitorConnection struct {
-	ID          int                    `json:"id"`
-	Server      string                 `json:"server"`
-	UserName    string                 `json:"userName"`
-	Password    string                 `json:"password"`
-	SslEnabled  bool                   `json:"sslEnabled"`
-	URL         string                 `json:"url"`
-	Views       []View                 `json:"views,omitempty"`
-	Extensions  map[string]interface{} `json:"extensions"`
-	ConnectorID int                    `json:"connectorId"`
+	ID          int         `json:"id"`
+	Server      string      `json:"server"`
+	UserName    string      `json:"userName"`
+	Password    string      `json:"password"`
+	SslEnabled  bool        `json:"sslEnabled"`
+	URL         string      `json:"url"`
+	Views       []View      `json:"views,omitempty"`
+	Extensions  interface{} `json:"extensions"`
+	ConnectorID int         `json:"connectorId"`
 }
 
 type View struct {

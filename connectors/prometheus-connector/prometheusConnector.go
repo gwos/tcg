@@ -30,7 +30,7 @@ type ExtConfig struct {
 	Groups    []transit.ResourceGroup   `json:"groups"`
 	Resources []Resource                `json:"resources"`
 	Services  []string                  `json:"services"`
-	Timer     time.Duration             `json:"timer"`
+	Timer     time.Duration             `json:"checkIntervalMinutes"`
 	Ownership transit.HostOwnershipType `json:"ownership,omitempty"`
 }
 
