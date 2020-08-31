@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,18 @@ type ExtConfig struct {
 	Services  []string                  `json:"services"`
 	Timer     time.Duration             `json:"timer"`
 	Ownership transit.HostOwnershipType `json:"ownership,omitempty"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
+	type plain ExtConfig
+	c := plain(*cfg)
+	if err := json.Unmarshal(input, &c); err != nil {
+		return err
+	}
+	c.Timer = c.Timer * time.Minute
+	*cfg = ExtConfig(c)
+	return nil
 }
 
 const defaultHostGroupName = "Servers"
