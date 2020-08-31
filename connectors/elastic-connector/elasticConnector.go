@@ -2,20 +2,25 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/log"
-	_ "github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel/api/trace"
 	"sort"
 	"strings"
+	"time"
 )
 
+// ElasticView describes flow
 type ElasticView string
 
+// Define flows
 const (
 	StoredQueries ElasticView = "storedQueries"
 	//StoredSearches ElasticView = "storedSearches"
@@ -23,14 +28,106 @@ const (
 	//SelfMonitoring ElasticView = "selfMonitoring"
 )
 
+// Kibana defines the connection props
+type Kibana struct {
+	ServerName string `json:"serverName"`
+	Username   string `json:"userName"`
+	Password   string `json:"password"`
+}
+
+// ExtConfig defines the MonitorConnection extensions configuration
+// extended with general configuration fields
+type ExtConfig struct {
+	Kibana             Kibana              `json:"kibana"`
+	Servers            []string            `json:"servers"`
+	CustomTimeFilter   clients.KTimeFilter `json:"timefilter"`
+	OverrideTimeFilter bool                `json:"override"`
+	HostNameField      string              `json:"hostNameLabelPath"`
+	HostGroupField     string              `json:"hostGroupLabelPath"`
+	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
+	Timer              time.Duration       `json:"checkIntervalMinutes"`
+	AppType            string
+	AgentID            string
+	GWConnections      config.GWConnections
+	Ownership          transit.HostOwnershipType
+	Views              map[string]map[string]transit.MetricDefinition
+}
+
+func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
+	type plain ExtConfig
+	c := plain(*cfg)
+	if err := json.Unmarshal(input, &c); err != nil {
+		return err
+	}
+	if c.Timer != cfg.Timer {
+		c.Timer = c.Timer * time.Minute
+	}
+	if c.CustomTimeFilter.Override != nil {
+		c.OverrideTimeFilter = *c.CustomTimeFilter.Override
+		c.CustomTimeFilter.Override = nil
+	}
+	*cfg = ExtConfig(c)
+	return nil
+}
+
+const (
+	// default config values
+	defaultProtocol                 = "http"
+	defaultElasticServer            = "http://localhost:9200"
+	defaultKibanaServerName         = "http://localhost:5601/"
+	defaultKibanaUsername           = ""
+	defaultKibanaPassword           = ""
+	defaultTimeFilterFrom           = "now-$interval"
+	defaultTimeFilterTo             = "now"
+	defaultAlwaysOverrideTimeFilter = false
+	defaultHostNameLabel            = "container.name.keyword"
+	defaultHostGroupLabel           = "container.labels.com_docker_compose_project.keyword"
+	defaultHostGroupName            = "Elastic Search"
+	defaultGroupNameByUser          = false
+
+	intervalTemplate = "$interval"
+)
+
+func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) {
+	kibanaClient := clients.KibanaClient{
+		ApiRoot:  cfg.Kibana.ServerName,
+		Username: cfg.Kibana.Username,
+		Password: cfg.Kibana.Password,
+	}
+	esClient := clients.EsClient{Servers: cfg.Servers}
+	err := esClient.InitEsClient()
+	if err != nil {
+		log.Error("|elasticConnector.go| : [initClients] : Cannot initialize ES client.")
+		return kibanaClient, esClient, errors.New("cannot initialize ES client")
+	}
+	return kibanaClient, esClient, nil
+}
+
+func (cfg *ExtConfig) replaceIntervalTemplates() {
+	cfg.CustomTimeFilter.From = replaceIntervalTemplate(cfg.CustomTimeFilter.From,
+		cfg.Timer)
+	cfg.CustomTimeFilter.To = replaceIntervalTemplate(cfg.CustomTimeFilter.To,
+		cfg.Timer)
+}
+
+func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
+	interval := fmt.Sprintf("%ds", int64(intervalValue.Seconds()))
+	if strings.Contains(templateString, intervalTemplate) {
+		templateString = strings.ReplaceAll(templateString, intervalTemplate, interval)
+	}
+	return templateString
+}
+
+// ElasticConnector handles the state
 type ElasticConnector struct {
-	config          ElasticConnectorConfig
+	config          ExtConfig
 	kibanaClient    clients.KibanaClient
 	esClient        clients.EsClient
 	monitoringState MonitoringState
 }
 
-func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) error {
+// LoadConfig updates state
+func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
 		return err
@@ -45,6 +142,7 @@ func (connector *ElasticConnector) LoadConfig(config ElasticConnectorConfig) err
 	return nil
 }
 
+// CollectMetrics retrives metric data
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	var err error
 	var spanCollectMetrics trace.Span
@@ -97,6 +195,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	return monitoredResources, inventoryResources, resourceGroups
 }
 
+// ListSuggestions provides suggestions by view
 func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
 	var suggestions []string
 	if connector.kibanaClient.ApiRoot == "" {
@@ -156,21 +255,6 @@ func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
 		groupsSorted[groupName] = hostNames
 	}
 	return connectors.Hashsum(hosts, metrics, groupsSorted)
-}
-
-func initClients(config ElasticConnectorConfig) (clients.KibanaClient, clients.EsClient, error) {
-	kibanaClient := clients.KibanaClient{
-		ApiRoot:  config.Kibana.ServerName,
-		Username: config.Kibana.Username,
-		Password: config.Kibana.Password,
-	}
-	esClient := clients.EsClient{Servers: config.Servers}
-	err := esClient.InitEsClient()
-	if err != nil {
-		log.Error("|elasticConnector.go| : [initClients] : Cannot initialize ES client.")
-		return kibanaClient, esClient, errors.New("cannot initialize ES client")
-	}
-	return kibanaClient, esClient, nil
 }
 
 func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) error {

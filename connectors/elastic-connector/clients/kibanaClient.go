@@ -56,7 +56,7 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 	savedObjectType := IndexPattern
 	ids := storedQuery.ExtractIndexIds()
 	if ids == nil {
-		log.Error("|kibanaClient.go | : [RetrieveIndexTitles]: No index patterns linked to query: ", storedQuery.Attributes.Title)
+		log.Warn("|kibanaClient.go | : [RetrieveIndexTitles]: No index patterns linked to query: ", storedQuery.Attributes.Title)
 		return nil
 	}
 	indexPatterns = client.bulkGetSavedObjects(&savedObjectType, ids)
@@ -128,7 +128,7 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 // Performs bulk get of saved objects for provided type and ids
 func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []KSavedObject {
 	if savedObjectType == nil || ids == nil || len(ids) == 0 {
-		log.Error("|kibanaClient.go| : [bulkGetSavedObjects]: Error performing Kibana Bulk Get: type and at least one id required.")
+		log.Warn("|kibanaClient.go| : [bulkGetSavedObjects]: Error performing Kibana Bulk Get: type and at least one id required.")
 		return nil
 	}
 
