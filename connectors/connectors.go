@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
@@ -29,19 +28,11 @@ const ExtensionsKeyTimer = "checkIntervalMinutes"
 var Inventory = make(map[string]transit.InventoryResource)
 var inventoryChksum []byte
 
-// MonitorConnection overrides transit.MonitorConnection
-// TODO: update and use transit.MonitorConnection instead
-type MonitorConnection struct {
-	transit.MonitorConnection
-	Extensions                interface{} `json:"extensions"`
-}
-
 // UnmarshalConfig updates args with data
-// TODO: update and use transit.MonitorConnection instead
-func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *MonitorConnection) error {
+func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
 	cfg := struct {
-		MetricsProfile    *transit.MetricsProfile `json:"metricsProfile"`
-		MonitorConnection *MonitorConnection      `json:"monitorConnection"`
+		MetricsProfile    *transit.MetricsProfile    `json:"metricsProfile"`
+		MonitorConnection *transit.MonitorConnection `json:"monitorConnection"`
 	}{metricsProfile, monitorConnection}
 	return json.Unmarshal(data, &cfg)
 }
@@ -54,24 +45,6 @@ func Start() error {
 		return err
 	}
 	return nil
-}
-
-// RetrieveCommonConnectorInfo deprecated
-// use UnmarshalConfig instead
-func RetrieveCommonConnectorInfo(data []byte) (*transit.MonitorConnection, *transit.MetricsProfile, config.GWConnections, error) {
-	var connector = struct {
-		MonitorConnection transit.MonitorConnection `json:"monitorConnection"`
-		MetricsProfile    transit.MetricsProfile    `json:"metricsProfile"`
-		Connections       config.GWConnections      `json:"groundworkConnections"`
-	}{}
-
-	err := json.Unmarshal(data, &connector)
-	if err != nil {
-		log.Error("|connectors.go| : [RetrieveCommonConnectorInfo] : Error parsing common connector data: ", err)
-		return nil, nil, nil, err
-	}
-
-	return &connector.MonitorConnection, &connector.MetricsProfile, connector.Connections, nil
 }
 
 func SendMetrics(resources []transit.MonitoredResource) error {
@@ -513,7 +486,7 @@ func ValidateInventory(inventory []transit.InventoryResource) bool {
 	if inventoryChksum != nil {
 		chk, err := Hashsum(inventory)
 		if err != nil || !bytes.Equal(inventoryChksum, chk) {
-			inventoryChksum= chk
+			inventoryChksum = chk
 			return false
 		}
 		return true

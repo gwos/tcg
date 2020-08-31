@@ -21,10 +21,10 @@ import (
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups    []transit.ResourceGroup
-	Processes []string
-	Timer     time.Duration
-	Ownership transit.HostOwnershipType
+	Groups    []transit.ResourceGroup   `json:"groups"`
+	Processes []string                  `json:"processes"`
+	Timer     time.Duration             `json:"checkIntervalMinutes"`
+	Ownership transit.HostOwnershipType `json:"ownership,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

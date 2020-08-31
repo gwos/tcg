@@ -25,7 +25,7 @@ var (
 
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
-	monitorConnection = &connectors.MonitorConnection{
+	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 	cfgChksum []byte
@@ -134,7 +134,7 @@ func configHandler(data []byte) {
 		Ownership:          transit.Yield,
 		Views:              make(map[string]map[string]transit.MetricDefinition),
 	}
-	tMonConn := &connectors.MonitorConnection{Extensions: tExt}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
 		log.Error("[Elastic Connector]: Error during parsing config.", err.Error())

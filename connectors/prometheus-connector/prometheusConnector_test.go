@@ -3,6 +3,7 @@ package main
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
@@ -32,13 +33,13 @@ func TestUnmarshalConfig(t *testing.T) {
 			"id": 11,
 			"connectorId": 111,
 			"extensions": {
-				"timer": 2
+				"checkIntervalMinutes": 3
 			}
 		}
 	}`)
 	extConfig := &ExtConfig{Timer: connectors.DefaultTimer}
 	metricsProfile := &transit.MetricsProfile{}
-	monitorConnection := &connectors.MonitorConnection{
+	monitorConnection := &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 
@@ -50,6 +51,7 @@ func TestUnmarshalConfig(t *testing.T) {
 	assert.Equal(t, 11, monitorConnection.ID)
 	assert.Equal(t, 111, monitorConnection.ConnectorID)
 
+	expected.Timer = 3 * time.Minute
 	assert.NoError(t, connectors.UnmarshalConfig(data2, metricsProfile, monitorConnection))
 	if !reflect.DeepEqual(*extConfig, expected) {
 		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
