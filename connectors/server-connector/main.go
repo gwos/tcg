@@ -22,7 +22,7 @@ var (
 
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
-	monitorConnection = &connectors.MonitorConnection{
+	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 	chksum []byte
@@ -84,7 +84,7 @@ func configHandler(data []byte) {
 		Timer:     connectors.DefaultTimer,
 		Ownership: transit.Yield,
 	}
-	tMonConn := &connectors.MonitorConnection{Extensions: tExt}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
 		log.Error("[Server Connector]: Error during parsing config.", err.Error())

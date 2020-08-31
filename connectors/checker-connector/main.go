@@ -21,7 +21,7 @@ var (
 
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
-	monitorConnection = &connectors.MonitorConnection{
+	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 	chksum []byte
@@ -70,7 +70,7 @@ func main() {
 func configHandler(data []byte) {
 	log.Info("[Checker Connector]: Configuration received")
 	tExt, tMetProf := &ExtConfig{}, &transit.MetricsProfile{}
-	tMonConn := &connectors.MonitorConnection{Extensions: tExt}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
 		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
 		return
