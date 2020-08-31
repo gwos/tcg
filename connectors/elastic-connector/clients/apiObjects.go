@@ -55,8 +55,9 @@ type KMeta struct {
 }
 
 type KTimeFilter struct {
-	From string `json:"from"`
-	To   string `json:"to"`
+	From     string `json:"from"`
+	To       string `json:"to"`
+	Override *bool  `json:"override,omitempty"`
 }
 
 type Timestamp struct {

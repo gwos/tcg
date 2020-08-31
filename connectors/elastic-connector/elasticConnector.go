@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gwos/tcg/config"
@@ -44,7 +45,7 @@ type ExtConfig struct {
 	HostNameField      string              `json:"hostNameLabelPath"`
 	HostGroupField     string              `json:"hostGroupLabelPath"`
 	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
-	Timer              time.Duration       `json:"timer"`
+	Timer              time.Duration       `json:"checkIntervalMinutes"`
 	AppType            string
 	AgentID            string
 	GWConnections      config.GWConnections
@@ -52,11 +53,28 @@ type ExtConfig struct {
 	Views              map[string]map[string]transit.MetricDefinition
 }
 
+func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
+	type plain ExtConfig
+	c := plain(*cfg)
+	if err := json.Unmarshal(input, &c); err != nil {
+		return err
+	}
+	if c.Timer != cfg.Timer {
+		c.Timer = c.Timer * time.Minute
+	}
+	if c.CustomTimeFilter.Override != nil {
+		c.OverrideTimeFilter = *c.CustomTimeFilter.Override
+		c.CustomTimeFilter.Override = nil
+	}
+	*cfg = ExtConfig(c)
+	return nil
+}
+
 const (
 	// default config values
 	defaultProtocol                 = "http"
 	defaultElasticServer            = "http://localhost:9200"
-	defaultKibanaServerName         = "http://localhost:5601"
+	defaultKibanaServerName         = "http://localhost:5601/"
 	defaultKibanaUsername           = ""
 	defaultKibanaPassword           = ""
 	defaultTimeFilterFrom           = "now-$interval"

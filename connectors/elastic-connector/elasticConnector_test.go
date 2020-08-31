@@ -1,8 +1,11 @@
 package main
 
 import (
+	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -11,171 +14,218 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
-// func TestInitFullConfig(t *testing.T) {
-// 	testExtensions := make(map[string]interface{})
+func TestInitFullConfig(t *testing.T) {
+	mockConfig()
 
-// 	kibanaExt := make(map[string]interface{})
-// 	kibanaExt[extensionsKeyServerName] = "eccTestKibanaServer"
-// 	kibanaExt[extensionsKeyUsername] = "eccTestKibanaUser"
-// 	kibanaExt[extensionsKeyPassword] = "eccTestKibanaPass"
-// 	testExtensions[extensionsKeyKibana] = kibanaExt
+	testMetric1View1 := transit.MetricDefinition{
+		Name:              "metric1",
+		CustomName:        "custom-metric1",
+		WarningThreshold:  -1,
+		CriticalThreshold: -1,
+		ServiceType:       "view1",
+		Monitored:         true,
+		Graphed:           false,
+	}
+	testMetric2View1 := transit.MetricDefinition{
+		Name:              "metric2",
+		ServiceType:       "view1",
+		WarningThreshold:  10,
+		CriticalThreshold: 20,
+		Monitored:         true,
+	}
+	testMetric3View2 := transit.MetricDefinition{
+		Name:        "metric3",
+		ServiceType: "view2",
+		Monitored:   true,
+		Graphed:     false,
+	}
 
-// 	timeFilterExt := make(map[string]interface{})
-// 	timeFilterExt[extensionsKeyFrom] = "now-$interval"
-// 	timeFilterExt[extensionsKeyTo] = "now"
-// 	timeFilterExt[extensionsKeyOverride] = true
-// 	testExtensions[extensionsKeyTimeFilter] = timeFilterExt
+	expectedViews := make(map[string]map[string]transit.MetricDefinition)
+	expectedView1 := make(map[string]transit.MetricDefinition)
+	expectedView2 := make(map[string]transit.MetricDefinition)
+	expectedView1["metric1"] = testMetric1View1
+	expectedView1["metric2"] = testMetric2View1
+	expectedView2["metric3"] = testMetric3View2
+	expectedViews["view1"] = expectedView1
+	expectedViews["view2"] = expectedView2
 
-// 	testExtensions[extensionsKeyHostNameLabelPath] = "eccTestHostNameLabel"
-// 	testExtensions[extensionsKeyHostGroupLabelPath] = "eccTestHostGroupLabel"
-// 	testExtensions[extensionsKeyGroupNameByUser] = false
+	expected := ExtConfig{
+		Kibana: Kibana{
+			ServerName: "http://eccTestKibanaServer/",
+			Username:   "eccTestKibanaUser",
+			Password:   "eccTestKibanaPass",
+		},
+		CustomTimeFilter: clients.KTimeFilter{
+			From: "now-300s",
+			To:   "now",
+		},
+		OverrideTimeFilter: true,
+		HostNameField:      "eccTestHostNameLabel",
+		HostGroupField:     "eccTestHostGroupLabel",
+		GroupNameByUser:    false,
+		Timer:              time.Duration(5) * time.Minute,
+		Ownership:          transit.Yield,
+		AppType:            "testAppType",
+		AgentID:            "testAgentId",
+		Servers:            []string{"http://eccTestServer1", "http://eccTestServer2"},
+		Views:              expectedViews,
+	}
 
-// 	testExtensions[connectors.ExtensionsKeyTimer] = float64(1)
+	data := []byte(`{
+	  "agentId": "testAgentId",
+	  "appType": "testAppType",
+	  "monitorConnection": {
+	    "server": "eccTestServer1,eccTestServer2",
+	    "extensions": {
+	      "checkIntervalMinutes": 5,
+	      "checkTimeoutSeconds": 10,
+	      "retryConnection": 10,
+	      "kibana": {
+	        "serverName": "eccTestKibanaServer",
+	        "userName": "eccTestKibanaUser",
+	        "password": "eccTestKibanaPass"
+	      },
+	      "timefilter": {
+	        "from": "now-$interval",
+	        "to": "now",
+	        "override": true
+	      },
+	      "hostNameLabelPath": "eccTestHostNameLabel",
+	      "hostGroupNameByUser": false,
+	      "hostGroupLabelPath": "eccTestHostGroupLabel"
+	    }
+	  },
+	  "metricsProfile": {
+	    "name": "test-profile-1",
+	    "profileType": "test",
+	    "metrics": [
+	      {
+	        "warningThreshold": -1,
+	        "criticalThreshold": -1,
+	        "name": "metric1",
+	        "customName": "custom-metric1",
+	        "monitored": true,
+	        "graphed": false,
+	        "serviceType": "view1"
+	      },
+	      {
+	        "name": "metric3",
+	        "monitored": true,
+	        "graphed": false,
+	        "serviceType": "view2"
+	      },
+	      {
+	        "warningThreshold": 10,
+	        "criticalThreshold": 20,
+	        "name": "metric2",
+	        "customName": "",
+	        "monitored": true,
+	        "graphed": false,
+	        "serviceType": "view1"
+	      },
+	      {
+	        "warningThreshold": -1,
+	        "criticalThreshold": -1,
+	        "name": "metric4",
+	        "customName": "custom-metric4",
+	        "monitored": false,
+	        "graphed": false,
+	        "serviceType": "view2"
+	      }
+	    ]
+	  }
+	}`)
 
-// 	testMonitorConnection := transit.MonitorConnection{
-// 		ID:          0,
-// 		Server:      "eccTestServer1,eccTestServer2",
-// 		UserName:    "eccTestUsername",
-// 		Password:    "ecctestPassword",
-// 		SslEnabled:  false,
-// 		URL:         "",
-// 		Views:       nil,
-// 		Extensions:  testExtensions,
-// 		ConnectorID: 0,
-// 	}
+	cfgChksum, _ = connectors.Hashsum(expected)
+	config.GetConfig().LoadConnectorDTO(data)
+	configHandler(data)
 
-// 	testMetric1View1 := transit.MetricDefinition{
-// 		Name:        "metric1",
-// 		ServiceType: "view1",
-// 		Monitored:   true,
-// 	}
-// 	testMetric2View1 := transit.MetricDefinition{
-// 		Name:        "metric2",
-// 		ServiceType: "view1",
-// 		Monitored:   true,
-// 	}
-// 	testMetric3View2 := transit.MetricDefinition{
-// 		Name:        "metric3",
-// 		ServiceType: "view2",
-// 		Monitored:   true,
-// 	}
-// 	testMetricsProfile := transit.MetricsProfile{
-// 		Name:        "",
-// 		ProfileType: "",
-// 		IsTemplate:  false,
-// 		Metrics:     []transit.MetricDefinition{testMetric1View1, testMetric2View1, testMetric3View2},
-// 	}
-// 	testGWConnections := config.GWConnections{
-// 		&config.GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
-// 		&config.GWConnection{HostName: "localhost:3001"},
-// 	}
+	if !reflect.DeepEqual(*extConfig, expected) {
+		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
+	}
+}
 
-// 	actual := InitConfig("testAppType", "testAgentId", &testMonitorConnection, &testMetricsProfile, testGWConnections)
+func TestInitConfigWithNotPresentedValues(t *testing.T) {
+	mockConfig()
 
-// 	expectedViews := make(map[string]map[string]transit.MetricDefinition)
-// 	expectedView1 := make(map[string]transit.MetricDefinition)
-// 	expectedView2 := make(map[string]transit.MetricDefinition)
-// 	expectedView1["metric1"] = testMetric1View1
-// 	expectedView1["metric2"] = testMetric2View1
-// 	expectedView2["metric3"] = testMetric3View2
-// 	expectedViews["view1"] = expectedView1
-// 	expectedViews["view2"] = expectedView2
+	expected := ExtConfig{
+		Kibana: Kibana{
+			ServerName: defaultKibanaServerName,
+			Username:   defaultKibanaUsername,
+			Password:   defaultKibanaPassword,
+		},
+		CustomTimeFilter: clients.KTimeFilter{
+			From: "now-120s",
+			To:   defaultTimeFilterTo,
+		},
+		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
+		HostNameField:      defaultHostNameLabel,
+		HostGroupField:     defaultHostGroupLabel,
+		GroupNameByUser:    defaultGroupNameByUser,
+		Timer:              connectors.DefaultTimer,
+		Ownership:          transit.Yield,
+		AppType:            "",
+		AgentID:            "",
+		Servers:            []string{defaultElasticServer},
+		Views:              map[string]map[string]transit.MetricDefinition{},
+	}
 
-// 	expected := ExtConfig{
-// 		AppType: "testAppType",
-// 		AgentID: "testAgentId",
-// 		Servers: []string{"http://eccTestServer1", "http://eccTestServer2"},
-// 		Kibana: Kibana{
-// 			ServerName: "http://eccTestKibanaServer/",
-// 			Username:   "eccTestKibanaUser",
-// 			Password:   "eccTestKibanaPass",
-// 		},
-// 		Views: expectedViews,
-// 		CustomTimeFilter: clients.KTimeFilter{
-// 			From: "now-60s",
-// 			To:   "now",
-// 		},
-// 		OverrideTimeFilter: true,
-// 		HostNameField:      "eccTestHostNameLabel",
-// 		HostGroupField:     "eccTestHostGroupLabel",
-// 		GroupNameByUser:    false,
-// 		Timer:              60,
-// 		GWConnections:      testGWConnections,
-// 	}
+	data := []byte(`{}`)
 
-// 	checkExpected(t, actual, &expected)
-// }
+	cfgChksum, _ = connectors.Hashsum(expected)
+	config.GetConfig().LoadConnectorDTO(data)
+	configHandler(data)
 
-// func TestInitConfigWithNotPresentedValues(t *testing.T) {
-// 	expected := ExtConfig{
-// 		AppType: "testAppType",
-// 		AgentID: "testAgentId",
-// 		Servers: []string{defaultElasticServer},
-// 		Kibana: Kibana{
-// 			ServerName: defaultKibanaServerName,
-// 			Username:   defaultKibanaUsername,
-// 			Password:   defaultKibanaPassword,
-// 		},
-// 		CustomTimeFilter: clients.KTimeFilter{
-// 			From: "now-120s",
-// 			To:   defaultTimeFilterTo,
-// 		},
-// 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
-// 		HostNameField:      defaultHostNameLabel,
-// 		HostGroupField:     defaultHostGroupLabel,
-// 		GroupNameByUser:    defaultGroupNameByUser,
-// 		Timer:              connectors.DefaultTimer,
-// 		Ownership:          transit.Yield,
-// 	}
-// 	actual := InitConfig("testAppType", "testAgentId", nil, nil, nil)
+	if !reflect.DeepEqual(*extConfig, expected) {
+		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
+	}
+}
 
-// 	checkExpected(t, actual, &expected)
-// }
+func TestInitConfigWithPartialPresentedValues(t *testing.T) {
+	mockConfig()
 
-// func TestInitConfigWithPartialPresentedValues(t *testing.T) {
-// 	testExtensions := make(map[string]interface{})
-// 	// set only checkbox "User Defined Host Group Name" as selected
-// 	testExtensions[extensionsKeyGroupNameByUser] = true
-// 	testMonitorConnection := transit.MonitorConnection{
-// 		Extensions: testExtensions,
-// 	}
+	expected := ExtConfig{
+		Kibana: Kibana{
+			ServerName: defaultKibanaServerName,
+			Username:   defaultKibanaUsername,
+			Password:   defaultKibanaPassword,
+		},
+		CustomTimeFilter: clients.KTimeFilter{
+			From: "now-120s",
+			To:   defaultTimeFilterTo,
+		},
+		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
+		HostNameField:      defaultHostNameLabel,
+		HostGroupField:     defaultHostGroupName,
+		GroupNameByUser:    true,
+		Timer:              connectors.DefaultTimer,
+		Ownership:          transit.Yield,
+		AppType:            "testAppType",
+		AgentID:            "testAgentId",
+		Servers:            []string{defaultElasticServer},
+		Views:              map[string]map[string]transit.MetricDefinition{},
+	}
 
-// 	expected := ExtConfig{
-// 		AppType: "testAppType",
-// 		AgentID: "testAgentId",
-// 		Servers: []string{defaultElasticServer},
-// 		Kibana: Kibana{
-// 			ServerName: defaultKibanaServerName,
-// 			Username:   defaultKibanaUsername,
-// 			Password:   defaultKibanaPassword,
-// 		},
-// 		CustomTimeFilter: clients.KTimeFilter{
-// 			From: "now-120s",
-// 			To:   defaultTimeFilterTo,
-// 		},
-// 		OverrideTimeFilter: defaultAlwaysOverrideTimeFilter,
-// 		HostNameField:      defaultHostNameLabel,
-// 		HostGroupField:     defaultHostGroupName,
-// 		GroupNameByUser:    true,
-// 		Timer:              connectors.DefaultTimer,
-// 		Ownership:          transit.Yield,
-// 	}
+	data := []byte(`{
+		"agentId": "testAgentId",
+		"appType": "testAppType",
+		"monitorConnection": {
+			"extensions": {"hostGroupNameByUser":true}
+		}
+	}`)
 
-// 	actual := InitConfig("testAppType", "testAgentId", &testMonitorConnection, nil, nil)
+	cfgChksum, _ = connectors.Hashsum(expected)
+	config.GetConfig().LoadConnectorDTO(data)
+	configHandler(data)
 
-// 	checkExpected(t, actual, &expected)
-
-// 	// set checkbox "User Defined Host Group Name" as not selected
-// 	testMonitorConnection.Extensions[extensionsKeyGroupNameByUser] = false
-// 	expected.HostGroupField = defaultHostGroupLabel
-// 	expected.GroupNameByUser = false
-
-// 	actual = InitConfig("testAppType", "testAgentId", &testMonitorConnection, nil, nil)
-
-// 	checkExpected(t, actual, &expected)
-// }
+	if !reflect.DeepEqual(*extConfig, expected) {
+		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
+	}
+}
 
 func TestHandleEmptyConfig(t *testing.T) {
+	mockConfig()
+
 	expected := ExtConfig{
 		Kibana: Kibana{
 			ServerName: defaultKibanaServerName,
@@ -213,4 +263,10 @@ func TestHandleEmptyConfig(t *testing.T) {
 	if !reflect.DeepEqual(*extConfig, expected) {
 		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
 	}
+}
+
+func mockConfig() {
+	tmpFile, _ := ioutil.TempFile("", "config")
+	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 }
