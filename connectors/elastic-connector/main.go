@@ -142,7 +142,7 @@ func configHandler(data []byte) {
 	}
 	/* Update config with received values */
 	if tMonConn.Server != "" {
-		servers := strings.Split(monitorConnection.Server, ",")
+		servers := strings.Split(tMonConn.Server, ",")
 		for i, server := range servers {
 			if !strings.HasPrefix(server, defaultProtocol) {
 				servers[i] = defaultProtocol + ":" + "//" + server
@@ -150,23 +150,40 @@ func configHandler(data []byte) {
 		}
 		tExt.Servers = servers
 	}
-	if metricsProfile != nil {
-		for _, metric := range metricsProfile.Metrics {
-			// temporary solution, will be removed
-			if templateMetricName == metric.Name || !metric.Monitored {
-				continue
-			}
-			if tExt.Views[metric.ServiceType] != nil {
-				tExt.Views[metric.ServiceType][metric.Name] = metric
-			} else {
-				metrics := make(map[string]transit.MetricDefinition)
-				metrics[metric.Name] = metric
-				tExt.Views[metric.ServiceType] = metrics
-			}
+	if !strings.HasPrefix(tExt.Kibana.ServerName, defaultProtocol) {
+		kibanaServerName := defaultProtocol + ":" + "//" + tExt.Kibana.ServerName
+		tExt.Kibana.ServerName = kibanaServerName
+	}
+	if !strings.HasSuffix(tExt.Kibana.ServerName, "/") {
+		kibanaServerName := tExt.Kibana.ServerName + "/"
+		tExt.Kibana.ServerName = kibanaServerName
+	}
+	if tExt.GroupNameByUser && tExt.HostGroupField == defaultHostGroupLabel {
+		tExt.HostGroupField = defaultHostGroupName
+	}
+	for _, metric := range tMetProf.Metrics {
+		// temporary solution, will be removed
+		if templateMetricName == metric.Name || !metric.Monitored {
+			continue
+		}
+		if tExt.Views[metric.ServiceType] != nil {
+			tExt.Views[metric.ServiceType][metric.Name] = metric
+		} else {
+			metrics := make(map[string]transit.MetricDefinition)
+			metrics[metric.Name] = metric
+			tExt.Views[metric.ServiceType] = metrics
 		}
 	}
 	if len(tExt.GWConnections) > 0 {
-		tExt.Ownership = transit.HostOwnershipType(tExt.GWConnections[0].DeferOwnership)
+		for _, conn := range tExt.GWConnections {
+			if conn.DeferOwnership != "" {
+				ownership := transit.HostOwnershipType(tExt.GWConnections[0].DeferOwnership)
+				if ownership != "" {
+					tExt.Ownership = ownership
+					break
+				}
+			}
+		}
 	}
 	tExt.replaceIntervalTemplates()
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
