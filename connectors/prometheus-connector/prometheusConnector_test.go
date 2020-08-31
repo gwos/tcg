@@ -38,7 +38,7 @@ func TestUnmarshalConfig(t *testing.T) {
 	}`)
 	extConfig := &ExtConfig{Timer: connectors.DefaultTimer}
 	metricsProfile := &transit.MetricsProfile{}
-	monitorConnection := &connectors.MonitorConnection{
+	monitorConnection := &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 

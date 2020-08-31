@@ -61,7 +61,7 @@ func TestUnmarshalConfig(t *testing.T) {
 	}`)
 	extConfig := &ExtConfig{}
 	metricsProfile := &transit.MetricsProfile{}
-	monitorConnection := &connectors.MonitorConnection{
+	monitorConnection := &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 
@@ -93,7 +93,7 @@ func TestExtConfigValidateFails(t *testing.T) {
 	}`)
 	extConfig := &ExtConfig{}
 	metricsProfile := &transit.MetricsProfile{}
-	monitorConnection := &connectors.MonitorConnection{
+	monitorConnection := &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 
