@@ -34,7 +34,9 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	if err := json.Unmarshal(input, &c); err != nil {
 		return err
 	}
-	c.Timer = c.Timer * time.Minute
+	if c.Timer != cfg.Timer {
+		c.Timer = c.Timer * time.Minute
+	}
 	*cfg = ExtConfig(c)
 	return nil
 }
