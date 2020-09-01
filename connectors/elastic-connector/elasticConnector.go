@@ -45,7 +45,7 @@ type ExtConfig struct {
 	HostNameField      string              `json:"hostNameLabelPath"`
 	HostGroupField     string              `json:"hostGroupLabelPath"`
 	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
-	Timer              time.Duration       `json:"checkIntervalMinutes"`
+	CheckInterval      time.Duration       `json:"checkIntervalMinutes"`
 	AppType            string
 	AgentID            string
 	GWConnections      config.GWConnections
@@ -53,14 +53,15 @@ type ExtConfig struct {
 	Views              map[string]map[string]transit.MetricDefinition
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
 func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	type plain ExtConfig
 	c := plain(*cfg)
 	if err := json.Unmarshal(input, &c); err != nil {
 		return err
 	}
-	if c.Timer != cfg.Timer {
-		c.Timer = c.Timer * time.Minute
+	if c.CheckInterval != cfg.CheckInterval {
+		c.CheckInterval = c.CheckInterval * time.Minute
 	}
 	if c.CustomTimeFilter.Override != nil {
 		c.OverrideTimeFilter = *c.CustomTimeFilter.Override
@@ -105,9 +106,9 @@ func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) 
 
 func (cfg *ExtConfig) replaceIntervalTemplates() {
 	cfg.CustomTimeFilter.From = replaceIntervalTemplate(cfg.CustomTimeFilter.From,
-		cfg.Timer)
+		cfg.CheckInterval)
 	cfg.CustomTimeFilter.To = replaceIntervalTemplate(cfg.CustomTimeFilter.To,
-		cfg.Timer)
+		cfg.CheckInterval)
 }
 
 func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {

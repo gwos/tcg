@@ -48,7 +48,7 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		pull(extConfig.Resources)
 	})
 }
@@ -61,10 +61,10 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Resources: []Resource{},
-		Services:  []string{},
-		Timer:     connectors.DefaultTimer,
-		Ownership: transit.Yield,
+		Resources:     []Resource{},
+		Services:      []string{},
+		CheckInterval: connectors.DefaultCheckInterval,
+		Ownership:     transit.Yield,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}

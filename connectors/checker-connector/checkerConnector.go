@@ -117,7 +117,7 @@ func parseBody(body []byte) (*[]transit.MonitoredResource, error) {
 			Type:          transit.Host,
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultTimer)},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultCheckInterval)},
 			Services:      value,
 		})
 	}
@@ -213,7 +213,7 @@ func getServices(metricsMap map[string][]transit.TimeSeries, metricsLines []stri
 			Owner:            arr[2],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultCheckInterval)},
 			LastPlugInOutput: arr[5],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
 		})

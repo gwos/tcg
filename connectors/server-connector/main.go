@@ -56,7 +56,7 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		if len(metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
@@ -80,9 +80,9 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Processes: []string{},
-		Timer:     connectors.DefaultTimer,
-		Ownership: transit.Yield,
+		Processes:     []string{},
+		CheckInterval: connectors.DefaultCheckInterval,
+		Ownership:     transit.Yield,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}

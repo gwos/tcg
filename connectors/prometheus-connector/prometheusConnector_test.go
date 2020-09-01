@@ -12,7 +12,7 @@ import (
 
 func TestUnmarshalConfig(t *testing.T) {
 	expected := ExtConfig{
-		Timer: connectors.DefaultTimer,
+		CheckInterval: connectors.DefaultCheckInterval,
 	}
 
 	data := []byte(`
@@ -37,7 +37,7 @@ func TestUnmarshalConfig(t *testing.T) {
 			}
 		}
 	}`)
-	extConfig := &ExtConfig{Timer: connectors.DefaultTimer}
+	extConfig := &ExtConfig{CheckInterval: connectors.DefaultCheckInterval}
 	metricsProfile := &transit.MetricsProfile{}
 	monitorConnection := &transit.MonitorConnection{
 		Extensions: extConfig,
@@ -51,7 +51,7 @@ func TestUnmarshalConfig(t *testing.T) {
 	assert.Equal(t, 11, monitorConnection.ID)
 	assert.Equal(t, 111, monitorConnection.ConnectorID)
 
-	expected.Timer = 3 * time.Minute
+	expected.CheckInterval = 3 * time.Minute
 	assert.NoError(t, connectors.UnmarshalConfig(data2, metricsProfile, monitorConnection))
 	if !reflect.DeepEqual(*extConfig, expected) {
 		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
