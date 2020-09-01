@@ -24,25 +24,17 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*AgentService
-	srv                *http.Server
+	entrypoints        []Entrypoint
 	listMetricsHandler GetBytesHandlerType
-	ListMetricsMutex   sync.Mutex
+	srv                *http.Server
 }
 
+// Entrypoint describes controller API
 type Entrypoint struct {
-	Url     string
-	Method  HttpMethod
+	URL     string
+	Method  string
 	Handler func(c *gin.Context)
 }
-
-type HttpMethod string
-
-const (
-	Get    HttpMethod = "Get"
-	Post              = "Post"
-	Put               = "Put"
-	Delete            = "Delete"
-)
 
 const shutdownTimeout = 5 * time.Second
 
@@ -54,18 +46,32 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetAgentService(),
+			[]Entrypoint{},
 			nil,
 			nil,
-			sync.Mutex{},
 		}
 	})
 	return controller
 }
 
+// RegisterEntrypoints sets addition API
+func (controller *Controller) RegisterEntrypoints(entrypoints []Entrypoint) {
+	controller.Mutex.Lock()
+	controller.entrypoints = entrypoints
+	controller.Mutex.Unlock()
+}
+
+// RemoveEntrypoints removes addition API
+func (controller *Controller) RemoveEntrypoints() {
+	controller.Mutex.Lock()
+	controller.entrypoints = []Entrypoint{}
+	controller.Mutex.Unlock()
+}
+
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
-	controller.ListMetricsMutex.Lock()
-	defer controller.ListMetricsMutex.Unlock()
+	controller.Mutex.Lock()
+	defer controller.Mutex.Unlock()
 	if controller.listMetricsHandler != nil {
 		return controller.listMetricsHandler()
 	}
@@ -74,16 +80,16 @@ func (controller *Controller) ListMetrics() ([]byte, error) {
 
 // RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
 func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
-	controller.ListMetricsMutex.Lock()
+	controller.Mutex.Lock()
 	controller.listMetricsHandler = fn
-	controller.ListMetricsMutex.Unlock()
+	controller.Mutex.Unlock()
 }
 
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
-	controller.ListMetricsMutex.Lock()
+	controller.Mutex.Lock()
 	controller.listMetricsHandler = nil
-	controller.ListMetricsMutex.Unlock()
+	controller.Mutex.Unlock()
 }
 
 // SendEvents implements Controllers.SendEvents interface
@@ -103,7 +109,7 @@ func (controller *Controller) SendEventsUnack(payload []byte) error {
 
 // starts the http server
 // overrides AgentService implementation
-func (controller *Controller) startController(entrypoints []Entrypoint) error {
+func (controller *Controller) startController() error {
 	if controller.srv != nil {
 		log.Warn("StartController: already started")
 		return nil
@@ -125,7 +131,7 @@ func (controller *Controller) startController(entrypoints []Entrypoint) error {
 	corsConfig.AllowedHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
 	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
-	controller.registerAPI1(router, addr, entrypoints)
+	controller.registerAPI1(router, addr, controller.entrypoints)
 
 	controller.srv = &http.Server{
 		Addr:    addr,
@@ -484,14 +490,14 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 
 	for _, entrypoint := range entrypoints {
 		switch entrypoint.Method {
-		case Get:
-			apiV1Group.GET(entrypoint.Url, entrypoint.Handler)
-		case Post:
-			apiV1Group.POST(entrypoint.Url, entrypoint.Handler)
-		case Put:
-			apiV1Group.PUT(entrypoint.Url, entrypoint.Handler)
-		case Delete:
-			apiV1Group.DELETE(entrypoint.Url, entrypoint.Handler)
+		case http.MethodGet:
+			apiV1Group.GET(entrypoint.URL, entrypoint.Handler)
+		case http.MethodPost:
+			apiV1Group.POST(entrypoint.URL, entrypoint.Handler)
+		case http.MethodPut:
+			apiV1Group.PUT(entrypoint.URL, entrypoint.Handler)
+		case http.MethodDelete:
+			apiV1Group.DELETE(entrypoint.URL, entrypoint.Handler)
 		}
 	}
 

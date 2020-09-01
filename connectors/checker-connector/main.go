@@ -45,6 +45,8 @@ func main() {
 	config.Version.Time = buildTime
 	log.Info(fmt.Sprintf("[Checker Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
+
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -54,7 +56,7 @@ func main() {
 	})
 
 	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error(err)
 		return
 	}

@@ -530,12 +530,10 @@ func updateCache() {
 // initializeEntrypoints - function for setting entrypoints,
 // that will be available through the Server Connector API
 func initializeEntrypoints() []services.Entrypoint {
-	var entrypoints []services.Entrypoint
-
-	entrypoints = append(entrypoints,
-		services.Entrypoint{
-			Url:    "/suggest/:viewName",
-			Method: "Get",
+	return []services.Entrypoint{
+		{
+			URL:    "/suggest/:viewName",
+			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
 				if c.Param("viewName") == string(transit.Process) {
 					c.JSON(http.StatusOK, listSuggestions(""))
@@ -544,9 +542,9 @@ func initializeEntrypoints() []services.Entrypoint {
 				}
 			},
 		},
-		services.Entrypoint{
-			Url:    "/suggest/:viewName/:name",
-			Method: "Get",
+		{
+			URL:    "/suggest/:viewName/:name",
+			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
 				if c.Param("viewName") == string(transit.Process) {
 					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
@@ -555,16 +553,16 @@ func initializeEntrypoints() []services.Entrypoint {
 				}
 			},
 		},
-		services.Entrypoint{
-			Url:    "/expressions/suggest/:name",
-			Method: "Get",
+		{
+			URL:    "/expressions/suggest/:name",
+			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
 				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
 			},
 		},
-		services.Entrypoint{
-			Url:    "/expressions/evaluate",
-			Method: "Post",
+		{
+			URL:    "/expressions/evaluate",
+			Method: http.MethodPost,
 			Handler: func(c *gin.Context) {
 				var expression connectors.ExpressionToEvaluate
 				body, err := c.GetRawData()
@@ -585,6 +583,6 @@ func initializeEntrypoints() []services.Entrypoint {
 				log.Error("[Server Connector]: ", err)
 				c.IndentedJSON(http.StatusBadRequest, err.Error())
 			},
-		})
-	return entrypoints
+		},
+	}
 }

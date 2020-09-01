@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
@@ -12,7 +11,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
 	"strings"
 )
 
@@ -41,40 +39,15 @@ func main() {
 	config.Version.Time = buildTime
 	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
+
 	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(
-		services.Entrypoint{
-			Url:    "/suggest/:viewName",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), ""))
-			},
-		},
-		services.Entrypoint{
-			Url:    "/suggest/:viewName/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
-			},
-		},
-		services.Entrypoint{
-			Url:    "/expressions/suggest/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
-			},
-		},
-		services.Entrypoint{
-			Url:     "/expressions/evaluate",
-			Method:  "Post",
-			Handler: connectors.EvaluateExpressionHandler,
-		},
-	); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Elastic Connector]: ", err)
 		return
 	}

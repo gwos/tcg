@@ -240,15 +240,13 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 }
 
 // initializeEntrypoints - function for setting entrypoints,
-// that will be available through the Server Connector API
+// that will be available through the Connector API
 func initializeEntrypoints() []services.Entrypoint {
-	return append(make([]services.Entrypoint, 1),
-		services.Entrypoint{
-			Url:     "/metrics/job/:name",
-			Method:  "Post",
-			Handler: receiverHandler,
-		},
-	)
+	return []services.Entrypoint{{
+		URL:     "/metrics/job/:name",
+		Method:  http.MethodPost,
+		Handler: receiverHandler,
+	}}
 }
 
 func receiverHandler(c *gin.Context) {
