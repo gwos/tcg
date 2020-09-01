@@ -84,7 +84,7 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		if len(connector.monitoringState.Metrics) > 0 {
 			metrics, inventory, groups := connector.CollectMetrics()
 
@@ -127,7 +127,7 @@ func configHandler(data []byte) {
 		HostNameField:      defaultHostNameLabel,
 		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
-		Timer:              connectors.DefaultTimer,
+		CheckInterval:      connectors.DefaultCheckInterval,
 		AppType:            config.GetConfig().Connector.AppType,
 		AgentID:            config.GetConfig().Connector.AgentID,
 		GWConnections:      config.GetConfig().GWConnections,
