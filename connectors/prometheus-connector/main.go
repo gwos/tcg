@@ -31,13 +31,15 @@ func main() {
 	config.Version.Time = buildTime
 	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
+
 	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Prometheus Connector]: ", err)
 		return
 	}

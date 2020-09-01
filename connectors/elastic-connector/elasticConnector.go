@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
@@ -12,6 +13,7 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel/api/trace"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -314,4 +316,35 @@ func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.
 		}
 	}
 	return srvs
+}
+
+func initializeEntrypoints() []services.Entrypoint {
+	return []services.Entrypoint{
+		{
+			URL:    "/suggest/:viewName",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), ""))
+			},
+		},
+		{
+			URL:    "/suggest/:viewName/:name",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+		{
+			URL:    "/expressions/suggest/:name",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
+		{
+			URL:     "/expressions/evaluate",
+			Method:  http.MethodPost,
+			Handler: connectors.EvaluateExpressionHandler,
+		},
+	}
 }

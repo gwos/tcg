@@ -45,17 +45,11 @@ func (cfg ExtConfig) Validate() error {
 }
 
 func initializeEntrypoints() []services.Entrypoint {
-	var entrypoints []services.Entrypoint
-
-	entrypoints = append(entrypoints,
-		services.Entrypoint{
-			Url:     "/receiver",
-			Method:  "Post",
-			Handler: receiverHandler,
-		},
-	)
-
-	return entrypoints
+	return []services.Entrypoint{{
+		URL:     "/receiver",
+		Method:  http.MethodPost,
+		Handler: receiverHandler,
+	}}
 }
 
 func receiverHandler(c *gin.Context) {
