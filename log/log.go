@@ -8,8 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 )
@@ -29,15 +29,17 @@ const (
 
 const timestampFormat = "2006-01-02 15:04:05"
 
-var RemoveKeys = [...]string{"password", "token"}
-
-var logger = struct {
-	*logrus.Logger
-	consPeriod int
-}{
-	logrus.New(),
-	0,
-}
+var (
+	logger = struct {
+		*logrus.Logger
+		consPeriod int
+	}{
+		logrus.New(),
+		0,
+	}
+	/* define regex matcher for json sanitizer */
+	sanRe = regexp.MustCompile(`((?i:password|token)"[^:]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`)
+)
 
 // Info makes entries in the log on Info level
 func Info(args ...interface{}) {
@@ -62,18 +64,25 @@ func Error(args ...interface{}) {
 // Config configures logger
 func Config(filePath string, level int, consPeriod int) {
 	once.Do(func() {
+		/* sanitize attached json */
+		SetHook(func(entry Entry) error {
+			for k, v := range entry.Data {
+				entry.Data[k] = sanRe.ReplaceAllString(fmt.Sprintf("%+v", v), `${1}"***"`)
+			}
+			return nil
+		})
+
+		/* consolidate log entries */
 		ch := ckHook{
 			cache.New(10*time.Minute, 10*time.Second),
 			os.Stdout,
 		}
-
 		if len(filePath) > 0 {
 			if logFile, err := os.OpenFile(filePath,
 				os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
 				ch.writer = io.MultiWriter(os.Stdout, logFile)
 			}
 		}
-
 		ch.cache.OnEvicted(fnOnEvicted(ch.writer))
 		logger.SetOutput(ioutil.Discard)
 		logger.AddHook(&ch)
@@ -175,37 +184,14 @@ func (h *ckHook) Fire(entry *logrus.Entry) error {
 	} else {
 		/* skip caching if consolidation off */
 		if logger.consPeriod > 0 {
-			_ = h.cache.Add(string(protectData(ck)), uint16(0), time.Duration(logger.consPeriod)*time.Second)
+			_ = h.cache.Add(ck, uint16(0), time.Duration(logger.consPeriod)*time.Second)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-		_, _ = h.writer.Write(protectData(string(output)))
+		_, _ = h.writer.Write(output)
 	}
 	/* debug hits */
 	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
 	return nil
-}
-
-func protectData(data string) []byte {
-	for _, key := range RemoveKeys {
-		jsonKey := fmt.Sprintf("\"%s\"", key)
-		if keyPos := strings.Index(data, jsonKey); keyPos != -1 {
-			endKeyPos := keyPos + len(jsonKey)
-			valuePos := endKeyPos + 2
-			var cut string
-			if valueEndPos := strings.Index(data[endKeyPos:], ",") + valuePos; valueEndPos != valuePos-1 {
-				cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
-				data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
-			} else {
-				if valueEndPos := strings.LastIndex(data[endKeyPos:], "}") + valuePos; valueEndPos != valuePos-1 {
-					cut = fmt.Sprintf("\"%s\": %s", key, data[valuePos:valueEndPos-2])
-					data = strings.Replace(data, cut, fmt.Sprintf("\"%s\": %s", key, "\"*****\""), 1)
-				} else {
-					continue
-				}
-			}
-		}
-	}
-	return []byte(data)
 }
 
 type genHook struct {
