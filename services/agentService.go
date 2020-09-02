@@ -128,15 +128,7 @@ func GetAgentService() *AgentService {
 		go agentService.listenStatsChan()
 		agentService.handleExit()
 
-		log.SetHook(func(entry log.Entry) error {
-			agentService.statsChan <- statsCounter{
-				bytesSent: 0,
-				lastError: fmt.Errorf("%+v : %s", entry.Data, entry.Message),
-				subject:   "log",
-			}
-			return nil
-		}, log.ErrorLevel)
-
+		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
@@ -699,6 +691,22 @@ func (service AgentService) handleExit() {
 		}
 		os.Exit(0)
 	}()
+}
+
+// hookLogErrors collects error entries for stats
+func (service AgentService) hookLogErrors(entry log.Entry) error {
+	entryData := ""
+	for _, v := range entry.Data {
+		if v != nil {
+			entryData += fmt.Sprintf("[%v] ", v)
+		}
+	}
+	service.statsChan <- statsCounter{
+		bytesSent: 0,
+		lastError: fmt.Errorf("%s%s", entryData, entry.Message),
+		subject:   "log",
+	}
+	return nil
 }
 
 // initTelemetryProvider creates a new provider instance
