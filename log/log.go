@@ -1,8 +1,8 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
-	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/patrickmn/go-cache"
 	"github.com/sirupsen/logrus"
 	"io"
@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -88,11 +89,8 @@ func Config(filePath string, level int, consPeriod int) {
 		logger.AddHook(&ch)
 	})
 
-	logger.SetFormatter(&nested.Formatter{
+	logger.SetFormatter(&Formatter{
 		TimestampFormat: timestampFormat,
-		HideKeys:        true,
-		ShowFullLevel:   true,
-		FieldsOrder:     []string{"component", "category"},
 	})
 
 	switch level {
@@ -215,4 +213,34 @@ func SetHook(fn func(Entry) error, levels ...logrus.Level) {
 		levels = logrus.AllLevels
 	}
 	logger.AddHook(&genHook{levels, fn})
+}
+
+// Formatter implements logrus.Formatter
+type Formatter struct {
+	TimestampFormat string
+}
+
+// Format implements logrus.Formatter.Format
+func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
+	colors := []int{31, 31, 31, 33, 36, 37}
+	data := ""
+	for _, v := range entry.Data {
+		if v != nil {
+			data += fmt.Sprintf("[%v] ", v)
+		}
+	}
+	var buf *bytes.Buffer
+	if entry.Buffer != nil {
+		buf = entry.Buffer
+	} else {
+		buf = &bytes.Buffer{}
+	}
+	fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
+		entry.Time.Format(f.TimestampFormat),
+		colors[entry.Level],
+		strings.ToUpper(entry.Level.String()),
+		data,
+		entry.Message,
+	)
+	return buf.Bytes(), nil
 }
