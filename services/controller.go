@@ -427,8 +427,7 @@ func (controller *Controller) status(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) version(c *gin.Context) {
-	c.JSON(http.StatusOK, config.BuildVersion{Tag: config.Version.Tag,
-		Time: config.Version.Time})
+	c.JSON(http.StatusOK, config.GetBuildInfo())
 }
 
 func (controller *Controller) validateToken(c *gin.Context) {
