@@ -19,7 +19,7 @@ import (
 
 var (
 	bronxRegexp              = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
-	nscaRegexp               = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
+	nscaRegexp               = regexp.MustCompile(`^(?:(.*?);)?(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
 	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);$`)
 	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);$`)
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
@@ -206,8 +206,21 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 	metricsMap := make(map[string][]transit.TimeSeries)
 	for _, metric := range metricsLines {
 		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
+
+		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		var err error
+		if len(arr) > 5 && arr[0] == "" {
+			arr = arr[1:]
+		} else {
+			timestamp, err = getTime(arr[0])
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		perfData := arr[len(arr)-1]
 		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
+
 		for _, metric := range pdArr {
 			var values []string
 			switch len(strings.Split(metric, ";")) {
@@ -224,12 +237,18 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 			var value, warning, critical float64
 			if v, err := strconv.ParseFloat(values[1], 64); err == nil {
 				value = v
+			} else {
+				return nil, err
 			}
 			if w, err := strconv.ParseFloat(values[2], 64); err == nil {
 				warning = w
+			} else {
+				return nil, err
 			}
 			if c, err := strconv.ParseFloat(values[3], 64); err == nil {
 				critical = c
+			} else {
+				return nil, err
 			}
 
 			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
@@ -239,8 +258,8 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 				UnitType:       transit.MB,
 				Warning:        warning,
 				Critical:       critical,
-				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: time.Now()},
-				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
+				StartTimestamp: timestamp,
+				EndTimestamp:   timestamp,
 			})
 			if err != nil {
 				return nil, err
@@ -258,16 +277,15 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 
 	for _, metric := range metricsLines {
 		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
-
-		var timestamp *milliseconds.MillisecondTimestamp
+		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		var err error
-		if len(arr) > 5 {
+		if len(arr) > 5 && arr[0] == "" {
+			arr = arr[1:]
+		} else {
 			timestamp, err = getTime(arr[0])
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		}
 
 		status, err := getStatus(arr[len(arr)-3])
@@ -299,9 +317,22 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 			return nil, errors.New("invalid metric format")
 		}
 
-		value, err := strconv.ParseFloat(arr[7], 64)
-		warning, err := strconv.ParseFloat(arr[8], 64)
-		critical, err := strconv.ParseFloat(arr[9], 64)
+		var value, warning, critical float64
+		if v, err := strconv.ParseFloat(arr[7], 64); err == nil {
+			value = v
+		} else {
+			return nil, err
+		}
+		if w, err := strconv.ParseFloat(arr[8], 64); err == nil {
+			warning = w
+		} else {
+			return nil, err
+		}
+		if c, err := strconv.ParseFloat(arr[9], 64); err == nil {
+			critical = c
+		} else {
+			return nil, err
+		}
 
 		timestamp, err := getTime(arr[1])
 		if err != nil {
