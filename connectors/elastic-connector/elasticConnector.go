@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
@@ -12,6 +13,7 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel/api/trace"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -45,7 +47,7 @@ type ExtConfig struct {
 	HostNameField      string              `json:"hostNameLabelPath"`
 	HostGroupField     string              `json:"hostGroupLabelPath"`
 	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
-	Timer              time.Duration       `json:"checkIntervalMinutes"`
+	CheckInterval      time.Duration       `json:"checkIntervalMinutes"`
 	AppType            string
 	AgentID            string
 	GWConnections      config.GWConnections
@@ -53,14 +55,15 @@ type ExtConfig struct {
 	Views              map[string]map[string]transit.MetricDefinition
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
 func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	type plain ExtConfig
 	c := plain(*cfg)
 	if err := json.Unmarshal(input, &c); err != nil {
 		return err
 	}
-	if c.Timer != cfg.Timer {
-		c.Timer = c.Timer * time.Minute
+	if c.CheckInterval != cfg.CheckInterval {
+		c.CheckInterval = c.CheckInterval * time.Minute
 	}
 	if c.CustomTimeFilter.Override != nil {
 		c.OverrideTimeFilter = *c.CustomTimeFilter.Override
@@ -105,9 +108,9 @@ func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) 
 
 func (cfg *ExtConfig) replaceIntervalTemplates() {
 	cfg.CustomTimeFilter.From = replaceIntervalTemplate(cfg.CustomTimeFilter.From,
-		cfg.Timer)
+		cfg.CheckInterval)
 	cfg.CustomTimeFilter.To = replaceIntervalTemplate(cfg.CustomTimeFilter.To,
-		cfg.Timer)
+		cfg.CheckInterval)
 }
 
 func replaceIntervalTemplate(templateString string, intervalValue time.Duration) string {
@@ -313,4 +316,35 @@ func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.
 		}
 	}
 	return srvs
+}
+
+func initializeEntrypoints() []services.Entrypoint {
+	return []services.Entrypoint{
+		{
+			URL:    "/suggest/:viewName",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), ""))
+			},
+		},
+		{
+			URL:    "/suggest/:viewName/:name",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+		{
+			URL:    "/expressions/suggest/:name",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
+			},
+		},
+		{
+			URL:     "/expressions/evaluate",
+			Method:  http.MethodPost,
+			Handler: connectors.EvaluateExpressionHandler,
+		},
+	}
 }

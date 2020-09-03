@@ -16,20 +16,36 @@ import (
 	"time"
 )
 
-// DefaultTimer defines interval in minutes
-const DefaultTimer = time.Duration(2) * time.Minute
+// ExtKeyCheckInterval defines field name
+const ExtKeyCheckInterval = "checkIntervalMinutes"
 
-// Timer comes from extensions field
-var Timer = DefaultTimer
+// DefaultCheckInterval defines interval
+const DefaultCheckInterval = time.Duration(2) * time.Minute
 
-// ExtensionsKeyTimer defines field name
-const ExtensionsKeyTimer = "checkIntervalMinutes"
+// CheckInterval comes from extensions field
+var CheckInterval = DefaultCheckInterval
 
 var Inventory = make(map[string]transit.InventoryResource)
 var inventoryChksum []byte
 
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
+	/* grab CheckInterval from MonitorConnection extensions */
+	var s struct {
+		MonitorConnection struct {
+			Extensions struct {
+				ExtensionsKeyTimer int `json:"checkIntervalMinutes"`
+			} `json:"extensions"`
+		} `json:"monitorConnection"`
+	}
+	if err := json.Unmarshal(data, &s); err == nil {
+		if s.MonitorConnection.Extensions.ExtensionsKeyTimer > 0 {
+			CheckInterval = time.Minute * time.Duration(s.MonitorConnection.Extensions.ExtensionsKeyTimer)
+		} else {
+			CheckInterval = DefaultCheckInterval
+		}
+	}
+	/* process args */
 	cfg := struct {
 		MetricsProfile    *transit.MetricsProfile    `json:"metricsProfile"`
 		MonitorConnection *transit.MonitorConnection `json:"monitorConnection"`
@@ -66,7 +82,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	}
 	for i := range request.Resources {
 		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(Timer)}
+		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(CheckInterval)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
@@ -80,7 +96,7 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 
 func setCheckTimes(resources []transit.MonitoredResource) {
 	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(Timer)
+	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	for i := range resources {
 		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
 		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
@@ -615,7 +631,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Status:           "SERVICE_OK",
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(Timer)},
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
