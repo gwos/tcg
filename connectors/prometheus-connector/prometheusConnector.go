@@ -25,6 +25,28 @@ type Resource struct {
 	URL     string            `json:"url"`
 }
 
+// UnmarshalJSON implements json.Unmarshaler.
+func (r *Resource) UnmarshalJSON(input []byte) error {
+	p := struct {
+		Headers []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"headers"`
+		URL string `json:"url"`
+	}{}
+
+	if err := json.Unmarshal(input, &p); err != nil {
+		return err
+	}
+
+	r.URL = p.URL
+	for _, h := range p.Headers {
+		r.Headers[h.Key] = h.Value
+	}
+
+	return nil
+}
+
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
 	Groups        []transit.ResourceGroup   `json:"groups"`
