@@ -23,7 +23,6 @@ import "C"
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/services"
 	"os"
 	"unsafe"
@@ -193,12 +192,6 @@ func DemandConfig(errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().DemandConfig(); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
-	}
-	if value, exist := os.LookupEnv("TCG_TAG"); exist {
-		config.Version.Tag = value
-	}
-	if value, exist := os.LookupEnv("TCG_BUILD_TIME"); exist {
-		config.Version.Time = value
 	}
 	return true
 }

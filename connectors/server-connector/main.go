@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -17,9 +16,6 @@ import (
 // Can be overridden during the build step.
 // See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.x.x"
-
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
@@ -35,10 +31,6 @@ var (
 // @BasePath /api/v1
 func main() {
 	go handleCache()
-
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
 
 	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
