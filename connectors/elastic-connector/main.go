@@ -3,8 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
@@ -12,7 +10,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
 	"strings"
 )
 
@@ -20,9 +17,6 @@ import (
 // Can be overridden during the build step.
 // See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.x.x"
-
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
@@ -37,9 +31,7 @@ var (
 const templateMetricName = "$view_Template#"
 
 func main() {
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-	log.Info(fmt.Sprintf("[Elastic Connector]: BuildVersion: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
 	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
@@ -47,34 +39,7 @@ func main() {
 	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(
-		services.Entrypoint{
-			Url:    "/suggest/:viewName",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), ""))
-			},
-		},
-		services.Entrypoint{
-			Url:    "/suggest/:viewName/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connector.ListSuggestions(c.Param("viewName"), c.Param("name")))
-			},
-		},
-		services.Entrypoint{
-			Url:    "/expressions/suggest/:name",
-			Method: "Get",
-			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, connectors.ListExpressions(c.Param("name")))
-			},
-		},
-		services.Entrypoint{
-			Url:     "/expressions/evaluate",
-			Method:  "Post",
-			Handler: connectors.EvaluateExpressionHandler,
-		},
-	); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Elastic Connector]: ", err)
 		return
 	}
@@ -84,7 +49,7 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		if len(connector.monitoringState.Metrics) > 0 {
 			metrics, inventory, groups := connector.CollectMetrics()
 
@@ -127,7 +92,7 @@ func configHandler(data []byte) {
 		HostNameField:      defaultHostNameLabel,
 		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
-		Timer:              connectors.DefaultTimer,
+		CheckInterval:      connectors.DefaultCheckInterval,
 		AppType:            config.GetConfig().Connector.AppType,
 		AgentID:            config.GetConfig().Connector.AgentID,
 		GWConnections:      config.GetConfig().GWConnections,

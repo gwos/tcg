@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -17,9 +16,6 @@ import (
 // Can be overridden during the build step.
 // See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.x.x"
-
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
@@ -36,9 +32,7 @@ var (
 func main() {
 	go handleCache()
 
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
 	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
@@ -46,7 +40,7 @@ func main() {
 	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Server Connector]: ", err)
 		return
 	}
@@ -56,7 +50,7 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		if len(metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
@@ -80,9 +74,9 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Processes: []string{},
-		Timer:     connectors.DefaultTimer,
-		Ownership: transit.Yield,
+		Processes:     []string{},
+		CheckInterval: connectors.DefaultCheckInterval,
+		Ownership:     transit.Yield,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}

@@ -27,11 +27,11 @@ type Resource struct {
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups    []transit.ResourceGroup   `json:"groups"`
-	Resources []Resource                `json:"resources"`
-	Services  []string                  `json:"services"`
-	Timer     time.Duration             `json:"checkIntervalMinutes"`
-	Ownership transit.HostOwnershipType `json:"ownership,omitempty"`
+	Groups        []transit.ResourceGroup   `json:"groups"`
+	Resources     []Resource                `json:"resources"`
+	Services      []string                  `json:"services"`
+	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -41,8 +41,8 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	if err := json.Unmarshal(input, &c); err != nil {
 		return err
 	}
-	if c.Timer != cfg.Timer {
-		c.Timer = c.Timer * time.Minute
+	if c.CheckInterval != cfg.CheckInterval {
+		c.CheckInterval = c.CheckInterval * time.Minute
 	}
 	*cfg = ExtConfig(c)
 	return nil
@@ -240,15 +240,13 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 }
 
 // initializeEntrypoints - function for setting entrypoints,
-// that will be available through the Server Connector API
+// that will be available through the Connector API
 func initializeEntrypoints() []services.Entrypoint {
-	return append(make([]services.Entrypoint, 1),
-		services.Entrypoint{
-			Url:     "/metrics/job/:name",
-			Method:  "Post",
-			Handler: receiverHandler,
-		},
-	)
+	return []services.Entrypoint{{
+		URL:     "/metrics/job/:name",
+		Method:  http.MethodPost,
+		Handler: receiverHandler,
+	}}
 }
 
 func receiverHandler(c *gin.Context) {

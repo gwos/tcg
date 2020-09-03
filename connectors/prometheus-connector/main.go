@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
@@ -15,9 +14,6 @@ import (
 // Can be overridden during the build step.
 // See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.x.x"
-
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
@@ -27,9 +23,7 @@ var (
 )
 
 func main() {
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-	log.Info(fmt.Sprintf("[Prometheus Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
 	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
@@ -37,7 +31,7 @@ func main() {
 	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Prometheus Connector]: ", err)
 		return
 	}
@@ -48,7 +42,7 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	connectors.StartPeriodic(ctxExit, extConfig.Timer, func() {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		pull(extConfig.Resources)
 	})
 }
@@ -61,10 +55,10 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Resources: []Resource{},
-		Services:  []string{},
-		Timer:     connectors.DefaultTimer,
-		Ownership: transit.Yield,
+		Resources:     []Resource{},
+		Services:      []string{},
+		CheckInterval: connectors.DefaultCheckInterval,
+		Ownership:     transit.Yield,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
