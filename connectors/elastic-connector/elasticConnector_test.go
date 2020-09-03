@@ -15,7 +15,9 @@ import (
 )
 
 func TestInitFullConfig(t *testing.T) {
-	mockConfig()
+	tmpFile, _ := ioutil.TempFile("", "config")
+	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	testMetric1View1 := transit.MetricDefinition{
 		Name:              "metric1",
@@ -146,7 +148,9 @@ func TestInitFullConfig(t *testing.T) {
 }
 
 func TestInitConfigWithNotPresentedValues(t *testing.T) {
-	mockConfig()
+	tmpFile, _ := ioutil.TempFile("", "config")
+	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{
 		Kibana: Kibana{
@@ -182,7 +186,9 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 }
 
 func TestInitConfigWithPartialPresentedValues(t *testing.T) {
-	mockConfig()
+	tmpFile, _ := ioutil.TempFile("", "config")
+	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{
 		Kibana: Kibana{
@@ -224,7 +230,9 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 }
 
 func TestHandleEmptyConfig(t *testing.T) {
-	mockConfig()
+	tmpFile, _ := ioutil.TempFile("", "config")
+	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{
 		Kibana: Kibana{
@@ -263,10 +271,4 @@ func TestHandleEmptyConfig(t *testing.T) {
 	if !reflect.DeepEqual(*extConfig, expected) {
 		t.Errorf("ExtConfig actual:\n%v\nexpected:\n%v", *extConfig, expected)
 	}
-}
-
-func mockConfig() {
-	tmpFile, _ := ioutil.TempFile("", "config")
-	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
-	defer os.Remove(tmpFile.Name())
 }
