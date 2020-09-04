@@ -99,8 +99,8 @@ tests	: ${JSON_TEST_FILES} _c_code/testjson.c ${BUILD_TARGET_DIRECTORY}/convert_
 gotocjson	: gotocjson.go
 	go build -o gotocjson gotocjson.go
 
-${BUILD_TARGET_DIRECTORY}/generic_datatypes.h ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c	: gotocjson generic_datatypes.go
-	./gotocjson -g -d -o ${BUILD_TARGET_DIRECTORY} generic_datatypes.go > ,generic-diagnostics
+${BUILD_TARGET_DIRECTORY}/generic_datatypes.h ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c	: gotocjson generic_datatypes/generic_datatypes.go
+	./gotocjson -g -d -o ${BUILD_TARGET_DIRECTORY} generic_datatypes/generic_datatypes.go > ,generic-diagnostics
 
 # Run the set of unit tests while looking for full detail on memory leaks.
 fullcheck	: ${BUILD_TARGET_DIRECTORY}/unittest
