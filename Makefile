@@ -133,8 +133,8 @@ ${INSTALL_BASE_DIRECTORY}/lib	:
 gotocjson/gotocjson	: gotocjson/gotocjson.go
 	make -C gotocjson gotocjson
 
-${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datatypes.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -g -o ${BUILD_TARGET_DIRECTORY} gotocjson/generic_datatypes.go
+${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datatypes/generic_datatypes.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -g -o ${BUILD_TARGET_DIRECTORY} gotocjson/generic_datatypes/generic_datatypes.go
 
 ${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson config/config.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
