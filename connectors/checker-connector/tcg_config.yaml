@@ -1,7 +1,7 @@
 connector:
   agentId: ""
-  appName: SERVER
-  appType: SERVER
+  appName: CHECKER
+  appType: CHECKER
   controllerAddr: 0.0.0.0:8099
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
