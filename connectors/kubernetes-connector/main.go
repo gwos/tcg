@@ -71,15 +71,15 @@ func main() {
 
 	log.Info("[Kubernetes1 Connector]: Starting metric connection ...")
 	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
-	cfg.Views = make(map[KubernetesView	]map[string]transit.MetricDefinition)
+	cfg.Views = make(map[KubernetesView]map[string]transit.MetricDefinition)
 	cfg.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
-	cfg.Views[ViewPods] =  fudgeUpPodMetricDefinitions()
+	cfg.Views[ViewPods] = fudgeUpPodMetricDefinitions()
 	count := 0
 	for {
 		if connector.kapi != nil {
 			inventory, monitored, groups := connector.Collect(&cfg)
 			fmt.Println(len(inventory), len(monitored), len(groups))
-			if  count == 0 {
+			if count == 0 {
 				error1 := connectors.SendInventory(inventory, groups, cfg.Ownership)
 				fmt.Println(error1)
 				time.Sleep(3 * time.Second)
