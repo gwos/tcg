@@ -8,31 +8,30 @@ import (
 // TODO: push down to Connectors
 const (
 	defaultHostGroupName = "Servers"
-	extensionsKeyGroups    = "groups"
-	extensionsKeyName      = "name"
-	extensionsKeyType      = "type"
+	extensionsKeyGroups  = "groups"
+	extensionsKeyName    = "name"
+	extensionsKeyType    = "type"
 )
 
 type KubernetesConnectorConfig struct {
-	AppType        string
-	AppName        string
-	AgentID        string
-	EndPoint 	   string
-	Ownership      transit.HostOwnershipType
-	Views          map[KubernetesView]map[string]transit.MetricDefinition
-	Groups         []transit.ResourceGroup
+	AppType   string
+	AppName   string
+	AgentID   string
+	EndPoint  string
+	Ownership transit.HostOwnershipType
+	Views     map[KubernetesView]map[string]transit.MetricDefinition
+	Groups    []transit.ResourceGroup
 }
 
 func InitConfig(monitorConnection *transit.MonitorConnection, metricsProfile *transit.MetricsProfile,
 	gwConnections config.GWConnections) *KubernetesConnectorConfig {
 
-
 	// Init config with default values
 	connectorConfig := KubernetesConnectorConfig{
-		AppType:  config.GetConfig().Connector.AppType,
-		AppName:  config.GetConfig().Connector.AppName,
-		AgentID:  config.GetConfig().Connector.AgentID,
-		EndPoint: "gwos.bluesunrise.com:8001", // TODO: hardcoded
+		AppType:   config.GetConfig().Connector.AppType,
+		AppName:   config.GetConfig().Connector.AppName,
+		AgentID:   config.GetConfig().Connector.AgentID,
+		EndPoint:  "gwos.bluesunrise.com:8001", // TODO: hardcoded
 		Ownership: transit.Yield,
 		Views:     nil,
 		Groups:    nil,

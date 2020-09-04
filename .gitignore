@@ -10,6 +10,7 @@ tcg
 test_libtransit
 connectors/checker-connector/checker-connector
 connectors/elastic-connector/elastic-connector
+connectors/kubernetes-connector/kubernetes-connector
 connectors/prometheus-connector/prometheus-connector
 connectors/server-connector/server-connector
 
