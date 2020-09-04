@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
@@ -9,57 +12,26 @@ import (
 	"time"
 )
 
-// Variables to control connector version and build time.
-// Can be overridden during the build step.
-// See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.1.1"
+	extConfig         = &ExtConfig{}
+	metricsProfile    = &transit.MetricsProfile{}
+	monitorConnection = &transit.MonitorConnection{
+		Extensions: extConfig,
+	}
+	chksum    []byte
+	connector KubernetesConnector
 )
 
 func main() {
-	var transitService = services.GetTransitService()
-	var cfg KubernetesConnectorConfig
-	// var chksum []byte
-	var connector KubernetesConnector
+	// services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
-	log.Info(fmt.Sprintf("[Kubernetes Connector]: Version: %s   /   Build time: %s", buildTag, buildTime))
+	ctxExit, exitHandler := context.WithCancel(context.Background())
+	transitService := services.GetTransitService()
+	transitService.RegisterConfigHandler(configHandler)
+	transitService.RegisterExitHandler(exitHandler)
 
-	transitService.RegisterConfigHandler(func(data []byte) {
-		log.Info("[Kubernetes Connector]: Configuration received")
-		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
-			c := InitConfig(monitorConn, profile, gwConnections)
-			cfg = *c
-			// TODO: refactor re-enable
-			// TODO: can we push 90% of this logic down to connectors? seems its redundant in each connectors
-			//chk, err := connectors.Hashsum(
-			//	config.GetConfig().Connector.AgentID,
-			//	config.GetConfig().GWConnections,
-			//	cfg,
-			//)
-			//if err != nil || !bytes.Equal(chksum, chk) {
-			//	log.Info("[Kubernetes Connector]: Sending inventory ...")
-			//	_ = connectors.SendInventory(
-			//		//*GatherInventory(),
-			//		nil, // TODO:
-			//		cfg.Groups,
-			//		cfg.Ownership,
-			//	)
-			//}
-			//if err == nil {
-			//	chksum = chk
-			//}
-
-			connector.Initialize(cfg) // TODO: handle error
-
-		} else {
-			log.Error("[Kubernetes Connector]: Error during parsing config. Aborting ...")
-			return
-		}
-	})
-
-	log.Info("[Kubernetes Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	log.Info("[K8 Connector]: Waiting for configuration to be delivered ...")
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error(err)
 		return
 	}
@@ -69,33 +41,86 @@ func main() {
 		return
 	}
 
-	log.Info("[Kubernetes1 Connector]: Starting metric connection ...")
-	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
-	cfg.Views = make(map[KubernetesView]map[string]transit.MetricDefinition)
-	cfg.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
-	cfg.Views[ViewPods] = fudgeUpPodMetricDefinitions()
+	log.Info("[K8 Connector]: Starting metric connection ...")
 	count := 0
-	for {
+	connectors.StartPeriodic(ctxExit, connectors.CheckInterval, func() {
 		if connector.kapi != nil {
-			inventory, monitored, groups := connector.Collect(&cfg)
-			fmt.Println(len(inventory), len(monitored), len(groups))
+			inventory, monitored, groups := connector.Collect(extConfig)
+			log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+
 			if count == 0 {
-				error1 := connectors.SendInventory(inventory, groups, cfg.Ownership)
-				fmt.Println(error1)
+				err := connectors.SendInventory(inventory, groups, extConfig.Ownership)
+				log.Error("[K8 Connector]: Error during sending inventory.", err)
 				time.Sleep(3 * time.Second)
 				count = count + 1
 			}
-			error2 := connectors.SendMetrics(monitored)
-			fmt.Println(error2)
+			err := connectors.SendMetrics(monitored)
+			log.Error("[K8 Connector]: Error during sending metrics.", err)
 		}
-		time.Sleep(300 * time.Second)
-	}
+	})
 }
 
-// initializeEntrypoints - function for setting entrypoints,
-// that will be available through the Server Connector API
-func initializeEntrypoints() []services.Entrypoint {
-	return make([]services.Entrypoint, 1)
+func configHandler(data []byte) {
+	log.Info("[K8 Connector]: Configuration received")
+	/* Init config with default values */
+	tExt := &ExtConfig{
+		AppType:   config.GetConfig().Connector.AppType,
+		AppName:   config.GetConfig().Connector.AppName,
+		AgentID:   config.GetConfig().Connector.AgentID,
+		EndPoint:  "gwos.bluesunrise.com:8001", // TODO: hardcoded
+		Ownership: transit.Yield,
+		Views:     make(map[KubernetesView]map[string]transit.MetricDefinition),
+		Groups:    []transit.ResourceGroup{},
+	}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
+	tMetProf := &transit.MetricsProfile{}
+	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
+		log.Error("[K8 Connector]: Error during parsing config.", err.Error())
+		return
+	}
+	/* Update config with received values */
+	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
+	tExt.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
+	tExt.Views[ViewPods] = fudgeUpPodMetricDefinitions()
+	for _, metric := range tMetProf.Metrics {
+		// temporary solution, will be removed
+		// TODO: push down into connectors - metric.Monitored breaks synthetics
+		//if templateMetricName == metric.Name || !metric.Monitored {
+		//	continue
+		//}
+		if metrics, has := tExt.Views[KubernetesView(metric.ServiceType)]; has {
+			metrics[metric.Name] = metric
+			tExt.Views[KubernetesView(metric.ServiceType)] = metrics
+		} else {
+			metrics := make(map[string]transit.MetricDefinition)
+			metrics[metric.Name] = metric
+			if tExt.Views != nil {
+				tExt.Views[KubernetesView(metric.ServiceType)] = metrics
+			}
+		}
+	}
+	gwConnections := config.GetConfig().GWConnections
+	if len(gwConnections) > 0 {
+		for _, conn := range gwConnections {
+			if conn.DeferOwnership != "" {
+				ownership := transit.HostOwnershipType(gwConnections[0].DeferOwnership)
+				if ownership != "" {
+					tExt.Ownership = ownership
+					break
+				}
+			}
+		}
+	}
+	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	monitorConnection.Extensions = extConfig
+	/* process checksums */
+	chk, err := connectors.Hashsum(extConfig)
+	if err != nil || !bytes.Equal(chksum, chk) {
+		// TODO: process inventory
+	}
+	if err == nil {
+		chksum = chk
+	}
 }
 
 // TODO: remove this
