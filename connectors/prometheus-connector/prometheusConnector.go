@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,62 @@ import (
 	"time"
 )
 
+// Resource defines Prometheus Source
+type Resource struct {
+	Headers map[string]string `json:"headers"`
+	URL     string            `json:"url"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (r *Resource) UnmarshalJSON(input []byte) error {
+	p := struct {
+		Headers []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"headers"`
+		URL string `json:"url"`
+	}{}
+
+	if err := json.Unmarshal(input, &p); err != nil {
+		return err
+	}
+
+	r.URL = p.URL
+	for _, h := range p.Headers {
+		r.Headers[h.Key] = h.Value
+	}
+
+	return nil
+}
+
+// ExtConfig defines the MonitorConnection extensions configuration
+type ExtConfig struct {
+	Groups        []transit.ResourceGroup   `json:"groups"`
+	Resources     []Resource                `json:"resources"`
+	Services      []string                  `json:"services"`
+	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
+	type plain ExtConfig
+	c := plain(*cfg)
+	if err := json.Unmarshal(input, &c); err != nil {
+		return err
+	}
+	if c.CheckInterval != cfg.CheckInterval {
+		c.CheckInterval = c.CheckInterval * time.Minute
+	}
+	*cfg = ExtConfig(c)
+	return nil
+}
+
+const defaultHostGroupName = "Servers"
+
 var parser expfmt.TextParser
 
+// Synchronize makes InventoryResource
 func Synchronize() *[]transit.InventoryResource {
 	var inventoryResources []transit.InventoryResource
 	for _, resource := range connectors.Inventory {
@@ -128,6 +183,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 				Value:          value,
 				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: timestamp},
 				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: timestamp},
+				Graphed:        true,
 			}
 
 			for _, label := range metric.GetLabel() {
@@ -206,15 +262,13 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 }
 
 // initializeEntrypoints - function for setting entrypoints,
-// that will be available through the Server Connector API
+// that will be available through the Connector API
 func initializeEntrypoints() []services.Entrypoint {
-	return append(make([]services.Entrypoint, 1),
-		services.Entrypoint{
-			Url:     "/metrics/job/:name",
-			Method:  "Post",
-			Handler: receiverHandler,
-		},
-	)
+	return []services.Entrypoint{{
+		URL:     "/metrics/job/:name",
+		Method:  http.MethodPost,
+		Handler: receiverHandler,
+	}}
 }
 
 func receiverHandler(c *gin.Context) {
@@ -232,16 +286,16 @@ func receiverHandler(c *gin.Context) {
 
 func pull(resources []Resource) {
 	for _, resource := range resources {
-		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.url, resource.headers, nil, nil)
+		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.URL, resource.Headers, nil, nil)
 
 		if err != nil {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.url, err.Error()))
+				resource.URL, err.Error()))
 			continue
 		}
 		if !(statusCode == 200 || statusCode == 201) {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.url, string(byteResponse)))
+				resource.URL, string(byteResponse)))
 			continue
 		}
 		err = processMetrics(byteResponse)

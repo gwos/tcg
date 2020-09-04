@@ -1,9 +1,10 @@
 package services
 
 import (
+	"time"
+
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 // Define NATS subjects
@@ -78,7 +79,7 @@ type ConnectorStatusDTO struct {
 
 // AgentServices defines TCG Agent services interface
 type AgentServices interface {
-	DemandConfig(entrypoints ...Entrypoint) error
+	DemandConfig() error
 	MakeTracerContext() *transit.TracerContext
 	RegisterConfigHandler(func([]byte))
 	RemoveConfigHandler()
@@ -92,7 +93,7 @@ type AgentServices interface {
 	StopNatsAsync(chan error) (*CtrlAction, error)
 	StartTransportAsync(chan error) (*CtrlAction, error)
 	StopTransportAsync(chan error) (*CtrlAction, error)
-	StartController(entrypoints ...Entrypoint) error
+	StartController() error
 	StopController() error
 	StartNats() error
 	StopNats() error
@@ -114,6 +115,8 @@ type GetBytesHandlerType func() ([]byte, error)
 // Controllers defines TCG Agent controllers interface
 type Controllers interface {
 	ListMetrics() ([]byte, error)
+	RegisterEntrypoints([]Entrypoint)
+	RemoveEntrypoints()
 	RegisterListMetricsHandler(GetBytesHandlerType)
 	RemoveListMetricsHandler()
 	SendEvents([]byte) error

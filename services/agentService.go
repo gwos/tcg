@@ -22,9 +22,9 @@ import (
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
-	"go.opentelemetry.io/otel/api/kv"
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/label"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -128,6 +128,7 @@ func GetAgentService() *AgentService {
 		go agentService.listenStatsChan()
 		agentService.handleExit()
 
+		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
@@ -141,8 +142,8 @@ func GetAgentService() *AgentService {
 }
 
 // DemandConfig implements AgentServices.DemandConfig interface
-func (service *AgentService) DemandConfig(entrypoints ...Entrypoint) error {
-	if err := service.StartController(entrypoints...); err != nil {
+func (service *AgentService) DemandConfig() error {
+	if err := service.StartController(); err != nil {
 		return err
 	}
 	if config.GetConfig().IsConfiguringPMC() {
@@ -203,42 +204,42 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 
 // RegisterConfigHandler sets callback
 // usefull for process extensions
-func (service *TransitService) RegisterConfigHandler(fn func([]byte)) {
+func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
 	service.Mutex.Lock()
 	service.configHandler = fn
 	service.Mutex.Unlock()
 }
 
 // RemoveConfigHandler removes callback
-func (service *TransitService) RemoveConfigHandler() {
+func (service *AgentService) RemoveConfigHandler() {
 	service.Mutex.Lock()
 	service.configHandler = nil
 	service.Mutex.Unlock()
 }
 
 // RegisterDemandConfigHandler sets callback
-func (service *TransitService) RegisterDemandConfigHandler(fn func() bool) {
+func (service *AgentService) RegisterDemandConfigHandler(fn func() bool) {
 	service.Mutex.Lock()
 	service.demandConfigHandler = fn
 	service.Mutex.Unlock()
 }
 
 // RemoveDemandConfigHandler removes callback
-func (service *TransitService) RemoveDemandConfigHandler() {
+func (service *AgentService) RemoveDemandConfigHandler() {
 	service.Mutex.Lock()
 	service.demandConfigHandler = nil
 	service.Mutex.Unlock()
 }
 
 // RegisterExitHandler sets callback
-func (service *TransitService) RegisterExitHandler(fn func()) {
+func (service *AgentService) RegisterExitHandler(fn func()) {
 	service.Mutex.Lock()
 	service.exitHandler = fn
 	service.Mutex.Unlock()
 }
 
 // RemoveExitHandler removes callback
-func (service *TransitService) RemoveExitHandler() {
+func (service *AgentService) RemoveExitHandler() {
 	service.Mutex.Lock()
 	service.exitHandler = nil
 	service.Mutex.Unlock()
@@ -275,8 +276,8 @@ func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlActio
 }
 
 // StartController implements AgentServices.StartController interface
-func (service *AgentService) StartController(entrypoints ...Entrypoint) error {
-	return service.ctrlPushSync(entrypoints, ctrlSubjStartController)
+func (service *AgentService) StartController() error {
+	return service.ctrlPushSync(nil, ctrlSubjStartController)
 }
 
 // StopController implements AgentServices.StopController interface
@@ -365,7 +366,7 @@ func (service *AgentService) listenCtrlChan() {
 		case ctrlSubjConfig:
 			err = service.config(ctrl.Data.([]byte))
 		case ctrlSubjStartController:
-			err = service.startController(ctrl.Data.([]Entrypoint))
+			err = service.startController()
 		case ctrlSubjStopController:
 			err = service.stopController()
 		case ctrlSubjStartNats:
@@ -500,12 +501,6 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 					lastError: nil,
 					subject:   subj,
 				}
-			} else {
-				service.statsChan <- statsCounter{
-					bytesSent: 0,
-					lastError: err,
-					subject:   subj,
-				}
 			}
 			return err
 		},
@@ -548,9 +543,9 @@ func (service *AgentService) config(data []byte) error {
 	return nil
 }
 
-func (service *AgentService) startController(entrypoints []Entrypoint) error {
+func (service *AgentService) startController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	return GetController().startController(entrypoints)
+	return GetController().startController()
 }
 
 func (service *AgentService) stopController() error {
@@ -698,6 +693,22 @@ func (service AgentService) handleExit() {
 	}()
 }
 
+// hookLogErrors collects error entries for stats
+func (service AgentService) hookLogErrors(entry log.Entry) error {
+	entryData := ""
+	for _, v := range entry.Data {
+		if v != nil {
+			entryData += fmt.Sprintf("[%v] ", v)
+		}
+	}
+	service.statsChan <- statsCounter{
+		bytesSent: 0,
+		lastError: fmt.Errorf("%s%s", entryData, entry.Message),
+		subject:   "log",
+	}
+	return nil
+}
+
 // initTelemetryProvider creates a new provider instance
 func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	var jaegerEndpoint jaeger.EndpointOption
@@ -717,11 +728,11 @@ func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	connector := config.GetConfig().Connector
 	serviceName := fmt.Sprintf("%s:%s:%s",
 		connector.AppType, connector.AppName, connector.AgentID)
-	tags := []kv.KeyValue{
-		kv.String("runtime", "golang"),
+	tags := []label.KeyValue{
+		label.String("runtime", "golang"),
 	}
 	for k, v := range config.GetConfig().Jaegertracing.Tags {
-		tags = append(tags, kv.String(k, v))
+		tags = append(tags, label.String(k, v))
 	}
 	return jaeger.NewExportPipeline(
 		jaegerEndpoint,
