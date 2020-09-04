@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"context"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -12,12 +12,13 @@ import (
 	"github.com/gwos/tcg/transit"
 )
 
-// Variables to control connector version and build time.
-// Can be overridden during the build step.
-// See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.1.0"
+	extConfig         = &ExtConfig{}
+	metricsProfile    = &transit.MetricsProfile{}
+	monitorConnection = &transit.MonitorConnection{
+		Extensions: extConfig,
+	}
+	chksum []byte
 )
 
 // @title TCG API Documentation
@@ -28,49 +29,15 @@ var (
 func main() {
 	go handleCache()
 
-	var transitService = services.GetTransitService()
-	var cfg ServerConnectorConfig
-	var chksum []byte
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-
-	log.Info(fmt.Sprintf("[Server Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
-
-	transitService.RegisterConfigHandler(func(data []byte) {
-		log.Info("[Server Connector]: Configuration received")
-		if monitorConn, profile, gwConnections, err := connectors.RetrieveCommonConnectorInfo(data); err == nil {
-			c := InitConfig(monitorConn, profile, gwConnections)
-			cfg = *c
-			chk, err := connectors.Hashsum(
-				config.GetConfig().Connector.AgentID,
-				config.GetConfig().GWConnections,
-				cfg,
-			)
-			if err != nil || !bytes.Equal(chksum, chk) {
-				log.Info("[Server Connector]: Sending inventory ...")
-				resources := []transit.InventoryResource{*Synchronize(cfg.MetricsProfile.Metrics)}
-				groups := cfg.Groups
-				for i, group := range groups {
-					groups[i] = connectors.FillGroupWithResources(group, resources)
-				}
-				_ = connectors.SendInventory(
-					resources,
-					groups,
-					cfg.Ownership,
-				)
-			}
-			if err == nil {
-				chksum = chk
-			}
-		} else {
-			log.Error("[Server Connector]: Error during parsing config. Aborting ...")
-			return
-		}
-	})
+	ctxExit, exitHandler := context.WithCancel(context.Background())
+	transitService := services.GetTransitService()
+	transitService.RegisterConfigHandler(configHandler)
+	transitService.RegisterExitHandler(exitHandler)
 
 	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[Server Connector]: ", err)
 		return
 	}
@@ -80,11 +47,11 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(nil, cfg.Timer, func() {
-		if len(cfg.MetricsProfile.Metrics) > 0 {
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
+		if len(metricsProfile.Metrics) > 0 {
 			log.Info("[Server Connector]: Monitoring resources ...")
 			if err := connectors.SendMetrics([]transit.MonitoredResource{
-				*CollectMetrics(cfg.MetricsProfile.Metrics),
+				*CollectMetrics(metricsProfile.Metrics),
 			}); err != nil {
 				log.Error("[Server Connector]: ", err)
 			}
@@ -94,4 +61,53 @@ func main() {
 
 func handleCache() {
 	cache.ProcessesCache.SetDefault("processes", collectProcesses())
+}
+
+func configHandler(data []byte) {
+	log.Info("[Server Connector]: Configuration received")
+	/* Init config with default values */
+	tExt := &ExtConfig{
+		Groups: []transit.ResourceGroup{{
+			GroupName: defaultHostGroupName,
+			Type:      transit.HostGroup,
+		}},
+		Processes:     []string{},
+		CheckInterval: connectors.DefaultCheckInterval,
+		Ownership:     transit.Yield,
+	}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
+	tMetProf := &transit.MetricsProfile{}
+	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
+		log.Error("[Server Connector]: Error during parsing config.", err.Error())
+		return
+	}
+	/* Update config with received values */
+	gwConnections := config.GetConfig().GWConnections
+	if len(gwConnections) > 0 {
+		tExt.Ownership = transit.HostOwnershipType(gwConnections[0].DeferOwnership)
+	}
+	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	monitorConnection.Extensions = extConfig
+
+	chk, err := connectors.Hashsum(
+		config.GetConfig().Connector.AgentID,
+		config.GetConfig().GWConnections,
+		extConfig,
+	)
+	if err != nil || !bytes.Equal(chksum, chk) {
+		log.Info("[Server Connector]: Sending inventory ...")
+		resources := []transit.InventoryResource{*Synchronize(metricsProfile.Metrics)}
+		groups := extConfig.Groups
+		for i, group := range groups {
+			groups[i] = connectors.FillGroupWithResources(group, resources)
+		}
+		_ = connectors.SendInventory(
+			resources,
+			groups,
+			extConfig.Ownership,
+		)
+	}
+	if err == nil {
+		chksum = chk
+	}
 }

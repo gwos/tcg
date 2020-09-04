@@ -531,7 +531,7 @@ node_loop:
 											    }
 											} else {
 											    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
-												file_line(), type_selectorexpr.X)
+													file_line(), type_selectorexpr.X)
 											    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
 											    panic_message = "aborting due to previous errors"
 											    break node_loop
@@ -599,21 +599,21 @@ node_loop:
 									}
 								} else if type_selectorexpr, ok := field.Type.(*ast.SelectorExpr); ok {
 									/*
-										    var x_type_ident *ast.Ident
-										    var ok bool
-										    if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
+										var x_type_ident *ast.Ident
+										var ok bool
+										if x_type_ident, ok = type_selectorexpr.X.(*ast.Ident); ok {
 											if print_diagnostics {
-											    // fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
+												// fmt.Fprintf(diag_file, "    --- struct field name and SelectorExpr X:  %#v %#v\n", name.Name, x_type_ident.Name)
 											}
-										    } else {
+										} else {
 											if print_diagnostics {
-											    fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
-												file_line(), type_selectorexpr.X)
-											    fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
+												fmt.Fprintf(diag_file, "ERROR:  when autovivifying at %s, found unexpected field.Type.X type:  %T\n",
+													file_line(), type_selectorexpr.X)
+												fmt.Fprintf(diag_file, "ERROR:  struct field Type.X field is not of a recognized type\n")
 											}
 											panic_message = "aborting due to previous errors"
 											break node_loop
-										    }
+										}
 									*/
 									if type_selectorexpr.Sel == nil {
 										if print_diagnostics {
@@ -810,7 +810,7 @@ node_loop:
 										field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
 									} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
 										if print_diagnostics {
-											// Suppress Go's "unused variable" noisyness, when the following printed output is commented out.
+											// Suppress Go's "unused variable" noisiness, when the following printed output is commented out.
 											value_type_interface = value_type_interface
 											// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
 										}
@@ -823,12 +823,12 @@ node_loop:
 										// business being transferred between Go code and C code in the first place.  So instead,
 										// we punt; we just abort this iteration of the loop, which suppresses recognition of the
 										// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
-										// CONTINUE" below), which we handle there in a similar manner, by simply skipping further
+										// CONTINUE #1" below), which we handle there in a similar manner, by simply skipping further
 										// processing of that loop iteration as well.  The net effect is that said field will not
 										// appear in the C structure at all, and it will be neither serialized nor deserialized.
 										// But that won't matter, because we don't expect to ever exchange that structure with
 										// any Go code anyway.  This is just a workaround to avoid having to make larger changes.
-										// field_type_name = "map[" + key_type_ident.Name + "]" + "interface"
+										// field_type_name = "map[" + key_type_ident.Name + "]" + "interface{...}"
 										continue
 									} else {
 										if print_diagnostics {
@@ -873,6 +873,20 @@ node_loop:
 									if print_diagnostics {
 										fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %v.%v\n", name.Name, x_type_ident.Name, field_type_name)
 									}
+								} else if type_interfacetype, ok := field.Type.(*ast.InterfaceType); ok {
+									if print_diagnostics {
+										// Suppress Go's "declared but not used" noisiness.
+										type_interfacetype = type_interfacetype
+										// We could analyze the declared type_interfacetype.Methods part of the abstract syntax tree
+										// in detail and include the interface methods within the braces in the printed field_type_name,
+										// but for now the complicated effort to walk the AST tree details to do so is not warranted.
+										// field_type_name = "interface{...}"
+										// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+									}
+									// See the comment above for a map[...]interface{...} type as to why we are skipping this field --
+									// the data structures using an interface{} field will not be used in C/Go data transfers.  See the
+									// companion "COMPENSATORY CONTINUE #2" below as well.
+									continue
 								} else {
 									if print_diagnostics {
 										fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type type:  %T\n", file_line(), field.Type)
@@ -1001,7 +1015,7 @@ node_loop:
 								field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
 							} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
 								if print_diagnostics {
-									// Suppress Go's "unused variable" noisyness, when the following printed output is commented out.
+									// Suppress Go's "unused variable" noisiness, when the following printed output is commented out.
 									value_type_interface = value_type_interface
 									// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
 								}
@@ -1014,7 +1028,7 @@ node_loop:
 								// business being transferred between Go code and C code in the first place.  So instead,
 								// we punt; we just abort this iteration of the loop, which suppresses recognition of the
 								// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
-								// CONTINUE" below), which we handle there in a similar manner, by simply skipping further 
+								// CONTINUE #1" below), which we handle there in a similar manner, by simply skipping further 
 								// processing of that loop iteration as well.  The net effect is that said field will not
 								// appear in the C structure at all, and it will be neither serialized nor deserialized.
 								// But that won't matter, because we don't expect to ever exchange that structure with
@@ -1221,6 +1235,7 @@ node_loop:
 				// converting such code, the analysis here will need extension.
 				key_value_types := map_key_value_types.FindStringSubmatch(field_type)
 				if key_value_types == nil {
+					fmt.Fprintf(diag_file, "ERROR:  at %s, found incomprehensible map construction '%s'\n", file_line(), field_type)
 					panic(fmt.Sprintf("found incomprehensible map construction '%s'", field_type))
 				}
 				key_type := key_value_types[1]
@@ -1754,6 +1769,7 @@ func print_type_declarations(
 	}()
 
 	if err = header_boilerplate.Execute(header_file, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, C header-file header processing failed\n", file_line())
 		panic("C header-file header processing failed")
 	}
 
@@ -2243,7 +2259,7 @@ func print_type_declarations(
 							field_type := go_type
 							key_value_types := map_key_value_types.FindStringSubmatch(field_type)
 							if key_value_types == nil {
-								// COMPENSATORY CONTINUE:
+								// COMPENSATORY CONTINUE #1:
 								// Logically, we would like to call panic() here, as shown, to indicate a failure of
 								// earlier processing to correctly analyze a particular mapping -- i.e., a bug in this
 								// conversion program.  However, we are now using the absence of key/value types to
@@ -2252,7 +2268,8 @@ func print_type_declarations(
 								// we will neither serialize nor desarialize such a field; it simply won't exist in our
 								// C-code structures.
 								continue
-								// Curiously, Go does not object to the following statement as being unreachable.
+								// Curiously, Go does not object to the following statements as being unreachable.
+								fmt.Fprintf(diag_file, "ERROR:  at %s, found incomprehensible map construction '%s'\n", file_line(), field_type)
 								panic(fmt.Sprintf("found incomprehensible map construction '%s'", field_type))
 							}
 							key_type := key_value_types[1]
@@ -2321,7 +2338,21 @@ func print_type_declarations(
 							struct_fields[decl_kind.type_name] = append(struct_fields[decl_kind.type_name], name.Name)
 							struct_field_C_types[decl_kind.type_name][name.Name] = type_pair_list_type
 							struct_field_tags[decl_kind.type_name][name.Name] = field_tag
+						case *ast.InterfaceType:
+							// COMPENSATORY CONTINUE #2:
+							// Logically, we would like to call panic() here, as shown, to indicate a failure of
+							// earlier processing to correctly analyze a particular field type -- i.e., a bug in
+							// this conversion program.  However, we are now using the absence of earlier support
+							// for this specific type to indicate that this entire field ought to be suppressed,
+							// as a means of handling an "interface{}" struct field type in the original Go code.
+							// Which is to say, we will neither serialize nor desarialize such a field; it simply
+							// won't exist in our C-code structures.
+							continue
+							// Curiously, Go does not object to the following statements as being unreachable.
+							fmt.Fprintf(diag_file, "ERROR:  at %s, found unsupported field type:  %T\n", file_line(), field.Type)
+							panic(fmt.Sprintf("found unsupported field type '%T'", field.Type))
 						default:
+							fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field type:  %T\n", file_line(), field.Type)
 							panic(fmt.Sprintf("found unexpected field type %T", field.Type))
 						}
 					}
@@ -2358,11 +2389,13 @@ func print_type_declarations(
 				fmt.Fprintln(header_file, struct_definition)
 			}
 		default:
+			fmt.Fprintf(diag_file, "ERROR:  at %s, found unknown type declaration kind:  %s\n", file_line(), decl_kind.type_kind)
 			panic(fmt.Sprintf("found unknown type declaration kind '%s'", decl_kind.type_kind))
 		}
 	}
 
 	if err = footer_boilerplate.Execute(header_file, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, C header-file footer processing failed\n", file_line())
 		panic("C header-file footer processing failed")
 	}
 	return pointer_base_types, pointer_list_base_types, simple_list_base_types, list_base_types, key_value_pair_types,
@@ -2895,6 +2928,7 @@ json_t *{{.ListType}}_ptr_as_JSON_ptr(const {{.ListType}} *{{.ListType}}_ptr) {
 
 	var complete_code bytes.Buffer
 	if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, encode routine complete processing failed\n", file_line())
 		panic("encode routine complete processing failed")
 	}
 	function_code += complete_code.String()
@@ -3019,6 +3053,7 @@ json_t *{{.PairListType}}_ptr_as_JSON_ptr(const {{.PairListType}} *{{.PairListTy
 
 	var complete_code bytes.Buffer
 	if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, encode routine complete processing failed\n", file_line())
 		panic("encode routine complete processing failed")
 	}
 	function_code += complete_code.String()
@@ -3135,6 +3170,7 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
 
 	var complete_code bytes.Buffer
 	if err := complete_template.Execute(&complete_code, complete_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, decode routine complete processing failed\n", file_line())
 		panic("decode routine complete processing failed")
 	}
 	function_code += complete_code.String()
@@ -3357,6 +3393,7 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 
 	var header_code bytes.Buffer
 	if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, encode routine header processing failed\n", file_line())
 		panic("encode routine header processing failed")
 	}
 	function_code += header_code.String()
@@ -3859,6 +3896,7 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 
 	var footer_code bytes.Buffer
 	if err := footer_template.Execute(&footer_code, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, encode routine footer processing failed\n", file_line())
 		panic("encode routine footer processing failed")
 	}
 	function_code += footer_code.String()
@@ -4500,18 +4538,22 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 	var object_template_code7 bytes.Buffer
 
 	if err := object_template_part1.Execute(&object_template_code1, object_template_values); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, object template processing failed\n", file_line())
 		panic("object template processing failed")
 	}
 
 	if err := object_template_part3.Execute(&object_template_code3, object_template_values); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, object template processing failed\n", file_line())
 		panic("object template processing failed")
 	}
 
 	if err := object_template_part5.Execute(&object_template_code5, object_template_values); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, object template processing failed\n", file_line())
 		panic("object template processing failed")
 	}
 
 	if err := object_template_part7.Execute(&object_template_code7, object_template_values); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, object template processing failed\n", file_line())
 		panic("object template processing failed")
 	}
 
@@ -4558,6 +4600,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 
 	var header_code bytes.Buffer
 	if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, decode routine header processing failed\n", file_line())
 		panic("decode routine header processing failed")
 	}
 	function_code += header_code.String()
@@ -4623,6 +4666,7 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 
 	var header_code bytes.Buffer
 	if err := header_template.Execute(&header_code, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, destroy routine header processing failed\n", file_line())
 		panic("destroy routine header processing failed")
 	}
 	function_code += header_code.String()
@@ -4841,6 +4885,7 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 
 	var footer_code bytes.Buffer
 	if err := footer_template.Execute(&footer_code, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, destroy routine footer processing failed\n", file_line())
 		panic("destroy routine footer processing failed")
 	}
 	function_code += footer_code.String()
@@ -4914,6 +4959,7 @@ func print_type_conversions(
 	}()
 
 	if err := header_boilerplate.Execute(code_file, boilerplate_variables); err != nil {
+		fmt.Fprintf(diag_file, "ERROR:  at %s, C code-file header processing failed\n", file_line())
 		panic("C code-file header processing failed")
 	}
 

@@ -1,7 +1,9 @@
 package transit
 
 import (
+	"errors"
 	"fmt"
+	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"strconv"
 )
@@ -125,7 +127,7 @@ type ServiceType string
 // Possible Types
 const (
 	Process ServiceType = "Process"
-	Service = "Service"
+	Service             = "Service"
 )
 
 // GroupType defines the foundation group type
@@ -420,6 +422,54 @@ func (inventoryResource *InventoryResource) CreateProperty(name string, value Ty
 		inventoryResource.Properties = make(map[string]TypedValue)
 	}
 	inventoryResource.Properties[name] = value
+}
+func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
+	for k, v := range properties {
+		var typedValue TypedValue
+		err := typedValue.toTypedValue(v)
+		if err != nil {
+			log.Error("Property ", k, " of service ", monitoredService.Name, ": ", err)
+		}
+		monitoredService.CreateProperty(k, typedValue)
+	}
+}
+
+func (value *TypedValue) toTypedValue(v interface{}) error {
+	switch v.(type) {
+	case bool:
+		value.ValueType = BooleanType
+		value.BoolValue = v.(bool)
+	case float32:
+		value.ValueType = DoubleType
+		value.DoubleValue = float64(v.(float32))
+	case float64:
+		value.ValueType = DoubleType
+		value.DoubleValue = v.(float64)
+	case int:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int))
+	case int8:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int8))
+	case int16:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int16))
+	case int32:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int32))
+	case int64:
+		value.ValueType = IntegerType
+		value.IntegerValue = v.(int64)
+	case string:
+		value.ValueType = StringType
+		value.StringValue = v.(string)
+	case milliseconds.MillisecondTimestamp:
+		value.ValueType = TimeType
+		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
+	default:
+		return errors.New("unable to convert to typed value: unsupported type")
+	}
+	return nil
 }
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
@@ -730,15 +780,15 @@ func (groundworkEvent GroundworkEvent) String() string {
 
 // MonitorConnection describes the connection to the monitored system
 type MonitorConnection struct {
-	ID          int                    `json:"id"`
-	Server      string                 `json:"server"`
-	UserName    string                 `json:"userName"`
-	Password    string                 `json:"password"`
-	SslEnabled  bool                   `json:"sslEnabled"`
-	URL         string                 `json:"url"`
-	Views       []View                 `json:"views,omitempty"`
-	Extensions  map[string]interface{} `json:"extensions"`
-	ConnectorID int                    `json:"connectorId"`
+	ID          int         `json:"id"`
+	Server      string      `json:"server"`
+	UserName    string      `json:"userName"`
+	Password    string      `json:"password"`
+	SslEnabled  bool        `json:"sslEnabled"`
+	URL         string      `json:"url"`
+	Views       []View      `json:"views,omitempty"`
+	Extensions  interface{} `json:"extensions"`
+	ConnectorID int         `json:"connectorId"`
 }
 
 type View struct {

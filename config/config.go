@@ -18,8 +18,24 @@ import (
 	"sync"
 )
 
-var once sync.Once
-var cfg *Config
+var (
+	buildTag  = "8.x.x"
+	buildTime = "Build time not provided"
+
+	once sync.Once
+	cfg  *Config
+)
+
+// BuildInfo describes the build properties
+type BuildInfo struct {
+	Tag  string `json:"tag"`
+	Time string `json:"time"`
+}
+
+// GetBuildInfo returns the build properties
+func GetBuildInfo() BuildInfo {
+	return BuildInfo{buildTag, buildTime}
+}
 
 // ConfigStringConstant defines string constant type
 type ConfigStringConstant string
@@ -310,6 +326,7 @@ func GetConfig() *Config {
 		}
 
 		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
+		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
 	})
 	return cfg
 }

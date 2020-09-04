@@ -6,7 +6,6 @@ require (
 	github.com/PaesslerAG/gval v1.0.1
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
-	github.com/antonfisher/nested-logrus-formatter v1.1.0
 	github.com/boj/redistore v0.0.0-20180917114910-cd5dcc76aeff // indirect
 	github.com/elastic/go-elasticsearch/v7 v7.9.0
 	github.com/gin-gonic/contrib v0.0.0-20200810162008-6dee08bf958e
@@ -22,7 +21,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.13.0
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/shirou/gopsutil v2.20.7+incompatible
+	github.com/shirou/gopsutil v2.20.8+incompatible
 	github.com/sirupsen/logrus v1.6.0
 	github.com/stretchr/testify v1.6.1
 	github.com/swaggo/gin-swagger v1.2.0

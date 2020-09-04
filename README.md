@@ -120,7 +120,7 @@ $ go build .
 ### Building tcg shared module:
 
 ```
-$ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
+$ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'" -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 ```
 
 #### or use Makefiles
@@ -130,18 +130,18 @@ $ go build -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit
 LINUX:
 ```
 $ cd connectors/<connector>
-$ go build -ldflags "-X 'main.buildTime=`date --rfc-3339=s`' -X main.buildTag=<TAG>"
+$ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
 ```
 
 OS X:
 ```
 $ cd connectors/<connector>
-$ go build -ldflags "-X 'main.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X main.buildTag=<TAG>"
+$ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
 ```
 
 ## Building Connectors for OS Targets (Cross Compiling)
 ```
-env GOOS=linux GOARCH=386 go build -ldflags "-X 'main.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X main.buildTag=8.1.0.1" .
+env GOOS=linux GOARCH=386 go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X 'github.com/gwos/tcg/config.buildTag=8.1.0.1'"
 ```
 
 ## Installing as a service 
