@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"fmt"
-	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
@@ -12,16 +10,10 @@ import (
 	"os/exec"
 )
 
-// Variables to control connector version and build time.
-// Can be overridden during the build step.
-// See README for details.
 var (
-	buildTime = "Build time not provided"
-	buildTag  = "8.x.x"
-
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
-	monitorConnection = &connectors.MonitorConnection{
+	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
 	chksum []byte
@@ -41,10 +33,6 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	config.Version.Tag = buildTag
-	config.Version.Time = buildTime
-	log.Info(fmt.Sprintf("[Checker Connector]: Version: %s   /   Build time: %s", config.Version.Tag, config.Version.Time))
-
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -54,7 +42,7 @@ func main() {
 	})
 
 	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
-	if err := transitService.DemandConfig(initializeEntrypoints()...); err != nil {
+	if err := transitService.DemandConfig(); err != nil {
 		log.Error(err)
 		return
 	}
@@ -70,7 +58,7 @@ func main() {
 func configHandler(data []byte) {
 	log.Info("[Checker Connector]: Configuration received")
 	tExt, tMetProf := &ExtConfig{}, &transit.MetricsProfile{}
-	tMonConn := &connectors.MonitorConnection{Extensions: tExt}
+	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
 		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
 		return

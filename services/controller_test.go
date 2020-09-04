@@ -1,11 +1,12 @@
 package services
 
 import (
-	"github.com/gwos/tcg/config"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gwos/tcg/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func init() {

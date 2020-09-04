@@ -58,7 +58,7 @@ func (cfg ExtConfig) Validate() error {
 
 func initializeEntrypoints() []services.Entrypoint {
 	var entrypoints []services.Entrypoint
-
+  
 	entrypoints = append(entrypoints,
 		services.Entrypoint{
 			Url:     "/bronx",
@@ -168,7 +168,7 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 			Type:          transit.Host,
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultTimer)},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultCheckInterval)},
 			Services:      value,
 		})
 	}
@@ -383,7 +383,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 			Owner:            arr[2],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultCheckInterval)},
 			LastPlugInOutput: arr[5],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
 		})

@@ -14,6 +14,7 @@ import (
 
 var doOnce sync.Once
 
+// MonitoringState describes state
 type MonitoringState struct {
 	Metrics    map[string]transit.MetricDefinition
 	Hosts      map[string]monitoringHost
@@ -32,7 +33,7 @@ type monitoringHost struct {
 	hostGroups []string
 }
 
-func (connectorConfig *ElasticConnectorConfig) initMonitoringState(previousState MonitoringState, esClient *ecClients.EsClient) MonitoringState {
+func (connectorConfig *ExtConfig) initMonitoringState(previousState MonitoringState, esClient *ecClients.EsClient) MonitoringState {
 	currentState := MonitoringState{
 		Metrics: make(map[string]transit.MetricDefinition),
 		Hosts:   make(map[string]monitoringHost),
@@ -47,12 +48,12 @@ func (connectorConfig *ElasticConnectorConfig) initMonitoringState(previousState
 	}
 
 	doOnce.Do(func() {
-		log.Info("Initializing state with GW hosts for agent ", connectorConfig.AgentId)
+		log.Info("Initializing state with GW hosts for agent ", connectorConfig.AgentID)
 		// add hosts form GW to current state
 		if connectorConfig.GWConnections == nil || len(connectorConfig.GWConnections) == 0 {
 			log.Error("|elasticConnectorModel.go| : [initMonitoringState] : Unable to get GW hosts to initialize state: GW connections are not set.")
 		} else {
-			gwHosts := initGwHosts(connectorConfig.AppType, connectorConfig.AgentId, connectorConfig.GWConnections)
+			gwHosts := initGwHosts(connectorConfig.AppType, connectorConfig.AgentID, connectorConfig.GWConnections)
 			if gwHosts != nil {
 				currentState.Hosts = gwHosts
 			} else {
@@ -151,6 +152,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				UnitType:    transit.UnitCounter,
 				Warning:     metricDefinition.WarningThreshold,
 				Critical:    metricDefinition.CriticalThreshold,
+				Graphed:     metricDefinition.Graphed,
 			}
 			if service.timeInterval != nil {
 				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
@@ -211,7 +213,7 @@ func (monitoringState *MonitoringState) buildGroups() map[string]map[string]stru
 	return groups
 }
 
-func initGwHosts(appType string, agentId string, gwConnections config.GWConnections) map[string]monitoringHost {
+func initGwHosts(appType string, agentID string, gwConnections config.GWConnections) map[string]monitoringHost {
 	gwHosts := make(map[string]monitoringHost)
 
 	for _, gwConnection := range gwConnections {
@@ -225,7 +227,7 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to connect to GW to get hosts to initialize state: ", err)
 			continue
 		}
-		gwServices, err := gwClient.GetServicesByAgent(agentId)
+		gwServices, err := gwClient.GetServicesByAgent(agentID)
 		if err != nil || gwServices == nil {
 			log.Error("|elasticConnectorModel.go| : [initGwHosts] : Unable to get GW hosts to initialize state.")
 			if err != nil {
@@ -279,7 +281,7 @@ func initGwHosts(appType string, agentId string, gwConnections config.GWConnecti
 	return gwHosts
 }
 
-func (connectorConfig *ElasticConnectorConfig) initEsHosts(esClient *ecClients.EsClient) map[string]monitoringHost {
+func (connectorConfig *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[string]monitoringHost {
 	esHosts := make(map[string]monitoringHost)
 
 	hostNameField := connectorConfig.HostNameField
