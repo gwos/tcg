@@ -13,9 +13,6 @@ import (
 	"strings"
 )
 
-// Variables to control connector version and build time.
-// Can be overridden during the build step.
-// See README for details.
 var (
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
