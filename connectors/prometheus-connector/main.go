@@ -55,10 +55,12 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Resources:     []Resource{},
-		Services:      []string{},
-		CheckInterval: connectors.DefaultCheckInterval,
-		Ownership:     transit.Yield,
+		Resources:        []Resource{},
+		Services:         []string{},
+		CheckInterval:    connectors.DefaultCheckInterval,
+		Ownership:        transit.Yield,
+		DefaultHost:      defaultHostName,
+		DefaultHostGroup: defaultHostGroupName,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}

@@ -49,11 +49,13 @@ func (r *Resource) UnmarshalJSON(input []byte) error {
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups        []transit.ResourceGroup   `json:"groups"`
-	Resources     []Resource                `json:"resources"`
-	Services      []string                  `json:"services"`
-	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
-	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	Groups           []transit.ResourceGroup   `json:"groups"`
+	Resources        []Resource                `json:"resources"`
+	Services         []string                  `json:"services"`
+	CheckInterval    time.Duration             `json:"checkIntervalMinutes"`
+	Ownership        transit.HostOwnershipType `json:"ownership,omitempty"`
+	DefaultHost      string                    `json:"defaultHost"`
+	DefaultHostGroup string                    `json:"defaultHostGroup"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -70,6 +72,7 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
+const defaultHostName = "Prometheus-Host"
 const defaultHostGroupName = "Servers"
 
 var parser expfmt.TextParser
@@ -163,10 +166,12 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 	return result
 }
 
-func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) []connectors.MetricBuilder {
-	var metricBuilders []connectors.MetricBuilder
+func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) map[string][]connectors.MetricBuilder {
+	metricBuilders := make(map[string][]connectors.MetricBuilder)
+	var serviceName string
 
 	for _, metric := range prometheusService.GetMetric() {
+		serviceName = ""
 		var timestamp = time.Now()
 		if metric.TimestampMs != nil {
 			timestamp = time.Unix(*metric.TimestampMs, 0)
@@ -204,6 +209,8 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 					} else {
 						metricBuilder.Warning = -1
 					}
+				case "service":
+					serviceName = *label.Value
 				}
 
 				for _, label := range metric.GetLabel() {
@@ -215,8 +222,22 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 						})
 					}
 				}
+
+				if *hostName == "" {
+					*hostName = extConfig.DefaultHost
+				}
+				if len(*groups) == 0 {
+					(*groups)[extConfig.DefaultHostGroup] = append((*groups)[extConfig.DefaultHostGroup], transit.MonitoredResourceRef{
+						Name: *hostName,
+						Type: transit.Host,
+					})
+				}
+
 			}
-			metricBuilders = append(metricBuilders, metricBuilder)
+			if serviceName == "" {
+				serviceName = name
+			}
+			metricBuilders[serviceName] = append(metricBuilders[serviceName], metricBuilder)
 		}
 	}
 	return metricBuilders
@@ -246,18 +267,21 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 			continue
 		}
 
-		metricBuilders := extractIntoMetricBuilders(prometheusService, hostName, groups)
+		serviceNameToMetricBuildersMap := extractIntoMetricBuilders(prometheusService, hostName, groups)
 
 		if *hostName == "" {
 			return nil, errors.New("HostName cannot be empty")
 		}
 
-		if service, err := connectors.BuildServiceForMetrics(*prometheusService.Name, *hostName, metricBuilders); err == nil {
-			monitoredServices = append(monitoredServices, *service)
-		} else {
-			return nil, err
+		for serviceName, metricBuilders := range serviceNameToMetricBuildersMap {
+			if service, err := connectors.BuildServiceForMetrics(serviceName, *hostName, metricBuilders); err == nil {
+				monitoredServices = append(monitoredServices, *service)
+			} else {
+				return nil, err
+			}
 		}
 	}
+
 	return &monitoredServices, nil
 }
 
