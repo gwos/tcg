@@ -19,9 +19,10 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	cfgChksum []byte
-	invChksum []byte
-	connector ElasticConnector
+	cfgChksum         []byte
+	invChksum         []byte
+	connector         ElasticConnector
+	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
 // temporary solution, will be removed
@@ -30,10 +31,9 @@ const templateMetricName = "$view_Template#"
 func main() {
 	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
-	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
-	transitService.RegisterExitHandler(exitHandler)
+	services.GetTransitService().RegisterExitHandler(cancel)
 
 	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
@@ -46,29 +46,10 @@ func main() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
-		if len(connector.monitoringState.Metrics) > 0 {
-			metrics, inventory, groups := connector.CollectMetrics()
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-			chk, chkErr := connector.getInventoryHashSum()
-			if chkErr != nil || !bytes.Equal(invChksum, chk) {
-				log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
-				err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
-				if err != nil {
-					log.Error("[Elastic Connector]: ", err.Error())
-				}
-			}
-			if chkErr == nil {
-				invChksum = chk
-			}
-
-			log.Info("[Elastic Connector]: Monitoring resources ...")
-			err := connectors.SendMetrics(metrics)
-			if err != nil {
-				log.Error("[Elastic Connector]: ", err.Error())
-			}
-		}
-	})
+	/* prevent return */
+	<-make(chan bool, 1)
 }
 
 func configHandler(data []byte) {
@@ -150,7 +131,7 @@ func configHandler(data []byte) {
 	tExt.replaceIntervalTemplates()
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-	/* process checksums */
+	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
 	if err != nil || !bytes.Equal(cfgChksum, chk) {
 		if err := connector.LoadConfig(*extConfig); err != nil {
@@ -168,5 +149,34 @@ func configHandler(data []byte) {
 	}
 	if err == nil {
 		cfgChksum = chk
+	}
+	/* Restart periodic loop */
+	cancel()
+	ctxCancel, cancel = context.WithCancel(context.Background())
+	services.GetTransitService().RegisterExitHandler(cancel)
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+}
+
+func periodicHandler() {
+	if len(connector.monitoringState.Metrics) > 0 {
+		metrics, inventory, groups := connector.CollectMetrics()
+
+		chk, chkErr := connector.getInventoryHashSum()
+		if chkErr != nil || !bytes.Equal(invChksum, chk) {
+			log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
+			err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
+			if err != nil {
+				log.Error("[Elastic Connector]: ", err.Error())
+			}
+		}
+		if chkErr == nil {
+			invChksum = chk
+		}
+
+		log.Info("[Elastic Connector]: Monitoring resources ...")
+		err := connectors.SendMetrics(metrics)
+		if err != nil {
+			log.Error("[Elastic Connector]: ", err.Error())
+		}
 	}
 }
