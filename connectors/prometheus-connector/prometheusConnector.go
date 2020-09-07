@@ -118,7 +118,7 @@ func processMetrics(body []byte) error {
 		if err != nil {
 			return err
 		}
-		time.Sleep(2	 * time.Second)  // TODO: better way to assure synch completion?
+		time.Sleep(2 * time.Second) // TODO: better way to assure synch completion?
 		err = connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err
@@ -162,7 +162,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 // modifies hostsMap parameter
 func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 	groups map[string][]transit.MonitoredResourceRef,
-	hostsMap map[string]map[string][]connectors.MetricBuilder)  {
+	hostsMap map[string]map[string][]connectors.MetricBuilder) {
 	var groupName, hostName, serviceName string
 
 	for _, metric := range prometheusService.GetMetric() {
@@ -184,6 +184,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: timestamp},
 				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: timestamp},
 				Graphed:        true,
+				Tags:           make(map[string]string),
 			}
 
 			for _, label := range metric.GetLabel() {
@@ -208,8 +209,10 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					serviceName = *label.Value
 				case "group":
 					groupName = *label.Value
-				default:
-					// TODO: pull out arbitrary labels -- need to add labels to metricsBuilder
+				case "node":
+					metricBuilder.Tags[*label.Name] = *label.Value
+				case "code":
+					metricBuilder.Tags[*label.Name] = *label.Value
 				}
 			}
 
