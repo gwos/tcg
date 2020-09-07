@@ -25,6 +25,7 @@ var (
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
 )
 
+// DataFormat describes incoming payload
 type DataFormat string
 
 // Data formats of the received body
@@ -57,22 +58,18 @@ func (cfg ExtConfig) Validate() error {
 }
 
 func initializeEntrypoints() []services.Entrypoint {
-	var entrypoints []services.Entrypoint
-  
-	entrypoints = append(entrypoints,
-		services.Entrypoint{
-			Url:     "/bronx",
-			Method:  "Post",
+	return []services.Entrypoint{
+		{
+			URL:     "/bronx",
+			Method:  http.MethodPost,
 			Handler: bronxHandler,
 		},
-		services.Entrypoint{
-			Url:     "/nsca",
-			Method:  "Post",
+		{
+			URL:     "/nsca",
+			Method:  http.MethodPost,
 			Handler: nscaHandler,
 		},
-	)
-
-	return entrypoints
+	}
 }
 
 func bronxHandler(c *gin.Context) {
@@ -168,7 +165,7 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 			Type:          transit.Host,
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultCheckInterval)},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)},
 			Services:      value,
 		})
 	}
@@ -299,7 +296,7 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 			Owner:            arr[len(arr)-5],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: arr[len(arr)-2],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])],
 		})
@@ -383,7 +380,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 			Owner:            arr[2],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultCheckInterval)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: arr[5],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
 		})
