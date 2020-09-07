@@ -10,9 +10,6 @@ import (
 	"os/exec"
 )
 
-// Variables to control connector version and build time.
-// Can be overridden during the build step.
-// See README for details.
 var (
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
@@ -87,7 +84,7 @@ func restartScheduler(sch *cron.Cron, tasks []ScheduleTask) {
 		sch.Remove(entry.ID)
 	}
 	for _, task := range tasks {
-		sch.AddFunc(task.Cron, taskHandler(task))
+		_, _ = sch.AddFunc(task.Cron, taskHandler(task))
 	}
 	if len(sch.Entries()) > 0 {
 		sch.Start()
@@ -115,7 +112,7 @@ func taskHandler(task ScheduleTask) func() {
 			return
 		}
 		logEntry.Debug("[Checker Connector]: Success in command execution")
-		if err = processMetrics(res); err != nil {
+		if err = processMetrics(res, NSCA); err != nil {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
 	}
