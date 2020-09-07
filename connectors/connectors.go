@@ -682,20 +682,36 @@ func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
 }
 
 // StartPeriodic starts periodic event loop
-// with 1 minute (not often) guard
-// loop can be cancelled via context argument
+// context can provide ctx.Done channel
+// and "notOften" guard with 1 minute defaults
 func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
-	ticker := time.NewTicker(MaxDuration(t, time.Minute))
-	defer ticker.Stop()
+	notOften := time.Minute
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go fn()
-		}
+	if v := ctx.Value("notOften"); v != nil {
+		notOften = v.(time.Duration)
 	}
+	ticker := time.NewTicker(MaxDuration(t, notOften))
+	handler := func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Error("[Recovered]", err)
+			}
+		}()
+		fn()
+	}
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				go handler()
+			}
+		}
+	}()
+	/* call handler immediately */
+	go handler()
 }
