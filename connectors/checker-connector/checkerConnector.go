@@ -61,12 +61,12 @@ func initializeEntrypoints() []services.Entrypoint {
   
 	entrypoints = append(entrypoints,
 		services.Entrypoint{
-			Url:     "/bronx",
+			URL:     "/bronx",
 			Method:  "Post",
 			Handler: bronxHandler,
 		},
 		services.Entrypoint{
-			Url:     "/nsca",
+			URL:     "/nsca",
 			Method:  "Post",
 			Handler: nscaHandler,
 		},
@@ -299,7 +299,7 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 			Owner:            arr[len(arr)-5],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultTimer)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: arr[len(arr)-2],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])],
 		})

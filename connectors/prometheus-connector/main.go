@@ -8,12 +8,10 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -40,17 +38,9 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	for ;; { // TODO: delete this for block when startPeriodic is fixed
-		if ctxExit == nil {
-
-		}
+	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
 		pull(extConfig.Resources)
-		time.Sleep(time.Second * 30)
-	}
-	// TODO: uncomment when start periodic starts on leading edge
-	//connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
-	//	pull(extConfig.Resources)
-	//})
+	})
 }
 
 func configHandler(data []byte) {
@@ -79,7 +69,7 @@ func configHandler(data []byte) {
 	if len(gwConnections) > 0 {
 		tExt.Ownership = transit.HostOwnershipType(gwConnections[0].DeferOwnership)
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 
 	chk, err := connectors.Hashsum(

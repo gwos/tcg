@@ -12,7 +12,6 @@ import (
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -33,6 +32,8 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
+
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -67,7 +68,7 @@ func configHandler(data []byte) {
 		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
 		return
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 
 	chk, err := connectors.Hashsum(extConfig)
