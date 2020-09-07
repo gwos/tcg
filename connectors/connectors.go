@@ -697,6 +697,7 @@ func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
 // with 1 minute (not often) guard
 // loop can be cancelled via context argument
 func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
+	// TODO: support seconds
 	ticker := time.NewTicker(MaxDuration(t, time.Minute))
 	defer ticker.Stop()
 	if ctx == nil {

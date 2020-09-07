@@ -1,98 +1,121 @@
 package main
 
 import (
-	"context"
-	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"math/rand"
 	"net/http"
-	"sync"
 	"time"
+)
 
-	"go.opentelemetry.io/otel/api/global"
-	"go.opentelemetry.io/otel/api/metric"
-	"go.opentelemetry.io/otel/exporters/metric/prometheus"
-	"go.opentelemetry.io/otel/label"
+const (
+	HostName = "FinanceServicesGo"
+	HostGroupName = "PrometheusDemo"
 )
 
 var (
-	defaultResource = "golang-server"
-	defaultGroup    = "Prometheus-Go"
-	defaultWarning  = fmt.Sprintf("%f", rand.Float64())
-	defaultCritical = fmt.Sprintf("%f", rand.Float64())
-	defaultUnitType = "MB"
-	defaultPort     = ":2222"
+	services = []string{"analytics", "distribution", "sales"}
+	nodes = []string{"node1", "node2"}
+
+	//dynamicLabels = []string{"node", "service", "code"}
+	dynamicLabels = []string{"service"}
+	requestsLabels = prometheus.Labels{
+		"resource": HostName,
+		"group": HostGroupName,
+		"warning": "70",
+		"critical": "90",
+	}
+	bytesLabels = prometheus.Labels{
+		"resource": HostName,
+		"group": HostGroupName,
+		"warning": "40000",
+		"critical": "45000",
+	}
+	responseLabels = prometheus.Labels{
+		"resource": HostName,
+		"group": HostGroupName,
+		"warning": "2.0",
+		"critical": "2.5",
+	}
+
+	requestsPerMinute = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "requests_per_minute",
+			Help: "Finance Services http requests per minute.",
+			ConstLabels: requestsLabels,
+		},
+		dynamicLabels,
+	)
+
+	bytesPerMinute = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "bytes_per_minute",
+			Help: "Finance Services bytes transferred over http per minute",
+			ConstLabels: bytesLabels,
+		},
+		dynamicLabels,
+	)
+
+	responseTime = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "response_time",
+			Help: "Finance Services http response time average over 1 minutew",
+			ConstLabels: responseLabels,
+		},
+		dynamicLabels,
+	)
+
+	randomizer = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
-func initMeter() {
-	exporter, err := prometheus.InstallNewPipeline(prometheus.Config{})
-	if err != nil {
-		log.Panicf("Failed to initialize prometheus exporter %v", err)
-	}
-
-	http.HandleFunc("/", exporter.ServeHTTP)
-
-	go func() {
-		_ = http.ListenAndServe(defaultPort, nil)
-	}()
-}
-
 func main() {
-	initMeter()
+	registry := prometheus.NewRegistry()
+	registry.Register(requestsPerMinute)
+	registry.Register(bytesPerMinute)
+	registry.Register(responseTime)
 
-	meter := global.Meter("groundwork")
-	observerLock := new(sync.RWMutex)
-	observerValueToReport := new(float64)
-	observerLabelsToReport := new([]label.KeyValue)
+	go metricsGenerator()
 
-	valueRecorder := metric.Must(meter).NewFloat64ValueRecorder("gw.service.one")
-	counter := metric.Must(meter).NewFloat64Counter("gw.service.two")
-
-	commonLabels := []label.KeyValue{
-		label.String("resource", defaultResource),
-		label.String("group", defaultGroup),
-		label.String("warning", defaultWarning),
-		label.String("critical", defaultCritical),
-		label.String("unitType", defaultUnitType),
-	}
-	var notSoCommonLabels []label.KeyValue
-
-	ctx := context.Background()
-
-	(*observerLock).Lock()
-	*observerValueToReport = rand.Float64()
-	*observerLabelsToReport = commonLabels
-	(*observerLock).Unlock()
-	meter.RecordBatch(
-		ctx,
-		commonLabels,
-		valueRecorder.Measurement(rand.Float64()),
-		counter.Measurement(rand.Float64()),
-	)
-
-	time.Sleep(5 * time.Second)
-
-	(*observerLock).Lock()
-	*observerValueToReport = rand.Float64()
-	*observerLabelsToReport = notSoCommonLabels
-	(*observerLock).Unlock()
-	meter.RecordBatch(
-		ctx,
-		notSoCommonLabels,
-	)
-
-	time.Sleep(5 * time.Second)
-
-	(*observerLock).Lock()
-	*observerValueToReport = rand.Float64()
-	*observerLabelsToReport = commonLabels
-	(*observerLock).Unlock()
-	meter.RecordBatch(
-		ctx,
-		commonLabels,
-		valueRecorder.Measurement(rand.Float64()),
-		counter.Measurement(rand.Float64()),
-	)
-
-	time.Sleep(100 * time.Second)
+	gwHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
+	http.Handle("/metrics", gwHandler)
+	http.HandleFunc("/", handler)
+	log.Fatal(http.ListenAndServe(":2222", nil))
 }
+
+func metricsGenerator() {
+	// simulate request traffic
+	for {
+		for _, service := range services {
+			//for _, node := range nodes {
+			//	code := "200"
+			//	if rand.Intn(20) > 18 {
+			//		code = "500"
+			//	}
+			requestsPerMinute.With(
+				prometheus.Labels{
+					"service": service,
+					//"node":    node,
+					//"code":   code,
+				}).Set(float64(randomizer.Intn(100)))
+			bytesPerMinute.With(
+				prometheus.Labels{
+					"service": service,
+					//"node":    node,
+					//"code":    code,
+				}).Set(float64(randomizer.Intn(50000)))
+			responseTime.With(
+				prometheus.Labels{
+					"service": service,
+				}).Set(float64(randomizer.Intn(30)) / 10)
+			//			}
+		}
+		time.Sleep(time.Second * 30)
+	}
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Groundwork Prometheus Metrics example. Hit the /metrics end point to see Prometheus Exposition metrics... "))
+	w.WriteHeader(200)
+}
+
