@@ -8,6 +8,7 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"time"
 )
 
 // Variables to control connector version and build time.
@@ -42,9 +43,17 @@ func main() {
 	}
 
 	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
+	for ;; { // TODO: delete this for block when startPeriodic is fixed
+		if ctxExit == nil {
+
+		}
 		pull(extConfig.Resources)
-	})
+		time.Sleep(time.Second * 30)
+	}
+	// TODO: uncomment when start periodic starts on leading edge
+	//connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
+	//	pull(extConfig.Resources)
+	//})
 }
 
 func configHandler(data []byte) {
@@ -85,7 +94,7 @@ func configHandler(data []byte) {
 		log.Info("[Prometheus Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
 			*Synchronize(),
-			extConfig.Groups,
+			extConfig.Groups, // TODO: this is broken, the extConfig cannot be relied on to retrieve group alone
 			extConfig.Ownership,
 		)
 	}

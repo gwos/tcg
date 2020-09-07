@@ -14,6 +14,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -86,39 +87,29 @@ func Synchronize() *[]transit.InventoryResource {
 	return &inventoryResources
 }
 
-func parsePrometheusBody(body []byte) (*transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, nil, err
 	}
-	var hostName string
 	groups := make(map[string][]transit.MonitoredResourceRef)
 
-	monitoredServices, err := parsePrometheusServices(prometheusServices, &hostName, &groups)
+	monitoredResources, err := parsePrometheusServices(prometheusServices, groups)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	resourceGroups := constructResourceGroups(groups)
-
-	monitoredResource, err := connectors.CreateResource(hostName)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	monitoredResource.Services = *monitoredServices
-
-	return monitoredResource, &resourceGroups, nil
+	return monitoredResources, &resourceGroups, nil
 }
 
 func processMetrics(body []byte) error {
-	monitoredResource, groups, err := parsePrometheusBody(body)
+	monitoredResources, groups, err := parsePrometheusBody(body)
 	if err != nil {
 		return err
 	}
-	inventory := connectors.BuildInventory(&[]transit.MonitoredResource{*monitoredResource})
+	inventory := connectors.BuildInventory(monitoredResources)
 	if connectors.ValidateInventory(*inventory) {
-		err := connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
+		err := connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err
 		}
@@ -127,8 +118,8 @@ func processMetrics(body []byte) error {
 		if err != nil {
 			return err
 		}
-		time.Sleep(2 * time.Second)
-		err = connectors.SendMetrics([]transit.MonitoredResource{*monitoredResource})
+		time.Sleep(2	 * time.Second)  // TODO: better way to assure synch completion?
+		err = connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err
 		}
@@ -163,15 +154,19 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 			result[fmt.Sprintf("%s_%s_%d", serviceName, "bucket", i)] = float64(bucket.GetCumulativeCount())
 		}
 	}
+	// TODO: need summary
 	return result
 }
 
-func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) map[string][]connectors.MetricBuilder {
-	metricBuilders := make(map[string][]connectors.MetricBuilder)
-	var serviceName string
+// extracts from Prometheus format to intermediate Host Maps format
+// modifies hostsMap parameter
+func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
+	groups map[string][]transit.MonitoredResourceRef,
+	hostsMap map[string]map[string][]connectors.MetricBuilder)  {
+	var groupName, hostName, serviceName string
 
 	for _, metric := range prometheusService.GetMetric() {
-		serviceName = ""
+		groupName, hostName, serviceName = "", "", ""
 		var timestamp = time.Now()
 		if metric.TimestampMs != nil {
 			timestamp = time.Unix(*metric.TimestampMs, 0)
@@ -196,7 +191,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 				case "unitType":
 					metricBuilder.UnitType = *label.Value
 				case "resource":
-					*hostName = *label.Value
+					hostName = *label.Value
 				case "warning":
 					if value, err := strconv.ParseFloat(*label.Value, 64); err == nil {
 						metricBuilder.Warning = value
@@ -211,36 +206,68 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily, hostName *st
 					}
 				case "service":
 					serviceName = *label.Value
+				case "group":
+					groupName = *label.Value
+				default:
+					// TODO: pull out arbitrary labels -- need to add labels to metricsBuilder
 				}
+			}
 
-				for _, label := range metric.GetLabel() {
-					switch *label.Name {
-					case "group":
-						(*groups)[*label.Value] = append((*groups)[*label.Value], transit.MonitoredResourceRef{
-							Name: *hostName,
-							Type: transit.Host,
-						})
-					}
+			// process defaults
+			if groupName == "" {
+				if extConfig.DefaultHostGroup == "" {
+					groupName = defaultHostGroupName
+				} else {
+					groupName = extConfig.DefaultHostGroup
 				}
-
-				if *hostName == "" {
-					*hostName = extConfig.DefaultHost
+			}
+			if hostName == "" {
+				if extConfig.DefaultHost == "" {
+					hostName = defaultHostName
+				} else {
+					hostName = extConfig.DefaultHost
 				}
-				if len(*groups) == 0 {
-					(*groups)[extConfig.DefaultHostGroup] = append((*groups)[extConfig.DefaultHostGroup], transit.MonitoredResourceRef{
-						Name: *hostName,
-						Type: transit.Host,
-					})
-				}
-
 			}
 			if serviceName == "" {
 				serviceName = name
 			}
-			metricBuilders[serviceName] = append(metricBuilders[serviceName], metricBuilder)
+
+			// build the host->service->metric tree
+			host, hostFound := hostsMap[hostName]
+			if !hostFound {
+				host = make(map[string][]connectors.MetricBuilder)
+				hostsMap[hostName] = host
+			}
+			metrics, metricsFound := host[serviceName]
+			if !metricsFound {
+				metrics = []connectors.MetricBuilder{}
+				host[serviceName] = metrics
+			}
+			host[serviceName] = append(host[serviceName], metricBuilder)
+
+			// add or update the groups collection
+			refs, groupFound := groups[groupName]
+			if !groupFound {
+				refs = []transit.MonitoredResourceRef{}
+				refs = groups[groupName]
+			}
+			if !containsRef(refs, hostName) {
+				groups[groupName] = append(groups[groupName], transit.MonitoredResourceRef{
+					Name: hostName,
+					Type: transit.Host,
+				})
+			}
 		}
 	}
-	return metricBuilders
+}
+
+func containsRef(refs []transit.MonitoredResourceRef, hostName string) bool {
+	for _, host := range refs {
+		if host.Name == hostName {
+			return true
+		}
+	}
+	return false
 }
 
 func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) []transit.ResourceGroup {
@@ -255,8 +282,9 @@ func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) [
 	return resourceGroups
 }
 
-func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, hostName *string, groups *map[string][]transit.MonitoredResourceRef) (*[]transit.MonitoredService, error) {
-	var monitoredServices []transit.MonitoredService
+func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, groups map[string][]transit.MonitoredResourceRef) (*[]transit.MonitoredResource, error) {
+	var monitoredResources []transit.MonitoredResource
+	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	for _, prometheusService := range prometheusServices {
 		if len(prometheusService.GetMetric()) == 0 {
 			continue
@@ -266,23 +294,30 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, ho
 			log.Error(fmt.Sprintf("[Prometheus Connector]: %s", err.Error()))
 			continue
 		}
-
-		serviceNameToMetricBuildersMap := extractIntoMetricBuilders(prometheusService, hostName, groups)
-
-		if *hostName == "" {
-			return nil, errors.New("HostName cannot be empty")
+		extractIntoMetricBuilders(prometheusService, groups, hostsMap)
+	}
+	for hostName, host := range hostsMap {
+		monitoredResource, err := connectors.CreateResource(hostName)
+		if err != nil {
+			return nil, err
 		}
 
-		for serviceName, metricBuilders := range serviceNameToMetricBuildersMap {
-			if service, err := connectors.BuildServiceForMetrics(serviceName, *hostName, metricBuilders); err == nil {
-				monitoredServices = append(monitoredServices, *service)
-			} else {
-				return nil, err
+		// sort the keys for hashSum consistency
+		keys := make([]string, 0, len(host))
+		for k := range host {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		// for serviceName, metrics := range host {
+		for _, serviceName := range keys {
+			metrics := host[serviceName]
+			if service, err := connectors.BuildServiceForMetrics(serviceName, hostName, metrics); err == nil {
+				monitoredResource.Services = append(monitoredResource.Services, *service)
 			}
 		}
+		monitoredResources = append(monitoredResources, *monitoredResource)
 	}
-
-	return &monitoredServices, nil
+	return &monitoredResources, nil
 }
 
 // initializeEntrypoints - function for setting entrypoints,
