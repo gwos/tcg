@@ -15,16 +15,16 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	chksum []byte
+	chksum            []byte
+	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
 func main() {
 	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
-	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
-	transitService.RegisterExitHandler(exitHandler)
+	transitService.RegisterExitHandler(cancel)
 
 	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
@@ -37,10 +37,10 @@ func main() {
 		return
 	}
 
-	log.Info("[Prometheus Connector]: Waiting for configuration ...")
-	connectors.StartPeriodic(ctxExit, extConfig.CheckInterval, func() {
-		pull(extConfig.Resources)
-	})
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+
+	/* prevent return */
+	<-make(chan bool, 1)
 }
 
 func configHandler(data []byte) {
@@ -71,7 +71,7 @@ func configHandler(data []byte) {
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-
+	/* Process checksums */
 	chk, err := connectors.Hashsum(
 		config.GetConfig().Connector.AgentID,
 		config.GetConfig().GWConnections,
@@ -88,4 +88,13 @@ func configHandler(data []byte) {
 	if err == nil {
 		chksum = chk
 	}
+	/* Restart periodic loop */
+	cancel()
+	ctxCancel, cancel = context.WithCancel(context.Background())
+	services.GetTransitService().RegisterExitHandler(cancel)
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+}
+
+func periodicHandler() {
+	pull(extConfig.Resources)
 }

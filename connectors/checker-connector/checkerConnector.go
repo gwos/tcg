@@ -25,6 +25,7 @@ var (
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
 )
 
+// DataFormat describes incoming payload
 type DataFormat string
 
 // Data formats of the received body
@@ -57,22 +58,18 @@ func (cfg ExtConfig) Validate() error {
 }
 
 func initializeEntrypoints() []services.Entrypoint {
-	var entrypoints []services.Entrypoint
-  
-	entrypoints = append(entrypoints,
-		services.Entrypoint{
+	return []services.Entrypoint{
+		{
 			URL:     "/bronx",
-			Method:  "Post",
+			Method:  http.MethodPost,
 			Handler: bronxHandler,
 		},
-		services.Entrypoint{
+		{
 			URL:     "/nsca",
-			Method:  "Post",
+			Method:  http.MethodPost,
 			Handler: nscaHandler,
 		},
-	)
-
-	return entrypoints
+	}
 }
 
 func bronxHandler(c *gin.Context) {
@@ -168,7 +165,7 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 			Type:          transit.Host,
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.DefaultCheckInterval)},
+			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)},
 			Services:      value,
 		})
 	}
@@ -383,7 +380,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 			Owner:            arr[2],
 			Status:           status,
 			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.DefaultCheckInterval)},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: arr[5],
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
 		})
