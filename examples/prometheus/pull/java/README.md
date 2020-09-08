@@ -8,7 +8,7 @@
 
 ### Prometheus server:
 
-    $ cd examples/java
+    $ cd examples/prometheus/pull/java
     $ mvn clean install
     $ mvn spring-boot:run
     
