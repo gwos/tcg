@@ -586,7 +586,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		}
 
 		headers["GWOS-API-TOKEN"] = client.token
-		statusCode, byteResponse, err = SendRequestWithContext(ctx, http.MethodPost, reqURL, headers, nil, payload)
+		statusCode, byteResponse, err = SendRequestWithContext(ctx, httpMethod, reqURL, headers, nil, payload)
 
 		logEntry = log.With(log.Fields{
 			"error":      err,

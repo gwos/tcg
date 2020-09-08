@@ -53,6 +53,7 @@ func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monito
 	return json.Unmarshal(data, &cfg)
 }
 
+// Start starts services
 func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
 		return err
@@ -63,6 +64,7 @@ func Start() error {
 	return nil
 }
 
+// SendMetrics processes metrics payload
 func SendMetrics(resources []transit.MonitoredResource) error {
 	var b []byte
 	var err error
@@ -75,38 +77,22 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 			span.End()
 		}()
 	}
-	setCheckTimes(resources)
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
 	for i := range request.Resources {
-		request.Resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-		request.Resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: request.Resources[i].LastCheckTime.Local().Add(CheckInterval)}
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
 
 	b, err = json.Marshal(request)
-
 	if err != nil {
 		return err
 	}
 	return services.GetTransitService().SendResourceWithMetrics(b)
 }
 
-func setCheckTimes(resources []transit.MonitoredResource) {
-	lastCheckTime := time.Now().Local()
-	nextCheckTime := lastCheckTime.Add(CheckInterval)
-	for i := range resources {
-		resources[i].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-		resources[i].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-		for j := range resources[i].Services {
-			resources[i].Services[j].LastCheckTime = milliseconds.MillisecondTimestamp{Time: lastCheckTime}
-			resources[i].Services[j].NextCheckTime = milliseconds.MillisecondTimestamp{Time: nextCheckTime}
-		}
-	}
-}
-
+// SendInventory processes inventory payload
 func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
 	var b []byte
 	var err error
@@ -415,7 +401,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 	return CreateService(serviceName, hostName, timeSeries)
 }
 
-// Create Service
+// CreateService makes node
 // required params: name, owner(resource)
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
@@ -424,8 +410,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 		Type:          transit.Service,
 		Owner:         owner,
 		Status:        transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -443,7 +429,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 	return &service, nil
 }
 
-// Create Resource
+// CreateResource makes node
 // required params: name
 // optional params: services
 func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
@@ -451,8 +437,8 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		Name:          name,
 		Type:          transit.Host,
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -614,6 +600,7 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	return transit.ServiceOk
 }
 
+// EvaluateExpressions calcs synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
 	var result []transit.MonitoredService
 	vars := make(map[string]interface{})
@@ -645,15 +632,15 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Owner:            result[i].Owner,
 						Status:           "SERVICE_OK",
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
-						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
 								SampleType: transit.Value,
 								Interval: &transit.TimeInterval{
-									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
+									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 								},
 								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
@@ -671,6 +658,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 	return result
 }
 
+// Name defines metric name
 func Name(defaultName string, customName string) string {
 	if customName == "" {
 		return defaultName
@@ -709,20 +697,36 @@ func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
 }
 
 // StartPeriodic starts periodic event loop
-// with 1 minute (not often) guard
-// loop can be cancelled via context argument
+// context can provide ctx.Done channel
+// and "notOften" guard with 1 minute defaults
 func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
-	ticker := time.NewTicker(MaxDuration(t, time.Minute))
-	defer ticker.Stop()
+	notOften := time.Minute
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			go fn()
-		}
+	if v := ctx.Value("notOften"); v != nil {
+		notOften = v.(time.Duration)
 	}
+	ticker := time.NewTicker(MaxDuration(t, notOften))
+	handler := func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Error("[Recovered]", err)
+			}
+		}()
+		fn()
+	}
+	go func() {
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				go handler()
+			}
+		}
+	}()
+	/* call handler immediately */
+	go handler()
 }
