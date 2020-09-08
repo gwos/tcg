@@ -18,21 +18,22 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	chksum    []byte
-	connector KubernetesConnector
+	chksum            []byte
+	connector         KubernetesConnector
+	ctxCancel, cancel = context.WithCancel(context.Background())
+	count             = 0
 )
 
 func main() {
 	// services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
-	ctxExit, exitHandler := context.WithCancel(context.Background())
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
-	transitService.RegisterExitHandler(exitHandler)
+	transitService.RegisterExitHandler(cancel)
 
 	log.Info("[K8 Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error(err)
+		log.Error("[K8 Connector]: ", err)
 		return
 	}
 
@@ -42,22 +43,10 @@ func main() {
 	}
 
 	log.Info("[K8 Connector]: Starting metric connection ...")
-	count := 0
-	connectors.StartPeriodic(ctxExit, connectors.CheckInterval, func() {
-		if connector.kapi != nil {
-			inventory, monitored, groups := connector.Collect(extConfig)
-			log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-			if count == 0 {
-				err := connectors.SendInventory(inventory, groups, extConfig.Ownership)
-				log.Error("[K8 Connector]: Error during sending inventory.", err)
-				time.Sleep(3 * time.Second)
-				count = count + 1
-			}
-			err := connectors.SendMetrics(monitored)
-			log.Error("[K8 Connector]: Error during sending metrics.", err)
-		}
-	})
+	/* prevent return */
+	<-make(chan bool, 1)
 }
 
 func configHandler(data []byte) {
@@ -113,13 +102,34 @@ func configHandler(data []byte) {
 	}
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-	/* process checksums */
+	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
 	if err != nil || !bytes.Equal(chksum, chk) {
 		// TODO: process inventory
 	}
 	if err == nil {
 		chksum = chk
+	}
+	/* Restart periodic loop */
+	cancel()
+	ctxCancel, cancel = context.WithCancel(context.Background())
+	services.GetTransitService().RegisterExitHandler(cancel)
+	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+}
+
+func periodicHandler() {
+	if connector.kapi != nil {
+		inventory, monitored, groups := connector.Collect(extConfig)
+		log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+
+		if count == 0 {
+			err := connectors.SendInventory(inventory, groups, extConfig.Ownership)
+			log.Error("[K8 Connector]: Error during sending inventory.", err)
+			time.Sleep(3 * time.Second)
+			count = count + 1
+		}
+		err := connectors.SendMetrics(monitored)
+		log.Error("[K8 Connector]: Error during sending metrics.", err)
 	}
 }
 
