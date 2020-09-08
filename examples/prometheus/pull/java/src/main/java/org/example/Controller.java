@@ -21,20 +21,21 @@ public class Controller {
     }};
 
     List<String> nodes = new ArrayList<String>() {{
-        add("node1");
-        add("node2");
+        add("node_1");
+        add("node_2");
     }};
 
     List<String> labels = new ArrayList<String>() {{
         add("node");
         add("service");
         add("code");
-
+        add("warning");
+        add("critical");
         add("resource");
         add("group");
     }};
 
-    String defaultResource = "FinanceServicesGo";
+    String defaultResource = "FinanceServicesJava";
     String defaultGroup = "PrometheusDemo";
 
     @RequestMapping("/")
@@ -56,20 +57,26 @@ public class Controller {
 
         for (String service : services) {
             for (String node : nodes) {
+                // Counter multi metric building example
                 counterFamily.addMetric(new ArrayList<String>() {{
-                    add(node);
-                    add(service);
-                    add("200");
-                    add(defaultResource);
-                    add(defaultGroup);
+                    add(node);                                              // node value
+                    add(service);                                           // service name
+                    add("200");                                             // code value
+                    add(String.valueOf((int) (1 + Math.random() * 10)));    // warning threshold
+                    add(String.valueOf((int) (1 + Math.random() * 10)));    // critical threshold
+                    add(defaultResource);                                   // resource name
+                    add(defaultGroup);                                      // group name
                 }}, (int) (1 + Math.random() * 10));
 
+                // Gauge multi metric building example
                 gaugeFamily.addMetric(new ArrayList<String>() {{
-                    add(node);
-                    add(service);
-                    add("200");
-                    add(defaultResource);
-                    add(defaultGroup);
+                    add(node);                                              // node value
+                    add(service);                                           // service name
+                    add("500");                                             // code value
+                    add(String.valueOf((int) (1 + Math.random() * 10)));    // warning threshold
+                    add(String.valueOf((int) (1 + Math.random() * 10)));    // critical threshold
+                    add(defaultResource);                                   // resource name
+                    add(defaultGroup);                                      // group name
                 }}, (int) (1 + Math.random() * 10));
             }
         }
