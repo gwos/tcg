@@ -47,7 +47,7 @@ func GetController() *Controller {
 		controller = &Controller{
 			GetAgentService(),
 			[]Entrypoint{},
-			nil,
+			defaultListMetricsHandler,
 			nil,
 		}
 	})
@@ -56,40 +56,31 @@ func GetController() *Controller {
 
 // RegisterEntrypoints sets addition API
 func (controller *Controller) RegisterEntrypoints(entrypoints []Entrypoint) {
-	controller.Mutex.Lock()
 	controller.entrypoints = entrypoints
-	controller.Mutex.Unlock()
 }
 
 // RemoveEntrypoints removes addition API
 func (controller *Controller) RemoveEntrypoints() {
-	controller.Mutex.Lock()
 	controller.entrypoints = []Entrypoint{}
-	controller.Mutex.Unlock()
+}
+
+func defaultListMetricsHandler() ([]byte, error) {
+	return nil, fmt.Errorf("listMetricsHandler unavailable")
 }
 
 // ListMetrics implements Controllers.ListMetrics interface
 func (controller *Controller) ListMetrics() ([]byte, error) {
-	controller.Mutex.Lock()
-	defer controller.Mutex.Unlock()
-	if controller.listMetricsHandler != nil {
-		return controller.listMetricsHandler()
-	}
-	return nil, fmt.Errorf("listMetricsHandler unavailable")
+	return controller.listMetricsHandler()
 }
 
 // RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
 func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
-	controller.Mutex.Lock()
 	controller.listMetricsHandler = fn
-	controller.Mutex.Unlock()
 }
 
 // RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
 func (controller *Controller) RemoveListMetricsHandler() {
-	controller.Mutex.Lock()
-	controller.listMetricsHandler = nil
-	controller.Mutex.Unlock()
+	controller.listMetricsHandler = defaultListMetricsHandler
 }
 
 // SendEvents implements Controllers.SendEvents interface
