@@ -117,9 +117,9 @@ func GetAgentService() *AgentService {
 			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
 			tracerToken,
-			nil,
-			nil,
-			nil,
+			defaultConfigHandler,
+			defaultDemandConfigHandler,
+			defaultExitHandler,
 			telemetryFlushHandler,
 			telemetryProvider,
 		}
@@ -202,47 +202,41 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	}
 }
 
+func defaultConfigHandler([]byte) {}
+
+func defaultDemandConfigHandler() bool { return true }
+
+func defaultExitHandler() {}
+
 // RegisterConfigHandler sets callback
 // usefull for process extensions
 func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
-	service.Mutex.Lock()
 	service.configHandler = fn
-	service.Mutex.Unlock()
 }
 
 // RemoveConfigHandler removes callback
 func (service *AgentService) RemoveConfigHandler() {
-	service.Mutex.Lock()
-	service.configHandler = nil
-	service.Mutex.Unlock()
+	service.configHandler = defaultConfigHandler
 }
 
 // RegisterDemandConfigHandler sets callback
 func (service *AgentService) RegisterDemandConfigHandler(fn func() bool) {
-	service.Mutex.Lock()
 	service.demandConfigHandler = fn
-	service.Mutex.Unlock()
 }
 
 // RemoveDemandConfigHandler removes callback
 func (service *AgentService) RemoveDemandConfigHandler() {
-	service.Mutex.Lock()
-	service.demandConfigHandler = nil
-	service.Mutex.Unlock()
+	service.demandConfigHandler = defaultDemandConfigHandler
 }
 
 // RegisterExitHandler sets callback
 func (service *AgentService) RegisterExitHandler(fn func()) {
-	service.Mutex.Lock()
 	service.exitHandler = fn
-	service.Mutex.Unlock()
 }
 
 // RemoveExitHandler removes callback
 func (service *AgentService) RemoveExitHandler() {
-	service.Mutex.Lock()
-	service.exitHandler = nil
-	service.Mutex.Unlock()
+	service.exitHandler = defaultExitHandler
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
@@ -512,19 +506,13 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
-	service.Mutex.Lock()
 	// custom connector may provide additional handler for extended fields
-	if service.configHandler != nil {
-		service.configHandler(data)
-	}
+	service.configHandler(data)
 	// notify C-API config change
-	if service.demandConfigHandler != nil {
-		if success := service.demandConfigHandler(); !success {
-			log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
-		}
-		// TODO: add logic to avoid processing previous inventory in case of callback fails
+	if success := service.demandConfigHandler(); !success {
+		log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
 	}
-	service.Mutex.Unlock()
+	// TODO: add logic to avoid processing previous inventory in case of callback fails
 	// stop nats processing
 	_ = service.stopTransport()
 	// flush uploading telemetry and configure provider while processing stopped
@@ -666,19 +654,15 @@ func (service AgentService) handleExit() {
 	go func() {
 		s := <-c
 		fmt.Printf("\n- Signal %s received, exiting\n", s)
-		service.Mutex.Lock()
-		if service.exitHandler != nil {
-			/* wrap exitHandler with recover */
-			go func(fn func()) {
-				defer func() {
-					if err := recover(); err != nil {
-						log.Error("[handleExit]", err)
-					}
-				}()
-				fn()
-			}(service.exitHandler)
-		}
-		service.Mutex.Unlock()
+		/* wrap exitHandler with recover */
+		go func(fn func()) {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Error("[handleExit]", err)
+				}
+			}()
+			fn()
+		}(service.exitHandler)
 
 		if err := service.StopController(); err != nil {
 			log.Error("[handleExit]", err.Error())
