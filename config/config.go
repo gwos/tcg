@@ -18,6 +18,9 @@ import (
 	"sync"
 )
 
+// Variables to control the build info
+// can be overridden by Go linker during the build step:
+// go build -ldflags "-X 'github.com/gwos/tcg/config.buildTag=<TAG>' -X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`'"
 var (
 	buildTag  = "8.x.x"
 	buildTime = "Build time not provided"
