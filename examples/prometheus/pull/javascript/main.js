@@ -13,15 +13,8 @@ const services = [
     'sales',
 ];
 
-const nodes = [
-    'node_1',
-    'node_2',
-];
-
 const labels = [
-    'node',
     'service',
-    'code',
     'warning',
     'critical',
     'resource',
@@ -30,51 +23,59 @@ const labels = [
 
 // Enable collection of default metrics
 require('prom-client').collectDefaultMetrics({
-    gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5], // These are the default buckets.
+    gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
 });
 
 // Create custom metrics
 const Counter = require('prom-client').Counter;
-const c = new Counter({
-    name: 'requests_total',
-    help: 'Finance Services total http requests made.',
+const requestsPerMinute = new Counter({
+    name: 'requests_per_minute',
+    help: 'Finance Services http requests per minute.',
     labelNames: labels,
 });
 
 const Gauge = require('prom-client').Gauge;
-const g = new Gauge({
-    name: 'bytes_transferred',
-    help: 'Finance Services bytes transferred over http.',
+const bytesPerMinute = new Gauge({
+    name: 'bytes_per_minute',
+    help: 'Finance Services bytes transferred over http per minute.',
+    labelNames: labels,
+});
+
+const responseTime = new Gauge({
+    name: 'response_time',
+    help: 'Finance Services http response time average over 1 minute.',
     labelNames: labels,
 });
 
 // Set metric values to some random values for demonstration
 for (let i = 0; i < services.length; i++) {
-    for (let j = 0; j < nodes.length; j++) {
-        g.labels(
-            nodes[j],
-            services[i],
-            '200',
-            (Math.random() * (20 - 1) + 1).toFixed(1).toString(),
-            (Math.random() * (20 - 1) + 1).toFixed(1).toString(),
-            defaultResource,
-            defaultGroup,
-        ).inc(parseInt((Math.random() * (20 - 1) + 1).toFixed(0)));
+    bytesPerMinute.labels(
+        services[i],
+        '40000',
+        '45000',
+        defaultResource,
+        defaultGroup,
+    ).inc(parseInt((Math.random() * (60000 - 10000) + 10000).toFixed(0)));
 
-        c.labels(
-            nodes[j],
-            services[i],
-            '500',
-            (Math.random() * (20 - 1) + 1).toFixed(1).toString(),
-            (Math.random() * (20 - 1) + 1).toFixed(1).toString(),
-            defaultResource,
-            defaultGroup,
-        ).inc(parseInt((Math.random() * (20 - 1) + 1).toFixed(0)));
-    }
+    requestsPerMinute.labels(
+        services[i],
+        '70',
+        '90',
+        defaultResource,
+        defaultGroup,
+    ).inc(parseInt((Math.random() * (100 - 1) + 1).toFixed(0)));
+
+    responseTime.labels(
+        services[i],
+        '2.0',
+        '2.5',
+        defaultResource,
+        defaultGroup,
+    ).inc(parseFloat((Math.random() * (3)).toFixed(1)));
 }
 
 // Setup main to Prometheus scrapes:
-main.get('/', async (req, res) => {
+main.get('/metrics', async (req, res) => {
     try {
         res.set('Content-Type', register.contentType);
         res.end(await response());
@@ -83,9 +84,18 @@ main.get('/', async (req, res) => {
     }
 });
 
+main.get('/', async (req, res) => {
+    try {
+        res.end('Groundwork Prometheus Metrics example. Hit the /metrics end point to see Prometheus Exposition metrics...');
+    } catch (ex) {
+        res.status(500).end(ex);
+    }
+});
+
 async function response() {
-    return await register.getSingleMetricAsString('requests_total') +
-        '\n' + await register.getSingleMetricAsString('bytes_transferred') +
+    return await register.getSingleMetricAsString('requests_per_minute') +
+        '\n' + await register.getSingleMetricAsString('bytes_per_minute') +
+        '\n' + await register.getSingleMetricAsString('response_time') +
         '\n';
 }
 

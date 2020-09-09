@@ -209,9 +209,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					serviceName = *label.Value
 				case "group":
 					groupName = *label.Value
-				case "node":
-					metricBuilder.Tags[*label.Name] = *label.Value
-				case "code":
+				default:
 					metricBuilder.Tags[*label.Name] = *label.Value
 				}
 			}
