@@ -10,39 +10,39 @@ import (
 )
 
 const (
-	HostName = "FinanceServicesGo"
+	HostName      = "FinanceServicesGo"
 	HostGroupName = "PrometheusDemo"
 )
 
 var (
 	services = []string{"analytics", "distribution", "sales"}
-	nodes = []string{"node1", "node2"}
+	// nodes    = []string{"node1", "node2"}
 
 	//dynamicLabels = []string{"node", "service", "code"}
-	dynamicLabels = []string{"service"}
+	dynamicLabels  = []string{"service"}
 	requestsLabels = prometheus.Labels{
 		"resource": HostName,
-		"group": HostGroupName,
-		"warning": "70",
+		"group":    HostGroupName,
+		"warning":  "70",
 		"critical": "90",
 	}
 	bytesLabels = prometheus.Labels{
 		"resource": HostName,
-		"group": HostGroupName,
-		"warning": "40000",
+		"group":    HostGroupName,
+		"warning":  "40000",
 		"critical": "45000",
 	}
 	responseLabels = prometheus.Labels{
 		"resource": HostName,
-		"group": HostGroupName,
-		"warning": "2.0",
+		"group":    HostGroupName,
+		"warning":  "2.0",
 		"critical": "2.5",
 	}
 
 	requestsPerMinute = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "requests_per_minute",
-			Help: "Finance Services http requests per minute.",
+			Name:        "requests_per_minute",
+			Help:        "Finance Services http requests per minute.",
 			ConstLabels: requestsLabels,
 		},
 		dynamicLabels,
@@ -50,8 +50,8 @@ var (
 
 	bytesPerMinute = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "bytes_per_minute",
-			Help: "Finance Services bytes transferred over http per minute",
+			Name:        "bytes_per_minute",
+			Help:        "Finance Services bytes transferred over http per minute.",
 			ConstLabels: bytesLabels,
 		},
 		dynamicLabels,
@@ -59,8 +59,8 @@ var (
 
 	responseTime = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "response_time",
-			Help: "Finance Services http response time average over 1 minutew",
+			Name:        "response_time",
+			Help:        "Finance Services http response time average over 1 minute.",
 			ConstLabels: responseLabels,
 		},
 		dynamicLabels,
@@ -71,9 +71,9 @@ var (
 
 func main() {
 	registry := prometheus.NewRegistry()
-	registry.Register(requestsPerMinute)
-	registry.Register(bytesPerMinute)
-	registry.Register(responseTime)
+	_ = registry.Register(requestsPerMinute)
+	_ = registry.Register(bytesPerMinute)
+	_ = registry.Register(responseTime)
 
 	go metricsGenerator()
 
@@ -115,7 +115,6 @@ func metricsGenerator() {
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Groundwork Prometheus Metrics example. Hit the /metrics end point to see Prometheus Exposition metrics... "))
+	_, _ = w.Write([]byte("Groundwork Prometheus Metrics example. Hit the /metrics end point to see Prometheus Exposition metrics..."))
 	w.WriteHeader(200)
 }
-
