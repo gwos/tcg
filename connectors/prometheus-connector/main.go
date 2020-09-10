@@ -12,7 +12,6 @@ import (
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -52,10 +51,12 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Resources:     []Resource{},
-		Services:      []string{},
-		CheckInterval: connectors.DefaultCheckInterval,
-		Ownership:     transit.Yield,
+		Resources:        []Resource{},
+		Services:         []string{},
+		CheckInterval:    connectors.DefaultCheckInterval,
+		Ownership:        transit.Yield,
+		DefaultHost:      defaultHostName,
+		DefaultHostGroup: defaultHostGroupName,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -68,7 +69,7 @@ func configHandler(data []byte) {
 	if len(gwConnections) > 0 {
 		tExt.Ownership = transit.HostOwnershipType(gwConnections[0].DeferOwnership)
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	/* Process checksums */
 	chk, err := connectors.Hashsum(
@@ -80,7 +81,7 @@ func configHandler(data []byte) {
 		log.Info("[Prometheus Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
 			*Synchronize(),
-			extConfig.Groups,
+			extConfig.Groups, // TODO: this is broken, the extConfig cannot be relied on to retrieve group alone
 			extConfig.Ownership,
 		)
 	}
