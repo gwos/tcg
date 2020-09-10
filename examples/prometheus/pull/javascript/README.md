@@ -8,7 +8,7 @@
 
 ### Prometheus server:
 
-    $ cd examples/javascript
+    $ cd examples/prometheus/pull/javascript
     $ npm i
     $ node main.js
     
@@ -20,5 +20,5 @@
 
 ```   
 To connect a Prometheus connector to the JS server, just create a new connector in the UI
-and set the resource to `localhost: 2222`.
+and set the resource to `localhost:3000`.
 ```

@@ -191,6 +191,7 @@ type MetricBuilder struct {
 	StartTimestamp *milliseconds.MillisecondTimestamp
 	EndTimestamp   *milliseconds.MillisecondTimestamp
 	Graphed        bool
+	Tags           map[string]string
 }
 
 // Creates metric based on data provided with metricBuilder
@@ -208,6 +209,9 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
 		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
 			": either start time or end time is not provided")
+	}
+	if metricBuilder.Tags != nil && len(metricBuilder.Tags) != 0 {
+		args = append(args, metricBuilder.Tags)
 	}
 
 	metricName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -294,6 +298,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
+		case map[string]string:
+			metric.Tags = arg.(map[string]string)
 		//case transit.MetricSampleType:
 		//	metric.SampleType = arg.(transit.MetricSampleType)
 		default:
