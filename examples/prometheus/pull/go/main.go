@@ -128,7 +128,7 @@ func genericHandler(w http.ResponseWriter, r *http.Request, serviceName string, 
 	elapsed = float64(randomizer.Intn(30)) / 10
 
 	responseTime.With(labels).Set(elapsed)
-	w.Write([]byte("Groundwork Prometheus Metrics example response for " + serviceName + "\n"))
+	_, _ = w.Write([]byte("Groundwork Prometheus Metrics example response for " + serviceName + "\n"))
 }
 
 // this is where your application would process the request and return a response
