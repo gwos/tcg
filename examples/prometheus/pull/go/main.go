@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
@@ -66,6 +67,10 @@ var (
 		dynamicLabels,
 	)
 
+	analyticsTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
+	distributionTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
+	salesTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
+
 	randomizer = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
@@ -75,12 +80,75 @@ func main() {
 	_ = registry.Register(bytesPerMinute)
 	_ = registry.Register(responseTime)
 
-	go metricsGenerator()
+	// go metricsGenerator()
+	go requestsGenerator()
 
 	gwHandler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 	http.Handle("/metrics", gwHandler)
 	http.HandleFunc("/", handler)
+	http.HandleFunc("/analytics", analyticsHandler)
+	http.HandleFunc("/distribution", distributionHandler)
+	http.HandleFunc("/sales", salesHandler)
 	log.Fatal(http.ListenAndServe(":2222", nil))
+}
+
+func analyticsHandler(w http.ResponseWriter, r *http.Request) {
+	genericHandler(w, r, "analytics", &analyticsTimer)
+}
+
+func distributionHandler(w http.ResponseWriter, r *http.Request) {
+	genericHandler(w, r, "distribution", &distributionTimer)
+}
+
+func salesHandler(w http.ResponseWriter, r *http.Request) {
+	genericHandler(w, r, "sales", &salesTimer)
+}
+
+func genericHandler(w http.ResponseWriter, r *http.Request, serviceName string, timer *time.Time) {
+	// instrument your code
+	start := time.Now()
+	labels := prometheus.Labels{"service": serviceName}
+
+	// call your application logic here...
+	bytesCount := processRequest()
+
+	//  per minute metrics
+	if timer.Add(time.Minute).Before(start) {
+		*timer = start
+		requestsPerMinute.With(labels).Set(1)
+		bytesPerMinute.With(labels).Set(0)
+	} else {
+		requestsPerMinute.With(labels).Inc()
+		bytesPerMinute.With(labels).Add(float64(bytesCount))
+	}
+
+	// normally calculate response time metrics
+	elapsed := float64(time.Since(start).Milliseconds())
+	// fake the response time for demo, normally use elapsed variable
+	elapsed = float64(randomizer.Intn(30)) / 10
+
+	responseTime.With(labels).Set(elapsed)
+	w.Write([]byte("Groundwork Prometheus Metrics example response for " + serviceName + "\n"))
+}
+
+// this is where your application would process the request and return a response
+func processRequest() int {
+	return randomizer.Intn(12500)
+}
+
+func requestsGenerator() {
+	for ;; {
+		resp, _ := http.Get("http://localhost:2222/analytics")
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		resp, _ = http.Get("http://localhost:2222/distribution")
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		resp, _ = http.Get("http://localhost:2222/sales")
+		ioutil.ReadAll(resp.Body)
+		resp.Body.Close()
+		time.Sleep(time.Second * 15) // generate 4 requests per minute
+	}
 }
 
 func metricsGenerator() {
