@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io/ioutil"
@@ -16,10 +17,6 @@ const (
 )
 
 var (
-	services = []string{"analytics", "distribution", "sales"}
-	// nodes    = []string{"node1", "node2"}
-
-	//dynamicLabels = []string{"node", "service", "code"}
 	dynamicLabels  = []string{"service"}
 	requestsLabels = prometheus.Labels{
 		"resource": HostName,
@@ -67,10 +64,6 @@ var (
 		dynamicLabels,
 	)
 
-	analyticsTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
-	distributionTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
-	salesTimer = time.Date(2020, 1,1, 0, 0, 0, 0, time.UTC)
-
 	randomizer = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
@@ -93,91 +86,59 @@ func main() {
 }
 
 func analyticsHandler(w http.ResponseWriter, r *http.Request) {
-	genericHandler(w, r, "analytics", &analyticsTimer)
+	instrumentedHandler(w, r, "analytics")
 }
 
 func distributionHandler(w http.ResponseWriter, r *http.Request) {
-	genericHandler(w, r, "distribution", &distributionTimer)
+	instrumentedHandler(w, r, "distribution")
 }
 
 func salesHandler(w http.ResponseWriter, r *http.Request) {
-	genericHandler(w, r, "sales", &salesTimer)
+	instrumentedHandler(w, r, "sales")
 }
 
-func genericHandler(w http.ResponseWriter, r *http.Request, serviceName string, timer *time.Time) {
-	// instrument your code
+func instrumentedHandler(w http.ResponseWriter, r *http.Request, serviceName string) {
+	// instrument your http handler, start the timer ...
 	start := time.Now()
 	labels := prometheus.Labels{"service": serviceName}
 
-	// call your application logic here...
-	bytesCount := processRequest()
+	// call your application logic here... this returns simulated random instrumentation numbers
+	requestsNumber, bytesNumber, responseTimeNumber := processRequest()
 
-	//  per minute metrics
-	if timer.Add(time.Minute).Before(start) {
-		*timer = start
-		requestsPerMinute.With(labels).Set(1)
-		bytesPerMinute.With(labels).Set(0)
-	} else {
-		requestsPerMinute.With(labels).Inc()
-		bytesPerMinute.With(labels).Add(float64(bytesCount))
-	}
+	// calculate responseTime, you would normally set instrument this on responseTime
+	elapsed := float64(time.Since(start).Nanoseconds())
 
-	// normally calculate response time metrics
-	elapsed := float64(time.Since(start).Milliseconds())
-	// fake the response time for demo, normally use elapsed variable
-	elapsed = float64(randomizer.Intn(30)) / 10
+	// instrument requestsPerMinute with random number, this could also be done with a histogram
+	requestsPerMinute.With(labels).Set(requestsNumber)
+	// instrument bytes per minute with random number, this could also be done with a histogram
+	bytesPerMinute.With(labels).Set(bytesNumber)
+	// instrument response time with random number, you would normally use the elapsed variable
+	responseTime.With(labels).Set(responseTimeNumber)
 
-	responseTime.With(labels).Set(elapsed)
-	_, _ = w.Write([]byte("Groundwork Prometheus Metrics example response for " + serviceName + "\n"))
+	message := fmt.Sprintf("Groundwork Prometheus Metrics example response for %s in %f ns\n", serviceName, elapsed)
+	_, _ = w.Write([]byte(message))
 }
 
-// this is where your application would process the request and return a response
-func processRequest() int {
-	return randomizer.Intn(12500)
+// Here is where your application would process the request & return a response. Instead we just generate random numbers
+func processRequest() (float64, float64, float64) {
+	requestsPerMinute := float64(randomizer.Intn(100))
+	bytesPerMinute := float64(randomizer.Intn(50000))
+	responseTime := float64(randomizer.Intn(30)) / 10
+	return requestsPerMinute, bytesPerMinute, responseTime
 }
 
+// simulate the generation of requests
 func requestsGenerator() {
 	for ;; {
 		resp, _ := http.Get("http://localhost:2222/analytics")
-		ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		resp, _ = http.Get("http://localhost:2222/distribution")
-		ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
+		_, _ = ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		resp, _ = http.Get("http://localhost:2222/sales")
-		ioutil.ReadAll(resp.Body)
-		resp.Body.Close()
-		time.Sleep(time.Second * 15) // generate 4 requests per minute
-	}
-}
-
-func metricsGenerator() {
-	// simulate request traffic
-	for {
-		for _, service := range services {
-			//for _, node := range nodes {
-			//	code := "200"
-			//	if rand.Intn(20) > 18 {
-			//		code = "500"
-			//	}
-			requestsPerMinute.With(
-				prometheus.Labels{
-					"service": service,
-					//"node":    node,
-					//"code":   code,
-				}).Set(float64(randomizer.Intn(100)))
-			bytesPerMinute.With(
-				prometheus.Labels{
-					"service": service,
-					//"node":    node,
-					//"code":    code,
-				}).Set(float64(randomizer.Intn(50000)))
-			responseTime.With(
-				prometheus.Labels{
-					"service": service,
-				}).Set(float64(randomizer.Intn(30)) / 10)
-			//			}
-		}
+		_, _ = ioutil.ReadAll(resp.Body)
+		_ = resp.Body.Close()
 		time.Sleep(time.Second * 30)
 	}
 }
