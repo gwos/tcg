@@ -60,8 +60,8 @@ public class Controller {
             // Counter multi metric building example
             requestsPerMinute.addMetric(new ArrayList<String>() {{
                 add(service);                                                   // service name
-                add("70");                                                        // warning threshold
-                add("90");                                                        // critical threshold
+                add("70");                                                      // warning threshold
+                add("90");                                                      // critical threshold
                 add(defaultResource);                                           // resource name
                 add(defaultGroup);                                              // group name
             }}, (int) (1 + Math.random() * 100));
@@ -69,16 +69,16 @@ public class Controller {
             // Gauge multi metric building example
             bytesPerMinute.addMetric(new ArrayList<String>() {{
                 add(service);                                                   // service name
-                add("40000");                                                        // warning threshold
-                add("45000");                                                        // critical threshold
+                add("40000");                                                   // warning threshold
+                add("45000");                                                   // critical threshold
                 add(defaultResource);                                           // resource name
                 add(defaultGroup);                                              // group name
             }}, (int) (10000 + Math.random() * 50000));
 
             responseTime.addMetric(new ArrayList<String>() {{
                 add(service);                                                   // service name
-                add("2.0");                                                        // warning threshold
-                add("2.5");                                                        // critical threshold
+                add("2.0");                                                     // warning threshold
+                add("2.5");                                                     // critical threshold
                 add(defaultResource);                                           // resource name
                 add(defaultGroup);                                              // group name
             }}, Double.parseDouble(df.format(Math.random() * 3)));
