@@ -55,8 +55,6 @@ func configHandler(data []byte) {
 		Services:         []string{},
 		CheckInterval:    connectors.DefaultCheckInterval,
 		Ownership:        transit.Yield,
-		DefaultHost:      defaultHostName,
-		DefaultHostGroup: defaultHostGroupName,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -81,7 +79,7 @@ func configHandler(data []byte) {
 		log.Info("[Prometheus Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
 			*Synchronize(),
-			extConfig.Groups, // TODO: this is broken, the extConfig cannot be relied on to retrieve group alone
+			extConfig.Groups,
 			extConfig.Ownership,
 		)
 	}

@@ -22,8 +22,10 @@ import (
 
 // Resource defines Prometheus Source
 type Resource struct {
-	Headers map[string]string `json:"headers"`
-	URL     string            `json:"url"`
+	Headers          map[string]string `json:"headers"`
+	URL              string            `json:"url"`
+	DefaultHost      string            `json:"defaultHost"`
+	DefaultHostGroup string            `json:"defaultHostGroup"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -33,7 +35,9 @@ func (r *Resource) UnmarshalJSON(input []byte) error {
 			Key   string `json:"key"`
 			Value string `json:"value"`
 		} `json:"headers"`
-		URL string `json:"url"`
+		URL              string `json:"url"`
+		DefaultHost      string `json:"defaultHost"`
+		DefaultHostGroup string `json:"defaultHostGroup"`
 	}{}
 
 	if err := json.Unmarshal(input, &p); err != nil {
@@ -44,19 +48,19 @@ func (r *Resource) UnmarshalJSON(input []byte) error {
 	for _, h := range p.Headers {
 		r.Headers[h.Key] = h.Value
 	}
+	r.DefaultHost = p.DefaultHost
+	r.DefaultHostGroup = p.DefaultHostGroup
 
 	return nil
 }
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups           []transit.ResourceGroup   `json:"groups"`
-	Resources        []Resource                `json:"resources"`
-	Services         []string                  `json:"services"`
-	CheckInterval    time.Duration             `json:"checkIntervalMinutes"`
-	Ownership        transit.HostOwnershipType `json:"ownership,omitempty"`
-	DefaultHost      string                    `json:"defaultHost"`
-	DefaultHostGroup string                    `json:"defaultHostGroup"`
+	Groups        []transit.ResourceGroup   `json:"groups"`
+	Resources     []Resource                `json:"resources"`
+	Services      []string                  `json:"services"`
+	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -87,14 +91,14 @@ func Synchronize() *[]transit.InventoryResource {
 	return &inventoryResources
 }
 
-func parsePrometheusBody(body []byte) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, nil, err
 	}
 	groups := make(map[string][]transit.MonitoredResourceRef)
 
-	monitoredResources, err := parsePrometheusServices(prometheusServices, groups)
+	monitoredResources, err := parsePrometheusServices(prometheusServices, groups, resourceIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -102,8 +106,8 @@ func parsePrometheusBody(body []byte) (*[]transit.MonitoredResource, *[]transit.
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(body []byte) error {
-	monitoredResources, groups, err := parsePrometheusBody(body)
+func processMetrics(body []byte, resourceIndex int) error {
+	monitoredResources, groups, err := parsePrometheusBody(body, resourceIndex)
 	if err != nil {
 		return err
 	}
@@ -162,7 +166,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 // modifies hostsMap parameter
 func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 	groups map[string][]transit.MonitoredResourceRef,
-	hostsMap map[string]map[string][]connectors.MetricBuilder) {
+	hostsMap map[string]map[string][]connectors.MetricBuilder, resourceIndex int) {
 	var groupName, hostName, serviceName string
 
 	for _, metric := range prometheusService.GetMetric() {
@@ -216,17 +220,17 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 
 			// process defaults
 			if groupName == "" {
-				if extConfig.DefaultHostGroup == "" {
+				if resourceIndex == -1 || extConfig.Resources[resourceIndex].DefaultHostGroup == "" {
 					groupName = defaultHostGroupName
 				} else {
-					groupName = extConfig.DefaultHostGroup
+					groupName = extConfig.Resources[resourceIndex].DefaultHostGroup
 				}
 			}
 			if hostName == "" {
-				if extConfig.DefaultHost == "" {
+				if resourceIndex == -1 || extConfig.Resources[resourceIndex].DefaultHost == "" {
 					hostName = defaultHostName
 				} else {
-					hostName = extConfig.DefaultHost
+					hostName = extConfig.Resources[resourceIndex].DefaultHost
 				}
 			}
 			if serviceName == "" {
@@ -283,7 +287,8 @@ func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) [
 	return resourceGroups
 }
 
-func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, groups map[string][]transit.MonitoredResourceRef) (*[]transit.MonitoredResource, error) {
+func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
+	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
 	var monitoredResources []transit.MonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	for _, prometheusService := range prometheusServices {
@@ -295,7 +300,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily, gr
 			log.Error(fmt.Sprintf("[Prometheus Connector]: %s", err.Error()))
 			continue
 		}
-		extractIntoMetricBuilders(prometheusService, groups, hostsMap)
+		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex)
 	}
 	for hostName, host := range hostsMap {
 		monitoredResource, err := connectors.CreateResource(hostName)
@@ -338,14 +343,14 @@ func receiverHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = processMetrics(body)
+	err = processMetrics(body, -1)
 	if err != nil {
 		log.Error(fmt.Sprintf("[Prometheus Connector]~[Push]: %s", err))
 	}
 }
 
 func pull(resources []Resource) {
-	for _, resource := range resources {
+	for index, resource := range resources {
 		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.URL, resource.Headers, nil, nil)
 
 		if err != nil {
@@ -358,7 +363,7 @@ func pull(resources []Resource) {
 				resource.URL, string(byteResponse)))
 			continue
 		}
-		err = processMetrics(byteResponse)
+		err = processMetrics(byteResponse, index)
 		if err != nil {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: %s", err))
 		}
