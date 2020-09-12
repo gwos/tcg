@@ -47,32 +47,11 @@ const responseTime = new Gauge({
     labelNames: labels,
 });
 
-// Set metric values to some random values for demonstration
-for (let i = 0; i < services.length; i++) {
-    bytesPerMinute.labels(
-        services[i],
-        '40000',
-        '45000',
-        defaultResource,
-        defaultGroup,
-    ).inc(parseInt((Math.random() * (60000 - 10000) + 10000).toFixed(0)));
+// Set metric values to some random values for demonstration:
+handleMetrics();
 
-    requestsPerMinute.labels(
-        services[i],
-        '70',
-        '90',
-        defaultResource,
-        defaultGroup,
-    ).inc(parseInt((Math.random() * (100 - 1) + 1).toFixed(0)));
-
-    responseTime.labels(
-        services[i],
-        '2.0',
-        '2.5',
-        defaultResource,
-        defaultGroup,
-    ).inc(parseFloat((Math.random() * (3)).toFixed(1)));
-}
+// Simulate request traffic:
+setInterval(handleMetrics, 30000);
 
 // Setup main to Prometheus scrapes:
 main.get('/metrics', async (req, res) => {
@@ -105,3 +84,35 @@ console.log(
 );
 
 main.listen(port);
+
+function handleMetrics() {
+    bytesPerMinute.reset();
+    requestsPerMinute.reset();
+    responseTime.reset();
+
+    for (let i = 0; i < services.length; i++) {
+        bytesPerMinute.labels(
+            services[i],
+            '40000',
+            '45000',
+            defaultResource,
+            defaultGroup,
+        ).inc(parseInt((Math.random() * (60000 - 10000) + 10000).toFixed(0)));
+
+        requestsPerMinute.labels(
+            services[i],
+            '70',
+            '90',
+            defaultResource,
+            defaultGroup,
+        ).inc(parseInt((Math.random() * (100 - 1) + 1).toFixed(0)));
+
+        responseTime.labels(
+            services[i],
+            '2.0',
+            '2.5',
+            defaultResource,
+            defaultGroup,
+        ).inc(parseFloat((Math.random() * (3)).toFixed(1)));
+    }
+}
