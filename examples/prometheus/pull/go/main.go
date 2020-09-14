@@ -21,20 +21,20 @@ var (
 	requestsLabels = prometheus.Labels{
 		"resource": HostName,
 		"group":    HostGroupName,
-		"warning":  "70",
-		"critical": "90",
+		"warning":  "85",
+		"critical": "95",
 	}
 	bytesLabels = prometheus.Labels{
 		"resource": HostName,
 		"group":    HostGroupName,
-		"warning":  "40000",
-		"critical": "45000",
+		"warning":  "45000",
+		"critical": "48000",
 	}
 	responseLabels = prometheus.Labels{
 		"resource": HostName,
 		"group":    HostGroupName,
-		"warning":  "2.0",
-		"critical": "2.5",
+		"warning":  "2.5",
+		"critical": "2.8",
 	}
 
 	requestsPerMinute = prometheus.NewGaugeVec(
