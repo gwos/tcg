@@ -12,6 +12,7 @@ connectors/checker-connector/checker-connector
 connectors/elastic-connector/elastic-connector
 connectors/prometheus-connector/prometheus-connector
 connectors/server-connector/server-connector
+examples/prometheus/pull/go/go
 
 # Temporary files
 ,*
