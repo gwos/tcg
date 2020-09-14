@@ -29,8 +29,8 @@ type Resource struct {
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
-func (r *Resource) UnmarshalJSON(input []byte) error {
-	p := struct {
+func (resource *Resource) UnmarshalJSON(input []byte) error {
+	config := struct {
 		Headers []struct {
 			Key   string `json:"key"`
 			Value string `json:"value"`
@@ -40,16 +40,19 @@ func (r *Resource) UnmarshalJSON(input []byte) error {
 		DefaultHostGroup string `json:"defaultHostGroup"`
 	}{}
 
-	if err := json.Unmarshal(input, &p); err != nil {
+	if err := json.Unmarshal(input, &config); err != nil {
 		return err
 	}
 
-	r.URL = p.URL
-	for _, h := range p.Headers {
-		r.Headers[h.Key] = h.Value
+	resource.URL = config.URL
+	if resource.Headers == nil {
+		resource.Headers = make(map[string]string)
 	}
-	r.DefaultHost = p.DefaultHost
-	r.DefaultHostGroup = p.DefaultHostGroup
+	for _, h := range config.Headers {
+		resource.Headers[h.Key] = h.Value
+	}
+	resource.DefaultHost = config.DefaultHost
+	resource.DefaultHostGroup = config.DefaultHostGroup
 
 	return nil
 }
