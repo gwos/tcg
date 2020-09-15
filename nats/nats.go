@@ -18,13 +18,16 @@ import (
 )
 
 // Define NATS IDs
+// Note: experienced issues with hardcoded values
+// in case of running a few instances on the same host
 const (
-	ClusterID    = "tcg-cluster"
-	DispatcherID = "tcg-dispatcher"
-	PublisherID  = "tcg-publisher"
+	clusterID    = "tcg-cluster"
+	dispatcherID = "tcg-dispatcher"
+	publisherID  = "tcg-publisher"
 )
 
 var (
+	natsMutex      = &sync.Mutex{}
 	cfg            Config
 	connDispatcher stan.Conn
 	connPublisher  stan.Conn
@@ -64,7 +67,8 @@ type DispatcherRetry struct {
 func StartServer(config Config) error {
 	var err error
 	cfg = config
-	natsOpts := stand.DefaultNatsServerOptions
+
+	natsOpts := stand.DefaultNatsServerOptions.Clone()
 	natsOpts.MaxPayload = math.MaxInt32
 	addrParts := strings.Split(cfg.NatsHost, ":")
 	if len(addrParts) == 2 {
@@ -77,8 +81,8 @@ func StartServer(config Config) error {
 	}
 	natsURL = fmt.Sprintf("nats://%s:%d", natsOpts.Host, natsOpts.Port)
 
-	stanOpts := stand.GetDefaultOptions()
-	stanOpts.ID = ClusterID
+	stanOpts := stand.GetDefaultOptions().Clone()
+	stanOpts.ID = clusterID
 	stanOpts.FilestoreDir = cfg.FilestoreDir
 	switch cfg.StoreType {
 	case "MEMORY":
@@ -89,18 +93,22 @@ func StartServer(config Config) error {
 		stanOpts.StoreType = stores.TypeFile
 	}
 
+	natsMutex.Lock()
 	if stanServer == nil || stanServer.State() == stand.Shutdown {
-		stanServer, err = stand.RunServerWithOpts(stanOpts, &natsOpts)
+		stanServer, err = stand.RunServerWithOpts(stanOpts, natsOpts)
 	}
+	natsMutex.Unlock()
 	return err
 }
 
 // StopServer shutdowns NATS
 func StopServer() {
+	natsMutex.Lock()
 	if connPublisher != nil {
 		_ = connPublisher.Close()
 		connPublisher = nil
 	}
+	natsMutex.Unlock()
 	stanServer.Shutdown()
 }
 
@@ -115,14 +123,17 @@ func StartDispatcher(options []DispatcherOption) error {
 		return err
 	}
 	var err error
+	natsMutex.Lock()
 	if connDispatcher == nil {
-		if connDispatcher, err = stan.Connect(
-			ClusterID,
-			DispatcherID,
+		connDispatcher, err = stan.Connect(
+			clusterID,
+			dispatcherID,
 			stan.NatsURL(natsURL),
-		); err != nil {
-			return err
-		}
+		)
+	}
+	natsMutex.Unlock()
+	if err != nil {
+		return err
 	}
 
 	for _, opt := range options {
@@ -133,26 +144,30 @@ func StartDispatcher(options []DispatcherOption) error {
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
+	var err error
+	natsMutex.Lock()
 	if connDispatcher != nil {
 		cache.DispatcherWorkersCache.Flush()
-		err := connDispatcher.Close()
+		err = connDispatcher.Close()
 		connDispatcher = nil
-		return err
 	}
-	return nil
+	natsMutex.Unlock()
+	return err
 }
 
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
 	var err error
+	natsMutex.Lock()
 	if connPublisher == nil {
 		connPublisher, err = stan.Connect(
-			ClusterID,
-			PublisherID,
+			clusterID,
+			publisherID,
 			stan.NatsURL(natsURL),
 			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
 		)
 	}
+	natsMutex.Unlock()
 	if err != nil {
 		return err
 	}
