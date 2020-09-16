@@ -43,7 +43,6 @@ type Config struct {
 	MaxPubAcksInflight    int
 	FilestoreDir          string
 	StoreType             string
-	NatsHost              string
 }
 
 // DispatcherFn defines message processor

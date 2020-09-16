@@ -73,7 +73,6 @@ gwConnections:
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         "127.0.0.1:4222",
 		},
 		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
@@ -105,7 +104,6 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
 		},
 		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
@@ -161,7 +159,6 @@ func TestLoadConnectorDTO(t *testing.T) {
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
 		},
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{

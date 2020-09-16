@@ -100,9 +100,6 @@ type Connector struct {
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
-	// NatsHost accepts value for combined "host:port"
-	// used as `strings.Split(natsHost, ":")`
-	NatsHost string `yaml:"natsHost"`
 	// LogConsPeriod accepts number of seconds
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
@@ -300,7 +297,6 @@ func GetConfig() *Config {
 				NatsMaxInflight:  math.MaxInt32,
 				NatsFilestoreDir: "natsstore",
 				NatsStoreType:    "FILE",
-				NatsHost:         "127.0.0.1:4222",
 			},
 			DSConnection:  &DSConnection{},
 			Jaegertracing: &Jaegertracing{},

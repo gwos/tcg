@@ -553,7 +553,6 @@ func (service *AgentService) startNats() error {
 		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
 		FilestoreDir:          service.Connector.NatsFilestoreDir,
 		StoreType:             service.Connector.NatsStoreType,
-		NatsHost:              service.Connector.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Nats = Running
