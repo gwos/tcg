@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +19,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	inventoryGroupsStorage    = make(map[string]map[string][]transit.MonitoredResourceRef)
+	inventoryResourcesStorage = make(map[string][]transit.InventoryResource)
+	inventoryChksum           = make(map[string][]byte)
 )
 
 // Resource defines Prometheus Source
@@ -86,12 +93,24 @@ const defaultHostGroupName = "Servers"
 var parser expfmt.TextParser
 
 // Synchronize makes InventoryResource
-func Synchronize() *[]transit.InventoryResource {
+func Synchronize() (*[]transit.InventoryResource, *[]transit.ResourceGroup) {
 	var inventoryResources []transit.InventoryResource
-	for _, resource := range connectors.Inventory {
-		inventoryResources = append(inventoryResources, resource)
+	var groups []transit.ResourceGroup
+	for _, resources := range inventoryResourcesStorage {
+		for _, resource := range resources {
+			inventoryResources = append(inventoryResources, resource)
+		}
 	}
-	return &inventoryResources
+	for _, groupsMap := range inventoryGroupsStorage {
+		for groupName, resources := range groupsMap {
+			groups = append(groups, transit.ResourceGroup{
+				GroupName: groupName,
+				Type:      transit.HostGroup,
+				Resources: resources,
+			})
+		}
+	}
+	return &inventoryResources, &groups
 }
 
 func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
@@ -110,18 +129,19 @@ func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredRe
 }
 
 func processMetrics(body []byte, resourceIndex int) error {
-	monitoredResources, groups, err := parsePrometheusBody(body, resourceIndex)
+	monitoredResources, _, err := parsePrometheusBody(body, resourceIndex)
 	if err != nil {
 		return err
 	}
-	inventory := connectors.BuildInventory(monitoredResources)
-	if connectors.ValidateInventory(*inventory) {
+	inventory := buildInventory(monitoredResources, resourceIndex)
+	if validateInventory(*inventory, resourceIndex) {
 		err := connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err
 		}
 	} else {
-		err := connectors.SendInventory(*inventory, *groups, transit.Yield)
+		inv, gr := Synchronize()
+		err := connectors.SendInventory(*inv, *gr, transit.Yield)
 		if err != nil {
 			return err
 		}
@@ -265,6 +285,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					Type: transit.Host,
 				})
 			}
+			inventoryGroupsStorage[extConfig.Resources[resourceIndex].URL] = groups
 		}
 	}
 }
@@ -370,5 +391,36 @@ func pull(resources []Resource) {
 		if err != nil {
 			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: %s", err))
 		}
+	}
+}
+
+func buildInventory(resources *[]transit.MonitoredResource, resourceIndex int) *[]transit.InventoryResource {
+	var inventoryResources []transit.InventoryResource
+	inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL] = nil
+	for _, resource := range *resources {
+		var inventoryServices []transit.InventoryService
+		for _, service := range resource.Services {
+			inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
+				service.Owner))
+		}
+
+		inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
+		inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL] = append(inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL], inventoryResource)
+		inventoryResources = append(inventoryResources, inventoryResource)
+	}
+	return &inventoryResources
+}
+
+func validateInventory(inventory []transit.InventoryResource, resourceIndex int) bool {
+	if inventoryChksum[extConfig.Resources[resourceIndex].URL] != nil {
+		chk, err := connectors.Hashsum(inventory)
+		if err != nil || !bytes.Equal(inventoryChksum[extConfig.Resources[resourceIndex].URL], chk) {
+			inventoryChksum[extConfig.Resources[resourceIndex].URL] = chk
+			return false
+		}
+		return true
+	} else {
+		inventoryChksum[extConfig.Resources[resourceIndex].URL], _ = connectors.Hashsum(inventory)
+		return false
 	}
 }
