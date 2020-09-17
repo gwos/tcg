@@ -35,16 +35,19 @@ type DataFormat string
 
 // Data formats of the received body
 const (
-	NSCA  DataFormat = "NSCA"
-	Bronx            = "Bronx"
+	Bronx   DataFormat = "bronx"
+	NSCA               = "nsca"
+	NSCAAlt            = "nsca-alt"
 )
 
 // ScheduleTask defines command
 type ScheduleTask struct {
-	CombinedOutput bool     `json:"combinedOutput,omitempty"`
-	Command        []string `json:"command"`
-	Cron           string   `json:"cron"`
-	Environment    []string `json:"environment,omitempty"`
+	CombinedOutput bool       `json:"combinedOutput,omitempty"`
+	Command        []string   `json:"command"`
+	Cron           string     `json:"cron"`
+	DataFormat     DataFormat `json:"dataFormat"`
+	Environment    []string   `json:"environment,omitempty"`
+	ForceInventory bool       `json:"forceInventory,omitempty"`
 }
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -63,74 +66,68 @@ func (cfg ExtConfig) Validate() error {
 }
 
 func initializeEntrypoints() []services.Entrypoint {
-	return []services.Entrypoint{
-		{
-			URL:     "/bronx",
+	rv := make([]services.Entrypoint, 6)
+	for _, dataFormat := range []DataFormat{Bronx, NSCA, NSCAAlt} {
+		rv = append(rv, services.Entrypoint{
+			Handler: makeEntrypointHandler(dataFormat, false),
 			Method:  http.MethodPost,
-			Handler: bronxHandler,
-		},
-		{
-			URL:     "/nsca",
+			URL:     fmt.Sprintf("checker/%s", dataFormat),
+		}, services.Entrypoint{
+			Handler: makeEntrypointHandler(dataFormat, true),
 			Method:  http.MethodPost,
-			Handler: nscaHandler,
-		},
+			URL:     fmt.Sprintf("checker/forced/%s", dataFormat),
+		})
+	}
+	return rv
+}
+
+func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin.Context) {
+	return func(c *gin.Context) {
+		body, err := c.GetRawData()
+		if err != nil {
+			log.With(log.Fields{"entrypoint": c.FullPath()}).
+				Warn("[Checker Connector]: ", err.Error())
+			c.JSON(http.StatusBadRequest, err.Error())
+			return
+		}
+		if _, err := processMetrics(body, dataFormat, forceInventory); err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
+		}
 	}
 }
 
-func bronxHandler(c *gin.Context) {
-	body, err := c.GetRawData()
+func processMetrics(body []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
+	monitoredResources, err := parseBody(body, dataFormat)
 	if err != nil {
-		log.Error(err.Error())
-		c.JSON(http.StatusBadRequest, err.Error())
-		return
+		return nil, err
 	}
 
-	if err := processMetrics(body, Bronx); err != nil {
-		c.JSON(http.StatusBadRequest, err.Error())
-	}
-}
-
-func nscaHandler(c *gin.Context) {
-	body, err := c.GetRawData()
-	if err != nil {
-		log.Error(err.Error())
-		c.JSON(http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := processMetrics(body, NSCA); err != nil {
-		c.JSON(http.StatusBadRequest, err.Error())
-	}
-}
-
-func processMetrics(body []byte, format DataFormat) error {
-	monitoredResources, err := parseBody(body, format)
-	if err != nil {
-		return err
+	if !forceInventory {
+		if err := connectors.SendMetrics(*monitoredResources); err != nil {
+			return nil, err
+		}
+		return monitoredResources, nil
 	}
 
 	inventoryResources := buildInventory(monitoredResources)
 	if validateInventory(*inventoryResources) {
-		err := connectors.SendMetrics(*monitoredResources)
-		if err != nil {
-			return err
+		if err := connectors.SendMetrics(*monitoredResources); err != nil {
+			return nil, err
 		}
 	} else {
-		err := connectors.SendInventory(*inventoryResources, nil, transit.Yield)
-		if err != nil {
-			return err
+		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield); err != nil {
+			return nil, err
 		}
 		time.Sleep(2 * time.Second)
-		err = connectors.SendMetrics(*monitoredResources)
-		if err != nil {
-			return err
+		if err := connectors.SendMetrics(*monitoredResources); err != nil {
+			return nil, err
 		}
 	}
 
-	return nil
+	return monitoredResources, nil
 }
 
-func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, error) {
+func parseBody(body []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(body, " \n\r")), "\n")
 
 	var (
@@ -140,10 +137,11 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 		err                       error
 	)
 
-	switch format {
+	switch dataFormat {
 	case Bronx:
 		serviceNameToMetricsMap, err = getBronxMetrics(metricsLines)
 	case NSCA:
+	case NSCAAlt:
 		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -152,10 +150,11 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 		return nil, err
 	}
 
-	switch format {
+	switch dataFormat {
 	case Bronx:
 		resourceNameToServicesMap, err = getBronxServices(serviceNameToMetricsMap, metricsLines)
 	case NSCA:
+	case NSCAAlt:
 		resourceNameToServicesMap, err = getNscaServices(serviceNameToMetricsMap, metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -417,10 +416,9 @@ func validateInventory(inventory []transit.InventoryResource) bool {
 			return false
 		}
 		return true
-	} else {
-		inventoryChksum, _ = connectors.Hashsum(inventory)
-		return false
 	}
+	inventoryChksum, _ = connectors.Hashsum(inventory)
+	return false
 }
 
 func buildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
