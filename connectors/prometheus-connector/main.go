@@ -47,10 +47,7 @@ func configHandler(data []byte) {
 	log.Info("[Prometheus Connector]: Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
-		Groups: []transit.ResourceGroup{{
-			GroupName: defaultHostGroupName,
-			Type:      transit.HostGroup,
-		}},
+		Groups: []transit.ResourceGroup{},
 		Resources:        []Resource{},
 		Services:         []string{},
 		CheckInterval:    connectors.DefaultCheckInterval,
@@ -76,10 +73,11 @@ func configHandler(data []byte) {
 		extConfig,
 	)
 	if err != nil || !bytes.Equal(chksum, chk) {
+		resources, groups := Synchronize()
 		log.Info("[Prometheus Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
-			*Synchronize(),
-			extConfig.Groups,
+			*resources,
+			*groups,
 			extConfig.Ownership,
 		)
 	}

@@ -25,9 +25,6 @@ const DefaultCheckInterval = time.Duration(2) * time.Minute
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
 
-var Inventory = make(map[string]transit.InventoryResource)
-var inventoryChksum []byte
-
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
 	/* grab CheckInterval from MonitorConnection extensions */
@@ -474,36 +471,6 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 	return previousStatus, nil
 }
 
-func BuildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
-	var inventoryResources []transit.InventoryResource
-	for _, resource := range *resources {
-		var inventoryServices []transit.InventoryService
-		for _, service := range resource.Services {
-			inventoryServices = append(inventoryServices, CreateInventoryService(service.Name,
-				service.Owner))
-		}
-
-		inventoryResource := CreateInventoryResource(resource.Name, inventoryServices)
-		Inventory[inventoryResource.Name] = inventoryResource
-		inventoryResources = append(inventoryResources, inventoryResource)
-	}
-	return &inventoryResources
-}
-
-func ValidateInventory(inventory []transit.InventoryResource) bool {
-	if inventoryChksum != nil {
-		chk, err := Hashsum(inventory)
-		if err != nil || !bytes.Equal(inventoryChksum, chk) {
-			inventoryChksum = chk
-			return false
-		}
-		return true
-	} else {
-		inventoryChksum, _ = Hashsum(inventory)
-		return false
-	}
-}
-
 // Weight of Monitor Status for multi-state comparison
 var monitorStatusWeightService = map[transit.MonitorStatus]int{
 	transit.ServiceOk:                  0,
@@ -702,7 +669,7 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 	handler := func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("[Recovered]", err)
+				log.Error("[Recovered]: ", err)
 			}
 		}()
 		fn()
