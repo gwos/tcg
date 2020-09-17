@@ -14,6 +14,8 @@ require (
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/nats-io/gnatsd v1.4.1 // indirect
+	github.com/nats-io/nats-server v1.4.1
 	github.com/nats-io/nats-streaming-server v0.18.0
 	github.com/nats-io/stan.go v0.7.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
