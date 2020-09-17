@@ -157,16 +157,18 @@ func (service *AgentService) DemandConfig() error {
 		return nil
 	}
 
-	for {
-		if err := service.dsClient.Reload(service.AgentID); err != nil {
-			log.With(log.Fields{"error": err}).
-				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
-			time.Sleep(time.Duration(20) * time.Second)
-			continue
+	go func() {
+		for i := 0; ; i++ {
+			if err := service.dsClient.Reload(service.AgentID); err != nil {
+				log.With(log.Fields{"error": err}).
+					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
+				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
+				continue
+			}
+			break
 		}
-		break
-	}
-	log.Info("[Demand Config]: Config Server found and connected")
+		log.Info("[Demand Config]: Config Server found and connected")
+	}()
 	return nil
 }
 
@@ -551,7 +553,6 @@ func (service *AgentService) startNats() error {
 		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
 		FilestoreDir:          service.Connector.NatsFilestoreDir,
 		StoreType:             service.Connector.NatsStoreType,
-		NatsHost:              service.Connector.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Nats = Running
