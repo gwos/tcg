@@ -25,8 +25,8 @@ var (
 		ConstLabels: prometheus.Labels{
 			"critical": fmt.Sprintf("%f", rand.Float64()*10),
 			"warning":  fmt.Sprintf("%f", rand.Float64()+0.5),
-			"resource": "Prometheus-Go-Push",
-			"group":    "Prometheus-Go",
+			"resource": "APM-Go-Push",
+			"group":    "APM-Go",
 			"unitType": "MB",
 		},
 	})
@@ -36,8 +36,8 @@ var (
 		ConstLabels: prometheus.Labels{
 			"critical": fmt.Sprintf("%f", rand.Float64()*10),
 			"warning":  fmt.Sprintf("%f", rand.Float64()+0.5),
-			"resource": "Prometheus-Go-Push",
-			"group":    "Prometheus-Go",
+			"resource": "APM-Go-Push",
+			"group":    "APM-Go",
 			"unitType": "MB",
 		},
 	})
@@ -47,8 +47,8 @@ var (
 		ConstLabels: prometheus.Labels{
 			"critical": fmt.Sprintf("%f", rand.Float64()*10),
 			"warning":  fmt.Sprintf("%f", rand.Float64()+0.5),
-			"resource": "Prometheus-Go-Push",
-			"group":    "Prometheus-Go",
+			"resource": "APM-Go-Push",
+			"group":    "APM-Go",
 			"unitType": "MB",
 		},
 	})
@@ -58,8 +58,8 @@ var (
 		ConstLabels: prometheus.Labels{
 			"critical": fmt.Sprintf("%f", rand.Float64()*10),
 			"warning":  fmt.Sprintf("%f", rand.Float64()+0.5),
-			"resource": "Prometheus-Go-Push",
-			"group":    "Prometheus-Go",
+			"resource": "APM-Go-Push",
+			"group":    "APM-Go",
 			"unitType": "MB",
 		},
 	})

@@ -27,7 +27,7 @@ var (
 	inventoryChksum           = make(map[string][]byte)
 )
 
-// Resource defines Prometheus Source
+// Resource defines APM Source
 type Resource struct {
 	Headers          map[string]string `json:"headers"`
 	URL              string            `json:"url"`
@@ -87,7 +87,7 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 	return nil
 }
 
-const defaultHostName = "Prometheus-Host"
+const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
 var parser expfmt.TextParser
@@ -200,7 +200,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 		}
 		values := makeValue(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
-			log.Error(fmt.Sprintf("[Prometheus Connector]:  Value for metric '%s' can not be empty", *prometheusService.Name))
+			log.Error(fmt.Sprintf("[APM Connector]:  Value for metric '%s' can not be empty", *prometheusService.Name))
 			continue
 		}
 
@@ -321,7 +321,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		}
 
 		if err := validatePrometheusService(prometheusService); err != nil {
-			log.Error(fmt.Sprintf("[Prometheus Connector]: %s", err.Error()))
+			log.Error(fmt.Sprintf("[APM Connector]: %s", err.Error()))
 			continue
 		}
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex)
@@ -363,13 +363,13 @@ func initializeEntrypoints() []services.Entrypoint {
 func receiverHandler(c *gin.Context) {
 	body, err := c.GetRawData()
 	if err != nil {
-		log.Error("|prometheusConnector.go| : [receiverHandler] : ", err)
+		log.Error("|apmConnector.go| : [receiverHandler] : ", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
 	err = processMetrics(body, -1)
 	if err != nil {
-		log.Error(fmt.Sprintf("[Prometheus Connector]~[Push]: %s", err))
+		log.Error(fmt.Sprintf("[APM Connector]~[Push]: %s", err))
 	}
 }
 
@@ -378,18 +378,18 @@ func pull(resources []Resource) {
 		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.URL, resource.Headers, nil, nil)
 
 		if err != nil {
-			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
+			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
 				resource.URL, err.Error()))
 			continue
 		}
 		if !(statusCode == 200 || statusCode == 201) {
-			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
+			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
 				resource.URL, string(byteResponse)))
 			continue
 		}
 		err = processMetrics(byteResponse, index)
 		if err != nil {
-			log.Error(fmt.Sprintf("[Prometheus Connector]~[Pull]: %s", err))
+			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
 	}
 }
