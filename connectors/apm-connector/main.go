@@ -26,14 +26,14 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	log.Info("[Prometheus Connector]: Waiting for configuration to be delivered ...")
+	log.Info("[APM Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[Prometheus Connector]: ", err)
+		log.Error("[APM Connector]: ", err)
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error("[Prometheus Connector]: ", err)
+		log.Error("[APM Connector]: ", err)
 		return
 	}
 
@@ -44,7 +44,7 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[Prometheus Connector]: Configuration received")
+	log.Info("[APM Connector]: Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		Groups: []transit.ResourceGroup{},
@@ -56,7 +56,7 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[Prometheus Connector]: Error during parsing config.", err.Error())
+		log.Error("[APM Connector]: Error during parsing config.", err.Error())
 		return
 	}
 	/* Update config with received values */
@@ -74,7 +74,7 @@ func configHandler(data []byte) {
 	)
 	if err != nil || !bytes.Equal(chksum, chk) {
 		resources, groups := Synchronize()
-		log.Info("[Prometheus Connector]: Sending inventory ...")
+		log.Info("[APM Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
 			*resources,
 			*groups,

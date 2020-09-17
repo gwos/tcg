@@ -12,13 +12,13 @@
     $ mvn clean install
     $ mvn spring-boot:run
     
-### Prometheus connector:
+### APM connector:
 
-    $ cd connectors/prometheus-connector
+    $ cd connectors/apm-connector
     $ go build
-    $ ./prometheus-connector
+    $ ./apm-connector
 
 ```   
-To connect a Prometheus connector to the Java server, just create a new connector in the UI
+To connect a APM connector to the Java server, just create a new connector in the UI
 and set the resource to `localhost:8080`.
 ```

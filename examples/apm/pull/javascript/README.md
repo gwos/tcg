@@ -12,11 +12,11 @@
     $ npm i
     $ node main.js
     
-### Prometheus connector:
+### APM connector:
 
-    $ cd connectors/prometheus-connector
+    $ cd connectors/apm-connector
     $ go build
-    $ ./prometheus-connector
+    $ ./apm-connector
 
 ```   
 To connect a Prometheus connector to the JS server, just create a new connector in the UI

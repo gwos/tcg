@@ -1,7 +1,7 @@
 connector:
   agentId: ""
-  appName: PROMETHEUS
-  appType: PROMETHEUS
+  appName: APM
+  appType: APM
   controllerAddr: 0.0.0.0:8099
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
