@@ -25,6 +25,11 @@ var (
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
 )
 
+var (
+	inventoryStorage = make(map[string]transit.InventoryResource)
+	inventoryChksum  []byte
+)
+
 // DataFormat describes incoming payload
 type DataFormat string
 
@@ -104,8 +109,8 @@ func processMetrics(body []byte, format DataFormat) error {
 		return err
 	}
 
-	inventoryResources := connectors.BuildInventory(monitoredResources)
-	if connectors.ValidateInventory(*inventoryResources) {
+	inventoryResources := buildInventory(monitoredResources)
+	if validateInventory(*inventoryResources) {
 		err := connectors.SendMetrics(*monitoredResources)
 		if err != nil {
 			return err
@@ -402,4 +407,34 @@ func removeDuplicateServices(servicesMap map[string][]transit.MonitoredService) 
 		servicesMap[key] = list
 	}
 	return servicesMap
+}
+
+func validateInventory(inventory []transit.InventoryResource) bool {
+	if inventoryChksum != nil {
+		chk, err := connectors.Hashsum(inventory)
+		if err != nil || !bytes.Equal(inventoryChksum, chk) {
+			inventoryChksum = chk
+			return false
+		}
+		return true
+	} else {
+		inventoryChksum, _ = connectors.Hashsum(inventory)
+		return false
+	}
+}
+
+func buildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
+	var inventoryResources []transit.InventoryResource
+	for _, resource := range *resources {
+		var inventoryServices []transit.InventoryService
+		for _, service := range resource.Services {
+			inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
+				service.Owner))
+		}
+
+		inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
+		inventoryStorage[inventoryResource.Name] = inventoryResource
+		inventoryResources = append(inventoryResources, inventoryResource)
+	}
+	return &inventoryResources
 }
