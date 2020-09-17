@@ -113,7 +113,7 @@ func taskHandler(task ScheduleTask) func() {
 			return
 		}
 		logEntry.Debug("[Checker Connector]: Success in command execution")
-		if err = processMetrics(res, NSCA); err != nil {
+		if _, err = processMetrics(res, task.DataFormat, task.ForceInventory); err != nil {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
 	}
