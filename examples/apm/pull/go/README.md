@@ -12,13 +12,13 @@
     $ go build
     $ ./go
     
-### Prometheus connector:
+### APM connector:
 
-    $ cd connectors/prometheus-connector
+    $ cd connectors/apm-connector
     $ go build
-    $ ./prometheus-connector
+    $ ./apm-connector
 
 ```   
-To connect a Prometheus connector to the Golang server, just create a new connector in the UI
+To connect an APM connector to the Golang server, just create a new connector in the UI
 and set the resource to `localhost:2222`.
 ```

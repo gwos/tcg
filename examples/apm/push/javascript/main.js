@@ -44,7 +44,7 @@ const counter = new client.Counter({
     registers: [registry],
 });
 
-let counterInternal = counter.labels(Math.random().toString(), Math.random().toString(), 'Prometheus-Javascript-Push', 'Prometheus-Javascript', 'MB');
+let counterInternal = counter.labels(Math.random().toString(), Math.random().toString(), 'APM-Javascript-Push', 'APM-Javascript', 'MB');
 counterInternal.inc(Math.random());
 
 const gauge = new client.Gauge({
@@ -54,7 +54,7 @@ const gauge = new client.Gauge({
     registers: [registry],
 });
 
-let gaugeInternal = gauge.labels((Math.random() * 100).toString(), (Math.random() * 100).toString(), 'Prometheus-Javascript-Push', 'Prometheus-Javascript', 'MB');
+let gaugeInternal = gauge.labels((Math.random() * 100).toString(), (Math.random() * 100).toString(), 'APM-Javascript-Push', 'APM-Javascript', 'MB');
 gaugeInternal.set(Math.random() * 100);
 
 gateway.pushAdd({jobName: 'test'}, function (err, resp, body) {
