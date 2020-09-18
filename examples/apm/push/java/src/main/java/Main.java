@@ -27,7 +27,7 @@ public class Main {
                 .help("Gauge example in Java")
                 .register(registry);
         Gauge.Child durationChild = duration.labels(String.valueOf(Math.random() * 40), String.valueOf(Math.random() * 40),
-                "Prometheus-Java-Push", "Prometheus-Java", "MB");
+                "APM-Java-Push", "APM-Java", "MB");
         durationChild.set(Precision.round(Math.random() * 40, 3));
 
         Counter counter = Counter.build()
@@ -36,7 +36,7 @@ public class Main {
                 .labelNames("critical", "warning", "resource", "group", "unitType")
                 .register(registry);
         Counter.Child counterChild = counter.labels(String.valueOf(Math.random() * 40), String.valueOf(Math.random() * 40),
-                "Prometheus-Java-Push", "Prometheus-Java", "MB");
+                "APM-Java-Push", "APM-Java", "MB");
         counterChild.inc(Precision.round(Math.random() * 40, 3));
 
         PushGateway pg = new PushGateway("localhost:8099/api/v1");

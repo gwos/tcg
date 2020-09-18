@@ -6,11 +6,11 @@
 
 ## Running and integrating
 
-### Prometheus connector:
+### APM connector:
 
-    $ cd connectors/prometheus-connector
+    $ cd connectors/apm-connector
     $ go build
-    $ ./prometheus-connector
+    $ ./apm-connector
     
 ### Prometheus Java PUSH tool:
 
