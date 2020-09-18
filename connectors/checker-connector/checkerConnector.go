@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -83,21 +84,49 @@ func initializeEntrypoints() []services.Entrypoint {
 
 func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin.Context) {
 	return func(c *gin.Context) {
-		body, err := c.GetRawData()
+		var (
+			ctx  context.Context
+			body []byte
+			err  error
+			span services.TraceSpan
+		)
+
+		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(body))
+			span.SetAttribute("entrypoint", c.FullPath())
+		}()
+
+		body, err = c.GetRawData()
 		if err != nil {
 			log.With(log.Fields{"entrypoint": c.FullPath()}).
 				Warn("[Checker Connector]: ", err.Error())
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		if _, err := processMetrics(body, dataFormat, forceInventory); err != nil {
+		if _, err = processMetrics(ctx, body, dataFormat, forceInventory); err != nil {
 			c.JSON(http.StatusBadRequest, err.Error())
+			return
 		}
 	}
 }
 
-func processMetrics(body []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
-	monitoredResources, err := parseBody(body, dataFormat)
+func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
+	var (
+		err                error
+		inventoryResources *[]transit.InventoryResource
+		monitoredResources *[]transit.MonitoredResource
+		span               services.TraceSpan
+	)
+
+	_, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
+	monitoredResources, err = parseBody(body, dataFormat)
+
+	span.SetAttribute("error", err)
+	span.SetAttribute("payloadLen", len(body))
+	span.End()
+
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +138,11 @@ func processMetrics(body []byte, dataFormat DataFormat, forceInventory bool) (*[
 		return monitoredResources, nil
 	}
 
-	inventoryResources := buildInventory(monitoredResources)
+	_, span = services.StartTraceSpan(ctx, "connectors", "buildInventory")
+	inventoryResources = buildInventory(monitoredResources)
+
+	span.End()
+
 	if validateInventory(*inventoryResources) {
 		if err := connectors.SendMetrics(*monitoredResources); err != nil {
 			return nil, err
@@ -118,7 +151,7 @@ func processMetrics(body []byte, dataFormat DataFormat, forceInventory bool) (*[
 		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield); err != nil {
 			return nil, err
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(2 * time.Second) // TODO: Remove it from the EntrypointHandler callstack
 		if err := connectors.SendMetrics(*monitoredResources); err != nil {
 			return nil, err
 		}
