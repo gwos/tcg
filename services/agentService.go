@@ -700,9 +700,8 @@ func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	jaegerAgent := config.GetConfig().Jaegertracing.Agent
 	jaegerCollector := config.GetConfig().Jaegertracing.Collector
 	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
-		err := fmt.Errorf("telemetry not configured")
-		log.Debug(err.Error())
-		return nil, nil, err
+		log.Debug("telemetry not configured")
+		return apitrace.NoopProvider{}, func() {}, nil
 	}
 	if len(jaegerAgent) == 0 {
 		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)
