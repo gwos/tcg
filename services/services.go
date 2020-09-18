@@ -1,10 +1,12 @@
 package services
 
 import (
+	"context"
 	"time"
 
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"go.opentelemetry.io/otel/api/trace"
 )
 
 // Define NATS subjects
@@ -122,4 +124,16 @@ type Controllers interface {
 	SendEvents([]byte) error
 	SendEventsAck([]byte) error
 	SendEventsUnack([]byte) error
+}
+
+// TraceSpan aliases trace.Span interface
+type TraceSpan trace.Span
+
+// StartTraceSpan starts a span
+func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.StartOption) (context.Context, TraceSpan) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return GetAgentService().TelemetryProvider.
+		Tracer(tracerName).Start(ctx, spanName, opts...)
 }
