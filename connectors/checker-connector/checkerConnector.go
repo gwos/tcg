@@ -151,10 +151,11 @@ func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, for
 		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield); err != nil {
 			return nil, err
 		}
-		time.Sleep(2 * time.Second) // TODO: Remove it from the EntrypointHandler callstack
-		if err := connectors.SendMetrics(*monitoredResources); err != nil {
-			return nil, err
-		}
+		time.AfterFunc(2*time.Second, func() { // TODO: better way to assure synch completion?
+			if err := connectors.SendMetrics(*monitoredResources); err != nil {
+				log.Warn("[Checker Connector]: ", err.Error())
+			}
+		})
 	}
 
 	return monitoredResources, nil
