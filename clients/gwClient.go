@@ -358,15 +358,22 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		}
 	}
 	client.buildURIs()
+	mergeParam := make(map[string]string)
+	mergeHosts := true
+	if client.GWConnection != nil {
+		mergeHosts = client.GWConnection.MergeHosts
+	}
+	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
+	syncUri := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(ctx, client.uriSynchronizeInventory, payload,
+		return client.sendData(ctx, syncUri, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	response, err := client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	response, err := client.sendData(ctx, syncUri, payload)
 	if err == nil {
 		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
 	}
