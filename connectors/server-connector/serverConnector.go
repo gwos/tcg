@@ -25,6 +25,7 @@ type ExtConfig struct {
 	Processes     []string                  `json:"processes"`
 	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
 	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	MergeHosts    bool                      `json:"mergeHosts"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

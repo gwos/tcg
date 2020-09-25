@@ -705,6 +705,7 @@ type InventoryRequest struct {
 	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
 	Resources     []InventoryResource `json:"resources"`
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
+	MergeHosts    *bool               `json:"merge,omitempty"`
 }
 
 func (inventoryRequest InventoryRequest) String() string {

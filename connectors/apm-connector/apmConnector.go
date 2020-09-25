@@ -71,6 +71,7 @@ type ExtConfig struct {
 	Services      []string                  `json:"services"`
 	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
 	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	MergeHosts    bool                      `json:"mergeHosts"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -141,7 +142,8 @@ func processMetrics(body []byte, resourceIndex int) error {
 		}
 	} else {
 		inv, gr := Synchronize()
-		err := connectors.SendInventory(*inv, *gr, transit.Yield)
+		// TODO: is that correct usage of extConfig here?
+		err := connectors.SendInventory(*inv, *gr, transit.Yield, extConfig.MergeHosts)
 		if err != nil {
 			return err
 		}

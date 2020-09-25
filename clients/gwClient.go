@@ -9,6 +9,7 @@ import (
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/transit"
 	"net/http"
 	"strconv"
 	"strings"
@@ -323,18 +324,12 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		hostName = client.GWConnection.HostName
 	}
 
-	// retrieve count of resources (hosts) to be sent and agentID
-	var payloadResources struct {
-		Context struct {
-			AgentID string `json:"agentId"`
-		} `json:"context"`
-		Resources []interface{} `json:"resources"`
-	}
-	err := json.Unmarshal(payload, &payloadResources)
+	var inventoryRequest transit.InventoryRequest
+	err := json.Unmarshal(payload, &inventoryRequest)
 	if err != nil {
 		log.Error("|gwClient.go| : [SynchronizeInventory] : Unable to parse SynchronizeInventory payload: ", err)
 	}
-	currentHostsCount := len(payloadResources.Resources)
+	currentHostsCount := len(inventoryRequest.Resources)
 
 	// get count of hosts sent last time from cache
 	// (if doesn't exist in cache count hosts owned curr agent in GWOS
@@ -343,7 +338,7 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 	if lastSentHostsCountCache, exists := cache.LastSentHostsCountCache.Get(hostName); exists {
 		lastSentHostsCount = lastSentHostsCountCache.(int)
 	} else {
-		lastSentHostsCount = client.getLastSentHostsCount(payloadResources.Context.AgentID)
+		lastSentHostsCount = client.getLastSentHostsCount(inventoryRequest.Context.AgentID)
 		cache.LastSentHostsCountCache.SetDefault(hostName, lastSentHostsCount)
 	}
 
@@ -358,15 +353,23 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		}
 	}
 	client.buildURIs()
+	mergeParam := make(map[string]string)
+	mergeParam["merge"] = strconv.FormatBool(*inventoryRequest.MergeHosts)
+	inventoryRequest.MergeHosts = nil
+	syncUri := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
+	payload, err = json.Marshal(inventoryRequest)
+	if err != nil {
+		return nil, err
+	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(ctx, client.uriSynchronizeInventory, payload,
+		return client.sendData(ctx, syncUri, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	response, err := client.sendData(ctx, client.uriSynchronizeInventory, payload)
+	response, err := client.sendData(ctx, syncUri, payload)
 	if err == nil {
 		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
 	}

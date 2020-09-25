@@ -68,6 +68,7 @@ func configHandler(data []byte) {
 		Processes:     []string{},
 		CheckInterval: connectors.DefaultCheckInterval,
 		Ownership:     transit.Yield,
+		MergeHosts:    connectors.DefaultMergeHosts,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -99,6 +100,7 @@ func configHandler(data []byte) {
 			resources,
 			groups,
 			extConfig.Ownership,
+			extConfig.MergeHosts,
 		)
 	}
 	if err == nil {

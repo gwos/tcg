@@ -71,6 +71,7 @@ func configHandler(data []byte) {
 		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
 		CheckInterval:      connectors.DefaultCheckInterval,
+		MergeHosts:         connectors.DefaultMergeHosts,
 		AppType:            config.GetConfig().Connector.AppType,
 		AgentID:            config.GetConfig().Connector.AgentID,
 		GWConnections:      config.GetConfig().GWConnections,
@@ -139,7 +140,7 @@ func configHandler(data []byte) {
 		} else {
 			_, inventory, groups := connector.CollectMetrics()
 			log.Info("[Elastic Connector]: Sending inventory ...")
-			if err := connectors.SendInventory(inventory, groups, connector.config.Ownership); err != nil {
+			if err := connectors.SendInventory(inventory, groups, connector.config.Ownership, connector.config.MergeHosts); err != nil {
 				log.Error("[Elastic Connector]: ", err.Error())
 			}
 			if invChk, err := connector.getInventoryHashSum(); err == nil {
@@ -164,7 +165,7 @@ func periodicHandler() {
 		chk, chkErr := connector.getInventoryHashSum()
 		if chkErr != nil || !bytes.Equal(invChksum, chk) {
 			log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
-			err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
+			err := connectors.SendInventory(inventory, groups, connector.config.Ownership, connector.config.MergeHosts)
 			if err != nil {
 				log.Error("[Elastic Connector]: ", err.Error())
 			}

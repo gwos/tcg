@@ -148,7 +148,8 @@ func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, for
 			return nil, err
 		}
 	} else {
-		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield); err != nil {
+		// TODO: mergeHosts must be taken from config
+		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield, connectors.DefaultMergeHosts); err != nil {
 			return nil, err
 		}
 		time.AfterFunc(2*time.Second, func() { // TODO: better way to assure synch completion?

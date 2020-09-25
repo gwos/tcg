@@ -22,6 +22,9 @@ const ExtKeyCheckInterval = "checkIntervalMinutes"
 // DefaultCheckInterval defines interval
 const DefaultCheckInterval = time.Duration(2) * time.Minute
 
+// DefaultMergeHosts defines merge hosts sync option
+const DefaultMergeHosts = true
+
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
 
@@ -90,7 +93,8 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 }
 
 // SendInventory processes inventory payload
-func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup,
+	ownershipType transit.HostOwnershipType, mergeHosts bool) error {
 	var b []byte
 	var err error
 	if services.GetTransitService().TelemetryProvider != nil {
@@ -108,6 +112,7 @@ func SendInventory(resources []transit.InventoryResource, resourceGroups []trans
 		OwnershipType: ownershipType,
 		Resources:     resources,
 		Groups:        resourceGroups,
+		MergeHosts:    &mergeHosts,
 	}
 
 	b, err = json.Marshal(inventoryRequest)
