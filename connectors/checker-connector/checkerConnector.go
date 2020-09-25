@@ -85,46 +85,46 @@ func initializeEntrypoints() []services.Entrypoint {
 func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var (
-			ctx  context.Context
-			body []byte
-			err  error
-			span services.TraceSpan
+			err     error
+			payload []byte
 		)
-
-		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
+		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
 		defer func() {
 			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(body))
+			span.SetAttribute("payloadLen", len(payload))
 			span.SetAttribute("entrypoint", c.FullPath())
+			span.End()
 		}()
 
-		body, err = c.GetRawData()
+		payload, err = c.GetRawData()
 		if err != nil {
 			log.With(log.Fields{"entrypoint": c.FullPath()}).
 				Warn("[Checker Connector]: ", err.Error())
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		if _, err = processMetrics(ctx, body, dataFormat, forceInventory); err != nil {
+		if _, err = processMetrics(ctx, payload, dataFormat, forceInventory); err != nil {
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
+		c.JSON(http.StatusOK, nil)
 	}
 }
 
-func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
+func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
 	var (
+		ctxN               context.Context
 		err                error
 		inventoryResources *[]transit.InventoryResource
 		monitoredResources *[]transit.MonitoredResource
 		span               services.TraceSpan
 	)
 
-	_, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
-	monitoredResources, err = parseBody(body, dataFormat)
+	ctxN, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
+	monitoredResources, err = parseBody(payload, dataFormat)
 
 	span.SetAttribute("error", err)
-	span.SetAttribute("payloadLen", len(body))
+	span.SetAttribute("payloadLen", len(payload))
 	span.End()
 
 	if err != nil {
@@ -132,27 +132,27 @@ func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, for
 	}
 
 	if !forceInventory {
-		if err := connectors.SendMetrics(*monitoredResources); err != nil {
+		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
 			return nil, err
 		}
 		return monitoredResources, nil
 	}
 
-	_, span = services.StartTraceSpan(ctx, "connectors", "buildInventory")
+	ctxN, span = services.StartTraceSpan(ctx, "connectors", "buildInventory")
 	inventoryResources = buildInventory(monitoredResources)
 
 	span.End()
 
 	if validateInventory(*inventoryResources) {
-		if err := connectors.SendMetrics(*monitoredResources); err != nil {
+		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := connectors.SendInventory(*inventoryResources, nil, transit.Yield); err != nil {
+		if err := connectors.SendInventory(ctxN, *inventoryResources, nil, transit.Yield); err != nil {
 			return nil, err
 		}
 		time.AfterFunc(2*time.Second, func() { // TODO: better way to assure synch completion?
-			if err := connectors.SendMetrics(*monitoredResources); err != nil {
+			if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
 				log.Warn("[Checker Connector]: ", err.Error())
 			}
 		})
@@ -161,8 +161,8 @@ func processMetrics(ctx context.Context, body []byte, dataFormat DataFormat, for
 	return monitoredResources, nil
 }
 
-func parseBody(body []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
-	metricsLines := strings.Split(string(bytes.Trim(body, " \n\r")), "\n")
+func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
+	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
 		monitoredResources        []transit.MonitoredResource

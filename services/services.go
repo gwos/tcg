@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"time"
 
@@ -10,16 +11,12 @@ import (
 )
 
 // Define NATS subjects
-const (
-	SubjSendResourceWithMetrics = "send-resource-with-metrics"
-	SubjSynchronizeInventory    = "synchronize-inventory"
-	SubjSendEvents              = "send-events"
-)
-
-// use one queue for events, events acks and unacks
+// group events actions and inventory with metrics
 // as try to keep the processing order
-const eventsAckSuffix = "#ack"
-const eventsUnackSuffix = "#unack"
+const (
+	subjEvents           = "events"
+	subjInventoryMetrics = "inventory-metrics"
+)
 
 // Status defines status value
 type Status string
@@ -107,8 +104,8 @@ type AgentServices interface {
 
 // TransitServices defines TCG Agent services interface
 type TransitServices interface {
-	SendResourceWithMetrics([]byte) error
-	SynchronizeInventory([]byte) error
+	SendResourceWithMetrics(context.Context, []byte) error
+	SynchronizeInventory(context.Context, []byte) error
 }
 
 // GetBytesHandlerType defines handler type
@@ -121,9 +118,9 @@ type Controllers interface {
 	RemoveEntrypoints()
 	RegisterListMetricsHandler(GetBytesHandlerType)
 	RemoveListMetricsHandler()
-	SendEvents([]byte) error
-	SendEventsAck([]byte) error
-	SendEventsUnack([]byte) error
+	SendEvents(context.Context, []byte) error
+	SendEventsAck(context.Context, []byte) error
+	SendEventsUnack(context.Context, []byte) error
 }
 
 // TraceSpan aliases trace.Span interface
@@ -136,4 +133,68 @@ func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...tr
 	}
 	return GetAgentService().TelemetryProvider.
 		Tracer(tracerName).Start(ctx, spanName, opts...)
+}
+
+type payloadType byte
+
+const (
+	typeUndefined payloadType = iota
+	typeEvents
+	typeEventsAck
+	typeEventsUnack
+	typeInventory
+	typeMetrics
+)
+
+func (s payloadType) String() string {
+	return [...]string{
+		"undefined",
+		"events",
+		"eventsAck",
+		"eventsUnack",
+		"inventory",
+		"metrics",
+	}[s]
+}
+
+type natsPayload struct {
+	Payload     []byte
+	SpanContext trace.SpanContext
+	Type        payloadType
+}
+
+// MarshalText implements json.Marshaler.
+func (t natsPayload) MarshalText() ([]byte, error) {
+	var b bytes.Buffer
+	if err := b.WriteByte(byte(t.Type)); err != nil {
+		return nil, err
+	}
+	if _, err := b.Write(t.SpanContext.SpanID[:]); err != nil {
+		return nil, err
+	}
+	if _, err := b.Write(t.SpanContext.TraceID[:]); err != nil {
+		return nil, err
+	}
+	if err := b.WriteByte(byte(t.SpanContext.TraceFlags)); err != nil {
+		return nil, err
+	}
+	if _, err := b.Write(t.Payload[:]); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
+
+// UnmarshalText implements json.Unmarshaler.
+func (t *natsPayload) UnmarshalText(input []byte) error {
+	b := bytes.NewBuffer(input)
+	t.Type = payloadType(b.Next(1)[0])
+	if _, err := b.Read(t.SpanContext.SpanID[:]); err != nil {
+		return err
+	}
+	if _, err := b.Read(t.SpanContext.TraceID[:]); err != nil {
+		return err
+	}
+	t.SpanContext.TraceFlags = b.Next(1)[0]
+	t.Payload = b.Bytes()
+	return nil
 }

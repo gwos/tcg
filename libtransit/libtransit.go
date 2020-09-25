@@ -21,11 +21,13 @@ package main
 //}
 import "C"
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tcg/services"
 	"os"
 	"unsafe"
+
+	"github.com/gwos/tcg/services"
 )
 
 func main() {
@@ -75,7 +77,7 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 //export SendEvents
 func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetController().
-		SendEvents([]byte(C.GoString(payloadJSON))); err != nil {
+		SendEvents(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -86,7 +88,7 @@ func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 //export SendEventsAck
 func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetController().
-		SendEventsAck([]byte(C.GoString(payloadJSON))); err != nil {
+		SendEventsAck(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -97,7 +99,7 @@ func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 //export SendEventsUnack
 func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetController().
-		SendEventsUnack([]byte(C.GoString(payloadJSON))); err != nil {
+		SendEventsUnack(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -108,7 +110,7 @@ func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 //export SendResourcesWithMetrics
 func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
-		SendResourceWithMetrics([]byte(C.GoString(payloadJSON))); err != nil {
+		SendResourceWithMetrics(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -119,7 +121,7 @@ func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) b
 //export SynchronizeInventory
 func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
-		SynchronizeInventory([]byte(C.GoString(payloadJSON))); err != nil {
+		SynchronizeInventory(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
