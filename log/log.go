@@ -2,9 +2,8 @@ package log
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/patrickmn/go-cache"
-	"github.com/sirupsen/logrus"
 	"io"
 	"io/ioutil"
 	"os"
@@ -13,6 +12,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/patrickmn/go-cache"
+	"github.com/sirupsen/logrus"
 )
 
 // Fields Type to pass when we want to call WithFields for structured logging
@@ -65,11 +67,20 @@ func Error(args ...interface{}) {
 // Config configures logger
 func Config(filePath string, level int, consPeriod int) {
 	once.Do(func() {
-		/* sanitize attached json */
 		SetHook(func(entry Entry) error {
+			formattedData := ""
 			for k, v := range entry.Data {
-				entry.Data[k] = sanRe.ReplaceAllString(fmt.Sprintf("%+v", v), `${1}"***"`)
+				s := fmt.Sprintf("%+v", v)
+				if s == "" || s == "{}" || s == "[]" || s == "map[]" || s == "<nil>" {
+					continue
+				}
+				/* sanitize attached json */
+				s = sanRe.ReplaceAllString(s, `${1}"***"`)
+				entry.Data[k] = s
+				formattedData += fmt.Sprintf("[%s] ", s)
 			}
+			/* keep formatted data for reuse */
+			entry.Context = context.WithValue(entry.Context, entry.Entry, formattedData)
 			return nil
 		})
 
@@ -121,24 +132,18 @@ func With(fields Fields) *Entry {
 
 // WithDebug adds a struct of fields to the log entry
 func (entry *Entry) WithDebug(fields Fields) *Entry {
-	entryWithDebug := entry
 	if logger.IsLevelEnabled(DebugLevel) {
-		entryWithDebug = &Entry{
-			entry.WithFields(logrus.Fields(fields)),
-		}
+		entry.Entry = entry.WithFields(logrus.Fields(fields))
 	}
-	return entryWithDebug
+	return entry
 }
 
 // WithInfo adds a struct of fields to the log entry
 func (entry *Entry) WithInfo(fields Fields) *Entry {
-	entryWithDebug := entry
 	if logger.IsLevelEnabled(InfoLevel) {
-		entryWithDebug = &Entry{
-			entry.WithFields(logrus.Fields(fields)),
-		}
+		entry.Entry = entry.WithFields(logrus.Fields(fields))
 	}
-	return entryWithDebug
+	return entry
 }
 
 func fnOnEvicted(w io.Writer) func(string, interface{}) {
@@ -223,23 +228,12 @@ type Formatter struct {
 // Format implements logrus.Formatter.Format
 func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	colors := []int{31, 31, 31, 33, 36, 37}
-	data := ""
-	for _, v := range entry.Data {
-		if v != nil {
-			data += fmt.Sprintf("[%v] ", v)
-		}
-	}
-	var buf *bytes.Buffer
-	if entry.Buffer != nil {
-		buf = entry.Buffer
-	} else {
-		buf = &bytes.Buffer{}
-	}
+	buf := &bytes.Buffer{}
 	fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
 		entry.Time.Format(f.TimestampFormat),
 		colors[entry.Level],
 		strings.ToUpper(entry.Level.String()),
-		data,
+		entry.Context.Value(entry),
 		entry.Message,
 	)
 	return buf.Bytes(), nil
