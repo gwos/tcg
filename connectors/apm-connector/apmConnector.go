@@ -2,9 +2,16 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/connectors"
@@ -14,11 +21,6 @@ import (
 	"github.com/gwos/tcg/transit"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
-	"net/http"
-	"sort"
-	"strconv"
-	"strings"
-	"time"
 )
 
 var (
@@ -135,18 +137,18 @@ func processMetrics(body []byte, resourceIndex int) error {
 	}
 	inventory := buildInventory(monitoredResources, resourceIndex)
 	if validateInventory(*inventory, resourceIndex) {
-		err := connectors.SendMetrics(*monitoredResources)
+		err := connectors.SendMetrics(context.Background(), *monitoredResources)
 		if err != nil {
 			return err
 		}
 	} else {
 		inv, gr := Synchronize()
-		err := connectors.SendInventory(*inv, *gr, transit.Yield)
+		err := connectors.SendInventory(context.Background(), *inv, *gr, transit.Yield)
 		if err != nil {
 			return err
 		}
 		time.Sleep(2 * time.Second) // TODO: better way to assure synch completion?
-		err = connectors.SendMetrics(*monitoredResources)
+		err = connectors.SendMetrics(context.Background(), *monitoredResources)
 		if err != nil {
 			return err
 		}
