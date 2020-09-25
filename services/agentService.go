@@ -59,6 +59,7 @@ type statsCounter struct {
 	bytesSent   int
 	lastError   error
 	payloadType payloadType
+	timestamp   time.Time
 }
 
 type ctrlSubj string
@@ -388,10 +389,11 @@ func (service *AgentService) listenStatsChan() {
 	for {
 		res := <-service.statsChan
 
+		ts := milliseconds.MillisecondTimestamp{Time: res.timestamp}
 		if res.lastError != nil {
 			service.agentStats.LastErrors = append(service.agentStats.LastErrors, LastError{
 				res.lastError.Error(),
-				&milliseconds.MillisecondTimestamp{Time: time.Now()},
+				&ts,
 			})
 			statsLastErrorsLen := len(service.agentStats.LastErrors)
 			if statsLastErrorsLen > statsLastErrorsLim {
@@ -402,24 +404,25 @@ func (service *AgentService) listenStatsChan() {
 			service.agentStats.MessagesSent++
 			switch res.payloadType {
 			case typeInventory:
-				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastInventoryRun = &ts
 			case typeMetrics:
-				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastMetricsRun = &ts
 				service.agentStats.MetricsSent++
 			case typeEvents:
 				// TODO: handle events acks, unacks
-				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastAlertRun = &ts
 			}
 
 		}
 	}
 }
 
-func (service *AgentService) updateStats(bytesSent int, lastError error, payloadType payloadType) {
+func (service *AgentService) updateStats(bytesSent int, lastError error, payloadType payloadType, timestamp time.Time) {
 	service.statsChan <- statsCounter{
 		bytesSent:   bytesSent,
 		lastError:   lastError,
 		payloadType: payloadType,
+		timestamp:   timestamp,
 	}
 }
 
@@ -500,7 +503,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			}()
 
 			if err = subjFn(ctx, p); err == nil {
-				service.updateStats(len(p.Payload), err, p.Type)
+				service.updateStats(len(p.Payload), err, p.Type, time.Now())
 			}
 			return err
 		},
@@ -684,13 +687,7 @@ func (service AgentService) handleExit() {
 
 // hookLogErrors collects error entries for stats
 func (service AgentService) hookLogErrors(entry log.Entry) error {
-	entryData := ""
-	for _, v := range entry.Data {
-		if v != nil {
-			entryData += fmt.Sprintf("[%v] ", v)
-		}
-	}
-	service.updateStats(0, fmt.Errorf("%s%s", entryData, entry.Message), typeUndefined)
+	service.updateStats(0, fmt.Errorf("%s%s", entry.Context.Value(entry.Entry), entry.Message), typeUndefined, entry.Time)
 	return nil
 }
 
