@@ -1,15 +1,9 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tcg/clients"
-	. "github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,6 +11,14 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gwos/tcg/clients"
+	. "github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -47,7 +49,7 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, existenceCheck(false, "irrelevant"))
 
 	log.Info("Send SynchronizeInventory request to GroundWork Foundation")
-	assert.NoError(t, services.GetTransitService().SynchronizeInventory(buildInventoryRequest(t)))
+	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), buildInventoryRequest(t)))
 
 	time.Sleep(5 * time.Second)
 	log.Info("Check for host availability in the database")
@@ -55,7 +57,7 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, existenceCheck(true, HostStatusPending))
 
 	log.Info("Send ResourcesWithMetrics request to GroundWork Foundation")
-	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(buildResourceWithMetricsRequest(t)))
+	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), buildResourceWithMetricsRequest(t)))
 
 	time.Sleep(5 * time.Second)
 

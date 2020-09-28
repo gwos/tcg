@@ -62,18 +62,18 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(resources []transit.MonitoredResource) error {
-	var b []byte
-	var err error
-	if services.GetTransitService().TelemetryProvider != nil {
-		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
-		_, span := tr.Start(context.Background(), "SendMetrics")
-		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(b))
-			span.End()
-		}()
-	}
+func SendMetrics(ctx context.Context, resources []transit.MonitoredResource) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendMetrics")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
+
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
@@ -81,41 +81,39 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	for i := range request.Resources {
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
-
 	b, err = json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	return services.GetTransitService().SendResourceWithMetrics(b)
+	err = services.GetTransitService().SendResourceWithMetrics(ctxN, b)
+	return err
 }
 
 // SendInventory processes inventory payload
-func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
-	var b []byte
-	var err error
-	if services.GetTransitService().TelemetryProvider != nil {
-		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
-		_, span := tr.Start(context.Background(), "SendInventory")
-		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(b))
-			span.End()
-		}()
-	}
+func SendInventory(ctx context.Context, resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendInventory")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
 
-	inventoryRequest := transit.InventoryRequest{
+	request := transit.InventoryRequest{
 		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
 		Resources:     resources,
 		Groups:        resourceGroups,
 	}
-
-	b, err = json.Marshal(inventoryRequest)
+	b, err = json.Marshal(request)
 	if err != nil {
 		return err
 	}
-
-	return services.GetTransitService().SynchronizeInventory(b)
+	err = services.GetTransitService().SynchronizeInventory(ctxN, b)
+	return err
 }
 
 // Inventory Constructors

@@ -139,7 +139,7 @@ func configHandler(data []byte) {
 		} else {
 			_, inventory, groups := connector.CollectMetrics()
 			log.Info("[Elastic Connector]: Sending inventory ...")
-			if err := connectors.SendInventory(inventory, groups, connector.config.Ownership); err != nil {
+			if err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership); err != nil {
 				log.Error("[Elastic Connector]: ", err.Error())
 			}
 			if invChk, err := connector.getInventoryHashSum(); err == nil {
@@ -164,7 +164,7 @@ func periodicHandler() {
 		chk, chkErr := connector.getInventoryHashSum()
 		if chkErr != nil || !bytes.Equal(invChksum, chk) {
 			log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
-			err := connectors.SendInventory(inventory, groups, connector.config.Ownership)
+			err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership)
 			if err != nil {
 				log.Error("[Elastic Connector]: ", err.Error())
 			}
@@ -174,7 +174,7 @@ func periodicHandler() {
 		}
 
 		log.Info("[Elastic Connector]: Monitoring resources ...")
-		err := connectors.SendMetrics(metrics)
+		err := connectors.SendMetrics(context.Background(), metrics)
 		if err != nil {
 			log.Error("[Elastic Connector]: ", err.Error())
 		}

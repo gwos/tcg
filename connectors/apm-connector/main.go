@@ -76,6 +76,7 @@ func configHandler(data []byte) {
 		resources, groups := Synchronize()
 		log.Info("[APM Connector]: Sending inventory ...")
 		_ = connectors.SendInventory(
+			context.Background(),
 			*resources,
 			*groups,
 			extConfig.Ownership,
