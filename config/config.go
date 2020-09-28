@@ -284,23 +284,27 @@ type Config struct {
 	Jaegertracing *Jaegertracing `yaml:"jaegertracing"`
 }
 
+func defaults() Config {
+	return Config{
+		Connector: &Connector{
+			ControllerAddr:   ":8099",
+			LogConsPeriod:    0,
+			LogLevel:         1,
+			NatsAckWait:      30,
+			NatsMaxInflight:  math.MaxInt32,
+			NatsFilestoreDir: "natsstore",
+			NatsStoreType:    "FILE",
+		},
+		DSConnection:  &DSConnection{},
+		Jaegertracing: &Jaegertracing{},
+	}
+}
+
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
-		// set defaults
-		cfg = &Config{
-			Connector: &Connector{
-				ControllerAddr:   ":8099",
-				LogConsPeriod:    0,
-				LogLevel:         1,
-				NatsAckWait:      30,
-				NatsMaxInflight:  math.MaxInt32,
-				NatsFilestoreDir: "natsstore",
-				NatsStoreType:    "FILE",
-			},
-			DSConnection:  &DSConnection{},
-			Jaegertracing: &Jaegertracing{},
-		}
+		c := defaults()
+		cfg = &c
 
 		configPath := os.Getenv(string(ConfigEnv))
 		if configPath == "" {
@@ -377,23 +381,19 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+	c := defaults()
+	newCfg := &c
 	/* load as ConnectorDTO */
-	dto, err := cfg.loadConnector(data)
+	dto, err := newCfg.loadConnector(data)
 	if err != nil {
 		return nil, err
 	}
 	/* load as struct with advanced prefixes field */
-	if err := cfg.loadAdvancedPrefixes(data); err != nil {
+	if err := newCfg.loadAdvancedPrefixes(data); err != nil {
 		return nil, err
 	}
-
-	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
-
-	if cfg.IsConfiguringPMC() {
-		cfg.Connector.InstallationMode = InstallationModePMC
-	}
-
-	if output, err := yaml.Marshal(cfg); err != nil {
+	/* override config file */
+	if output, err := yaml.Marshal(newCfg); err != nil {
 		log.Warn(err)
 	} else {
 		configPath := os.Getenv(string(ConfigEnv))
@@ -409,6 +409,22 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 			log.Warn(err)
 		}
 	}
+	/* load environment */
+	if err := envconfig.Process(EnvConfigPrefix, newCfg); err != nil {
+		log.Warn(err)
+	}
+	/* process PMC */
+	if cfg.IsConfiguringPMC() {
+		newCfg.Connector.InstallationMode = InstallationModePMC
+	}
+	/* update config */
+	*cfg.Connector = *newCfg.Connector
+	*cfg.DSConnection = *newCfg.DSConnection
+	*cfg.Jaegertracing = *newCfg.Jaegertracing
+	cfg.GWConnections = newCfg.GWConnections
+
+	/* update logger */
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 
 	return dto, nil
 }

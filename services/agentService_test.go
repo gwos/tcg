@@ -47,6 +47,7 @@ func TestAgentService_DemandConfig(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
 	_ = os.Setenv(string(config.ConfigEnv), tmpfile.Name())
+	defer os.Unsetenv(string(config.ConfigEnv))
 
 	dto := []byte(`
 {
@@ -69,7 +70,10 @@ func TestAgentService_DemandConfig(t *testing.T) {
 
 	agentService := GetAgentService()
 	assert.Equal(t, "", agentService.Connector.AgentID)
-	_ = agentService.config(dto)
+	assert.NoError(t, agentService.config(dto))
 	assert.Equal(t, "99998888-7777-6666-a3b0-b14622f7dd39", agentService.Connector.AgentID)
 	assert.Equal(t, "gw-host-xxx", agentService.dsClient.HostName)
+	assert.NoError(t, agentService.startNats())
+	assert.NoError(t, agentService.startTransport())
+	assert.Equal(t, "gw-host-xx", agentService.gwClients[0].HostName)
 }
