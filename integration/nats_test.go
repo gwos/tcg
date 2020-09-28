@@ -1,17 +1,9 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/clients"
-	. "github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/nats"
-	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -20,6 +12,15 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/clients"
+	. "github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -54,9 +55,9 @@ func TestNatsQueue_1(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
-		assert.NoError(t, nats.Publish(services.SubjSendResourceWithMetrics, testMessage))
-		time.Sleep(1 * time.Second)
+		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), testMessage))
 	}
+	time.Sleep(1 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent-m0 != 0 {
 		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
@@ -69,7 +70,7 @@ func TestNatsQueue_1(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	time.Sleep(TestMessagesCount * 2 * time.Second)
+	time.Sleep(1 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent-m0 == 0 {
 		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
@@ -93,7 +94,7 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
-		assert.NoError(t, nats.Publish(services.SubjSendResourceWithMetrics, testMessage))
+		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), testMessage))
 		time.Sleep(1 * time.Second)
 	}
 
@@ -146,7 +147,7 @@ func TestNatsPerformance(t *testing.T) {
 	}
 	jsonBytes, err := json.Marshal(request)
 	assert.NoError(t, err)
-	assert.NoError(t, services.GetTransitService().SynchronizeInventory(jsonBytes))
+	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), jsonBytes))
 
 	for i := 0; i < PerformanceResourcesCount; i++ {
 		res := resource()
@@ -167,7 +168,7 @@ func TestNatsPerformance(t *testing.T) {
 		}
 		jsonBytes, err := json.Marshal(request)
 		assert.NoError(t, err)
-		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(jsonBytes))
+		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), jsonBytes))
 	}
 
 	time.Sleep(10 * time.Second)

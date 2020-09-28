@@ -60,6 +60,10 @@ gwConnections:
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
 	_ = os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	_ = os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
+	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
+	defer os.Unsetenv("TCG_DSCONNECTION")
+	defer os.Unsetenv("TCG_GWCONNECTIONS")
 
 	expected := &Config{
 		Connector: &Connector{
@@ -91,19 +95,20 @@ func TestLoadConnectorDTO(t *testing.T) {
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	defer os.Unsetenv(string(ConfigEnv))
 
 	expected := &Config{
 		Connector: &Connector{
 			AgentID:          "11112222-3333-4444-a3b0-b14622f7dd39",
 			AppName:          "test-app",
 			AppType:          "test",
-			ControllerAddr:   "0.0.0.0:8099",
+			ControllerAddr:   ":8099",
 			LogConsPeriod:    0,
 			LogLevel:         0,
-			NatsAckWait:      15,
+			NatsAckWait:      30,
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "MEMORY",
+			NatsStoreType:    "FILE",
 		},
 		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
@@ -152,13 +157,13 @@ func TestLoadConnectorDTO(t *testing.T) {
 			AgentID:          "99998888-7777-6666-a3b0-b14622f7dd39",
 			AppName:          "test-app-XX",
 			AppType:          "test-XX",
-			ControllerAddr:   "0.0.0.0:8099",
+			ControllerAddr:   ":8099",
 			LogConsPeriod:    30,
 			LogLevel:         2,
-			NatsAckWait:      15,
+			NatsAckWait:      30,
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "MEMORY",
+			NatsStoreType:    "FILE",
 		},
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{

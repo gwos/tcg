@@ -96,6 +96,7 @@ func configHandler(data []byte) {
 			groups[i] = connectors.FillGroupWithResources(group, resources)
 		}
 		_ = connectors.SendInventory(
+			context.Background(),
 			resources,
 			groups,
 			extConfig.Ownership,
@@ -114,7 +115,7 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if len(metricsProfile.Metrics) > 0 {
 		log.Info("[Server Connector]: Monitoring resources ...")
-		if err := connectors.SendMetrics([]transit.MonitoredResource{
+		if err := connectors.SendMetrics(context.Background(), []transit.MonitoredResource{
 			*CollectMetrics(metricsProfile.Metrics),
 		}); err != nil {
 			log.Error("[Server Connector]: ", err)
