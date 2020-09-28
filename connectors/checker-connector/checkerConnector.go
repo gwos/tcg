@@ -174,8 +174,7 @@ func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResou
 	switch dataFormat {
 	case Bronx:
 		serviceNameToMetricsMap, err = getBronxMetrics(metricsLines)
-	case NSCA:
-	case NSCAAlt:
+	case NSCA, NSCAAlt:
 		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -187,8 +186,7 @@ func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResou
 	switch dataFormat {
 	case Bronx:
 		resourceNameToServicesMap, err = getBronxServices(serviceNameToMetricsMap, metricsLines)
-	case NSCA:
-	case NSCAAlt:
+	case NSCA, NSCAAlt:
 		resourceNameToServicesMap, err = getNscaServices(serviceNameToMetricsMap, metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -218,7 +216,7 @@ func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
 	}
 
 	i *= int64(time.Millisecond)
-	return &milliseconds.MillisecondTimestamp{Time: time.Unix(0, i).UTC()}, nil
+	return &milliseconds.MillisecondTimestamp{Time: time.Unix(0, i)}, nil
 }
 
 func getStatus(str string) (transit.MonitorStatus, error) {
