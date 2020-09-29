@@ -80,7 +80,11 @@ func Config(filePath string, level int, consPeriod int) {
 				formattedData += fmt.Sprintf("[%s] ", s)
 			}
 			/* keep formatted data for reuse */
-			entry.Context = context.WithValue(entry.Context, entry.Entry, formattedData)
+			ctx := entry.Context
+			if ctx == nil {
+				ctx = context.Background()
+			}
+			entry.Context = context.WithValue(ctx, entry.Entry, formattedData)
 			return nil
 		})
 
