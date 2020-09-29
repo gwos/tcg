@@ -40,8 +40,9 @@ var (
 		logrus.New(),
 		0,
 	}
-	/* define regex matcher for json sanitizer */
-	sanRe = regexp.MustCompile(`((?i:password|token)"[^:]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`)
+	/* define regex matchers for sanitizing */
+	sanReJSON = regexp.MustCompile(`((?i:password|token)"[^:]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`)
+	sanReMaps = regexp.MustCompile(`((?i:password|token):)(?:[^\s\]]*)`)
 )
 
 // Info makes entries in the log on Info level
@@ -75,7 +76,9 @@ func Config(filePath string, level int, consPeriod int) {
 					continue
 				}
 				/* sanitize attached json */
-				s = sanRe.ReplaceAllString(s, `${1}"***"`)
+				s = sanReJSON.ReplaceAllString(s, `${1}"***"`)
+				/* sanitize attached maps */
+				s = sanReMaps.ReplaceAllString(s, `${1}***`)
 				entry.Data[k] = s
 				formattedData += fmt.Sprintf("[%s] ", s)
 			}
