@@ -556,7 +556,7 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	return transit.ServiceOk
 }
 
-// EvaluateExpressions calcs synthetic metrics
+// EvaluateExpressions calculates synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
 	var result []transit.MonitoredService
 	vars := make(map[string]interface{})
@@ -586,7 +586,6 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Name:             result[i].Name,
 						Type:             transit.Service,
 						Owner:            result[i].Owner,
-						Status:           "SERVICE_OK",
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
@@ -606,6 +605,11 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 								},
 							},
 						},
+					}
+					status, err := CalculateServiceStatus(&result[i].Metrics)
+					result[i].Status = status
+					if err != nil {
+						log.Error(fmt.Sprintf("|connectors.go| : [EvaluateExpressions] : %s (default status - \"STATUS_OK\")", err))
 					}
 				}
 			}
