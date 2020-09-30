@@ -240,8 +240,12 @@ func parseJSON(filePath string) ([]byte, error) {
 
 func resource() transit.MonitoredResource {
 	return transit.MonitoredResource{
-		Name:          TestHostName,
-		Type:          transit.Host,
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: TestHostName,
+				Type: transit.Host,
+			},
+		},
 		Status:        transit.HostUp,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
@@ -251,9 +255,12 @@ func resource() transit.MonitoredResource {
 
 func service(i int) transit.MonitoredService {
 	return transit.MonitoredService{
-		Name:          fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
+		BaseTransitData: transit.BaseTransitData{
+			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
+			Type:  transit.Service,
+			Owner: TestHostName,
+		},
 		Status:        transit.ServiceOk,
-		Owner:         TestHostName,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Metrics: []transit.TimeSeries{
@@ -276,17 +283,22 @@ func service(i int) transit.MonitoredService {
 
 func inventoryResource() transit.InventoryResource {
 	return transit.InventoryResource{
-		Name:   TestHostName,
-		Device: "",
-		Type:   "HOST",
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: TestHostName,
+				Type: transit.Host,
+			},
+		},
 	}
 }
 
 func inventoryService(i int) transit.InventoryService {
 	return transit.InventoryService{
-		Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
-		Type:  "network-device",
-		Owner: TestHostName,
+		BaseTransitData: transit.BaseTransitData{
+			Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
+			Type:  "network-device",
+			Owner: TestHostName,
+		},
 	}
 }
 
