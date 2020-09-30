@@ -119,17 +119,23 @@ func SendInventory(ctx context.Context, resources []transit.InventoryResource, r
 // Inventory Constructors
 func CreateInventoryService(name string, owner string) transit.InventoryService {
 	return transit.InventoryService{
-		Name:  name,
-		Type:  transit.Service,
-		Owner: owner,
+		BaseTransitData: transit.BaseTransitData{
+			Name:  name,
+			Type:  transit.Service,
+			Owner: owner,
+		},
 	}
 }
 
 // makes and modifies a copy, doesn't modify services
 func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
 	resource := transit.InventoryResource{
-		Name: name,
-		Type: transit.Host,
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: name,
+				Type: transit.Host,
+			},
+		},
 	}
 	for _, s := range services {
 		resource.Services = append(resource.Services, s)
@@ -163,8 +169,8 @@ func FillGroupWithResources(group transit.ResourceGroup, resources []transit.Inv
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
 			transit.MonitoredResourceRef{
-				Name: resource.Name,
-				Type: resource.Type,
+				Name: resource.BaseResource.Name,
+				Type: resource.BaseResource.Type,
 			},
 		)
 	}
@@ -392,9 +398,11 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
 	service := transit.MonitoredService{
-		Name:          name,
-		Type:          transit.Service,
-		Owner:         owner,
+		BaseTransitData: transit.BaseTransitData{
+			Name:  name,
+			Type:  transit.Service,
+			Owner: owner,
+		},
 		Status:        transit.ServiceOk,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
@@ -420,8 +428,12 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 // optional params: services
 func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
 	resource := transit.MonitoredResource{
-		Name:          name,
-		Type:          transit.Host,
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: name,
+				Type: transit.Host,
+			},
+		},
 		Status:        transit.HostUp,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
@@ -583,9 +595,11 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 					continue
 				} else {
 					result[i] = transit.MonitoredService{
-						Name:             result[i].Name,
-						Type:             transit.Service,
-						Owner:            result[i].Owner,
+						BaseTransitData: transit.BaseTransitData{
+							Name:  result[i].Name,
+							Type:  transit.Service,
+							Owner: result[i].Owner,
+						},
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
