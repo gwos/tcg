@@ -23,7 +23,7 @@ The Transit Connection Generator (TCG). TCG contains two sub-systems/packages:
 <a name="dependencies"></a>
 ## Dependencies
 
-The TCG project is built with Go Modules. See `go.mod` for a list of dependencies. Here are some of the main frameworks used by this project:
+The TCG project is built with Go Modules. See `go.mod` for a list of dependencies. Here are some main frameworks used by this project:
 
 1. [Gin Web Framework](github.com/gin-gonic/gin)
 
@@ -225,26 +225,11 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test ./integration
 
 
-### Run tests in Docker container:
-
->All packages:
-
-    $ ./docker_tests.sh
-
->One package:
-
-    $ ./docker_tests.sh -v ./<package_one>/ ./<package_two>/
-
-*Available packages:* <b>integration, config, milliseconds, customTime</b>
-
-
 ### Examples:
 
     $ go test ./integration/
 
     $ go test -v ./config
-
-    $ ./docker_tests.sh milliseconds
 
 
 <a name="envvar"></a>
@@ -253,14 +238,14 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
 ### LIBTRANSIT
 
-Defines path to `libtransit.so` library in docker container and tests.
+Defines the path to `libtransit.so` library in docker container and tests.
 
     $ export LIBTRANSIT=/path/to/libtransit.so
 
 
 ### TCG
 
-By default the config file is looked for in the work directory as `tcg_config.yaml`.
+By default, the config file is looked for in the work directory as `tcg_config.yaml`.
 
 The path to config file and any config option can be overridden with env vars:
 
