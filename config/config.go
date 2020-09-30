@@ -306,17 +306,7 @@ func GetConfig() *Config {
 		c := defaults()
 		cfg = &c
 
-		configPath := os.Getenv(string(ConfigEnv))
-		if configPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				log.Warn(err)
-				wd = ""
-			}
-			configPath = path.Join(wd, ConfigName)
-		}
-
-		if data, err := ioutil.ReadFile(configPath); err != nil {
+		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
 			log.Warn(err)
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -332,6 +322,19 @@ func GetConfig() *Config {
 		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
 	})
 	return cfg
+}
+
+func (cfg Config) configPath() string {
+	configPath := os.Getenv(string(ConfigEnv))
+	if configPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Warn(err)
+			wd = ""
+		}
+		configPath = path.Join(wd, ConfigName)
+	}
+	return configPath
 }
 
 func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
@@ -383,6 +386,14 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
 	newCfg := &c
+	/* load config file */
+	if data, err := ioutil.ReadFile(newCfg.configPath()); err != nil {
+		log.Warn(err)
+	} else {
+		if err := yaml.Unmarshal(data, newCfg); err != nil {
+			log.Warn(err)
+		}
+	}
 	/* load as ConnectorDTO */
 	dto, err := newCfg.loadConnector(data)
 	if err != nil {
@@ -396,16 +407,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if output, err := yaml.Marshal(newCfg); err != nil {
 		log.Warn(err)
 	} else {
-		configPath := os.Getenv(string(ConfigEnv))
-		if configPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				log.Warn(err)
-				wd = ""
-			}
-			configPath = path.Join(wd, ConfigName)
-		}
-		if err := ioutil.WriteFile(configPath, output, 0644); err != nil {
+		if err := ioutil.WriteFile(newCfg.configPath(), output, 0644); err != nil {
 			log.Warn(err)
 		}
 	}
