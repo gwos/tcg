@@ -87,13 +87,19 @@ func BenchmarkWithJavaIntegration(t *testing.B) {
 
 func buildInventoryRequest(t *testing.T) []byte {
 	inventoryResource := transit.InventoryResource{
-		Name: TestHostName,
-		Type: "HOST",
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: TestHostName,
+				Type: transit.Host,
+			},
+		},
 		Services: []transit.InventoryService{
 			{
-				Name:  "test",
-				Type:  transit.Hypervisor,
-				Owner: TestHostName,
+				BaseTransitData: transit.BaseTransitData{
+					Name:  "test",
+					Type:  transit.Hypervisor,
+					Owner: TestHostName,
+				},
 			},
 		},
 	}
@@ -112,16 +118,23 @@ func buildInventoryRequest(t *testing.T) []byte {
 
 func buildResourceWithMetricsRequest(t *testing.T) []byte {
 	monitoredResource := transit.MonitoredResource{
-		Name:          TestHostName,
-		Type:          transit.Host,
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: TestHostName,
+				Type: transit.Host,
+			},
+		},
 		Status:        transit.HostUp,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		Services: []transit.MonitoredService{
 			{
-				Name:          "test",
+				BaseTransitData: transit.BaseTransitData{
+					Name:  "test",
+					Type:  transit.Service,
+					Owner: TestHostName,
+				},
 				Status:        transit.ServiceOk,
-				Owner:         TestHostName,
 				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 				Metrics: []transit.TimeSeries{

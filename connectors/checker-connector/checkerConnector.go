@@ -197,8 +197,12 @@ func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResou
 
 	for key, value := range resourceNameToServicesMap {
 		monitoredResources = append(monitoredResources, transit.MonitoredResource{
-			Name:          key,
-			Type:          transit.Host,
+			BaseResource: transit.BaseResource{
+				BaseTransitData: transit.BaseTransitData{
+					Name: key,
+					Type: transit.Host,
+				},
+			},
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)},
@@ -327,9 +331,11 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 		}
 
 		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.MonitoredService{
-			Name:             arr[len(arr)-4],
-			Type:             transit.Service,
-			Owner:            arr[len(arr)-5],
+			BaseTransitData: transit.BaseTransitData{
+				Name:  arr[len(arr)-4],
+				Type:  transit.Service,
+				Owner: arr[len(arr)-5],
+			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
@@ -411,9 +417,11 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 		}
 
 		servicesMap[arr[2]] = append(servicesMap[arr[2]], transit.MonitoredService{
-			Name:             arr[3],
-			Type:             transit.Service,
-			Owner:            arr[2],
+			BaseTransitData: transit.BaseTransitData{
+				Name:  arr[3],
+				Type:  transit.Service,
+				Owner: arr[2],
+			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
