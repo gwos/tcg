@@ -66,25 +66,6 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, existenceCheck(true, HostStatusUp))
 }
 
-func BenchmarkWithJavaIntegration(t *testing.B) {
-	var err error
-	headers, err = config(t)
-	defer clean(headers)
-	assert.NoError(t, err)
-
-	assert.NoError(t, existenceCheck(false, "irrelevant"))
-
-	assert.NoError(t, installDependencies())
-
-	assert.NoError(t, runJavaSynchronizeInventoryTest())
-
-	assert.NoError(t, existenceCheck(true, HostStatusPending))
-
-	assert.NoError(t, runJavaSendResourceWithMetricsTest())
-
-	assert.NoError(t, existenceCheck(true, HostStatusUp))
-}
-
 func buildInventoryRequest(t *testing.T) []byte {
 	inventoryResource := transit.InventoryResource{
 		Name: TestHostName,
@@ -202,54 +183,6 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	if mustExist && (response.HostName != TestHostName || response.MonitorStatus != mustHasStatus) {
 		return fmt.Errorf("host from database = (Name: %s, Status: %s), want = (Name: %s, Status: %s)",
 			response.HostName, response.MonitorStatus, TestHostName, mustHasStatus)
-	}
-
-	return nil
-}
-
-func installDependencies() error {
-	workDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("mvn", "install:install-file", "-Dfile=lib/collagerest-common-8.0.0-SNAPSHOT.jar", "-DgroupId=org.groundwork", "-DartifactId=collagerest-common", "-Dversion=8.0.0-SNAPSHOT")
-	cmd.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func runJavaSynchronizeInventoryTest() error {
-	workDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSynchronizeInventory", "test")
-	cmd.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func runJavaSendResourceWithMetricsTest() error {
-	workDir, err := os.Getwd()
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("mvn", "-Dtest=AppTest#shouldSendResourceAndMetrics", "test")
-	cmd.Dir = path.Join(workDir, "../gw-transit")
-	_, err = cmd.Output()
-	if err != nil {
-		return err
 	}
 
 	return nil
