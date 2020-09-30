@@ -86,6 +86,7 @@ func configHandler(data []byte) {
 	chk, err := connectors.Hashsum(
 		config.GetConfig().Connector.AgentID,
 		config.GetConfig().GWConnections,
+		metricsProfile,
 		extConfig,
 	)
 	if err != nil || !bytes.Equal(chksum, chk) {
