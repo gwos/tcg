@@ -108,7 +108,7 @@ type Connector struct {
 	LogLevel           LogLevel `yaml:"logLevel"`
 	Enabled            bool     `yaml:"enabled"`
 	InstallationMode   string   `yaml:"installationMode,omitempty"`
-	IsDynamicInventory bool
+	IsDynamicInventory bool     `yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration

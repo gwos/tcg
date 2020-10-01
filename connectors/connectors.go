@@ -62,7 +62,7 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(ctx context.Context, resources []transit.MonitoredResource) error {
+func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, groups *[]transit.ResourceGroup) error {
 	var (
 		b   []byte
 		err error
@@ -77,6 +77,9 @@ func SendMetrics(ctx context.Context, resources []transit.MonitoredResource) err
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
+	}
+	if groups != nil {
+		request.Groups = *groups
 	}
 	for i := range request.Resources {
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
