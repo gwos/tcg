@@ -123,13 +123,20 @@ func periodicHandler() {
 		log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
 
 		if count == 0 {
-			err := connectors.SendInventory(inventory, groups, extConfig.Ownership)
-			log.Error("[K8 Connector]: Error during sending inventory.", err)
-			time.Sleep(3 * time.Second)
+			if err := connectors.SendInventory(
+				context.Background(),
+				inventory,
+				groups,
+				extConfig.Ownership,
+			); err != nil {
+				log.Error("[K8 Connector]: Error during sending inventory.", err)
+			}
 			count = count + 1
 		}
-		err := connectors.SendMetrics(monitored)
-		log.Error("[K8 Connector]: Error during sending metrics.", err)
+		time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
+		if err := connectors.SendMetrics(context.Background(), monitored); err != nil {
+			log.Error("[K8 Connector]: Error during sending metrics.", err)
+		}
 	}
 }
 
