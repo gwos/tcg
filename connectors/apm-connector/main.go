@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -15,7 +14,6 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	chksum            []byte
 	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
@@ -66,25 +64,6 @@ func configHandler(data []byte) {
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-	/* Process checksums */
-	chk, err := connectors.Hashsum(
-		config.GetConfig().Connector.AgentID,
-		config.GetConfig().GWConnections,
-		extConfig,
-	)
-	if err != nil || !bytes.Equal(chksum, chk) {
-		resources, groups := Synchronize()
-		log.Info("[APM Connector]: Sending inventory ...")
-		_ = connectors.SendInventory(
-			context.Background(),
-			*resources,
-			*groups,
-			extConfig.Ownership,
-		)
-	}
-	if err == nil {
-		chksum = chk
-	}
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

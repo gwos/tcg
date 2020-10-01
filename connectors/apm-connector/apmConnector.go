@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -25,8 +24,6 @@ import (
 
 var (
 	inventoryGroupsStorage    = make(map[string]map[string][]transit.MonitoredResourceRef)
-	inventoryResourcesStorage = make(map[string][]transit.InventoryResource)
-	inventoryChksum           = make(map[string][]byte)
 )
 
 // Resource defines APM Source
@@ -94,27 +91,6 @@ const defaultHostGroupName = "Servers"
 
 var parser expfmt.TextParser
 
-// Synchronize makes InventoryResource
-func Synchronize() (*[]transit.InventoryResource, *[]transit.ResourceGroup) {
-	var inventoryResources []transit.InventoryResource
-	var groups []transit.ResourceGroup
-	for _, resources := range inventoryResourcesStorage {
-		for _, resource := range resources {
-			inventoryResources = append(inventoryResources, resource)
-		}
-	}
-	for _, groupsMap := range inventoryGroupsStorage {
-		for groupName, resources := range groupsMap {
-			groups = append(groups, transit.ResourceGroup{
-				GroupName: groupName,
-				Type:      transit.HostGroup,
-				Resources: resources,
-			})
-		}
-	}
-	return &inventoryResources, &groups
-}
-
 func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
@@ -131,28 +107,14 @@ func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredRe
 }
 
 func processMetrics(body []byte, resourceIndex int) error {
-	monitoredResources, _, err := parsePrometheusBody(body, resourceIndex)
-	if err != nil {
-		return err
-	}
-	inventory := buildInventory(monitoredResources, resourceIndex)
-	if validateInventory(*inventory, resourceIndex) {
-		err := connectors.SendMetrics(context.Background(), *monitoredResources)
-		if err != nil {
+	if monitoredResources, _, err := parsePrometheusBody(body, resourceIndex); err == nil {
+		if err := connectors.SendMetrics(context.Background(), *monitoredResources); err != nil {
 			return err
 		}
 	} else {
-		inv, gr := Synchronize()
-		err := connectors.SendInventory(context.Background(), *inv, *gr, transit.Yield)
-		if err != nil {
-			return err
-		}
-		time.Sleep(2 * time.Second) // TODO: better way to assure synch completion?
-		err = connectors.SendMetrics(context.Background(), *monitoredResources)
-		if err != nil {
-			return err
-		}
+		return err
 	}
+
 	return nil
 }
 
@@ -393,36 +355,5 @@ func pull(resources []Resource) {
 		if err != nil {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
-	}
-}
-
-func buildInventory(resources *[]transit.MonitoredResource, resourceIndex int) *[]transit.InventoryResource {
-	var inventoryResources []transit.InventoryResource
-	inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL] = nil
-	for _, resource := range *resources {
-		var inventoryServices []transit.InventoryService
-		for _, service := range resource.Services {
-			inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
-				service.Owner))
-		}
-
-		inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
-		inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL] = append(inventoryResourcesStorage[extConfig.Resources[resourceIndex].URL], inventoryResource)
-		inventoryResources = append(inventoryResources, inventoryResource)
-	}
-	return &inventoryResources
-}
-
-func validateInventory(inventory []transit.InventoryResource, resourceIndex int) bool {
-	if inventoryChksum[extConfig.Resources[resourceIndex].URL] != nil {
-		chk, err := connectors.Hashsum(inventory)
-		if err != nil || !bytes.Equal(inventoryChksum[extConfig.Resources[resourceIndex].URL], chk) {
-			inventoryChksum[extConfig.Resources[resourceIndex].URL] = chk
-			return false
-		}
-		return true
-	} else {
-		inventoryChksum[extConfig.Resources[resourceIndex].URL], _ = connectors.Hashsum(inventory)
-		return false
 	}
 }
