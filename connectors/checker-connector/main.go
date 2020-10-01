@@ -135,7 +135,7 @@ func taskHandler(task ScheduleTask) func() {
 
 		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
 
-		if _, err = processMetrics(ctxN, res, task.DataFormat, task.ForceInventory); err != nil {
+		if _, err = processMetrics(ctxN, res, task.DataFormat); err != nil {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
 
