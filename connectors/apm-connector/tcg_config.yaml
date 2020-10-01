@@ -1,12 +1,12 @@
 connector:
-  agentId: "76AE2920-0F88-44A5-BF1D-1B6B61B842C2"
-  appName: "tcg"
-  appType: "VEMA"
-  controllerAddr: "0.0.0.0:8099"
+  agentId: ""
+  appName: APM
+  appType: APM
+  controllerAddr: 0.0.0.0:8099
   natsAckWait: 30
   natsMaxInflight: 2147483647 # math.MaxInt32
-  natsFilestoreDir: "nats/datastore"
-  natsStoreType: "FILE"
+  natsFilestoreDir: nats/datastore
+  natsStoreType: FILE
   logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 2 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:

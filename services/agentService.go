@@ -56,9 +56,10 @@ type CtrlAction struct {
 }
 
 type statsCounter struct {
-	subject   string
-	bytesSent int
-	lastError error
+	bytesSent   int
+	lastError   error
+	payloadType payloadType
+	timestamp   time.Time
 }
 
 type ctrlSubj string
@@ -157,16 +158,18 @@ func (service *AgentService) DemandConfig() error {
 		return nil
 	}
 
-	for {
-		if err := service.dsClient.Reload(service.AgentID); err != nil {
-			log.With(log.Fields{"error": err}).
-				Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
-			time.Sleep(time.Duration(20) * time.Second)
-			continue
+	go func() {
+		for i := 0; ; i++ {
+			if err := service.dsClient.Reload(service.AgentID); err != nil {
+				log.With(log.Fields{"error": err}).
+					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
+				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
+				continue
+			}
+			break
 		}
-		break
-	}
-	log.Info("[Demand Config]: Config Server found and connected")
+		log.Info("[Demand Config]: Config Server found and connected")
+	}()
 	return nil
 }
 
@@ -386,10 +389,11 @@ func (service *AgentService) listenStatsChan() {
 	for {
 		res := <-service.statsChan
 
+		ts := milliseconds.MillisecondTimestamp{Time: res.timestamp}
 		if res.lastError != nil {
 			service.agentStats.LastErrors = append(service.agentStats.LastErrors, LastError{
 				res.lastError.Error(),
-				&milliseconds.MillisecondTimestamp{Time: time.Now()},
+				&ts,
 			})
 			statsLastErrorsLen := len(service.agentStats.LastErrors)
 			if statsLastErrorsLen > statsLastErrorsLim {
@@ -398,18 +402,27 @@ func (service *AgentService) listenStatsChan() {
 		} else {
 			service.agentStats.BytesSent += res.bytesSent
 			service.agentStats.MessagesSent++
-			switch res.subject {
-			case SubjSynchronizeInventory:
-				service.agentStats.LastInventoryRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-			case SubjSendResourceWithMetrics:
-				service.agentStats.LastMetricsRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+			switch res.payloadType {
+			case typeInventory:
+				service.agentStats.LastInventoryRun = &ts
+			case typeMetrics:
+				service.agentStats.LastMetricsRun = &ts
 				service.agentStats.MetricsSent++
-			case SubjSendEvents:
+			case typeEvents:
 				// TODO: handle events acks, unacks
-				service.agentStats.LastAlertRun = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+				service.agentStats.LastAlertRun = &ts
 			}
 
 		}
+	}
+}
+
+func (service *AgentService) updateStats(bytesSent int, lastError error, payloadType payloadType, timestamp time.Time) {
+	service.statsChan <- statsCounter{
+		bytesSent:   bytesSent,
+		lastError:   lastError,
+		payloadType: payloadType,
+		timestamp:   timestamp,
 	}
 }
 
@@ -421,38 +434,36 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", SubjSendEvents, gwClient.HostName),
-				SubjSendEvents,
-				func(ctx context.Context, b []byte) error {
+				fmt.Sprintf("#%s#%s#", subjEvents, gwClientRef.HostName),
+				subjEvents,
+				func(ctx context.Context, p natsPayload) error {
 					var err error
-					if bytes.HasSuffix(b, []byte(eventsAckSuffix)) {
-						_, err = gwClientRef.SendEventsAck(ctx, bytes.TrimSuffix(b, []byte(eventsAckSuffix)))
-					} else if bytes.HasSuffix(b, []byte(eventsUnackSuffix)) {
-						_, err = gwClientRef.SendEventsUnack(ctx, bytes.TrimSuffix(b, []byte(eventsUnackSuffix)))
-					} else {
-						_, err = gwClientRef.SendEvents(ctx, b)
+					switch p.Type {
+					case typeEvents:
+						_, err = gwClientRef.SendEvents(ctx, p.Payload)
+					case typeEventsAck:
+						_, err = gwClientRef.SendEventsAck(ctx, p.Payload)
+					case typeEventsUnack:
+						_, err = gwClientRef.SendEventsUnack(ctx, p.Payload)
+					default:
+						err = fmt.Errorf("dispatcher error on process payload type")
 					}
 					return err
 				},
 			),
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", SubjSendResourceWithMetrics, gwClient.HostName),
-				SubjSendResourceWithMetrics,
-				func(ctx context.Context, b []byte) error {
-					_, err := gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(b))
-					if errors.Is(err, clients.ErrUnauthorized) {
-						/* it looks like an issue with credentialed user
-						so, wait for configuration update */
-						_ = service.StopTransport()
+				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClientRef.HostName),
+				subjInventoryMetrics,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeInventory:
+						_, err = gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
+					case typeMetrics:
+						_, err = gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
+					default:
+						err = fmt.Errorf("dispatcher error on process payload type")
 					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", SubjSynchronizeInventory, gwClient.HostName),
-				SubjSynchronizeInventory,
-				func(ctx context.Context, b []byte) error {
-					_, err := gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(b))
 					if errors.Is(err, clients.ErrUnauthorized) {
 						/* it looks like an issue with credentialed user
 						so, wait for configuration update */
@@ -466,35 +477,33 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func(context.Context, []byte) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func(context.Context, natsPayload) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
 		DurableName: durableName,
 		Subject:     subj,
 		Handler: func(b []byte) error {
-			var (
-				ctx  context.Context
-				err  error
-				span apitrace.Span
-			)
-			if service.TelemetryProvider != nil {
-				tr := service.TelemetryProvider.Tracer("services")
-				ctx, span = tr.Start(context.Background(), subj)
-				defer func() {
-					span.SetAttribute("error", err)
-					span.SetAttribute("payloadLen", len(b))
-					span.SetAttribute("durableName", durableName)
-					span.End()
-				}()
+			var err error
+			getCtx := func(sc apitrace.SpanContext) context.Context {
+				if sc.IsValid() {
+					return apitrace.ContextWithRemoteSpanContext(context.Background(), sc)
+				}
+				return context.Background()
 			}
 
-			// TODO: filter the message by rules per gwClient
-			err = subjFn(ctx, b)
-			if err == nil {
-				service.statsChan <- statsCounter{
-					bytesSent: len(b),
-					lastError: nil,
-					subject:   subj,
-				}
+			p := natsPayload{SpanContext: apitrace.EmptySpanContext()}
+			if err = p.UnmarshalText(b); err != nil {
+				log.Warn("dispatcher error on unmarshal payload: ", err)
+			}
+			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
+			defer func() {
+				span.SetAttribute("error", err)
+				span.SetAttribute("payloadLen", len(b))
+				span.SetAttribute("durableName", durableName)
+				span.End()
+			}()
+
+			if err = subjFn(ctx, p); err == nil {
+				service.updateStats(len(p.Payload), err, p.Type, time.Now())
 			}
 			return err
 		},
@@ -551,7 +560,6 @@ func (service *AgentService) startNats() error {
 		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
 		FilestoreDir:          service.Connector.NatsFilestoreDir,
 		StoreType:             service.Connector.NatsStoreType,
-		NatsHost:              service.Connector.NatsHost,
 	})
 	if err == nil {
 		service.agentStatus.Nats = Running
@@ -679,17 +687,7 @@ func (service AgentService) handleExit() {
 
 // hookLogErrors collects error entries for stats
 func (service AgentService) hookLogErrors(entry log.Entry) error {
-	entryData := ""
-	for _, v := range entry.Data {
-		if v != nil {
-			entryData += fmt.Sprintf("[%v] ", v)
-		}
-	}
-	service.statsChan <- statsCounter{
-		bytesSent: 0,
-		lastError: fmt.Errorf("%s%s", entryData, entry.Message),
-		subject:   "log",
-	}
+	service.updateStats(0, fmt.Errorf("%s%s", entry.Context.Value(entry.Entry), entry.Message), typeUndefined, entry.Time)
 	return nil
 }
 
@@ -699,9 +697,8 @@ func initTelemetryProvider() (apitrace.Provider, func(), error) {
 	jaegerAgent := config.GetConfig().Jaegertracing.Agent
 	jaegerCollector := config.GetConfig().Jaegertracing.Collector
 	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
-		err := fmt.Errorf("telemetry not configured")
-		log.Debug(err.Error())
-		return nil, nil, err
+		log.Debug("telemetry not configured")
+		return apitrace.NoopProvider{}, func() {}, nil
 	}
 	if len(jaegerAgent) == 0 {
 		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)

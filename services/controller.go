@@ -84,18 +84,57 @@ func (controller *Controller) RemoveListMetricsHandler() {
 }
 
 // SendEvents implements Controllers.SendEvents interface
-func (controller *Controller) SendEvents(payload []byte) error {
-	return nats.Publish(SubjSendEvents, payload)
+func (controller *Controller) SendEvents(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "SendEvents")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
+
+	b, err = natsPayload{payload, span.SpanContext(), typeEvents}.MarshalText()
+	err = nats.Publish(subjEvents, b)
+	return err
 }
 
 // SendEventsAck implements Controllers.SendEventsAck interface
-func (controller *Controller) SendEventsAck(payload []byte) error {
-	return nats.Publish(SubjSendEvents, append(payload, []byte(eventsAckSuffix)...))
+func (controller *Controller) SendEventsAck(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "SendEventsAck")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
+
+	b, err = natsPayload{payload, span.SpanContext(), typeEventsAck}.MarshalText()
+	err = nats.Publish(subjEvents, b)
+	return err
 }
 
 // SendEventsUnack implements Controllers.SendEventsUnack interface
-func (controller *Controller) SendEventsUnack(payload []byte) error {
-	return nats.Publish(SubjSendEvents, append(payload, []byte(eventsUnackSuffix)...))
+func (controller *Controller) SendEventsUnack(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "SendEventsUnack")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
+
+	b, err = natsPayload{payload, span.SpanContext(), typeEventsUnack}.MarshalText()
+	err = nats.Publish(subjEvents, b)
+	return err
 }
 
 // starts the http server
@@ -191,13 +230,13 @@ func (controller *Controller) stopController() error {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) config(c *gin.Context) {
-	value, err := c.GetRawData()
+	payload, err := c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
 	var dto config.ConnectorDTO
-	if err := json.Unmarshal(value, &dto); err != nil {
+	if err := json.Unmarshal(payload, &dto); err != nil {
 		log.Error("|controller.go| : [config] : ", err)
 		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
 		return
@@ -212,7 +251,7 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
-	_, _ = controller.ctrlPushAsync(value, ctrlSubjConfig, nil)
+	_, _ = controller.ctrlPushAsync(payload, ctrlSubjConfig, nil)
 	c.JSON(http.StatusOK, nil)
 }
 
@@ -227,12 +266,24 @@ func (controller *Controller) config(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) events(c *gin.Context) {
-	value, err := c.GetRawData()
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(payload))
+		span.SetAttribute("entrypoint", c.FullPath())
+		span.End()
+	}()
+
+	payload, err = c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = controller.SendEvents(value)
+	err = controller.SendEvents(ctx, payload)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
@@ -251,12 +302,24 @@ func (controller *Controller) events(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) eventsAck(c *gin.Context) {
-	value, err := c.GetRawData()
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(payload))
+		span.SetAttribute("entrypoint", c.FullPath())
+		span.End()
+	}()
+
+	payload, err = c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = controller.SendEventsAck(value)
+	err = controller.SendEventsAck(ctx, payload)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
@@ -275,12 +338,24 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) eventsUnack(c *gin.Context) {
-	value, err := c.GetRawData()
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(payload))
+		span.SetAttribute("entrypoint", c.FullPath())
+		span.End()
+	}()
+
+	payload, err = c.GetRawData()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = controller.SendEventsUnack(value)
+	err = controller.SendEventsUnack(ctx, payload)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return

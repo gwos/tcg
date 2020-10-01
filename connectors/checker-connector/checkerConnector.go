@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -25,21 +26,29 @@ var (
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
 )
 
+var (
+	inventoryStorage = make(map[string]transit.InventoryResource)
+	inventoryChksum  []byte
+)
+
 // DataFormat describes incoming payload
 type DataFormat string
 
 // Data formats of the received body
 const (
-	NSCA  DataFormat = "NSCA"
-	Bronx            = "Bronx"
+	Bronx   DataFormat = "bronx"
+	NSCA               = "nsca"
+	NSCAAlt            = "nsca-alt"
 )
 
 // ScheduleTask defines command
 type ScheduleTask struct {
-	CombinedOutput bool     `json:"combinedOutput,omitempty"`
-	Command        []string `json:"command"`
-	Cron           string   `json:"cron"`
-	Environment    []string `json:"environment,omitempty"`
+	CombinedOutput bool       `json:"combinedOutput,omitempty"`
+	Command        []string   `json:"command"`
+	Cron           string     `json:"cron"`
+	DataFormat     DataFormat `json:"dataFormat"`
+	Environment    []string   `json:"environment,omitempty"`
+	ForceInventory bool       `json:"forceInventory,omitempty"`
 }
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -58,75 +67,102 @@ func (cfg ExtConfig) Validate() error {
 }
 
 func initializeEntrypoints() []services.Entrypoint {
-	return []services.Entrypoint{
-		{
-			URL:     "/bronx",
+	rv := make([]services.Entrypoint, 6)
+	for _, dataFormat := range []DataFormat{Bronx, NSCA, NSCAAlt} {
+		rv = append(rv, services.Entrypoint{
+			Handler: makeEntrypointHandler(dataFormat, false),
 			Method:  http.MethodPost,
-			Handler: bronxHandler,
-		},
-		{
-			URL:     "/nsca",
+			URL:     fmt.Sprintf("checker/%s", dataFormat),
+		}, services.Entrypoint{
+			Handler: makeEntrypointHandler(dataFormat, true),
 			Method:  http.MethodPost,
-			Handler: nscaHandler,
-		},
+			URL:     fmt.Sprintf("checker/forced/%s", dataFormat),
+		})
 	}
+	return rv
 }
 
-func bronxHandler(c *gin.Context) {
-	body, err := c.GetRawData()
-	if err != nil {
-		log.Error(err.Error())
-		c.JSON(http.StatusBadRequest, err.Error())
-		return
-	}
+func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin.Context) {
+	return func(c *gin.Context) {
+		var (
+			err     error
+			payload []byte
+		)
+		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(payload))
+			span.SetAttribute("entrypoint", c.FullPath())
+			span.End()
+		}()
 
-	if err := processMetrics(body, Bronx); err != nil {
-		c.JSON(http.StatusBadRequest, err.Error())
-	}
-}
-
-func nscaHandler(c *gin.Context) {
-	body, err := c.GetRawData()
-	if err != nil {
-		log.Error(err.Error())
-		c.JSON(http.StatusBadRequest, err.Error())
-		return
-	}
-
-	if err := processMetrics(body, NSCA); err != nil {
-		c.JSON(http.StatusBadRequest, err.Error())
-	}
-}
-
-func processMetrics(body []byte, format DataFormat) error {
-	monitoredResources, err := parseBody(body, format)
-	if err != nil {
-		return err
-	}
-
-	inventoryResources := connectors.BuildInventory(monitoredResources)
-	if connectors.ValidateInventory(*inventoryResources) {
-		err := connectors.SendMetrics(*monitoredResources)
+		payload, err = c.GetRawData()
 		if err != nil {
-			return err
+			log.With(log.Fields{"entrypoint": c.FullPath()}).
+				Warn("[Checker Connector]: ", err.Error())
+			c.JSON(http.StatusBadRequest, err.Error())
+			return
+		}
+		if _, err = processMetrics(ctx, payload, dataFormat, forceInventory); err != nil {
+			c.JSON(http.StatusBadRequest, err.Error())
+			return
+		}
+		c.JSON(http.StatusOK, nil)
+	}
+}
+
+func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
+	var (
+		ctxN               context.Context
+		err                error
+		inventoryResources *[]transit.InventoryResource
+		monitoredResources *[]transit.MonitoredResource
+		span               services.TraceSpan
+	)
+
+	ctxN, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
+	monitoredResources, err = parseBody(payload, dataFormat)
+
+	span.SetAttribute("error", err)
+	span.SetAttribute("payloadLen", len(payload))
+	span.End()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !forceInventory {
+		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
+			return nil, err
+		}
+		return monitoredResources, nil
+	}
+
+	ctxN, span = services.StartTraceSpan(ctx, "connectors", "buildInventory")
+	inventoryResources = buildInventory(monitoredResources)
+
+	span.End()
+
+	if validateInventory(*inventoryResources) {
+		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
+			return nil, err
 		}
 	} else {
-		err := connectors.SendInventory(*inventoryResources, nil, transit.Yield)
-		if err != nil {
-			return err
+		if err := connectors.SendInventory(ctxN, *inventoryResources, nil, transit.Yield); err != nil {
+			return nil, err
 		}
-		time.Sleep(2 * time.Second)
-		err = connectors.SendMetrics(*monitoredResources)
-		if err != nil {
-			return err
-		}
+		time.AfterFunc(2*time.Second, func() { // TODO: better way to assure synch completion?
+			if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
+				log.Warn("[Checker Connector]: ", err.Error())
+			}
+		})
 	}
 
-	return nil
+	return monitoredResources, nil
 }
 
-func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, error) {
-	metricsLines := strings.Split(string(bytes.Trim(body, " \n\r")), "\n")
+func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
+	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
 		monitoredResources        []transit.MonitoredResource
@@ -135,10 +171,10 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 		err                       error
 	)
 
-	switch format {
+	switch dataFormat {
 	case Bronx:
 		serviceNameToMetricsMap, err = getBronxMetrics(metricsLines)
-	case NSCA:
+	case NSCA, NSCAAlt:
 		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -147,10 +183,10 @@ func parseBody(body []byte, format DataFormat) (*[]transit.MonitoredResource, er
 		return nil, err
 	}
 
-	switch format {
+	switch dataFormat {
 	case Bronx:
 		resourceNameToServicesMap, err = getBronxServices(serviceNameToMetricsMap, metricsLines)
-	case NSCA:
+	case NSCA, NSCAAlt:
 		resourceNameToServicesMap, err = getNscaServices(serviceNameToMetricsMap, metricsLines)
 	default:
 		return nil, errors.New("unknown data format provided")
@@ -180,7 +216,7 @@ func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
 	}
 
 	i *= int64(time.Millisecond)
-	return &milliseconds.MillisecondTimestamp{Time: time.Unix(0, i).UTC()}, nil
+	return &milliseconds.MillisecondTimestamp{Time: time.Unix(0, i)}, nil
 }
 
 func getStatus(str string) (transit.MonitorStatus, error) {
@@ -402,4 +438,33 @@ func removeDuplicateServices(servicesMap map[string][]transit.MonitoredService) 
 		servicesMap[key] = list
 	}
 	return servicesMap
+}
+
+func validateInventory(inventory []transit.InventoryResource) bool {
+	if inventoryChksum != nil {
+		chk, err := connectors.Hashsum(inventory)
+		if err != nil || !bytes.Equal(inventoryChksum, chk) {
+			inventoryChksum = chk
+			return false
+		}
+		return true
+	}
+	inventoryChksum, _ = connectors.Hashsum(inventory)
+	return false
+}
+
+func buildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
+	var inventoryResources []transit.InventoryResource
+	for _, resource := range *resources {
+		var inventoryServices []transit.InventoryService
+		for _, service := range resource.Services {
+			inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
+				service.Owner))
+		}
+
+		inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
+		inventoryStorage[inventoryResource.Name] = inventoryResource
+		inventoryResources = append(inventoryResources, inventoryResource)
+	}
+	return &inventoryResources
 }

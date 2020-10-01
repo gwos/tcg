@@ -25,9 +25,6 @@ const DefaultCheckInterval = time.Duration(2) * time.Minute
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
 
-var Inventory = make(map[string]transit.InventoryResource)
-var inventoryChksum []byte
-
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
 	/* grab CheckInterval from MonitorConnection extensions */
@@ -65,18 +62,18 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(resources []transit.MonitoredResource) error {
-	var b []byte
-	var err error
-	if services.GetTransitService().TelemetryProvider != nil {
-		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
-		_, span := tr.Start(context.Background(), "SendMetrics")
-		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(b))
-			span.End()
-		}()
-	}
+func SendMetrics(ctx context.Context, resources []transit.MonitoredResource) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendMetrics")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
+
 	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
@@ -84,41 +81,39 @@ func SendMetrics(resources []transit.MonitoredResource) error {
 	for i := range request.Resources {
 		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
 	}
-
 	b, err = json.Marshal(request)
 	if err != nil {
 		return err
 	}
-	return services.GetTransitService().SendResourceWithMetrics(b)
+	err = services.GetTransitService().SendResourceWithMetrics(ctxN, b)
+	return err
 }
 
 // SendInventory processes inventory payload
-func SendInventory(resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
-	var b []byte
-	var err error
-	if services.GetTransitService().TelemetryProvider != nil {
-		tr := services.GetTransitService().TelemetryProvider.Tracer("connectors")
-		_, span := tr.Start(context.Background(), "SendInventory")
-		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(b))
-			span.End()
-		}()
-	}
+func SendInventory(ctx context.Context, resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendInventory")
+	defer func() {
+		span.SetAttribute("error", err)
+		span.SetAttribute("payloadLen", len(b))
+		span.End()
+	}()
 
-	inventoryRequest := transit.InventoryRequest{
+	request := transit.InventoryRequest{
 		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
 		Resources:     resources,
 		Groups:        resourceGroups,
 	}
-
-	b, err = json.Marshal(inventoryRequest)
+	b, err = json.Marshal(request)
 	if err != nil {
 		return err
 	}
-
-	return services.GetTransitService().SynchronizeInventory(b)
+	err = services.GetTransitService().SynchronizeInventory(ctxN, b)
+	return err
 }
 
 // Inventory Constructors
@@ -191,6 +186,7 @@ type MetricBuilder struct {
 	StartTimestamp *milliseconds.MillisecondTimestamp
 	EndTimestamp   *milliseconds.MillisecondTimestamp
 	Graphed        bool
+	Tags           map[string]string
 }
 
 // Creates metric based on data provided with metricBuilder
@@ -208,6 +204,9 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
 		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
 			": either start time or end time is not provided")
+	}
+	if metricBuilder.Tags != nil && len(metricBuilder.Tags) != 0 {
+		args = append(args, metricBuilder.Tags)
 	}
 
 	metricName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -294,6 +293,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 			metric.Unit = arg.(transit.UnitType)
 		case *transit.TimeInterval:
 			metric.Interval = arg.(*transit.TimeInterval)
+		case map[string]string:
+			metric.Tags = arg.(map[string]string)
 		//case transit.MetricSampleType:
 		//	metric.SampleType = arg.(transit.MetricSampleType)
 		default:
@@ -483,36 +484,6 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 	return previousStatus, nil
 }
 
-func BuildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
-	var inventoryResources []transit.InventoryResource
-	for _, resource := range *resources {
-		var inventoryServices []transit.InventoryService
-		for _, service := range resource.Services {
-			inventoryServices = append(inventoryServices, CreateInventoryService(service.Name,
-				service.Owner))
-		}
-
-		inventoryResource := CreateInventoryResource(resource.Name, inventoryServices)
-		Inventory[inventoryResource.Name] = inventoryResource
-		inventoryResources = append(inventoryResources, inventoryResource)
-	}
-	return &inventoryResources
-}
-
-func ValidateInventory(inventory []transit.InventoryResource) bool {
-	if inventoryChksum != nil {
-		chk, err := Hashsum(inventory)
-		if err != nil || !bytes.Equal(inventoryChksum, chk) {
-			inventoryChksum = chk
-			return false
-		}
-		return true
-	} else {
-		inventoryChksum, _ = Hashsum(inventory)
-		return false
-	}
-}
-
 // Weight of Monitor Status for multi-state comparison
 var monitorStatusWeightService = map[transit.MonitorStatus]int{
 	transit.ServiceOk:                  0,
@@ -600,7 +571,7 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	return transit.ServiceOk
 }
 
-// EvaluateExpressions calcs synthetic metrics
+// EvaluateExpressions calculates synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
 	var result []transit.MonitoredService
 	vars := make(map[string]interface{})
@@ -630,7 +601,6 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Name:             result[i].Name,
 						Type:             transit.Service,
 						Owner:            result[i].Owner,
-						Status:           "SERVICE_OK",
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
 						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
 						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
@@ -650,6 +620,11 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 								},
 							},
 						},
+					}
+					status, err := CalculateServiceStatus(&result[i].Metrics)
+					result[i].Status = status
+					if err != nil {
+						log.Error(fmt.Sprintf("|connectors.go| : [EvaluateExpressions] : %s (default status - \"STATUS_OK\")", err))
 					}
 				}
 			}
@@ -711,7 +686,7 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 	handler := func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("[Recovered]", err)
+				log.Error("[Recovered]: ", err)
 			}
 		}()
 		fn()
