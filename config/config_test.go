@@ -1,35 +1,17 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
-	"reflect"
+	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 )
 
-func checkExpected(t *testing.T, expected *Config) {
-	t.Helper()
-
-	got := GetConfig()
-	if !reflect.DeepEqual(got.Connector, expected.Connector) {
-		t.Errorf("Connector got: %v, expected: %v", got.Connector, expected.Connector)
-	}
-	if !reflect.DeepEqual(got.DSConnection, expected.DSConnection) {
-		t.Errorf("DSConnection got: %v, expected: %v", got.DSConnection, expected.DSConnection)
-	}
-	if len(got.GWConnections) != len(expected.GWConnections) {
-		t.Errorf("GWConnections got: %v, expected: %v", len(got.GWConnections), len(expected.GWConnections))
-	}
-	for k, v := range got.GWConnections {
-		if !reflect.DeepEqual(v, expected.GWConnections[k]) {
-			t.Errorf("GWConnections key: %v, got: %v, expected: %v", k, v, expected.GWConnections[k])
-		}
-	}
-}
-
 func TestGetConfig(t *testing.T) {
+	once = sync.Once{}
 	configYAML := []byte(`
 connector:
   agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
@@ -60,6 +42,10 @@ gwConnections:
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
 	_ = os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	_ = os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
+	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
+	defer os.Unsetenv("TCG_DSCONNECTION")
+	defer os.Unsetenv("TCG_GWCONNECTIONS")
 
 	expected := &Config{
 		Connector: &Connector{
@@ -73,7 +59,6 @@ gwConnections:
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
 			NatsStoreType:    "MEMORY",
-			NatsHost:         "127.0.0.1:4222",
 		},
 		DSConnection: &DSConnection{"localhost:3001"},
 		GWConnections: GWConnections{
@@ -82,42 +67,54 @@ gwConnections:
 		},
 	}
 
-	checkExpected(t, expected)
+	cfg := GetConfig()
+	assert.Equal(t, *expected.Connector, *cfg.Connector)
+	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
+	assert.Equal(t, expected.GWConnections, cfg.GWConnections)
 }
 
 func TestLoadConnectorDTO(t *testing.T) {
+	once = sync.Once{}
+	configYAML := []byte(`
+connector:
+  agentId:
+  appName: "test-app"
+  appType: "test"
+  controllerAddr: ":8011"
+dsConnection:
+  hostName: "localhost"
+`)
+
 	tmpFile, err := ioutil.TempFile("", "config")
 	assert.NoError(t, err)
-	err = tmpFile.Close()
-	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
+	_, err = tmpFile.Write(configYAML)
+	assert.NoError(t, err)
+
 	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	_ = os.Setenv("TCG_CONNECTOR_CONTROLLERADDR", ":8022")
+	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv("TCG_CONNECTOR_CONTROLLERADDR")
 
 	expected := &Config{
 		Connector: &Connector{
-			AgentID:          "11112222-3333-4444-a3b0-b14622f7dd39",
+			AgentID:          "",
 			AppName:          "test-app",
 			AppType:          "test",
-			ControllerAddr:   "0.0.0.0:8099",
+			ControllerAddr:   ":8022",
 			LogConsPeriod:    0,
-			LogLevel:         0,
-			NatsAckWait:      15,
+			LogLevel:         1,
+			NatsAckWait:      30,
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
+			NatsStoreType:    "FILE",
 		},
-		DSConnection: &DSConnection{"localhost:3001"},
-		GWConnections: GWConnections{
-			&GWConnection{HostName: "gw-host1"},
-			&GWConnection{HostName: "gw-host2"},
-		},
+		DSConnection: &DSConnection{"localhost"},
 	}
-	cfg := GetConfig()
-	cfg.Connector = expected.Connector
-	cfg.GWConnections = expected.GWConnections
 
-	checkExpected(t, expected)
+	cfg := GetConfig()
+	assert.Equal(t, *expected.Connector, *cfg.Connector)
+	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
 
 	dto := []byte(`
 {
@@ -154,14 +151,13 @@ func TestLoadConnectorDTO(t *testing.T) {
 			AgentID:          "99998888-7777-6666-a3b0-b14622f7dd39",
 			AppName:          "test-app-XX",
 			AppType:          "test-XX",
-			ControllerAddr:   "0.0.0.0:8099",
+			ControllerAddr:   ":8022",
 			LogConsPeriod:    30,
 			LogLevel:         2,
-			NatsAckWait:      15,
+			NatsAckWait:      30,
 			NatsMaxInflight:  2147483647,
 			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "MEMORY",
-			NatsHost:         ":4222",
+			NatsStoreType:    "FILE",
 		},
 		DSConnection: &DSConnection{"gw-host-xxx"},
 		GWConnections: GWConnections{
@@ -178,12 +174,13 @@ func TestLoadConnectorDTO(t *testing.T) {
 		},
 	}
 
-	checkExpected(t, expected)
-	// ss, err := json.Marshal(GetConfig())
-	// t.Logf("%v", ss)
+	assert.Equal(t, *expected.Connector, *cfg.Connector)
+	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
+	assert.Equal(t, expected.GWConnections, cfg.GWConnections)
 
 	data, err := ioutil.ReadFile(tmpFile.Name())
 	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
+	assert.Contains(t, string(data), "controllerAddr: :8011")
 }
 
 func TestMarshaling(t *testing.T) {

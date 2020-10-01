@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
@@ -12,7 +13,6 @@ import (
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -33,6 +33,8 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
+
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -67,7 +69,7 @@ func configHandler(data []byte) {
 		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
 		return
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 
 	chk, err := connectors.Hashsum(extConfig)
@@ -96,24 +98,49 @@ func taskHandler(task ScheduleTask) func() {
 		cmd := exec.Command(task.Command[0], task.Command[1:]...)
 		cmd.Env = task.Environment
 		var (
-			handler func() ([]byte, error)
-			err     error
-			res     []byte
+			handler     func() ([]byte, error)
+			err         error
+			res         []byte
+			span, spanN services.TraceSpan
+			ctx, ctxN   context.Context
 		)
 		if task.CombinedOutput {
 			handler = cmd.CombinedOutput
 		} else {
 			handler = cmd.Output
 		}
+
+		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
+		defer func() {
+			span.SetAttribute("error", err)
+			span.SetAttribute("payloadLen", len(res))
+			span.SetAttribute("task", task)
+			span.End()
+		}()
+		_, spanN = services.StartTraceSpan(ctx, "connectors", "command")
+
 		res, err = handler()
+
+		spanN.SetAttribute("error", err)
+		spanN.SetAttribute("payloadLen", len(res))
+		spanN.SetAttribute("command", task.Command)
+		spanN.End()
+
 		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
 		if err != nil {
 			logEntry.Warn("[Checker Connector]: Error running command:", err.Error())
 			return
 		}
 		logEntry.Debug("[Checker Connector]: Success in command execution")
-		if err = processMetrics(res, NSCA); err != nil {
+
+		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
+
+		if _, err = processMetrics(ctxN, res, task.DataFormat, task.ForceInventory); err != nil {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
+
+		spanN.SetAttribute("error", err)
+		spanN.SetAttribute("payloadLen", len(res))
+		spanN.End()
 	}
 }

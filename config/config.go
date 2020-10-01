@@ -18,6 +18,9 @@ import (
 	"sync"
 )
 
+// Variables to control the build info
+// can be overridden by Go linker during the build step:
+// go build -ldflags "-X 'github.com/gwos/tcg/config.buildTag=<TAG>' -X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`'"
 var (
 	buildTag  = "8.x.x"
 	buildTime = "Build time not provided"
@@ -97,9 +100,6 @@ type Connector struct {
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
-	// NatsHost accepts value for combined "host:port"
-	// used as `strings.Split(natsHost, ":")`
-	NatsHost string `yaml:"natsHost"`
 	// LogConsPeriod accepts number of seconds
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
@@ -284,36 +284,29 @@ type Config struct {
 	Jaegertracing *Jaegertracing `yaml:"jaegertracing"`
 }
 
+func defaults() Config {
+	return Config{
+		Connector: &Connector{
+			ControllerAddr:   ":8099",
+			LogConsPeriod:    0,
+			LogLevel:         1,
+			NatsAckWait:      30,
+			NatsMaxInflight:  math.MaxInt32,
+			NatsFilestoreDir: "natsstore",
+			NatsStoreType:    "FILE",
+		},
+		DSConnection:  &DSConnection{},
+		Jaegertracing: &Jaegertracing{},
+	}
+}
+
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
-		// set defaults
-		cfg = &Config{
-			Connector: &Connector{
-				ControllerAddr:   ":8099",
-				LogConsPeriod:    0,
-				LogLevel:         1,
-				NatsAckWait:      30,
-				NatsMaxInflight:  math.MaxInt32,
-				NatsFilestoreDir: "natsstore",
-				NatsStoreType:    "FILE",
-				NatsHost:         "127.0.0.1:4222",
-			},
-			DSConnection:  &DSConnection{},
-			Jaegertracing: &Jaegertracing{},
-		}
+		c := defaults()
+		cfg = &c
 
-		configPath := os.Getenv(string(ConfigEnv))
-		if configPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				log.Warn(err)
-				wd = ""
-			}
-			configPath = path.Join(wd, ConfigName)
-		}
-
-		if data, err := ioutil.ReadFile(configPath); err != nil {
+		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
 			log.Warn(err)
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -329,6 +322,19 @@ func GetConfig() *Config {
 		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
 	})
 	return cfg
+}
+
+func (cfg Config) configPath() string {
+	configPath := os.Getenv(string(ConfigEnv))
+	if configPath == "" {
+		wd, err := os.Getwd()
+		if err != nil {
+			log.Warn(err)
+			wd = ""
+		}
+		configPath = path.Join(wd, ConfigName)
+	}
+	return configPath
 }
 
 func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
@@ -378,38 +384,49 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
+	c := defaults()
+	newCfg := &c
+	/* load config file */
+	if data, err := ioutil.ReadFile(newCfg.configPath()); err != nil {
+		log.Warn(err)
+	} else {
+		if err := yaml.Unmarshal(data, newCfg); err != nil {
+			log.Warn(err)
+		}
+	}
 	/* load as ConnectorDTO */
-	dto, err := cfg.loadConnector(data)
+	dto, err := newCfg.loadConnector(data)
 	if err != nil {
 		return nil, err
 	}
 	/* load as struct with advanced prefixes field */
-	if err := cfg.loadAdvancedPrefixes(data); err != nil {
+	if err := newCfg.loadAdvancedPrefixes(data); err != nil {
 		return nil, err
 	}
-
-	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
-
-	if cfg.IsConfiguringPMC() {
-		cfg.Connector.InstallationMode = InstallationModePMC
-	}
-
-	if output, err := yaml.Marshal(cfg); err != nil {
+	/* override config file */
+	if output, err := yaml.Marshal(newCfg); err != nil {
 		log.Warn(err)
 	} else {
-		configPath := os.Getenv(string(ConfigEnv))
-		if configPath == "" {
-			wd, err := os.Getwd()
-			if err != nil {
-				log.Warn(err)
-				wd = ""
-			}
-			configPath = path.Join(wd, ConfigName)
-		}
-		if err := ioutil.WriteFile(configPath, output, 0644); err != nil {
+		if err := ioutil.WriteFile(newCfg.configPath(), output, 0644); err != nil {
 			log.Warn(err)
 		}
 	}
+	/* load environment */
+	if err := envconfig.Process(EnvConfigPrefix, newCfg); err != nil {
+		log.Warn(err)
+	}
+	/* process PMC */
+	if cfg.IsConfiguringPMC() {
+		newCfg.Connector.InstallationMode = InstallationModePMC
+	}
+	/* update config */
+	*cfg.Connector = *newCfg.Connector
+	*cfg.DSConnection = *newCfg.DSConnection
+	*cfg.Jaegertracing = *newCfg.Jaegertracing
+	cfg.GWConnections = newCfg.GWConnections
+
+	/* update logger */
+	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
 
 	return dto, nil
 }

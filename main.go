@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
-	"math/rand"
-	"time"
 )
 
 //////////////////////////////////////////////////////////
@@ -88,7 +90,7 @@ func main() {
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if enableTransit {
-		connectors.SendMetrics([]transit.MonitoredResource{*resource1, *resource2})
+		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2})
 	}
 }
 
