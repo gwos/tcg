@@ -36,7 +36,7 @@ type Entrypoint struct {
 	Handler func(c *gin.Context)
 }
 
-const shutdownTimeout = 5 * time.Second
+const shutdownTimeout = 500 * time.Millisecond
 
 var onceController sync.Once
 var controller *Controller
@@ -207,14 +207,9 @@ func (controller *Controller) stopController() error {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Error("[Controller]: Shutdown error:", err)
+		log.Warn("[Controller]: Shutdown:", err)
 	}
-	// catching ctx.Done() timeout
-	select {
-	case <-ctx.Done():
-		log.Warn("[Controller]: Shutdown: timeout")
-	}
-	log.Warn("[Controller]: Exiting")
+	log.Info("[Controller]: Exiting")
 	controller.srv = nil
 	return nil
 }
