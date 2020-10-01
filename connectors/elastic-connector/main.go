@@ -174,7 +174,7 @@ func periodicHandler() {
 		}
 
 		log.Info("[Elastic Connector]: Monitoring resources ...")
-		err := connectors.SendMetrics(context.Background(), metrics)
+		err := connectors.SendMetrics(context.Background(), metrics, nil)
 		if err != nil {
 			log.Error("[Elastic Connector]: ", err.Error())
 		}

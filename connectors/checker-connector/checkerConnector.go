@@ -120,7 +120,7 @@ func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) 
 		return nil, err
 	}
 
-	if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
+	if err := connectors.SendMetrics(ctxN, *monitoredResources, nil); err != nil {
 		return nil, err
 	}
 

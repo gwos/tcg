@@ -674,6 +674,7 @@ func (resourceGroup ResourceGroup) String() string {
 type ResourcesWithServicesRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
+	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
 func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
