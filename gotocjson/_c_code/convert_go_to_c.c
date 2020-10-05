@@ -1,9 +1,10 @@
 // Code that is used during conversion of Go types, enumerations, and
 // data structures, but is not specific to any one generated package.
 
-#include <string.h>	// for strcmp()
+#include <string.h>	// for strcmp() and strlen()
 #include <inttypes.h>	// for PRId64
 #include <errno.h>	// for errno
+#include <stdio.h>	// for &fprintf, stderr, and the like
 
 #include "convert_go_to_c.h"
 
@@ -57,8 +58,8 @@ string JSON_as_str(json_t *json, size_t flags) {
 	flags = JSON_INDENT(4) | JSON_ENSURE_ASCII;
     }
     if (json == NULL) {
-	// FIX MAJOR:  this message is just for development use, to track down the true source of failure
-	printf(FILE_LINE "in JSON_as_str, received a NULL pointer\n");
+	// FIX MINOR:  This message is mostly for development use, to track down the true source of failure.
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "in JSON_as_str, received a NULL pointer\n");
 	result = NULL;
     }
     else {
@@ -196,8 +197,7 @@ json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *struct_timespec) 
 	 , (struct_timespec ? string_milliseconds_timestamp : NULL) 
     );
     if (json == NULL) {
-	// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
-	fprintf(stderr,
+	(*external_logging_function)(external_logging_first_arg,
 	    FILE_LINE "ERROR:  in struct_timespec_ptr_as_JSON_ptr, JSON packing failed:  text '%s', source '%s', line %d, column %d, position %d\n",
 	    error.text, error.source, error.line, error.column, error.position);
     }
@@ -209,8 +209,7 @@ json_t *struct_timespec_ptr_as_JSON_ptr(const struct_timespec *struct_timespec) 
 struct_timespec *JSON_as_struct_timespec(json_t *json) {
     struct_timespec *timespec = (struct_timespec *)malloc(sizeof(struct_timespec));
     if (!timespec) {
-	// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "malloc failed");
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_struct_timespec, %s\n", "malloc failed");
     } else {
 	int failed = 0;
 	json_error_t error;
@@ -224,14 +223,13 @@ struct_timespec *JSON_as_struct_timespec(json_t *json) {
 	if (json_unpack_ex(json, &error, flags, "s"
 	    , &string_milliseconds_timestamp
 	) != 0) {
-	    // FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
-	    fprintf(stderr,
+	    (*external_logging_function)(external_logging_first_arg,
 		FILE_LINE "ERROR:  in JSON_as_struct_timespec, JSON unpacking failed:  text '%s', source '%s', line %d, column %d, position %d\n",
 		error.text, error.source, error.line, error.column, error.position);
 	    failed = 1;
 	} else if (string_milliseconds_timestamp == NULL) {
-	    // FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, found a non-string, so could not convert to a number");
+	    (*external_logging_function)(external_logging_first_arg,
+		FILE_LINE "ERROR:  in JSON_as_struct_timespec, found a non-string, so could not convert to a number");
 	    failed = 1;
 	} else {
 	    char *endptr;
@@ -246,8 +244,8 @@ struct_timespec *JSON_as_struct_timespec(json_t *json) {
 	    if (errno) {
 		// We don't bother to try to diagnose the specific failure; it should suffice to print the
 		// string value under consideration and allow a human to identify the likely problem.
-		// FIX MAJOR:  invoke proper logging for error conditions, integrated with application logging
-		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_struct_timespec, conversion of \"%s\" to a number failed", string_milliseconds_timestamp);
+		(*external_logging_function)(external_logging_first_arg,
+		    FILE_LINE "ERROR:  in JSON_as_struct_timespec, conversion of \"%s\" to a number failed", string_milliseconds_timestamp);
 		failed = 1;
 	    }
 	    else {
@@ -268,3 +266,379 @@ void free_JSON(json_t *json) {
 	json_decref(json);
     }
 }
+
+// A future version of this library might use the iconv library to be more general.
+// We have designed the API to the routines we supply here so that could be a seamless
+// transition if we do need to support character encodings other than ISO-8859-1 at
+// some point in the future.  The reason we're not using libiconv in this first pass
+// is because the iconv doc says it could be unnecessarily slow using the default
+// available modules, and we have not yet written a module that would do direct
+// conversions for the encodings we are most likely to care about.  If we do use
+// libiconv at some future time, the simple conversion routines here could form the
+// basis for a module which would play nice in the libiconv context, removing the
+// worry about performance for the conversions we most expect to use.
+
+int C_strings_use_utf8 = 0;
+static char *C_string_encoding = NULL;
+
+static char * string_conversion_buffer = NULL;
+static size_t string_conversion_buffer_len = 0;
+
+int string_is_ascii(char *c_string) {
+    unsigned char *ch = (unsigned char *) c_string;
+    while (*ch && *ch <= '\x7F') {
+	++ch;
+    }
+    return (*ch ? 0 : 1);
+}
+
+int set_C_string_encoding(char *encoding) {
+    free(C_string_encoding);
+    C_string_encoding = strdup(encoding);
+    if (C_string_encoding == NULL) {
+	C_strings_use_utf8  = 0;
+        return -1;
+    }
+    C_strings_use_utf8 = !strcmp(C_string_encoding, "UTF-8") || !strcmp(C_string_encoding, "UTF8");;
+    return 0;
+}
+
+// See https://www.utf8-chartable.de/unicode-utf8-table.pl for a table of character
+// encodings between ISO-8859-1 and UTF-8.  Strangely, that table is hard to find
+// in its fully expanded form on the Internet.  Those are the transformations we
+// carry out here.
+
+// At present, this routine mostly ignores the C_string_encoding and just converts
+// ISO-8859-1 to UTF-8.  We may generalize our support for encodings in the future.
+char *C_string_to_UTF_8(char *c_string) {
+    // Despite our not otherwise using the C_string_encoding, we insist that it be
+    // set by the application to prepare in advance for any future generalization.
+    if (C_string_encoding == NULL) {
+        return NULL;
+    }
+    // We don't bother to check the boolean C_strings_use_utf8 flag here.  Instead,
+    // we assume the data-conversion routines have checked that themselves before
+    // deciding they need to call this function.
+
+    // ISO-8859-1 => UTF-8 character conversions:
+    //
+    // 0x00 .. 0x7F => 0x00      .. 0x7F
+    // 0x80 .. 0xBF => 0xC2 0x80 .. 0xC2 0xBF
+    // 0xC0 .. 0xFF => 0xC3 0x80 .. 0xC3 0xBF
+
+    // We make our temporary buffer just over twice as long as the input string,
+    // to allow for maximal expansion of an ISO-8859-1 string to the UTF-8 form.
+    size_t string_len = strlen(c_string);
+    size_t need_buffer_len = string_len * 2 + NUL_TERM_LEN;
+    if (string_conversion_buffer_len < need_buffer_len) {
+        char *new_buffer = realloc(string_conversion_buffer, need_buffer_len);
+	if (new_buffer == NULL) {
+	    // The old buffer has not been freed, so we don't want to assign the
+	    // new_buffer pointer to string_conversion_buffer right now.  But at
+	    // the same time, we might not have enough memory for the converted
+	    // string to fit.  So we must declare defeat, and allow the calling
+	    // application to deal with that.
+	    return NULL;
+	}
+	else {
+	    string_conversion_buffer = new_buffer;
+	    string_conversion_buffer_len = need_buffer_len;
+	}
+    }
+
+    unsigned char *in_byte  = (unsigned char *) c_string;
+    unsigned char *out_byte = (unsigned char *) string_conversion_buffer;
+    do {
+        if (*in_byte < 0x0080) {
+	    *out_byte++ = *in_byte;
+	}
+	else {
+	    // See the chart below for these transforms.
+	    *out_byte++ = '\xC0' | (*in_byte >> 6);
+	    *out_byte++ = '\x80' | (*in_byte & '\x3F');
+	}
+    } while (*in_byte++);
+    return string_conversion_buffer;
+}
+
+// The UTF_8_to_C_string() routine is fine as it stands, but in practice for
+// the Go-to-C conversions we might need, an in-place conversion from UTF-8
+// to ISO-8859-1 within the passed input string is probably easier to handle
+// from a memory-management and less-copying point of view.  So it is unlikely
+// that we will actually use the UTF_8_to_C_string() routine.  Instead, the
+// UTF_8_to_C_string_in_place() routine is more likely to be used.
+
+// At present, this routine mostly ignores the C_string_encoding and just converts
+// UTF-8 to ISO-8859-1.  We may generalize our support for encodings in the future.
+char *UTF_8_to_C_string(char *utf_8_string) {
+    // Despite our not otherwise using the C_string_encoding, we insist that it be
+    // set by the application to prepare in advance for any future generalization.
+    if (C_string_encoding == NULL) {
+        return NULL;
+    }
+    // We don't bother to check the boolean C_strings_use_utf8 flag here.  Instead,
+    // we assume the data-conversion routines have checked that themselves before
+    // deciding they need to call this function.
+
+    // UTF-8 character conversions:
+    //
+    // 0x00      .. 0x7F      => 0x00 .. 0x7F
+    // 0xC2 0x80 .. 0xC2 0xBF => 0x80 .. 0xBF
+    // 0xC3 0x80 .. 0xC3 0xBF => 0xC0 .. 0xFF
+    //
+    // For good measure, just to cover all bases, any other UTF-8 character will be
+    // translated into 0x3F (a "?" character), just to make the unexpected character
+    // visible.  Logically, we could have used the ASCII SUB control character, but
+    // as a control character, it likely would not be visible in many contexts,
+    // making it that much harder to identify problems should they occur.
+
+    // We assume the UTF-8 input string is NUL-terminated, just like an ordinary
+    // ASCII or ISO-8859-1 C string would be.
+    size_t buffer_len = strlen(utf_8_string);
+    size_t need_buffer_len = buffer_len + NUL_TERM_LEN;
+    if (string_conversion_buffer_len < need_buffer_len) {
+        char *new_buffer = realloc(string_conversion_buffer, need_buffer_len);
+	if (new_buffer == NULL) {
+	    // The old buffer has not been freed, so we don't want to assign the
+	    // new_buffer pointer to string_conversion_buffer right now.  But at
+	    // the same time, we might not have enough memory for the converted
+	    // string to fit.  So we must declare defeat, and allow the calling
+	    // application to deal with that.
+	    return NULL;
+	}
+	else {
+	    string_conversion_buffer = new_buffer;
+	    string_conversion_buffer_len = need_buffer_len;
+	}
+    }
+
+    // A proper UTF-8 decoder, which is what we ought to be implementing here,
+    // has to cope not just with actual UTF-8 encoded characters, but also with
+    // the possibility that it might receive byte sequences that are not valid
+    // UTF-8, and so should not be blindly decoded.  See for example:
+    //
+    //     https://en.wikipedia.org/wiki/UTF-8#Overlong_encodings
+    //     https://en.wikipedia.org/wiki/UTF-8#Invalid_sequences_and_error_handling
+    //
+    // As a simple example of an overlong encoding, a 0xC0 or 0xC1 byte followed
+    // by a byte with the high two bits being 10 could in theory be used as an
+    // alternate form of a simple ASCII character in the range 0x00 through 0x7F.
+    // But the rule allowing only the shortest possible encoding rules that out.
+    // So if we do encounter some invalid encoding, we must reject it as best we
+    // can, and do whatever we can to resynchronize the byte stream to the start
+    // of the next valid UTF-8 codepoint.
+    unsigned char *in_byte  = (unsigned char *) utf_8_string;
+    unsigned char *out_byte = (unsigned char *) string_conversion_buffer;
+    do {
+        if (*in_byte < 0x0080) {
+	    *out_byte++ = *in_byte;
+	}
+	else if (*in_byte == '\xC2') {
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    if ((*++in_byte & 0x00C0) == 0x0080) {
+		// This is a very special case, in which no bit masking or shifting
+		// is needed to transform the input byte to the output byte.
+		*out_byte++ = *in_byte;
+	    }
+	    else {
+		// The initial byte of a two-byte sequence was not followed by a valid
+		// next-byte.  So we don't try to decode that sequence as such; we just
+		// ignore that initial byte.  To give some downstream indication that we
+		// had a problem, we do plant our substitution character in place of the
+		// bad decoding.  There is no harm in doing so, because we know that our
+		// output buffer is long enough to hold this byte.
+		*out_byte++ = '?';
+		--in_byte;
+	    }
+	}
+	else if (*in_byte == '\xC3') {
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    if ((*++in_byte & 0x00C0) == 0x0080) {
+		// In this rather special case, no bit shifting is needed to transform
+		// the input byte to the output byte; only one more bit must be set.
+		*out_byte++ = *in_byte | '\x40';
+	    }
+	    else {
+		// See above for our handling of this invalid byte sequence.
+		*out_byte++ = '?';
+		--in_byte;
+	    }
+	}
+	else {
+	    // Assuming we got in a good UTF-8 string, just not one containing
+	    // only codepoints in the ISO-8859-1 character set, we will at this
+	    // point have two or more bytes to consume in the input string to
+	    // properly sync with codepoint boundaries.
+	    //
+	    // Code Point (hex)    UTF-8 Bytes (binary)
+	    // ------------------  -----------------------------------------------------
+	    // 00000000..0000007F  0xxxxxxx
+	    // 00000080..000007FF  110xxxxx 10xxxxxx
+	    // 00000800..0000FFFF  1110xxxx 10xxxxxx 10xxxxxx
+	    // 00010000..001FFFFF  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    // 00200000..003FFFFF  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    // 04000000..7FFFFFFF  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    //
+	    // As it happens, our simple algorithm here should also correctly clean up
+	    // any malformed byte sequences as well.  It will swallow overlong encodings,
+	    // too-short encodings, and any extra unexpected continuation bytes regardless
+	    // of what the leading byte was, producing only one output substitution
+	    // character for the entire sequence, good or bad.
+	    //
+	    *out_byte++ = '?';
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    while ((*++in_byte & 0x00C0) == 0x0080) {
+	        // do nothing
+	    }
+	    --in_byte;
+	}
+    } while (*in_byte++);
+    return string_conversion_buffer;
+}
+
+int UTF_8_to_C_string_in_place(char *utf_8_string) {
+    int bad_conversion = 0;
+
+    // In this routine, we don't bother to check either the C_string_encoding setup
+    // or the boolean C_strings_use_utf8 flag here.  Instead, we assume the overall
+    // application and the data-conversion routines that will call this function
+    // have properly initialized the system and checked that flag themselves before
+    // deciding that this function must be called.
+
+    // UTF-8 character conversions:
+    //
+    // 0x00      .. 0x7F      => 0x00 .. 0x7F
+    // 0xC2 0x80 .. 0xC2 0xBF => 0x80 .. 0xBF
+    // 0xC3 0x80 .. 0xC3 0xBF => 0xC0 .. 0xFF
+    //
+    // For good measure, just to cover all bases, any other UTF-8 character will be
+    // translated into 0x3F (a "?" character), just to make the unexpected character
+    // visible.  Logically, we could have used the ASCII SUB control character, but
+    // as a control character, it likely would not be visible in many contexts,
+    // making it that much harder to identify problems should they occur.
+
+    // We assume the UTF-8 input string is NUL-terminated, just like an ordinary
+    // ASCII or ISO-8859-1 C string would be.
+
+    // A proper UTF-8 decoder, which is what we ought to be implementing here,
+    // has to cope not just with actual UTF-8 encoded characters, but also with
+    // the possibility that it might receive byte sequences that are not valid
+    // UTF-8, and so should not be blindly decoded.  See for example:
+    //
+    //     https://en.wikipedia.org/wiki/UTF-8#Overlong_encodings
+    //     https://en.wikipedia.org/wiki/UTF-8#Invalid_sequences_and_error_handling
+    //
+    // As a simple example of an overlong encoding, a 0xC0 or 0xC1 byte followed
+    // by a byte with the high two bits being 10 could in theory be used as an
+    // alternate form of a simple ASCII character in the range 0x00 through 0x7F.
+    // But the rule allowing only the shortest possible encoding rules that out.
+    // So if we do encounter some invalid encoding, we must reject it as best we
+    // can, and do whatever we can to resynchronize the byte stream to the start
+    // of the next valid UTF-8 codepoint.
+    unsigned char *in_byte  = (unsigned char *) utf_8_string;
+    unsigned char *out_byte = (unsigned char *) utf_8_string;
+    do {
+        if (*in_byte < 0x0080) {
+	    *out_byte++ = *in_byte;
+	}
+	else if (*in_byte == '\xC2') {
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    if ((*++in_byte & 0x00C0) == 0x0080) {
+		// This is a very special case, in which no bit masking or shifting
+		// is needed to transform the input byte to the output byte.
+		*out_byte++ = *in_byte;
+	    }
+	    else {
+		// The initial byte of a two-byte sequence was not followed by a valid
+		// next-byte.  So we don't try to decode that sequence as such; we just
+		// ignore that initial byte.  To give some downstream indication that we
+		// had a problem, we do plant our substitution character in place of the
+		// bad decoding.  There is no harm in doing so, because we know that our
+		// output buffer is long enough to hold this byte.
+		bad_conversion = 1;
+		*out_byte++ = '?';
+		--in_byte;
+	    }
+	}
+	else if (*in_byte == '\xC3') {
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    if ((*++in_byte & 0x00C0) == 0x0080) {
+		// In this rather special case, no bit shifting is needed to transform
+		// the input byte to the output byte; only one more bit must be set.
+		*out_byte++ = *in_byte | '\x40';
+	    }
+	    else {
+		// See above for our handling of this invalid byte sequence.
+		bad_conversion = 1;
+		*out_byte++ = '?';
+		--in_byte;
+	    }
+	}
+	else {
+	    // Assuming we got in a good UTF-8 string, just not one containing
+	    // only codepoints in the ISO-8859-1 character set, we will at this
+	    // point have two or more bytes to consume in the input string to
+	    // properly sync with codepoint boundaries.
+	    //
+	    // Code Point (hex)    UTF-8 Bytes (binary)
+	    // ------------------  -----------------------------------------------------
+	    // 00000000..0000007F  0xxxxxxx
+	    // 00000080..000007FF  110xxxxx 10xxxxxx
+	    // 00000800..0000FFFF  1110xxxx 10xxxxxx 10xxxxxx
+	    // 00010000..001FFFFF  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    // 00200000..003FFFFF  111110xx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    // 04000000..7FFFFFFF  1111110x 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx 10xxxxxx
+	    //
+	    // As it happens, our simple algorithm here should also correctly clean up
+	    // any malformed byte sequences as well.  It will swallow overlong encodings,
+	    // too-short encodings, and any extra unexpected continuation bytes regardless
+	    // of what the leading byte was, producing only one output substitution
+	    // character for the entire sequence, good or bad.
+	    //
+	    bad_conversion = 1;
+	    *out_byte++ = '?';
+	    // We express the mask and comparison values as numbers with leading
+	    // zeroes, to avoid any unintended sign extension.
+	    while ((*++in_byte & 0x00C0) == 0x0080) {
+	        // do nothing
+	    }
+	    --in_byte;
+	}
+    } while (*in_byte++);
+    return (bad_conversion ? -1 : (out_byte - (unsigned char *) utf_8_string));
+}
+
+void (*external_logging_function)(void *arg, const char *format_string, ...) = NULL;
+void *external_logging_first_arg = NULL;
+
+int register_logging_callback(void (*logging_function)(void *arg, const char *format_string, ...), void *actual_arg) {
+    if (logging_function) {
+        external_logging_function = logging_function;
+	external_logging_first_arg = actual_arg;
+	return 0;
+    }
+    return -1;
+}
+
+void initialize_data_conversions() {
+    set_C_string_encoding("ISO-8859-1");
+
+    //
+    // Actual definitions of safe initial values.
+    //
+    //     int fprintf (FILE *__restrict __stream, const char *__restrict __format, ...);
+    //     FILE *stderr;
+    //
+    register_logging_callback( ( void (*)(void *arg, const char *format_string, ...) ) &fprintf, stderr );
+}
+
+void terminate_data_conversions() {
+    // This routine is defined mostly to provide a place to run iconv_close() if need be
+    // in the future.  At present, there are no cleanup actions to take.
+}
+
