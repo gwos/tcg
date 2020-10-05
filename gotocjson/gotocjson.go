@@ -1652,9 +1652,6 @@ var C_code_boilerplate = `//
 {{.OtherHeaders}}
 #include "{{.HeaderFilename}}"
 
-// FIX MAJOR:  Also include in here some initialization of the conversion library,
-// so we can pass our logger to the package and have it use that for all error logging.
-
 `
 
 func print_type_declarations(
@@ -2599,7 +2596,7 @@ func generate_decode_pointer_list_tree(
 %[1]s_Ptr_List *JSON_as_%[1]s_Ptr_List_ptr(json_t *json) {
     %[1]s_Ptr_List *%[1]s_Ptr_List_ptr = (%[1]s_Ptr_List *) calloc(1, sizeof(%[1]s_Ptr_List));
     if (%[1]s_Ptr_List_ptr == NULL) {
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List_ptr, %%s\n", "malloc failed");
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List_ptr, %%s\n", "malloc failed");
     } else {
 	int failed = 0;
 	%[1]s_Ptr_List_ptr->count = json_array_size(json);
@@ -2609,7 +2606,8 @@ func generate_decode_pointer_list_tree(
 	json_array_foreach(json, index, value) {
 	    %[1]s *%[1]s_ptr = JSON_as_%[1]s_ptr(value);
 	    if (%[1]s_ptr == NULL) {
-		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List_ptr, %%s\n", "transit_TypedValue_ptr is NULL");
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_Ptr_List_ptr, %%s\n",
+		    "transit_TypedValue_ptr is NULL");
 		failed = 1;
 		break;
 	    } else {
@@ -2641,7 +2639,7 @@ func generate_decode_simple_list_tree(
 %[1]s_List *JSON_as_%[1]s_List_ptr(json_t *json) {
     %[1]s_List *%[1]s_List_ptr = (%[1]s_List *) calloc(1, sizeof(%[1]s_List));
     if (%[1]s_List_ptr == NULL) {
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_List_ptr, %%s\n", "malloc failed");
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_List_ptr, %%s\n", "malloc failed");
     } else {
 	int failed = 0;
 	%[1]s_List_ptr->count = json_array_size(json);
@@ -2651,7 +2649,8 @@ func generate_decode_simple_list_tree(
 	json_array_foreach(json, index, value) {
 	    %[1]s *%[1]s_ptr = JSON_as_%[1]s_ptr(value);
 	    if (%[1]s_ptr == NULL) {
-		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_List_ptr, %%s\n", "transit_TypedValue_ptr is NULL");
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_List_ptr, %%s\n",
+		    "transit_TypedValue_ptr is NULL");
 		failed = 1;
 		break;
 	    } else {
@@ -2835,7 +2834,8 @@ func generate_encode_list_tree(base_type string) (function_code string, err erro
 	       } else {
 	   	json = json_array();
 	   	if (json == NULL) {
-	   	    printf(FILE_LINE "ERROR:  cannot create a JSON %s object\n", "transit_MonitoredResource_List");
+	   	    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot create a JSON %s object\n",
+	   		"transit_MonitoredResource_List");
 	   	} else {
 	   	    for (size_t i = 0; i < transit_MonitoredResource_List->count; ++i) {
 	   		if (json_array_append_new(json,
@@ -2855,7 +2855,8 @@ func generate_encode_list_tree(base_type string) (function_code string, err erro
 	   		    // A future version might print at least the failing key, if not also the failing value (which
 	   		    // could be of some complicated type).
 	   		    //
-	   		    printf(FILE_LINE "ERROR:  cannot append an element to a JSON %s array\n", "transit_MonitoredResource_List");
+	   		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot append an element to a JSON %s array\n",
+	   			"transit_MonitoredResource_List");
 	   		    json_array_clear(json);
 	   		    json_decref(json);
 	   		    json = NULL;
@@ -2881,12 +2882,20 @@ json_t *{{.ListType}}_ptr_as_JSON_ptr(const {{.ListType}} *{{.ListType}}_ptr) {
     } else {
 	json = json_array();
 	if (json == NULL) {
-	    printf(FILE_LINE "ERROR:  cannot create a JSON %s object\n", "{{.ListType}}");
+	    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot create a JSON %s object\n", "{{.ListType}}");
 	} else {
 	    for (size_t i = 0; i < {{.ListType}}_ptr->count; ++i) {
-		if (json_array_append_new(json,
-		    {{.BaseType}}_ptr_as_JSON_ptr( &{{.ListType}}_ptr->items[i] ) // {{.BaseType}}*
-		) != 0) {
+		json_t *json_obj = {{.BaseType}}_ptr_as_JSON_ptr( &{{.ListType}}_ptr->items[i] ); // {{.BaseType}}*
+		if (json_obj == NULL) {
+		    (*external_logging_function)(external_logging_first_arg,
+			FILE_LINE "ERROR:  intended value for JSON %s array element was generated as NULL; cannot append that value to the array\n",
+			"{{.ListType}}");
+		    json_array_clear(json);
+		    json_decref(json);
+		    json = NULL;
+		    break;
+		}
+		if (json_array_append_new(json, json_obj) != 0) {
 		    //
 		    // Report and handle the error condition.  Unfortunately, there is no json_error_t value to
 		    // look at, to determine the exact cause.  Also, be aware that we might now have a memory leak.
@@ -2901,7 +2910,8 @@ json_t *{{.ListType}}_ptr_as_JSON_ptr(const {{.ListType}} *{{.ListType}}_ptr) {
 		    // A future version might print at least the failing key, if not also the failing value (which
 		    // could be of some complicated type).
 		    //
-		    printf(FILE_LINE "ERROR:  cannot append an element to a JSON %s array\n", "{{.ListType}}");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot append an element to a JSON %s array\n",
+			"{{.ListType}}");
 		    json_array_clear(json);
 		    json_decref(json);
 		    json = NULL;
@@ -2955,7 +2965,8 @@ func generate_encode_key_value_pair_tree(key_type string, value_type string) (fu
 	       } else {
 	   	json = json_object();
 	   	if (json == NULL) {
-	   	    printf(FILE_LINE "ERROR:  cannot create a JSON %s object\n", "string_transit_TypedValue_Pair_List");
+	   	    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot create a JSON %s object\n",
+	   		"string_transit_TypedValue_Pair_List");
 	   	} else {
 	   	    for (size_t i = 0; i < string_transit_TypedValue_Pair_List_ptr->count; ++i) {
 	   		if (json_object_set_new(json
@@ -2976,7 +2987,8 @@ func generate_encode_key_value_pair_tree(key_type string, value_type string) (fu
 	   		    // A future version might print at least the failing key, if not also the failing value (which
 	   		    // could be of some complicated type).
 	   		    //
-	   		    printf(FILE_LINE "ERROR:  cannot set a key/value pair in a JSON %s object\n", "string_transit_TypedValue_Pair_List");
+	   		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot set a key/value pair in a JSON %s object\n",
+	   			"string_transit_TypedValue_Pair_List");
 	   		    json_object_clear(json);
 	   		    json_decref(json);
 	   		    json = NULL;
@@ -3003,12 +3015,22 @@ json_t *{{.PairListType}}_ptr_as_JSON_ptr(const {{.PairListType}} *{{.PairListTy
     } else {
 	json = json_object();
 	if (json == NULL) {
-	    printf(FILE_LINE "ERROR:  cannot create a JSON %s object\n", "{{.PairListType}}");
+	    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot create a JSON %s object\n", "{{.PairListType}}");
 	} else {
 	    for (size_t i = 0; i < {{.PairListType}}_ptr->count; ++i) {
+		json_t *json_obj = {{.PairValueType}}_ptr_as_JSON_ptr( &{{.PairListType}}_ptr->items[i].value ); // {{.PairValueType}}
+		if (json_obj == NULL) {
+		    (*external_logging_function)(external_logging_first_arg,
+			FILE_LINE "ERROR:  intended value for JSON %s key \"%s\" was generated as NULL; cannot assign that value to the key\n",
+			"{{.PairListType}}", {{.PairListType}}_ptr->items[i].key);
+		    json_object_clear(json);
+		    json_decref(json);
+		    json = NULL;
+		    break;
+		}
 		if (json_object_set_new(json
 		    , {{.PairListType}}_ptr->items[i].key // {{.PairKeyType}}
-		    , {{.PairValueType}}_ptr_as_JSON_ptr( &{{.PairListType}}_ptr->items[i].value ) // {{.PairValueType}}
+		    , json_obj // {{.PairValueType}}
 		) != 0) {
 		    //
 		    // Report and handle the error condition.  Unfortunately, there is no json_error_t value to
@@ -3024,7 +3046,8 @@ json_t *{{.PairListType}}_ptr_as_JSON_ptr(const {{.PairListType}} *{{.PairListTy
 		    // A future version might print at least the failing key, if not also the failing value (which
 		    // could be of some complicated type).
 		    //
-		    printf(FILE_LINE "ERROR:  cannot set a key/value pair in a JSON %s object\n", "{{.PairListType}}");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot set a key/value pair in a JSON %s object\n",
+			"{{.PairListType}}");
 		    json_object_clear(json);
 		    json_decref(json);
 		    json = NULL;
@@ -3075,7 +3098,8 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
 	       string_transit_TypedValue_Pair_List *Pair_List = (string_transit_TypedValue_Pair_List *) malloc(sizeof(string_transit_TypedValue_Pair_List));
 	       if (Pair_List == NULL) {
 	   	// FIX MAJOR:  Invoke proper logging for error conditions.
-	   	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List_ptr, %s\n", "malloc failed");
+	   	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List_ptr, %s\n",
+	   	    "malloc failed");
 	       } else {
 	   	int failed = 0;
 	   	Pair_List->count = json_object_size(json);
@@ -3089,7 +3113,8 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
 	   	    Pair_List->items[i].key = (char *) key;
 	   	    transit_TypedValue *TypedValue_ptr = JSON_as_transit_TypedValue_ptr(value);
 	   	    if (TypedValue_ptr == NULL) {
-	   		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List_ptr, %s\n", "TypedValue_ptr is NULL");
+	   		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_string_transit_TypedValue_Pair_List_ptr, %s\n",
+	   		    "TypedValue_ptr is NULL");
 	   		failed = 1;
 	   		break;
 	   	    } else {
@@ -3119,7 +3144,7 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
     {{.PairListType}} *Pair_List = ({{.PairListType}} *) malloc(sizeof({{.PairListType}}));
     if (Pair_List == NULL) {
 	// FIX MAJOR:  Invoke proper logging for error conditions.
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}_ptr, %s\n", "malloc failed");
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}_ptr, %s\n", "malloc failed");
     } else {
 	int failed = 0;
 	Pair_List->count = json_object_size(json);
@@ -3133,7 +3158,8 @@ func generate_decode_key_value_pair_tree(key_type string, value_type string) (fu
 	    Pair_List->items[i].key = (char *) key;
 	    {{.PairValueType}} *{{.PairValueType}}_ptr = JSON_as_{{.PairValueType}}_ptr(value);
 	    if ({{.PairValueType}}_ptr == NULL) {
-		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}_ptr, %s\n", "{{.PairValueType}}_ptr is NULL");
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_{{.PairListType}}_ptr, %s\n",
+		    "{{.PairValueType}}_ptr is NULL");
 		failed = 1;
 		break;
 	    } else {
@@ -3285,7 +3311,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 		     )
 		);
 		if (json == NULL) {
-		    // printf(FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+		    // (*external_logging_function)(external_logging_first_arg,
+			// FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
 			// error.text, error.source, error.line, error.column, error.position);
 		    failure = error.text;
 		    break;
@@ -3320,8 +3347,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	    , (%[1]s_%s_ptr ? string_milliseconds_timestamp : NULL)
 	);
 	if (json == NULL) {
-	    // printf(FILE_LINE
-		// "ERROR:  JSON packing failed:  text '%s', source '%s', line %d, column %d, position %d\n",
+	    // (*external_logging_function)(external_logging_first_arg,
+		// FILE_LINE "ERROR:  JSON packing failed:  text '%s', source '%s', line %d, column %d, position %d\n",
 		// error.text, error.source, error.line, error.column, error.position);
 	    failure = error.text;
 	    break;
@@ -3330,9 +3357,8 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	var encode_routine_footer_template = `
     } while (0);
     if (failure) {
-	// FIX MAJOR:  Re-jigger the function call API to either pass back the failure string up the call chain,
-	// or call a logger with which the package has been previously initialilzed.
-	printf(FILE_LINE "ERROR:  failed to create JSON for a %s structure:  %s\n", "{{.StructName}}", failure);
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  failed to create JSON for a %s structure:  %s\n",
+	    "{{.StructName}}", failure);
 	if (json) {
 	    json_decref(json);
 	    json = NULL;
@@ -3518,7 +3544,36 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 				}
 				function_code += fmt.Sprintf(`
 	if (%s) {
-	    if (json_object_set_new(json, "%s", json_string(%s_%s_ptr->%s)) != 0) {
+	    // We must ensure that the value we pass to json_string() here is expressed in UTF-8,
+	    // not in ISO-8859-1 as we may get from some data sources.  And that means, we must have
+	    // a well-founded knowledge of where the data that we are converting originated, so we
+	    // don't mistakenly take a string already in UTF-8 encoding and attempt to re-encode it.
+	    // Since down here in the bowels of the ship we cannot necessarily analyze this specific
+	    // string and know what its encoding is, we depend on a global flag set by the calling
+	    // application to tell us what the right course of action is for any particular set of
+	    // conversions.  The application is free to modify the value of that flag as it sees fit
+	    // for additional conversions, depending on its knowledge of the string encodings.
+	    json_t *json_str;
+	    if (string_is_ascii(%[3]s_%s_ptr->%s) || C_strings_use_utf8) {
+		json_str = json_string(%[3]s_%s_ptr->%s);
+	    }
+	    else {
+		char *uf8_string = C_string_to_UTF_8(%[3]s_%s_ptr->%s);
+		if (uf8_string == NULL) {
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  String \"%%s\" cannot be converted to UTF-8.\n",
+			%[3]s_%s_ptr->%s);
+		    failure = "cannot convert %[3]s_%s_ptr->%s string encoding";
+		    break;
+		}
+		json_str = json_string(uf8_string);
+	    }
+	    if (json_str == NULL) {
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  json_string(\"%%s\") returns a NULL value.\n",
+		    %[3]s_%s_ptr->%s);
+		failure = "cannot convert %[3]s_%s_ptr->%s into string value";
+		break;
+	    }
+	    if (json_object_set_new(json, "%[2]s", json_str) != 0) {
 		failure = "cannot set %[3]s_%s_ptr->%s string value into object";
 		break;
 	    }
@@ -3549,7 +3604,12 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 	const string %[3]s_%s_%s = %[3]s_%[6]s_String[%[3]s_%s_ptr->%s];
 	if (%[1]s) {
 	    // %[3]s_%s.%s enumeration value, expressed as a string
-	    if (json_object_set_new(json, "%[2]s", json_string(%s_%s_%s)) != 0) {
+	    json_t *json_str = json_string(%[3]s_%s_%s);
+	    if (json_str == NULL) {
+		failure = "cannot convert %[3]s_%s_ptr->%s %s enumeration into string value";
+		break;
+	    }
+	    if (json_object_set_new(json, "%[2]s", json_str) != 0) {
 		failure = "cannot set %[3]s_%s_ptr->%s %s enumeration string value into object";
 		break;
 	    }
@@ -3914,51 +3974,51 @@ bool is_%[1]s_%s_ptr_zero_value(const %[1]s_%s *%[1]s_%s_ptr) {
 // This is a sample decode routine, splayed out all in one piece so I can see what kinds
 // of code constructions need to be generated.
 {{.StructName}} *decode{{.StructName}}(const char *json_str) {
-  {{.StructName}} *{{.StructName}}_ptr = NULL;
-  size_t size = 0;
-  json_error_t error;
-  json_t *json = NULL;
+    {{.StructName}} *{{.StructName}}_ptr = NULL;
+    size_t size = 0;
+    json_error_t error;
+    json_t *json = NULL;
 
-  json = json_loads(json_str, 0, &error);
-  if (json) {
-    fprintf(stderr, "decode{{.StructName}} error on line %d: %s\n", error.line, error.text);
-  } else {
-    json_t *jsonCfg         = json_object_get(json, "setup");
-    json_t *jsonCfgHostName = json_object_get(jsonCfg, "hostName");
-    json_t *jsonCfgAccount  = json_object_get(jsonCfg, "account");
-    json_t *jsonCfgToken    = json_object_get(jsonCfg, "token");
-    json_t *jsonCfgSSL      = json_object_get(jsonCfg, "ssl");
-
-    size_t jsonCfgHostName_len = json_string_length(jsonCfgHostName);
-    size_t jsonCfgAccount_len  = json_string_length(jsonCfgAccount);
-    size_t jsonCfgToken_len    = json_string_length(jsonCfgToken);
-
-    // incrementally compute a total size for allocation of the
-    // target struct, including all the strings it refers to
-    size = sizeof({{.StructName}});
-    size += jsonCfgHostName_len + NUL_TERM_LEN;
-    size += jsonCfgAccount_len  + NUL_TERM_LEN;
-    size += jsonCfgToken_len    + NUL_TERM_LEN;
-
-    // allocate and fill the target struct by pointer
-    {{.StructName}}_ptr = ({{.StructName}} *) malloc(size);
-    if ({{.StructName}}_ptr == NULL) {
-      fprintf(stderr, "decode{{.StructName}} error: %s\n", "malloc failed");
+    json = json_loads(json_str, 0, &error);
+    if (json) {
+        (*external_logging_function)(external_logging_first_arg, "decode{{.StructName}} error on line %d: %s\n", error.line, error.text);
     } else {
-      char *ptr = (char *){{.StructName}}_ptr;
-      ptr += sizeof({{.StructName}});
-      {{.StructName}}_ptr->setup.hostName = strcpy(ptr, json_string_value(jsonCfgHostName));
-      ptr += jsonCfgHostName_len + NUL_TERM_LEN;
-      {{.StructName}}_ptr->setup.account = strcpy(ptr, json_string_value(jsonCfgAccount));
-      ptr += jsonCfgAccount_len + NUL_TERM_LEN;
-      {{.StructName}}_ptr->setup.token = strcpy(ptr, json_string_value(jsonCfgToken));
-      {{.StructName}}_ptr->setup.ssl = json_boolean_value(jsonCfgSSL);
+        json_t *jsonCfg         = json_object_get(json, "setup");
+        json_t *jsonCfgHostName = json_object_get(jsonCfg, "hostName");
+        json_t *jsonCfgAccount  = json_object_get(jsonCfg, "account");
+        json_t *jsonCfgToken    = json_object_get(jsonCfg, "token");
+        json_t *jsonCfgSSL      = json_object_get(jsonCfg, "ssl");
+
+        size_t jsonCfgHostName_len = json_string_length(jsonCfgHostName);
+        size_t jsonCfgAccount_len  = json_string_length(jsonCfgAccount);
+        size_t jsonCfgToken_len    = json_string_length(jsonCfgToken);
+
+        // incrementally compute a total size for allocation of the
+        // target struct, including all the strings it refers to
+        size = sizeof({{.StructName}});
+        size += jsonCfgHostName_len + NUL_TERM_LEN;
+        size += jsonCfgAccount_len  + NUL_TERM_LEN;
+        size += jsonCfgToken_len    + NUL_TERM_LEN;
+
+        // allocate and fill the target struct by pointer
+        {{.StructName}}_ptr = ({{.StructName}} *) malloc(size);
+        if ({{.StructName}}_ptr == NULL) {
+            (*external_logging_function)(external_logging_first_arg, "decode{{.StructName}} error: %s\n", "malloc failed");
+        } else {
+            char *ptr = (char *){{.StructName}}_ptr;
+            ptr += sizeof({{.StructName}});
+            {{.StructName}}_ptr->setup.hostName = strcpy(ptr, json_string_value(jsonCfgHostName));
+            ptr += jsonCfgHostName_len + NUL_TERM_LEN;
+            {{.StructName}}_ptr->setup.account = strcpy(ptr, json_string_value(jsonCfgAccount));
+            ptr += jsonCfgAccount_len + NUL_TERM_LEN;
+            {{.StructName}}_ptr->setup.token = strcpy(ptr, json_string_value(jsonCfgToken));
+            {{.StructName}}_ptr->setup.ssl = json_boolean_value(jsonCfgSSL);
+        }
+
+        json_decref(json);
     }
 
-    json_decref(json);
-  }
-
-  return {{.StructName}}_ptr;
+    return {{.StructName}}_ptr;
 }
 */
 
@@ -4002,7 +4062,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
     {{.Package_StructName}} *{{.StructName}}_ptr = ({{.Package_StructName}} *) calloc(1, sizeof({{.Package_StructName}}));
     if ({{.StructName}}_ptr == NULL) {
 	// FIX MAJOR:  Invoke proper logging for error conditions.
-	fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.Package_StructName}}_ptr, %s\n", "malloc failed");
+	(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_{{.Package_StructName}}_ptr, %s\n", "calloc failed");
     } else {
 	int failed = 0;
 `
@@ -4011,8 +4071,10 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 `
 
 	var JSON_as_object_template_ptr_part5 = `        ) != 0) {
-	    // FIX MAJOR:  Invoke proper logging for error conditions.
-	    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_{{.Package_StructName}}_ptr, %s\n", "JSON unpacking failed");
+	    // FIX MAJOR:  Invoke proper logging for error conditions, with enough
+	    // logical coordinates so one can identify the exact source of bad data.
+	    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_{{.Package_StructName}}_ptr, %s\n",
+		"JSON unpacking failed");
 	    failed = 1;
 	} else {
 `
@@ -4169,7 +4231,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 	    // implementation of enumeration_value() return a 0 instead of -1 if the string in hand cannot be
 	    // found in the _String array.
 	    if ((int) (%[2]s_ptr->%s = enumeration_value(%[1]s_%[4]s_String, arraysize(%[1]s_%[4]s_String), %[3]s_as_string)) == 0) {
-		fprintf(stderr, FILE_LINE "ERROR:  cannot find the %[4]s enumeration value for %[3]s '%%s'\n", %[3]s_as_string);
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot find the %[4]s enumeration value for %[3]s '%%s'\n",
+		    %[3]s_as_string);
 		failed = 1;
 	    }
 `, package_name, struct_name, field_name, field_C_type)
@@ -4197,7 +4260,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					field_values += fmt.Sprintf(
 						`	    %[4]s *%[4]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 	    if (%[4]s_ptr == NULL) {
-		fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "%[4]s_ptr is NULL");
+		(*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "%[4]s_ptr is NULL");
 		failed = 1;
 	    } else {
 		%[2]s_ptr->%s = *%[4]s_ptr;
@@ -4240,7 +4303,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 							TimeSeries->MetricSamples.count = 0;
 							TimeSeries->MetricSamples.items = NULL;
 							if (!omitempty) {  // This is only a reportable error if the field is not declared as "omitempty".
-							    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries_ptr, %s\n", "json_MetricSamples is NULL");
+							    (*external_logging_function)(external_logging_first_arg,
+								FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries_ptr, %s\n", "json_MetricSamples is NULL");
 							    failed = 1;
 							}
 						    } else {
@@ -4248,7 +4312,9 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 							if (transit_MetricSample_Ptr_List_ptr == NULL) {
 							    TimeSeries->MetricSamples.count = 0;
 							    TimeSeries->MetricSamples.items = NULL;
-							    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries_ptr, %s\n", "transit_MetricSample_Ptr_List_ptr is NULL");
+							    (*external_logging_function)(external_logging_first_arg,
+								FILE_LINE "ERROR:  in JSON_as_transit_TimeSeries_ptr, %s\n",
+								"transit_MetricSample_Ptr_List_ptr is NULL");
 							    failed = 1;
 							} else {
 							    TimeSeries->MetricSamples = *transit_MetricSample_Ptr_List_ptr;
@@ -4264,7 +4330,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 		%[2]s_ptr->%s.count = 0;
 		%[2]s_ptr->%s.items = NULL;
 		if (!%[5]s) {  // This is only a reportable error if the field is not declared as "omitempty".
-		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "json_%[3]s is NULL");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "json_%[3]s is NULL");
 		    failed = 1;
 		}
 	    } else {
@@ -4272,7 +4338,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 		if (%[4]s_ptr == NULL) {
 		    %[2]s_ptr->%s.count = 0;
 		    %[2]s_ptr->%s.items = NULL;
-		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "%[4]s_ptr is NULL");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, %%s\n", "%[4]s_ptr is NULL");
 		    failed = 1;
 		} else {
 		    %[2]s_ptr->%s = *%[4]s_ptr;
@@ -4302,7 +4368,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 						    if (1) {
 							transit_TimeSeries_List *Metrics_ptr = JSON_as_transit_TimeSeries_List_ptr(json_Metrics);
 							if (Metrics_ptr == NULL) {
-							    fprintf(stderr, FILE_LINE "ERROR:  cannot find the transit_TimeSeries_List value for transit_ResourceWithMetrics_ptr->Metrics\n");
+							    (*external_logging_function)(external_logging_first_arg,
+								FILE_LINE "ERROR:  cannot find the transit_TimeSeries_List value for transit_ResourceWithMetrics_ptr->Metrics\n");
 							    failed = 1;
 							} else {
 							    ResourceWithMetrics->Metrics = *Metrics_ptr;
@@ -4315,7 +4382,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 	    if (1) {
 		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 		if (%[3]s_ptr == NULL) {
-		    fprintf(stderr, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
 		    failed = 1;
 		} else {
 		    %[2]s_ptr->%s = *%[3]s_ptr;
@@ -4347,7 +4414,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 						    if (1) {
 							transit_OperationResult_List *Results_ptr = JSON_as_transit_OperationResult_List_ptr(json_Results);
 							if (Results_ptr == NULL) {
-							    fprintf(stderr, FILE_LINE "ERROR:  cannot find the transit_OperationResult_List_Ptr value for OperationResults->Results\n");
+							    (*external_logging_function)(external_logging_first_arg,
+								FILE_LINE "ERROR:  cannot find the transit_OperationResult_List_Ptr value for OperationResults->Results\n");
 							    failed = 1;
 							} else {
 							    OperationResults->Results = Results_ptr;
@@ -4359,7 +4427,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 	    if (1) {
 		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 		if (%[3]s_ptr == NULL) {
-		    fprintf(stderr, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
 		    failed = 1;
 		} else {
 		    %[2]s_ptr->%s = %[3]s_ptr;
@@ -4463,7 +4531,8 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 
 						milliseconds_MillisecondTimestamp *TimeValue_ptr = JSON_as_milliseconds_MillisecondTimestamp_ptr(json_TimeValue);
 						if (TimeValue_ptr == NULL) {
-						    fprintf(stderr, FILE_LINE "ERROR:  cannot find the milliseconds_MillisecondTimestamp value for TimeValue_ptr\n");
+						    (*external_logging_function)(external_logging_first_arg,
+							FILE_LINE "ERROR:  cannot find the milliseconds_MillisecondTimestamp value for TimeValue_ptr\n");
 						    failed = 1;
 						} else {
 						    TypedValue->TimeValue = *TimeValue_ptr;
@@ -4488,9 +4557,11 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 #endif
 		if (errno) {
 		    // We don't bother to try to diagnose the specific failure; it should suffice to print the
-		    // string value under consideration and allow a human to identify the likely problem.
-		    // FIX MAJOR:  Invoke proper logging for error conditions.
-		    fprintf(stderr, FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, conversion of \"%%s\" to a number failed",
+		    // string value under consideration and allow a human to identify the likely problem, although
+		    // it might help if we also logged enough logical coordinates to be able to identify exactly
+		    // where the bad data came from.
+		    (*external_logging_function)(external_logging_first_arg,
+			FILE_LINE "ERROR:  in JSON_as_%[1]s_%s_ptr, conversion of \"%%s\" to a number failed",
 			string_milliseconds_timestamp);
 		    failed = 1;
 		}
@@ -4503,7 +4574,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 						field_values += fmt.Sprintf(
 							`		%[4]s *%[3]s_ptr = JSON_as_%[4]s_ptr(json_%[3]s);
 		if (%[3]s_ptr == NULL) {
-		    fprintf(stderr, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
+		    (*external_logging_function)(external_logging_first_arg, FILE_LINE "ERROR:  cannot find the %[4]s value for %[2]s_ptr->%s\n");
 		    failed = 1;
 		} else {
 		    %[2]s_ptr->%s = *%[3]s_ptr;
@@ -4570,9 +4641,9 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
     json_error_t error;
     *json = json_loads(json_str, 0, &error);
     if (*json == NULL) {
-	// FIX MAJOR:  Once we have our official support for logging in place,
-	// produce a log message based on the content of the "error" object.
-	printf(FILE_LINE "json for {{.StructName}} is NULL\n");
+	(*external_logging_function)(external_logging_first_arg,
+	    FILE_LINE "ERROR:  json for {{.StructName}} is NULL (\"%s\" in \"%s\" line %d column %d)\n",
+	    error.text, error.source, error.line, error.column);
 	return NULL;
     }
     {{.StructName}} *{{.StructName}}_ptr = JSON_as_{{.StructName}}_ptr(*json);

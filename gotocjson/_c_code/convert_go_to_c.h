@@ -102,6 +102,68 @@ extern struct_timespec *JSON_as_struct_timespec(json_t *json);
 // must be made only after the application is done with the returned C data structures.
 extern void free_JSON(json_t *json);
 
+// Global variable to be referenced internally in TCG conversion routines
+// when they need to understand whether to convert strings to or from UTF-8.
+extern int C_strings_use_utf8;
+
+// Specify the character set encoding that strings on the C side use, at any
+// time after initialize_data_conversions() is first called.  If this routine
+// is not called, the effect will be as though the "ISO-8859-1" encoding was
+// selected.  Argument values that are recognized as specifying that C strings
+// already use UTF-8 encoding are "UTF-8" and "UTF8"; anything else will be
+// treated as requiring an encoding conversion during data serialization and
+// deserialization.
+extern int set_C_string_encoding(char *encoding);
+
+// Routine to scan a string and tell if it contains only 7-bit ASCII characters.
+// This is the simplest means to bypass more-complex processing which will only
+// be necessary if the upper half of the ISO-8859-1 character set is in use.
+// Returns a true or false value, reflecting the content of the c_string.
+extern int string_is_ascii(char *c_string);
+
+// Conversion routines, to change character-set encodings.  The result strings
+// are provided in static memory which will be overwritten on the next call to
+// either routine, so these routines are neither reentrant (i.e., they cannot be
+// called from separate threads), nor is their result data long-term persistent.
+// They are intended for very short-term use in conversions where the resulting
+// string will be used immediately and then this copy will be otherwise forgotten.
+extern char *C_string_to_UTF_8(char *c_string);
+extern char *UTF_8_to_C_string(char *utf_8_string);
+
+// Like UTF_8_to_C_string(), but converts the string in-place.  This is safe
+// because we will only at most reduce the number of bytes used in the string.
+// Always converts as best it can, even if there were conversion errors.
+// Returns the length of the resulting string if no errors were encountered,
+// or -1 if some byte sequence was found that did not correspond to the target
+// character set.
+extern int UTF_8_to_C_string_in_place(char *utf_8_string);
+
+// Global variables to be referenced internally in TCG conversion routines
+// when they need to log errors.  Not for external use.
+extern void (*external_logging_function)(void *arg, const char *format_string, ...);
+extern void *external_logging_first_arg;
+
+// A routine that an application can call to register a logging function to be
+// used by TCG conversion routines to report errors.  When logging occurs, the
+// actual_arg will be passed as the first argument to logging_function().  This
+// registration routine returns zero on success, -1 on failure to register the
+// logging function.  If no such logging function is registered, the effect will
+// be as though register_logging_callback(&fprintf, stderr) had been called at
+// the time that initialize_data_conversions() was called.  This means that it
+// is the value of stderr at that moment that will rule by default (which may
+// be important for applications that internally modify stderr at some point).
+extern int register_logging_callback(void (*logging_function)(void *arg, const char *format_string, ...), void *actual_arg);
+
+// A routine that should be called at application startup, before running any
+// data-structure conversions.  This will take care of setting initial state
+// which is necessary to make all the conversions operate safely.
+extern void initialize_data_conversions();
+
+// A routine that should be called at application end, after running all
+// data-structure conversions, whether run directly by the application itself
+// or by any callbacks triggered from outside the application.
+extern void terminate_data_conversions();
+
 #ifdef  __cplusplus
 }
 #endif
