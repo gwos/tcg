@@ -432,12 +432,12 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 	for _, hostProcess := range hostProcesses {
 		cpuUsed, err := hostProcess.CPUPercent()
 		if err != nil {
-			log.Error("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
+			log.Warn("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
 		}
 
 		name, err := hostProcess.Name()
 		if err != nil {
-			log.Error("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
+			log.Warn("|serverConnector.go| : [collectMonitoredProcesses] : ", err)
 		}
 
 		processes = append(processes, &localProcess{name, cpuUsed})

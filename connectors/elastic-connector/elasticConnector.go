@@ -12,7 +12,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/api/trace"
 	"net/http"
 	"sort"
 	"strings"
@@ -148,30 +147,20 @@ func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 // CollectMetrics retrives metric data
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	var err error
-	var spanCollectMetrics trace.Span
-	var spanMonitoringState trace.Span
-	var ctx context.Context
 
-	if services.GetTransitService().TelemetryProvider != nil {
-		tr := services.GetTransitService().TelemetryProvider.Tracer("elasticConnector")
-		ctx, spanCollectMetrics = tr.Start(context.Background(), "CollectMetrics")
-		_, spanMonitoringState = tr.Start(ctx, "initMonitoringState")
-		defer func() {
-			spanCollectMetrics.SetAttribute("error", err)
-			spanCollectMetrics.End()
-		}()
-	}
+	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
+	defer func() {
+		spanCollectMetrics.SetAttribute("error", err)
+		spanCollectMetrics.End()
+	}()
+	_, spanMonitoringState := services.StartTraceSpan(ctx, "connectors", "initMonitoringState")
 
 	monitoringState := connector.config.initMonitoringState(connector.monitoringState, &connector.esClient)
 	connector.monitoringState = monitoringState
-	if spanMonitoringState == nil {
-		return nil, nil, nil
-	}
-	if services.GetTransitService().TelemetryProvider != nil {
-		spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
-		spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
-		spanMonitoringState.End()
-	}
+
+	spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
+	spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
+	spanMonitoringState.End()
 
 	for view, metrics := range connector.config.Views {
 		for metricName, metric := range metrics {
