@@ -134,7 +134,7 @@ func periodicHandler() {
 			count = count + 1
 		}
 		time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
-		if err := connectors.SendMetrics(context.Background(), monitored); err != nil {
+		if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
 			log.Error("[K8 Connector]: Error during sending metrics.", err)
 		}
 	}
