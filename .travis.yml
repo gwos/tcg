@@ -3,7 +3,7 @@ language: bash
 script:
   - export DOCKER_HUB_USERNAME=groundworkbot
   - export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
-  - make --warn-undefined-variables -f travis.Makefile trigger-docker-hub-build
+  - make --warn-undefined-variables -f travis.Makefile all
 
 notifications:
   slack:
