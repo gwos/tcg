@@ -41,6 +41,7 @@ echo:
 	@echo BUILD_ARGS:          ${BUILD_ARGS}
 	@echo =======================================
 
+all: echo login build tag push trigger-docker-hub-build
 
 login:
 	echo "$${DOCKER_HUB_PASSWORD}" | docker login -u "$${DOCKER_HUB_USERNAME}" --password-stdin "$${DOCKER_REGISTRY}"
