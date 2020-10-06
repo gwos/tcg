@@ -1,0 +1,17 @@
+#!/bin/bash
+
+branch="${1}"
+tag="${2}"
+repo="${3}"
+
+echo "Branch: ${branch}"
+echo "Tag: ${tag}"
+echo "Repo: ${repo}"
+
+if [[ "${branch}" == "master" ]]; then
+  echo "Triggering Docker hub build on ${branch}..."
+  curl -i -H "Content-Type: application/json" --data "{"source_type": "Branch", "source_name": "${branch}"}" -X POST "${DOCKER_HUB_TRIGGER_URL}"
+else
+  echo "NOT skipping Docker Hub build for non-master branch ${branch}"
+  curl -i -H "Content-Type: application/json" --data "{"source_type": "Branch", "source_name": "${branch}"}" -X POST "${DOCKER_HUB_TRIGGER_URL}"
+fi
