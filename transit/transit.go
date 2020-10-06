@@ -380,17 +380,7 @@ func (thresholdDescriptor ThresholdDescriptor) String() string {
 	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
 
-// InventoryResource represents a resource that is included in a inventory scan.
-// Examples include:
-//  * nagios host
-//  * virtual machine instance
-//  * RDS database
-//  * storage devices such as disks
-//  * cloud resources such as cloud apps, cloud functions(lambdas)
-//
-// An InventoryResource is the representation of a specific monitored resource during an nventory scan.
-// Each InventoryResource contains list of services (InventoryService) (no metrics are sent).
-type InventoryResource struct {
+type BaseTransitData struct {
 	// The unique name of the resource
 	Name string `json:"name,required"`
 	// Type: Required. The resource type of the resource
@@ -402,27 +392,102 @@ type InventoryResource struct {
 	Category string `json:"category,omitempty"`
 	// Optional description of this resource, such as Nagios notes
 	Description string `json:"description,omitempty"`
-	// Device (usually IP address), leave empty if not available, will default to name
-	Device string `json:"device,omitempty"`
 	// Foundation Properties
 	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+type BaseResource struct {
+	BaseTransitData
+	// Device (usually IP address), leave empty if not available, will default to name
+	Device string `json:"device,omitempty"`
+}
+
+// InventoryResource represents a resource that is included in a inventory scan.
+// Examples include:
+//  * nagios host
+//  * virtual machine instance
+//  * RDS database
+//  * storage devices such as disks
+//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//
+// An InventoryResource is the representation of a specific monitored resource during an nventory scan.
+// Each InventoryResource contains list of services (InventoryService) (no metrics are sent).
+type InventoryResource struct {
+	BaseResource
 	// Inventory Service collection
 	Services []InventoryService `json:"services"`
 }
 
+// InventoryService represents a Groundwork Service that is included in a inventory scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
+//
+// InventoryService collections are attached to an InventoryResource during inventory scans.
+type InventoryService struct {
+	BaseTransitData
+}
+
+// A MonitoredResource defines the current status and services of a resource during a metrics scan.
+// Examples include:
+//  * nagios host
+//  * virtual machine instance
+//  * RDS database
+//  * storage devices such as disks
+//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//
+// A MonitoredResource is the representation of a specific monitored resource during a metric scan.
+// Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
+// only services.
+type MonitoredResource struct {
+	BaseResource
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// Services state collection
+	Services []MonitoredService `json:"services"`
+}
+
+// A MonitoredService represents a Groundwork Service creating during a metrics scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series.
+//
+// A MonitoredService contains a collection of TimeSeries Metrics.
+// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
+type MonitoredService struct {
+	BaseTransitData
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// metrics
+	Metrics []TimeSeries `json:"metrics"`
+}
+
 func (inventoryResource InventoryResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
-		inventoryResource.Name, inventoryResource.Type, inventoryResource.Owner, inventoryResource.Category,
-		inventoryResource.Description, inventoryResource.Device, inventoryResource.Properties, inventoryResource.Services,
+		inventoryResource.BaseResource.Name, inventoryResource.BaseResource.Type,
+		inventoryResource.BaseResource.Owner, inventoryResource.BaseResource.Category,
+		inventoryResource.BaseResource.Description, inventoryResource.BaseResource.Device,
+		inventoryResource.BaseResource.Properties, inventoryResource.Services,
 	)
 }
 
 func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
-	if inventoryResource.Properties == nil {
-		inventoryResource.Properties = make(map[string]TypedValue)
+	if inventoryResource.BaseResource.Properties == nil {
+		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
-	inventoryResource.Properties[name] = value
+	inventoryResource.BaseResource.Properties[name] = value
 }
+
 func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
 	for k, v := range properties {
 		var typedValue TypedValue
@@ -472,26 +537,6 @@ func (value *TypedValue) toTypedValue(v interface{}) error {
 	return nil
 }
 
-// InventoryService represents a Groundwork Service that is included in a inventory scan.
-// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
-//
-// InventoryService collections are attached to an InventoryResource during inventory scans.
-type InventoryService struct {
-	// The unique name of the service
-	Name string `json:"name,required"`
-	// Type: Required. The service type
-	Type ServiceType `json:"type"`
-	// Owner relationship for associations like host->service
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of services
-	Category string `json:"category,omitempty"`
-	// Optional description of this service
-	Description string `json:"description,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-}
-
 func (inventoryService InventoryService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
 		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
@@ -506,86 +551,25 @@ func (inventoryService *InventoryService) CreateProperty(name string, value Type
 	inventoryService.Properties[name] = value
 }
 
-// A MonitoredResource defines the current status and services of a resource during a metrics scan.
-// Examples include:
-//  * nagios host
-//  * virtual machine instance
-//  * RDS database
-//  * storage devices such as disks
-//  * cloud resources such as cloud apps, cloud functions(lambdas)
-//
-// A MonitoredResource is the representation of a specific monitored resource during a metric scan.
-// Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
-// only services.
-type MonitoredResource struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	// Services state collection
-	Services []MonitoredService `json:"services"`
-}
-
 func (monitoredResource MonitoredResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
-		monitoredResource.Name,
-		monitoredResource.Type,
-		monitoredResource.Owner,
+		monitoredResource.BaseResource.Name,
+		monitoredResource.BaseResource.Type,
+		monitoredResource.BaseResource.Owner,
 		monitoredResource.Status,
 		monitoredResource.LastCheckTime.String(),
 		monitoredResource.NextCheckTime.String(),
 		monitoredResource.LastPlugInOutput,
-		monitoredResource.Properties,
+		monitoredResource.BaseResource.Properties,
 		monitoredResource.Services,
 	)
 }
 
 func (monitoredResource *MonitoredResource) CreateProperty(name string, value TypedValue) {
-	if monitoredResource.Properties == nil {
-		monitoredResource.Properties = make(map[string]TypedValue)
+	if monitoredResource.BaseResource.Properties == nil {
+		monitoredResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
-	monitoredResource.Properties[name] = value
-}
-
-// A MonitoredService represents a Groundwork Service creating during a metrics scan.
-// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series.
-//
-// A MonitoredService contains a collection of TimeSeries Metrics.
-// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
-type MonitoredService struct {
-	// The unique name of the service
-	Name string `json:"name,required"`
-	// Type: Required. The service type uniquely defining the service type
-	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
-	Type ServiceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	// metrics
-	Metrics []TimeSeries `json:"metrics"`
+	monitoredResource.BaseResource.Properties[name] = value
 }
 
 func (monitoredService MonitoredService) String() string {
@@ -690,6 +674,7 @@ func (resourceGroup ResourceGroup) String() string {
 type ResourcesWithServicesRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
+	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
 func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {

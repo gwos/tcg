@@ -117,7 +117,7 @@ func periodicHandler() {
 		log.Info("[Server Connector]: Monitoring resources ...")
 		if err := connectors.SendMetrics(context.Background(), []transit.MonitoredResource{
 			*CollectMetrics(metricsProfile.Metrics),
-		}); err != nil {
+		}, nil); err != nil {
 			log.Error("[Server Connector]: ", err)
 		}
 	}

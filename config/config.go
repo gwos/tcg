@@ -104,10 +104,11 @@ type Connector struct {
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile          string   `yaml:"logFile"`
-	LogLevel         LogLevel `yaml:"logLevel"`
-	Enabled          bool     `yaml:"enabled"`
-	InstallationMode string   `yaml:"installationMode,omitempty"`
+	LogFile            string   `yaml:"logFile"`
+	LogLevel           LogLevel `yaml:"logLevel"`
+	Enabled            bool     `yaml:"enabled"`
+	InstallationMode   string   `yaml:"installationMode,omitempty"`
+	IsDynamicInventory bool     `yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -382,6 +383,31 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 	return nil
 }
 
+func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
+	/* TODO: Support dynamic flag in UI
+	var s struct {
+		Connection struct {
+			Extensions struct {
+				IsDynamicInventory bool `json:"isDynamicInventory"`
+			} `json:"extensions,omitempty"`
+		} `json:"monitorConnection,omitempty"`
+	}
+
+	if err := json.Unmarshal(data, &s); err != nil {
+		log.Error("|config.go| : [loadDynamicInventoryFlag] : ", err.Error())
+		return err
+	} */
+
+	switch cfg.Connector.AppType {
+	case "CHECKER", "APM":
+		cfg.Connector.IsDynamicInventory = true
+	default:
+		cfg.Connector.IsDynamicInventory = false
+	}
+
+	return nil
+}
+
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
@@ -401,6 +427,10 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	}
 	/* load as struct with advanced prefixes field */
 	if err := newCfg.loadAdvancedPrefixes(data); err != nil {
+		return nil, err
+	}
+	/* load as struct with dynamic inventory flag */
+	if err := newCfg.loadDynamicInventoryFlag(data); err != nil {
 		return nil, err
 	}
 	/* override config file */

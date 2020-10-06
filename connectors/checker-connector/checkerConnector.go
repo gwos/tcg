@@ -26,11 +26,6 @@ var (
 	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
 )
 
-var (
-	inventoryStorage = make(map[string]transit.InventoryResource)
-	inventoryChksum  []byte
-)
-
 // DataFormat describes incoming payload
 type DataFormat string
 
@@ -48,7 +43,6 @@ type ScheduleTask struct {
 	Cron           string     `json:"cron"`
 	DataFormat     DataFormat `json:"dataFormat"`
 	Environment    []string   `json:"environment,omitempty"`
-	ForceInventory bool       `json:"forceInventory,omitempty"`
 }
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -70,19 +64,15 @@ func initializeEntrypoints() []services.Entrypoint {
 	rv := make([]services.Entrypoint, 6)
 	for _, dataFormat := range []DataFormat{Bronx, NSCA, NSCAAlt} {
 		rv = append(rv, services.Entrypoint{
-			Handler: makeEntrypointHandler(dataFormat, false),
+			Handler: makeEntrypointHandler(dataFormat),
 			Method:  http.MethodPost,
 			URL:     fmt.Sprintf("checker/%s", dataFormat),
-		}, services.Entrypoint{
-			Handler: makeEntrypointHandler(dataFormat, true),
-			Method:  http.MethodPost,
-			URL:     fmt.Sprintf("checker/forced/%s", dataFormat),
 		})
 	}
 	return rv
 }
 
-func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin.Context) {
+func makeEntrypointHandler(dataFormat DataFormat) func(*gin.Context) {
 	return func(c *gin.Context) {
 		var (
 			err     error
@@ -103,7 +93,7 @@ func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		if _, err = processMetrics(ctx, payload, dataFormat, forceInventory); err != nil {
+		if _, err = processMetrics(ctx, payload, dataFormat); err != nil {
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
@@ -111,11 +101,10 @@ func makeEntrypointHandler(dataFormat DataFormat, forceInventory bool) func(*gin
 	}
 }
 
-func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat, forceInventory bool) (*[]transit.MonitoredResource, error) {
+func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
 	var (
 		ctxN               context.Context
 		err                error
-		inventoryResources *[]transit.InventoryResource
 		monitoredResources *[]transit.MonitoredResource
 		span               services.TraceSpan
 	)
@@ -131,31 +120,8 @@ func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat, 
 		return nil, err
 	}
 
-	if !forceInventory {
-		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
-			return nil, err
-		}
-		return monitoredResources, nil
-	}
-
-	ctxN, span = services.StartTraceSpan(ctx, "connectors", "buildInventory")
-	inventoryResources = buildInventory(monitoredResources)
-
-	span.End()
-
-	if validateInventory(*inventoryResources) {
-		if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
-			return nil, err
-		}
-	} else {
-		if err := connectors.SendInventory(ctxN, *inventoryResources, nil, transit.Yield); err != nil {
-			return nil, err
-		}
-		time.AfterFunc(2*time.Second, func() { // TODO: better way to assure synch completion?
-			if err := connectors.SendMetrics(ctxN, *monitoredResources); err != nil {
-				log.Warn("[Checker Connector]: ", err.Error())
-			}
-		})
+	if err := connectors.SendMetrics(ctxN, *monitoredResources, nil); err != nil {
+		return nil, err
 	}
 
 	return monitoredResources, nil
@@ -197,8 +163,12 @@ func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResou
 
 	for key, value := range resourceNameToServicesMap {
 		monitoredResources = append(monitoredResources, transit.MonitoredResource{
-			Name:          key,
-			Type:          transit.Host,
+			BaseResource: transit.BaseResource{
+				BaseTransitData: transit.BaseTransitData{
+					Name: key,
+					Type: transit.Host,
+				},
+			},
 			Status:        connectors.CalculateResourceStatus(value),
 			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)},
@@ -327,9 +297,11 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 		}
 
 		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.MonitoredService{
-			Name:             arr[len(arr)-4],
-			Type:             transit.Service,
-			Owner:            arr[len(arr)-5],
+			BaseTransitData: transit.BaseTransitData{
+				Name:  arr[len(arr)-4],
+				Type:  transit.Service,
+				Owner: arr[len(arr)-5],
+			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
@@ -411,9 +383,11 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 		}
 
 		servicesMap[arr[2]] = append(servicesMap[arr[2]], transit.MonitoredService{
-			Name:             arr[3],
-			Type:             transit.Service,
-			Owner:            arr[2],
+			BaseTransitData: transit.BaseTransitData{
+				Name:  arr[3],
+				Type:  transit.Service,
+				Owner: arr[2],
+			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
@@ -438,33 +412,4 @@ func removeDuplicateServices(servicesMap map[string][]transit.MonitoredService) 
 		servicesMap[key] = list
 	}
 	return servicesMap
-}
-
-func validateInventory(inventory []transit.InventoryResource) bool {
-	if inventoryChksum != nil {
-		chk, err := connectors.Hashsum(inventory)
-		if err != nil || !bytes.Equal(inventoryChksum, chk) {
-			inventoryChksum = chk
-			return false
-		}
-		return true
-	}
-	inventoryChksum, _ = connectors.Hashsum(inventory)
-	return false
-}
-
-func buildInventory(resources *[]transit.MonitoredResource) *[]transit.InventoryResource {
-	var inventoryResources []transit.InventoryResource
-	for _, resource := range *resources {
-		var inventoryServices []transit.InventoryService
-		for _, service := range resource.Services {
-			inventoryServices = append(inventoryServices, connectors.CreateInventoryService(service.Name,
-				service.Owner))
-		}
-
-		inventoryResource := connectors.CreateInventoryResource(resource.Name, inventoryServices)
-		inventoryStorage[inventoryResource.Name] = inventoryResource
-		inventoryResources = append(inventoryResources, inventoryResource)
-	}
-	return &inventoryResources
 }
