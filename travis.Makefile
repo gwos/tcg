@@ -41,6 +41,7 @@ echo:
 	@echo BUILD_ARGS:          ${BUILD_ARGS}
 	@echo =======================================
 
+all: echo login build tag push trigger-docker-hub-build
 
 login:
 	echo "$${DOCKER_HUB_PASSWORD}" | docker login -u "$${DOCKER_HUB_USERNAME}" --password-stdin "$${DOCKER_REGISTRY}"
@@ -75,7 +76,7 @@ trigger-docker-hub-build:
     ifeq ($(DOCKER_HUB_TRIGGER_URL),)
 		@echo "DOCKER_HUB_TRIGGER_URL is empty; skipping"
     else
-		@echo "DOCKER_HUB_TRIGGER_URL is set to $(DOCKER_HUB_TRIGGER_URL); triggering build..."
+		@echo "DOCKER_HUB_TRIGGER_URL is set to $(DOCKER_HUB_TRIGGER_URL); triggering NAGIOS build..."
 		curl -i -H "Content-Type: application/json" -H "Accept: application/json" -H "Travis-API-Version: 3" -H "Authorization: token ${TRAVIS_ACCESS_TOKEN}" --data '{"request": {"branch": "master"}}' -X POST "${DOCKER_HUB_TRIGGER_URL}"
     endif
     endif
