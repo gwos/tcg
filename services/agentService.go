@@ -44,7 +44,7 @@ type AgentService struct {
 	demandConfigHandler   func() bool
 	exitHandler           func()
 	telemetryFlushHandler func()
-	TelemetryProvider     apitrace.Provider
+	telemetryProvider     apitrace.Provider
 }
 
 // CtrlAction defines queued controll action
@@ -531,7 +531,7 @@ func (service *AgentService) config(data []byte) error {
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
 	service.telemetryFlushHandler = telemetryFlushHandler
-	service.TelemetryProvider = telemetryProvider
+	service.telemetryProvider = telemetryProvider
 	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
