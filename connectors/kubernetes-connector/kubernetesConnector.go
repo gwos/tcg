@@ -149,18 +149,10 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 		services := make([]transit.InventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
-			services[serviceIndex] = transit.InventoryService{
-				Name:  service.Name,
-				Type:  service.Type,
-				Owner: service.Owner,
-			}
+			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
 			serviceIndex = serviceIndex + 1
 		}
-		inventory[index] = transit.InventoryResource{
-			Name:     resource.Name,
-			Type:     resource.Type,
-			Services: services,
-		}
+		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
 		// convert monitored state
 		mServices := make([]transit.MonitoredService, len(resource.Services))
 		serviceIndex = 0
@@ -169,8 +161,12 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 			serviceIndex = serviceIndex + 1
 		}
 		monitored[index] = transit.MonitoredResource{
-			Name:             resource.Name,
-			Type:             resource.Type,
+			BaseResource: transit.BaseResource{
+				BaseTransitData: transit.BaseTransitData{
+					Name:             resource.Name,
+					Type:             resource.Type,
+				},
+			},
 			Status:           resource.Status,
 			LastCheckTime:    milliseconds.MillisecondTimestamp{time.Now()},
 			NextCheckTime:    milliseconds.MillisecondTimestamp{time.Now()}, // TODO: interval
