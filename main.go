@@ -90,7 +90,7 @@ func main() {
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if enableTransit {
-		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2})
+		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
 	}
 }
 
@@ -120,39 +120,45 @@ func LowLevelExamples() {
 
 	// Example Service
 	var localLoadService = transit.MonitoredService{
-		Name:             "local_load",
-		Type:             transit.Service,
+		BaseTransitData: transit.BaseTransitData{
+			Name: "local_load",
+			Type: transit.Service,
+			Properties: map[string]transit.TypedValue{
+				"stateType":       {StringValue: "SOFT"},
+				"checkType":       {StringValue: "ACTIVE"},
+				"PerformanceData": {StringValue: "007-321 RAD"},
+				"ExecutionTime":   {DoubleValue: 3.0},
+				"CurrentAttempt":  {IntegerValue: 2},
+				"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+			},
+		},
 		Status:           transit.ServiceOk,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
-		Properties: map[string]transit.TypedValue{
-			"stateType":       {StringValue: "SOFT"},
-			"checkType":       {StringValue: "ACTIVE"},
-			"PerformanceData": {StringValue: "007-321 RAD"},
-			"ExecutionTime":   {DoubleValue: 3.0},
-			"CurrentAttempt":  {IntegerValue: 2},
-			"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
-		},
-		Metrics: []transit.TimeSeries{sampleValue},
+		Metrics:          []transit.TimeSeries{sampleValue},
 	}
 
 	geneva := transit.MonitoredResource{
-		Name:             "geneva",
-		Type:             transit.Host,
+		BaseResource: transit.BaseResource{
+			BaseTransitData: transit.BaseTransitData{
+				Name: "geneva",
+				Type: transit.Host,
+				Properties: map[string]transit.TypedValue{
+					"stateType":       {StringValue: "SOFT"},
+					"checkType":       {StringValue: "ACTIVE"},
+					"PerformanceData": {StringValue: "007-321 RAD"},
+					"ExecutionTime":   {DoubleValue: 3.0},
+					"CurrentAttempt":  {IntegerValue: 2},
+					"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+				},
+			},
+		},
 		Status:           transit.HostUp,
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Properties: map[string]transit.TypedValue{
-			"stateType":       {StringValue: "SOFT"},
-			"checkType":       {StringValue: "ACTIVE"},
-			"PerformanceData": {StringValue: "007-321 RAD"},
-			"ExecutionTime":   {DoubleValue: 3.0},
-			"CurrentAttempt":  {IntegerValue: 2},
-			"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
-		},
-		Services: []transit.MonitoredService{localLoadService},
+		Services:         []transit.MonitoredService{localLoadService},
 	}
 
 	// Build Monitored Resources

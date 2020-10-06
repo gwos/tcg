@@ -31,19 +31,20 @@ type GWOperations interface {
 
 // Define entrypoints for GWOperations
 const (
-	GWEntrypointConnectRemote           = "/api/users/authenticatePassword"
-	GWEntrypointConnect                 = "/api/auth/login"
-	GWEntrypointDisconnect              = "/api/auth/logout"
-	GWEntrypointSendEvents              = "/api/events"
-	GWEntrypointSendEventsAck           = "/api/events/ack"
-	GWEntrypointSendEventsUnack         = "/api/events/unack"
-	GWEntrypointSendResourceWithMetrics = "/api/monitoring"
-	GWEntrypointSynchronizeInventory    = "/api/synchronizer"
-	GWEntrypointServices                = "/api/services"
-	GWEntrypointHostgroups              = "/api/hostgroups"
-	GWEntrypointLicenseCheck            = "/api/license/check"
-	GWEntrypointValidateToken           = "/api/auth/validatetoken"
-	NagiosApp                           = "NAGIOS"
+	GWEntrypointConnectRemote                  = "/api/users/authenticatePassword"
+	GWEntrypointConnect                        = "/api/auth/login"
+	GWEntrypointDisconnect                     = "/api/auth/logout"
+	GWEntrypointSendEvents                     = "/api/events"
+	GWEntrypointSendEventsAck                  = "/api/events/ack"
+	GWEntrypointSendEventsUnack                = "/api/events/unack"
+	GWEntrypointSendResourceWithMetrics        = "/api/monitoring"
+	GWEntrypointSendResourceWithMetricsDynamic = "/api/monitoring?dynamic=true"
+	GWEntrypointSynchronizeInventory           = "/api/synchronizer"
+	GWEntrypointServices                       = "/api/services"
+	GWEntrypointHostgroups                     = "/api/hostgroups"
+	GWEntrypointLicenseCheck                   = "/api/license/check"
+	GWEntrypointValidateToken                  = "/api/auth/validatetoken"
+	NagiosApp                                  = "NAGIOS"
 )
 
 // GWClient implements GWOperations interface
@@ -54,17 +55,18 @@ type GWClient struct {
 	sync.Mutex
 	token string
 	sync.Once
-	uriConnect                 string
-	uriDisconnect              string
-	uriSendEvents              string
-	uriSendEventsAck           string
-	uriSendEventsUnack         string
-	uriSendResourceWithMetrics string
-	uriSynchronizeInventory    string
-	uriServices                string
-	uriHostGroups              string
-	uriLicenseCheck            string
-	uriValidateToken           string
+	uriConnect                        string
+	uriDisconnect                     string
+	uriSendEvents                     string
+	uriSendEventsAck                  string
+	uriSendEventsUnack                string
+	uriSendResourceWithMetrics        string
+	uriSendResourceWithMetricsDynamic string
+	uriSynchronizeInventory           string
+	uriServices                       string
+	uriHostGroups                     string
+	uriLicenseCheck                   string
+	uriValidateToken                  string
 }
 
 // AuthPayload defines Connect payload on nonLocalConnection
@@ -391,6 +393,11 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 			},
 		)
 	}
+
+	if config.GetConfig().Connector.IsDynamicInventory {
+		return client.sendData(ctx, client.uriSendResourceWithMetricsDynamic, payload)
+	}
+
 	return client.sendData(ctx, client.uriSendResourceWithMetrics, payload)
 }
 
@@ -643,6 +650,7 @@ func (client *GWClient) buildURIs() {
 		uriSendEventsAck := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
 		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
 		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
+		uriSendResourceWithMetricsDynamic := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
 		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
 		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
@@ -655,6 +663,7 @@ func (client *GWClient) buildURIs() {
 		client.uriSendEventsAck = uriSendEventsAck
 		client.uriSendEventsUnack = uriSendEventsUnack
 		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
+		client.uriSendResourceWithMetricsDynamic = uriSendResourceWithMetricsDynamic
 		client.uriSynchronizeInventory = uriSynchronizeInventory
 		client.uriServices = uriServices
 		client.uriHostGroups = uriHostGroups
