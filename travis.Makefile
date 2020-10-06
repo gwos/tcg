@@ -29,7 +29,6 @@ all: echo login build tag push
 
 
 echo:
-
 	@echo =======================================
 	@echo REGISTRY_REPO:       ${REGISTRY_REPO}
 	@echo COMMIT_HASH:         ${COMMIT_HASH}
@@ -60,16 +59,23 @@ tag:
 			docker tag ${IMG} ${REGISTRY_REPO}:${TRAVIS_TAG}
     endif
 
+	# If branch is master, tag latest
+    ifeq ($(BRANCH),master)
+			docker tag ${IMG} ${REGISTRY_REPO}:latest
+    endif
+
 
 push:
 	./script/docker-push ${REGISTRY_REPO} ${DOCKER_REGISTRY}
 
 
 trigger-docker-hub-build:
-	# trigger docker hub build
+	# trigger docker hub build if master
+    ifeq ($(BRANCH),master)
     ifeq ($(DOCKER_HUB_TRIGGER_URL),)
 		@echo "DOCKER_HUB_TRIGGER_URL is empty; skipping"
     else
-		@echo "DOCKER_HUB_TRIGGER_URL is set to $(DOCKER_HUB_TRIGGER_URL); triggering build..."
-		curl -i -H "Content-Type: application/json" --data "{"source_type": "Branch", "source_name": "${BRANCH}"}" -X POST "${DOCKER_HUB_TRIGGER_URL}"
+		@echo "DOCKER_HUB_TRIGGER_URL is set to $(DOCKER_HUB_TRIGGER_URL); triggering NAGIOS build..."
+		curl -i -H "Content-Type: application/json" -H "Accept: application/json" -H "Travis-API-Version: 3" -H "Authorization: token ${TRAVIS_ACCESS_TOKEN}" --data '{"request": {"branch": "master"}}' -X POST "${DOCKER_HUB_TRIGGER_URL}"
+    endif
     endif
