@@ -131,7 +131,7 @@ func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...tr
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return GetAgentService().TelemetryProvider.
+	return GetAgentService().telemetryProvider.
 		Tracer(tracerName).Start(ctx, spanName, opts...)
 }
 

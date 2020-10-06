@@ -1,0 +1,11 @@
+#!/bin/bash
+
+REGISTRY_REPO="$1"
+DOCKER_REGISTRY="$2"
+
+images="$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "${REGISTRY_REPO}")"
+
+for i in ${images}; do
+  echo "Pushing ${DOCKER_REGISTRY}/${i}"
+  docker push "${DOCKER_REGISTRY}/${i}"
+done

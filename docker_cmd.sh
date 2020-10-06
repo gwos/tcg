@@ -1,14 +1,18 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
-__build_libtransit() {
-    go build -buildmode=c-shared -o /src/libtransit/libtransit.so /src/libtransit/libtransit.go
-    export LIBTRANSIT=/src/libtransit/libtransit.so
-}
+connector=$1
+fs_app=/app
+fs_var=/tcg
 
-__go_test() {
-    go test $@
-}
+if ! [ -x "${fs_app}/${connector}/${connector}" ]; then
+    echo "CONNECTOR NOT FOUND: ${fs_app}/${connector}/${connector}"
+    exit 1
+fi
 
-__build_libtransit
+if ! [ -f "${fs_var}/${connector}/tcg_config.yaml" ]; then
+    mkdir -p "${fs_var}/${connector}"
+    cp "${fs_app}/${connector}/tcg_config.yaml" "${fs_var}/${connector}/tcg_config.yaml" || exit 1
+fi
 
-__go_test $@
+cd "${fs_var}/${connector}" || exit 1
+"${fs_app}/${connector}/${connector}"
