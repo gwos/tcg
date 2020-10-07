@@ -32,7 +32,7 @@ RUN cp ./docker_cmd.sh /app/
 FROM scratch as export
 COPY --from=build /app .
 
-FROM alpine:latest as prod
+FROM alpine:3.11 as prod
 COPY --from=build /app /app
 
 # Land docker exec into var folder
