@@ -91,7 +91,7 @@ const defaultHostGroupName = "Servers"
 
 var parser expfmt.TextParser
 
-func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, nil, err
@@ -276,8 +276,8 @@ func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) [
 }
 
 func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
-	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
-	var monitoredResources []transit.MonitoredResource
+	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.DynamicMonitoredResource, error) {
+	var monitoredResources []transit.DynamicMonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	for _, prometheusService := range prometheusServices {
 		if len(prometheusService.GetMetric()) == 0 {
