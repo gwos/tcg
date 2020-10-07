@@ -101,11 +101,11 @@ func makeEntrypointHandler(dataFormat DataFormat) func(*gin.Context) {
 	}
 }
 
-func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
+func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
 	var (
 		ctxN               context.Context
 		err                error
-		monitoredResources *[]transit.MonitoredResource
+		monitoredResources *[]transit.DynamicMonitoredResource
 		span               services.TraceSpan
 	)
 
@@ -127,13 +127,13 @@ func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) 
 	return monitoredResources, nil
 }
 
-func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
+func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
-		monitoredResources        []transit.MonitoredResource
+		monitoredResources        []transit.DynamicMonitoredResource
 		serviceNameToMetricsMap   map[string][]transit.TimeSeries
-		resourceNameToServicesMap map[string][]transit.MonitoredService
+		resourceNameToServicesMap map[string][]transit.DynamicMonitoredService
 		err                       error
 	)
 
@@ -162,7 +162,7 @@ func parseBody(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResou
 	}
 
 	for key, value := range resourceNameToServicesMap {
-		monitoredResources = append(monitoredResources, transit.MonitoredResource{
+		monitoredResources = append(monitoredResources, transit.DynamicMonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
 					Name: key,
@@ -275,8 +275,8 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 	return metricsMap, nil
 }
 
-func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.MonitoredService, error) {
-	servicesMap := make(map[string][]transit.MonitoredService)
+func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
+	servicesMap := make(map[string][]transit.DynamicMonitoredService)
 
 	for _, metric := range metricsLines {
 		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
@@ -296,7 +296,7 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 			return nil, err
 		}
 
-		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.MonitoredService{
+		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  arr[len(arr)-4],
 				Type:  transit.Service,
@@ -363,8 +363,8 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 	return metricsMap, nil
 }
 
-func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.MonitoredService, error) {
-	servicesMap := make(map[string][]transit.MonitoredService)
+func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
+	servicesMap := make(map[string][]transit.DynamicMonitoredService)
 	for _, metric := range metricsLines {
 		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
 
@@ -382,7 +382,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 			return nil, err
 		}
 
-		servicesMap[arr[2]] = append(servicesMap[arr[2]], transit.MonitoredService{
+		servicesMap[arr[2]] = append(servicesMap[arr[2]], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  arr[3],
 				Type:  transit.Service,
@@ -399,10 +399,10 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 	return removeDuplicateServices(servicesMap), nil
 }
 
-func removeDuplicateServices(servicesMap map[string][]transit.MonitoredService) map[string][]transit.MonitoredService {
+func removeDuplicateServices(servicesMap map[string][]transit.DynamicMonitoredService) map[string][]transit.DynamicMonitoredService {
 	for key, value := range servicesMap {
 		keys := make(map[string]bool)
-		var list []transit.MonitoredService
+		var list []transit.DynamicMonitoredService
 		for _, entry := range value {
 			if _, value := keys[entry.Name]; !value {
 				keys[entry.Name] = true

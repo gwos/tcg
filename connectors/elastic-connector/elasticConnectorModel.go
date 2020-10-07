@@ -105,10 +105,10 @@ func (monitoringState *MonitoringState) updateHost(hostName string, serviceName 
 	}
 }
 
-func (monitoringState *MonitoringState) toTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
+func (monitoringState *MonitoringState) toTransitResources() ([]transit.DynamicMonitoredResource, []transit.DynamicInventoryResource) {
 	hosts := monitoringState.Hosts
-	mrs := make([]transit.MonitoredResource, len(hosts))
-	irs := make([]transit.InventoryResource, len(hosts))
+	mrs := make([]transit.DynamicMonitoredResource, len(hosts))
+	irs := make([]transit.DynamicInventoryResource, len(hosts))
 	i := 0
 	for _, host := range hosts {
 		monitoredServices, inventoryServices := host.toTransitResources(monitoringState.Metrics)
@@ -129,9 +129,9 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.Monitore
 	return mrs, irs
 }
 
-func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
-	monitoredServices := make([]transit.MonitoredService, len(host.services))
-	inventoryServices := make([]transit.InventoryService, len(host.services))
+func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.DynamicMonitoredService, []transit.DynamicInventoryService) {
+	monitoredServices := make([]transit.DynamicMonitoredService, len(host.services))
+	inventoryServices := make([]transit.DynamicInventoryService, len(host.services))
 	if metricDefinitions == nil {
 		return monitoredServices, inventoryServices
 	}
