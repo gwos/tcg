@@ -62,7 +62,7 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, groups *[]transit.ResourceGroup) error {
+func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResource, groups *[]transit.ResourceGroup) error {
 	var (
 		b   []byte
 		err error
@@ -74,7 +74,7 @@ func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, gro
 		span.End()
 	}()
 
-	request := transit.ResourcesWithServicesRequest{
+	request := transit.DynamicResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
@@ -93,7 +93,7 @@ func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, gro
 }
 
 // SendInventory processes inventory payload
-func SendInventory(ctx context.Context, resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+func SendInventory(ctx context.Context, resources []transit.DynamicInventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
 	var (
 		b   []byte
 		err error
@@ -105,7 +105,7 @@ func SendInventory(ctx context.Context, resources []transit.InventoryResource, r
 		span.End()
 	}()
 
-	request := transit.InventoryRequest{
+	request := transit.DynamicInventoryRequest{
 		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
 		Resources:     resources,
@@ -120,8 +120,8 @@ func SendInventory(ctx context.Context, resources []transit.InventoryResource, r
 }
 
 // Inventory Constructors
-func CreateInventoryService(name string, owner string) transit.InventoryService {
-	return transit.InventoryService{
+func CreateInventoryService(name string, owner string) transit.DynamicInventoryService {
+	return transit.DynamicInventoryService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
 			Type:  transit.Service,
@@ -131,8 +131,8 @@ func CreateInventoryService(name string, owner string) transit.InventoryService 
 }
 
 // makes and modifies a copy, doesn't modify services
-func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
-	resource := transit.InventoryResource{
+func CreateInventoryResource(name string, services []transit.DynamicInventoryService) transit.DynamicInventoryResource {
+	resource := transit.DynamicInventoryResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
@@ -167,7 +167,7 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 	return group
 }
 
-func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
+func FillGroupWithResources(group transit.ResourceGroup, resources []transit.DynamicInventoryResource) transit.ResourceGroup {
 	var monitoredResourceRefs []transit.MonitoredResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
@@ -367,7 +367,7 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 // Creates metric based on data provided in metric builder and if metric successfully created
 // creates service with same name as metric which contains only this one metric
 // returns the result of service creation
-func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
+func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.DynamicMonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
 		log.Error("|connectors.go| : [BuildServiceForMetric] : Error creating metric for process: ", metricBuilder.Name,
@@ -382,7 +382,7 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
 }
 
-func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.DynamicMonitoredService, error) {
 	metrics := make([]transit.TimeSeries, len(metricBuilders))
 	for index, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
@@ -397,7 +397,7 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 	return CreateService(gwServiceName, hostName, metrics)
 }
 
-func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.DynamicMonitoredService, error) {
 	var timeSeries []transit.TimeSeries
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
@@ -414,8 +414,8 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // CreateService makes node
 // required params: name, owner(resource)
 // optional params: metrics
-func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
-	service := transit.MonitoredService{
+func CreateService(name string, owner string, args ...interface{}) (*transit.DynamicMonitoredService, error) {
+	service := transit.DynamicMonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
 			Type:  transit.Service,
@@ -444,8 +444,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 // CreateResource makes node
 // required params: name
 // optional params: services
-func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
-	resource := transit.MonitoredResource{
+func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitoredResource, error) {
+	resource := transit.DynamicMonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
@@ -459,7 +459,7 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.MonitoredService:
-			resource.Services = arg.([]transit.MonitoredService)
+			resource.Services = arg.([]transit.DynamicMonitoredService)
 		default:
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
 		}
@@ -468,7 +468,7 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 	return &resource, nil
 }
 
-func CalculateResourceStatus(services []transit.MonitoredService) transit.MonitorStatus {
+func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit.MonitorStatus {
 
 	// TODO: implement logic
 
@@ -587,8 +587,8 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 }
 
 // EvaluateExpressions calculates synthetic metrics
-func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
-	var result []transit.MonitoredService
+func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.DynamicMonitoredService {
+	var result []transit.DynamicMonitoredService
 	vars := make(map[string]interface{})
 
 	for _, service := range services {
@@ -612,7 +612,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
 					continue
 				} else {
-					result[i] = transit.MonitoredService{
+					result[i] = transit.DynamicMonitoredService{
 						BaseTransitData: transit.BaseTransitData{
 							Name:  result[i].Name,
 							Type:  transit.Service,
