@@ -13,7 +13,7 @@ func TestEvents(t *testing.T) {
 	testMessage, err := parseJSON("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
-	configNats(t, 5)
+	setupIntegration(t, 5)
 	defer cleanNats(t)
 
 	l0 := len(services.GetTransitService().Stats().LastErrors)

@@ -5,16 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
-	"path"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gwos/tcg/clients"
-	. "github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
@@ -38,32 +35,32 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	configNats(t, 5)
-	headers, err = config(t)
+	setupIntegration(t, 5)
+	headers, err = connect(t)
 	defer cleanNats(t)
-	defer clean(headers)
+	defer clean(t, headers)
 	assert.NoError(t, err)
 
-	log.Info("Check for host availability in the database")
+	t.Log("Check for host availability in the database")
 	time.Sleep(1 * time.Second)
-	assert.NoError(t, existenceCheck(false, "irrelevant"))
+	assert.NoError(t, existenceCheck(t, false, "irrelevant"))
 
-	log.Info("Send SynchronizeInventory request to GroundWork Foundation")
+	t.Log("Send SynchronizeInventory request to GroundWork Foundation")
 	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), buildInventoryRequest(t)))
 
 	time.Sleep(5 * time.Second)
-	log.Info("Check for host availability in the database")
+	t.Log("Check for host availability in the database")
 	time.Sleep(1 * time.Second)
-	assert.NoError(t, existenceCheck(true, HostStatusPending))
+	assert.NoError(t, existenceCheck(t, true, HostStatusPending))
 
-	log.Info("Send ResourcesWithMetrics request to GroundWork Foundation")
+	t.Log("Send ResourcesWithMetrics request to GroundWork Foundation")
 	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), buildResourceWithMetricsRequest(t)))
 
 	time.Sleep(5 * time.Second)
 
-	log.Info("Check for host availability in the database")
+	t.Log("Check for host availability in the database")
 	time.Sleep(1 * time.Second)
-	assert.NoError(t, existenceCheck(true, HostStatusUp))
+	assert.NoError(t, existenceCheck(t, true, HostStatusUp))
 }
 
 func buildInventoryRequest(t *testing.T) []byte {
@@ -147,15 +144,12 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 	return b
 }
 
-func config(t assert.TestingT) (map[string]string, error) {
-	err := os.Setenv(string(ConfigEnv), path.Join("..", ConfigName))
-	assert.NoError(t, err)
-
+func connect(t assert.TestingT) (map[string]string, error) {
 	gwClient := &clients.GWClient{
-		AppName:      GetConfig().Connector.AppName,
-		GWConnection: GetConfig().GWConnections[0],
+		AppName:      config.GetConfig().Connector.AppName,
+		GWConnection: config.GetConfig().GWConnections[0],
 	}
-	err = gwClient.Connect()
+	err := gwClient.Connect()
 	assert.NoError(t, err)
 
 	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
@@ -168,15 +162,15 @@ func config(t assert.TestingT) (map[string]string, error) {
 	return headers, nil
 }
 
-func existenceCheck(mustExist bool, mustHasStatus string) error {
+func existenceCheck(t *testing.T, mustExist bool, mustHasStatus string) error {
 	statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, HostGetAPI+TestHostName, headers, nil, nil)
 	if err != nil {
 		return err
 	}
 	if statusCode == 200 {
-		log.Info(" -> Host exists")
+		t.Log(" -> Host exists")
 	} else {
-		log.Info(" -> Host doesn't exist")
+		t.Log(" -> Host doesn't exist")
 	}
 
 	if !mustExist && statusCode == 404 {
@@ -201,15 +195,11 @@ func existenceCheck(mustExist bool, mustHasStatus string) error {
 	return nil
 }
 
-func clean(headers map[string]string) {
+func clean(t *testing.T, headers map[string]string) {
 	_, _, err := clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
-	if err != nil {
-		log.Error(err.Error())
-	}
+	assert.NoError(t, err)
 
-	cmd := exec.Command("rm", "-rf", "../gw-transit/src/main/resources/datastore")
+	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsFilestoreDir)
 	_, err = cmd.Output()
-	if err != nil {
-		log.Error(err.Error())
-	}
+	assert.NoError(t, err)
 }
