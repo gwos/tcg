@@ -458,7 +458,7 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 	}
 	for _, arg := range args {
 		switch arg.(type) {
-		case []transit.MonitoredService:
+		case []transit.DynamicMonitoredService:
 			resource.Services = arg.([]transit.DynamicMonitoredService)
 		default:
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
