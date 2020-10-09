@@ -49,6 +49,9 @@ func TestAgentService_DemandConfig(t *testing.T) {
 	_ = os.Setenv(string(config.ConfigEnv), tmpfile.Name())
 	defer os.Unsetenv(string(config.ConfigEnv))
 
+	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
+
 	dto := []byte(`
 {
   "agentId": "99998888-7777-6666-a3b0-b14622f7dd39",
