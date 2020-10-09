@@ -32,8 +32,8 @@ libtransit/libtransit.h
 vendor
 
 # NATS Datastore
-datastore
-integration/test_datastore/
+natsstore
+natsstore.test
 
 # Compiled Go-to-C conversion tool
 gotocjson/gotocjson
@@ -61,10 +61,6 @@ build
 
 # Location of installed headers, libraries, etc.
 install/*
-
-# Temp NATS store
-gw-transit/natsstore/
-natsstore/
 
 target
 
