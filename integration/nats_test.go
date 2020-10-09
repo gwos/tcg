@@ -8,15 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path"
 	"reflect"
 	"testing"
 	"time"
 
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
-	. "github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
@@ -24,19 +22,17 @@ import (
 )
 
 const (
-	TestMessagesCount                  = 3
-	PerformanceServicesCount           = 1
-	PerformanceResourcesCount          = 1000
-	TestAppType                        = "VEMA"
-	TestAgentID                        = "3939333393342"
-	TestTraceToken                     = "token-99e93"
-	GWAccountEnvVar                    = "TEST_GW_USERNAME"
-	GWPasswordEnvVar                   = "TEST_GW_PASSWORD"
-	GWAccountRemote                    = "***REMOVED***"
-	GWPasswordRemote                   = "***REMOVED***"
-	GWValidHost                        = "http://localhost:80"
-	GWInvalidHost                      = "http://localhost:23"
-	TestTcgAgentConfigNatsFileStoreDir = "test_datastore"
+	TestMessagesCount          = 3
+	PerformanceServicesCount   = 1
+	PerformanceResourcesCount  = 1000
+	TestAgentID                = "INTEGRATION-TEST"
+	TestAppName                = "INTEGRATION-TEST"
+	TestAppType                = "VEMA"
+	GWAccountEnvVar            = "TEST_GW_USERNAME"
+	GWPasswordEnvVar           = "TEST_GW_PASSWORD"
+	GWValidHost                = "http://localhost:80"
+	GWInvalidHost              = "http://localhost:23"
+	TestConfigNatsFileStoreDir = "natsstore.test"
 )
 
 // Test for ensuring that all data is stored in NATS and later resent
@@ -44,9 +40,9 @@ const (
 // TCG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
-	configNats(t, 5)
-	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	GetConfig().GWConnections[0].HostName = GWInvalidHost
+	setupIntegration(t, 5)
+	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
+	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent
 	assert.NoError(t, services.GetTransitService().StartTransport())
@@ -65,8 +61,8 @@ func TestNatsQueue_1(t *testing.T) {
 		return
 	}
 
-	GetConfig().GWConnections[0].HostName = GWValidHost
-	log.Info("Invalid path was changed to valid one")
+	config.GetConfig().GWConnections[0].HostName = GWValidHost
+	t.Log("Invalid path was changed to valid one")
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
@@ -83,9 +79,9 @@ func TestNatsQueue_1(t *testing.T) {
 // TCG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
-	configNats(t, 30)
-	log.Info("Config has invalid path to Groundwork Foundation, messages will be stored in a datastore:")
-	GetConfig().GWConnections[0].HostName = GWInvalidHost
+	setupIntegration(t, 30)
+	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
+	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent
 	assert.NoError(t, services.GetTransitService().StartTransport())
@@ -104,21 +100,18 @@ func TestNatsQueue_2(t *testing.T) {
 		return
 	}
 
-	log.Info("Stopping NATS server ...")
+	t.Log("Stopping NATS server ...")
 	assert.NoError(t, services.GetTransitService().StopNats())
-	log.Info("NATS Server was stopped successfully")
+	t.Log("NATS Server was stopped successfully")
 
-	GetConfig().GWConnections[0].LocalConnection = false
-	GetConfig().GWConnections[0].UserName = GWAccountRemote
-	GetConfig().GWConnections[0].Password = GWPasswordRemote
-	GetConfig().GWConnections[0].HostName = GWValidHost
-	log.Info("Invalid path was changed to valid one")
+	config.GetConfig().GWConnections[0].HostName = GWValidHost
+	t.Log("Invalid path was changed to valid one")
 
-	log.Info("Starting NATS server ...")
+	t.Log("Starting NATS server ...")
 	assert.NoError(t, services.GetTransitService().StartNats())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	log.Info("NATS Server was started successfully")
+	t.Log("NATS Server was started successfully")
 	time.Sleep(TestMessagesCount * 1 * time.Second)
 
 	if services.GetTransitService().Stats().MessagesSent-m0 == 0 {
@@ -130,7 +123,7 @@ func TestNatsQueue_2(t *testing.T) {
 //Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
-	configNats(t, 30)
+	setupIntegration(t, 30)
 	m0 := services.GetTransitService().Stats().MessagesSent
 
 	var resources []transit.DynamicMonitoredResource
@@ -181,23 +174,26 @@ func TestNatsPerformance(t *testing.T) {
 	defer removeHost(t)
 }
 
-func configNats(t *testing.T, natsAckWait int64) {
-	time.Sleep(3 * time.Second)
-
-	assert.NoError(t, os.Setenv(string(ConfigEnv), path.Join("..", ConfigName)))
+func setupIntegration(t *testing.T, natsAckWait int64) {
 	testGroundworkUserName := os.Getenv(GWAccountEnvVar)
 	testGroundworkPassword := os.Getenv(GWPasswordEnvVar)
-
 	if testGroundworkUserName == "" || testGroundworkPassword == "" {
-		t.Errorf("|nats_test.go| [configNats]: Provide environment variables for Groundwork Connection username('%s') and password('%s')",
+		t.Errorf("[setupIntegration]: Provide environment variables for Groundwork Connection username('%s') and password('%s')",
 			GWAccountEnvVar, GWPasswordEnvVar)
 		t.SkipNow()
 	}
 
-	GetConfig().GWConnections = []*GWConnection{
+	cfg := config.GetConfig()
+	cfg.Connector.AgentID = TestAgentID
+	cfg.Connector.AppName = TestAppName
+	cfg.Connector.AppType = TestAppType
+	cfg.Connector.LogLevel = 2
+	cfg.Connector.NatsAckWait = natsAckWait
+	cfg.Connector.NatsFilestoreDir = TestConfigNatsFileStoreDir
+	cfg.GWConnections = []*config.GWConnection{
 		{
 			Enabled:         true,
-			LocalConnection: true,
+			LocalConnection: false,
 			HostName:        GWValidHost,
 			UserName:        testGroundworkUserName,
 			Password:        testGroundworkPassword,
@@ -205,22 +201,19 @@ func configNats(t *testing.T, natsAckWait int64) {
 	}
 
 	service := services.GetTransitService()
-	service.Connector.NatsFilestoreDir = TestTcgAgentConfigNatsFileStoreDir
-	service.Connector.NatsAckWait = natsAckWait
-
 	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
-	log.Info("#configNats status: ", service.Status())
+	t.Log("[setupIntegration]: ", service.Status())
 }
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", TestTcgAgentConfigNatsFileStoreDir)
+	cmd := exec.Command("rm", "-rf", TestConfigNatsFileStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
 	cache.DispatcherDoneCache.Flush()
-	log.Info("#cleanNats status: ", services.GetTransitService().Status())
+	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
 
 func parseJSON(filePath string) ([]byte, error) {
@@ -304,8 +297,8 @@ func inventoryService(i int) transit.DynamicInventoryService {
 
 func removeHost(t *testing.T) {
 	gwClient := &clients.GWClient{
-		AppName:      GetConfig().Connector.AppName,
-		GWConnection: GetConfig().GWConnections[0],
+		AppName:      config.GetConfig().Connector.AppName,
+		GWConnection: config.GetConfig().GWConnections[0],
 	}
 	err := gwClient.Connect()
 	assert.NoError(t, err)
