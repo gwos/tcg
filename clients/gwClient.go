@@ -452,13 +452,13 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	reqUrl := client.uriServices + BuildQueryParams(params)
 	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
 	if err != nil {
-		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
+		log.Warn("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
 		return nil, err
 	}
 	var gwServices GwServices
 	err = json.Unmarshal(response, &gwServices)
 	if err != nil {
-		log.Error("|gwClient.go| : [GetServicesByAgent] : Unable to parse received GW services: ", err)
+		log.Warn("|gwClient.go| : [GetServicesByAgent] : Unable to parse received GW services: ", err)
 		return nil, err
 	}
 	return &gwServices, nil
@@ -539,11 +539,11 @@ func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, err
 func (client *GWClient) getLastSentHostsCount(agentID string) int {
 	gwServices, err := client.GetServicesByAgent(agentID)
 	if err != nil || gwServices == nil {
-		log.Error("|gwClient.go| : [getLastSentHostsCount] : Unable to get GW hosts to init  last hosts sent count.")
+		log.Warn("|gwClient.go| : [getLastSentHostsCount] : Unable to get GW hosts to init  last hosts sent count.")
 		if err != nil {
-			log.Error("|gwClient.go| : [getLastSentHostsCount] : ", err)
+			log.Warn("|gwClient.go| : [getLastSentHostsCount] : ", err)
 		} else {
-			log.Error("|gwClient.go| : [getLastSentHostsCount] : Response is nil.")
+			log.Warn("|gwClient.go| : [getLastSentHostsCount] : Response is nil.")
 		}
 		return 0
 	}
