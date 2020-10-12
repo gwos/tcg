@@ -15,6 +15,7 @@ import (
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -73,6 +74,7 @@ var hostName string
 
 // temporary solution, will be removed
 var templateMetricName = "$view_Template#"
+const EnvTcgHostName = "TCG_HOST_NAME"
 
 // Synchronize inventory for necessary processes
 func Synchronize(processes []transit.MetricDefinition) *transit.DynamicInventoryResource {
@@ -82,7 +84,10 @@ func Synchronize(processes []transit.MetricDefinition) *transit.DynamicInventory
 		return nil
 	}
 
-	hostName = hostStat.Hostname
+	hostName = os.Getenv(EnvTcgHostName)
+	if hostName == "" {
+		hostName = hostStat.Hostname
+	}
 
 	var srvs []transit.DynamicInventoryService
 	for _, pr := range processes {
@@ -111,7 +116,10 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.DynamicMonito
 		return nil
 	}
 
-	hostName = hostStat.Hostname
+	hostName = os.Getenv(EnvTcgHostName)
+	if hostName == "" {
+		hostName = hostStat.Hostname
+	}
 
 	monitoredResource, _ := connectors.CreateResource(hostName)
 
