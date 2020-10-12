@@ -44,7 +44,6 @@ const (
 	GWEntrypointHostgroups                     = "/api/hostgroups"
 	GWEntrypointLicenseCheck                   = "/api/license/check"
 	GWEntrypointValidateToken                  = "/api/auth/validatetoken"
-	NagiosApp                                  = "NAGIOS"
 )
 
 // GWClient implements GWOperations interface
@@ -131,8 +130,7 @@ func (client *GWClient) Connect() error {
 		/* token already changed */
 		return nil
 	}
-	isInternalConnector := client.AppType == NagiosApp && client.IsChild == false
-	if isInternalConnector {
+	if client.LocalConnection {
 		return client.connectLocal()
 	}
 	return client.connectRemote()
@@ -641,8 +639,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 func (client *GWClient) buildURIs() {
 	client.Once.Do(func() {
 		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		isInternalConnector := client.AppType == NagiosApp && client.IsChild == false
-		if !isInternalConnector {
+		if !client.LocalConnection {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
