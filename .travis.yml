@@ -8,7 +8,7 @@ script:
 notifications:
   slack:
     rooms:
-      - gwos:qKDnrmd5j8m6ebPpkalow24w#bot-noise
+      - $SLACK_BOT_NOISE
     on_pull_requests: true
 
   webhooks:
