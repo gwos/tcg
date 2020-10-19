@@ -5,10 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/gwos/tcg/log"
-	"github.com/kelseyhightower/envconfig"
-	"golang.org/x/crypto/nacl/secretbox"
-	"gopkg.in/yaml.v3"
 	"io"
 	"io/ioutil"
 	"math"
@@ -16,6 +12,12 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/gwos/tcg/log"
+	"github.com/kelseyhightower/envconfig"
+	"golang.org/x/crypto/nacl/secretbox"
+	"gopkg.in/yaml.v3"
 )
 
 // Variables to control the build info
@@ -304,23 +306,31 @@ func defaults() Config {
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
+		logBuf := make(map[string]interface{}, 3)
 		c := defaults()
 		cfg = &c
 
 		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
-			log.Warn(err)
+			logBuf["ioutil.ReadFile"] = err
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
-				log.Warn(err)
+				logBuf["yaml.Unmarshal"] = err
 			}
 		}
 
 		if err := envconfig.Process(EnvConfigPrefix, cfg); err != nil {
-			log.Warn(err)
+			logBuf["envconfig.Process"] = err
 		}
 
-		log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
+		log.Config(
+			cfg.Connector.LogFile,
+			int(cfg.Connector.LogLevel),
+			time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
+		)
 		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
+		if len(logBuf) > 0 {
+			log.With(logBuf).Warn()
+		}
 	})
 	return cfg
 }
@@ -456,7 +466,11 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.GWConnections = newCfg.GWConnections
 
 	/* update logger */
-	log.Config(cfg.Connector.LogFile, int(cfg.Connector.LogLevel), cfg.Connector.LogConsPeriod)
+	log.Config(
+		cfg.Connector.LogFile,
+		int(cfg.Connector.LogLevel),
+		time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
+	)
 
 	return dto, nil
 }
