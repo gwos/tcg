@@ -5,17 +5,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
-	"time"
+	"go.opentelemetry.io/otel/label"
 )
 
 var (
@@ -43,6 +45,16 @@ type ScheduleTask struct {
 	Cron           string     `json:"cron"`
 	DataFormat     DataFormat `json:"dataFormat"`
 	Environment    []string   `json:"environment,omitempty"`
+}
+
+func (t ScheduleTask) String() string {
+	return fmt.Sprintf(
+		"%s [%s] %v %v",
+		t.DataFormat,
+		t.Cron,
+		t.Command,
+		t.Environment,
+	)
 }
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -80,9 +92,11 @@ func makeEntrypointHandler(dataFormat DataFormat) func(*gin.Context) {
 		)
 		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
 		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(payload))
-			span.SetAttribute("entrypoint", c.FullPath())
+			span.SetAttributes(
+				label.Int("payloadLen", len(payload)),
+				label.String("error", fmt.Sprint(err)),
+				label.String("entrypoint", c.FullPath()),
+			)
 			span.End()
 		}()
 
@@ -112,8 +126,10 @@ func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) 
 	ctxN, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
 	monitoredResources, err = parseBody(payload, dataFormat)
 
-	span.SetAttribute("error", err)
-	span.SetAttribute("payloadLen", len(payload))
+	span.SetAttributes(
+		label.Int("payloadLen", len(payload)),
+		label.String("error", fmt.Sprint(err)),
+	)
 	span.End()
 
 	if err != nil {

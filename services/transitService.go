@@ -2,9 +2,11 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/gwos/tcg/nats"
+	"go.opentelemetry.io/otel/label"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces
@@ -31,8 +33,10 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	)
 	_, span := StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		span.End()
 	}()
 
@@ -53,8 +57,10 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	)
 	_, span := StartTraceSpan(ctx, "services", "SynchronizeInventory")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		span.End()
 	}()
 

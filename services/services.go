@@ -127,7 +127,7 @@ type Controllers interface {
 type TraceSpan trace.Span
 
 // StartTraceSpan starts a span
-func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.StartOption) (context.Context, TraceSpan) {
+func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

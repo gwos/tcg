@@ -3,12 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"os/exec"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
-	"os/exec"
+	"go.opentelemetry.io/otel/label"
 )
 
 var (
@@ -112,18 +115,22 @@ func taskHandler(task ScheduleTask) func() {
 
 		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
-			span.SetAttribute("error", err)
-			span.SetAttribute("payloadLen", len(res))
-			span.SetAttribute("task", task)
+			span.SetAttributes(
+				label.Int("payloadLen", len(res)),
+				label.String("error", fmt.Sprint(err)),
+				label.String("task", task.String()),
+			)
 			span.End()
 		}()
 		_, spanN = services.StartTraceSpan(ctx, "connectors", "command")
 
 		res, err = handler()
 
-		spanN.SetAttribute("error", err)
-		spanN.SetAttribute("payloadLen", len(res))
-		spanN.SetAttribute("command", task.Command)
+		span.SetAttributes(
+			label.Int("payloadLen", len(res)),
+			label.String("error", fmt.Sprint(err)),
+			label.Array("command", task.Command),
+		)
 		spanN.End()
 
 		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
@@ -139,8 +146,10 @@ func taskHandler(task ScheduleTask) func() {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
 
-		spanN.SetAttribute("error", err)
-		spanN.SetAttribute("payloadLen", len(res))
+		span.SetAttributes(
+			label.Int("payloadLen", len(res)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		spanN.End()
 	}
 }

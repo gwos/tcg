@@ -44,7 +44,7 @@ type AgentService struct {
 	demandConfigHandler   func() bool
 	exitHandler           func()
 	telemetryFlushHandler func()
-	telemetryProvider     apitrace.Provider
+	telemetryProvider     apitrace.TracerProvider
 }
 
 // CtrlAction defines queued controll action
@@ -496,9 +496,11 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 			}
 			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
 			defer func() {
-				span.SetAttribute("error", err)
-				span.SetAttribute("payloadLen", len(b))
-				span.SetAttribute("durableName", durableName)
+				span.SetAttributes(
+					label.Int("payloadLen", len(b)),
+					label.String("error", fmt.Sprint(err)),
+					label.String("durableName", durableName),
+				)
 				span.End()
 			}()
 
@@ -692,13 +694,13 @@ func (service AgentService) hookLogErrors(entry log.Entry) error {
 }
 
 // initTelemetryProvider creates a new provider instance
-func initTelemetryProvider() (apitrace.Provider, func(), error) {
+func initTelemetryProvider() (apitrace.TracerProvider, func(), error) {
 	var jaegerEndpoint jaeger.EndpointOption
 	jaegerAgent := config.GetConfig().Jaegertracing.Agent
 	jaegerCollector := config.GetConfig().Jaegertracing.Collector
 	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
 		log.Debug("telemetry not configured")
-		return apitrace.NoopProvider{}, func() {}, nil
+		return apitrace.NoopTracerProvider(), func() {}, nil
 	}
 	if len(jaegerAgent) == 0 {
 		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)

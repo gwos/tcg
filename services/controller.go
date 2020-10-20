@@ -19,6 +19,7 @@ import (
 	"github.com/gwos/tcg/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
+	"go.opentelemetry.io/otel/label"
 )
 
 // Controller implements AgentServices, Controllers interface
@@ -91,8 +92,10 @@ func (controller *Controller) SendEvents(ctx context.Context, payload []byte) er
 	)
 	_, span := StartTraceSpan(ctx, "services", "SendEvents")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		span.End()
 	}()
 
@@ -109,8 +112,10 @@ func (controller *Controller) SendEventsAck(ctx context.Context, payload []byte)
 	)
 	_, span := StartTraceSpan(ctx, "services", "SendEventsAck")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		span.End()
 	}()
 
@@ -127,8 +132,10 @@ func (controller *Controller) SendEventsUnack(ctx context.Context, payload []byt
 	)
 	_, span := StartTraceSpan(ctx, "services", "SendEventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+		)
 		span.End()
 	}()
 
@@ -267,9 +274,11 @@ func (controller *Controller) events(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 
@@ -303,9 +312,11 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 
@@ -339,9 +350,11 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 
