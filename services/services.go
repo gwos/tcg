@@ -11,9 +11,10 @@ import (
 )
 
 // Define NATS subjects
-// group events actions and inventory with metrics
+// group downtime, events actions, and inventory with metrics
 // as try to keep the processing order
 const (
+	subjDowntime         = "downtime"
 	subjEvents           = "events"
 	subjInventoryMetrics = "inventory-metrics"
 )
@@ -107,6 +108,8 @@ type TransitServices interface {
 	ListMetrics() ([]byte, error)
 	RegisterListMetricsHandler(func() ([]byte, error))
 	RemoveListMetricsHandler()
+	ClearInDowntime(context.Context, []byte) error
+	SetInDowntime(context.Context, []byte) error
 	SendEvents(context.Context, []byte) error
 	SendEventsAck(context.Context, []byte) error
 	SendEventsUnack(context.Context, []byte) error
@@ -141,6 +144,8 @@ const (
 	typeEventsUnack
 	typeInventory
 	typeMetrics
+	typeClearInDowntime
+	typeSetInDowntime
 )
 
 func (s payloadType) String() string {
@@ -151,6 +156,8 @@ func (s payloadType) String() string {
 		"eventsUnack",
 		"inventory",
 		"metrics",
+		"clearInDowntime",
+		"setInDowntime",
 	}[s]
 }
 

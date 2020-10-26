@@ -48,6 +48,46 @@ func (service *TransitService) RemoveListMetricsHandler() {
 	service.listMetricsHandler = defaultListMetricsHandler
 }
 
+// ClearInDowntime implements TransitServices.ClearInDowntime interface
+func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "ClearInDowntime")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+
+	b, err = natsPayload{payload, span.SpanContext(), typeClearInDowntime}.MarshalText()
+	err = nats.Publish(subjDowntime, b)
+	return err
+}
+
+// SetInDowntime implements TransitServices.SetInDowntime interface
+func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "SetInDowntime")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+
+	b, err = natsPayload{payload, span.SpanContext(), typeSetInDowntime}.MarshalText()
+	err = nats.Publish(subjDowntime, b)
+	return err
+}
+
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
 	var (
