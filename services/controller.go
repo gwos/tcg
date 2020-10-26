@@ -16,17 +16,16 @@ import (
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/nats"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
+	"go.opentelemetry.io/otel/label"
 )
 
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
-	*AgentService
-	entrypoints        []Entrypoint
-	listMetricsHandler GetBytesHandlerType
-	srv                *http.Server
+	*TransitService
+	entrypoints []Entrypoint
+	srv         *http.Server
 }
 
 // Entrypoint describes controller API
@@ -45,9 +44,8 @@ var controller *Controller
 func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
-			GetAgentService(),
+			GetTransitService(),
 			[]Entrypoint{},
-			defaultListMetricsHandler,
 			nil,
 		}
 	})
@@ -62,79 +60,6 @@ func (controller *Controller) RegisterEntrypoints(entrypoints []Entrypoint) {
 // RemoveEntrypoints removes addition API
 func (controller *Controller) RemoveEntrypoints() {
 	controller.entrypoints = []Entrypoint{}
-}
-
-func defaultListMetricsHandler() ([]byte, error) {
-	return nil, fmt.Errorf("listMetricsHandler unavailable")
-}
-
-// ListMetrics implements Controllers.ListMetrics interface
-func (controller *Controller) ListMetrics() ([]byte, error) {
-	return controller.listMetricsHandler()
-}
-
-// RegisterListMetricsHandler implements Controllers.RegisterListMetricsHandler interface
-func (controller *Controller) RegisterListMetricsHandler(fn GetBytesHandlerType) {
-	controller.listMetricsHandler = fn
-}
-
-// RemoveListMetricsHandler implements Controllers.RemoveListMetricsHandler interface
-func (controller *Controller) RemoveListMetricsHandler() {
-	controller.listMetricsHandler = defaultListMetricsHandler
-}
-
-// SendEvents implements Controllers.SendEvents interface
-func (controller *Controller) SendEvents(ctx context.Context, payload []byte) error {
-	var (
-		b   []byte
-		err error
-	)
-	_, span := StartTraceSpan(ctx, "services", "SendEvents")
-	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
-		span.End()
-	}()
-
-	b, err = natsPayload{payload, span.SpanContext(), typeEvents}.MarshalText()
-	err = nats.Publish(subjEvents, b)
-	return err
-}
-
-// SendEventsAck implements Controllers.SendEventsAck interface
-func (controller *Controller) SendEventsAck(ctx context.Context, payload []byte) error {
-	var (
-		b   []byte
-		err error
-	)
-	_, span := StartTraceSpan(ctx, "services", "SendEventsAck")
-	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
-		span.End()
-	}()
-
-	b, err = natsPayload{payload, span.SpanContext(), typeEventsAck}.MarshalText()
-	err = nats.Publish(subjEvents, b)
-	return err
-}
-
-// SendEventsUnack implements Controllers.SendEventsUnack interface
-func (controller *Controller) SendEventsUnack(ctx context.Context, payload []byte) error {
-	var (
-		b   []byte
-		err error
-	)
-	_, span := StartTraceSpan(ctx, "services", "SendEventsUnack")
-	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(b))
-		span.End()
-	}()
-
-	b, err = natsPayload{payload, span.SpanContext(), typeEventsUnack}.MarshalText()
-	err = nats.Publish(subjEvents, b)
-	return err
 }
 
 // starts the http server
@@ -267,9 +192,11 @@ func (controller *Controller) events(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 
@@ -303,9 +230,11 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 
@@ -339,9 +268,11 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttribute("error", err)
-		span.SetAttribute("payloadLen", len(payload))
-		span.SetAttribute("entrypoint", c.FullPath())
+		span.SetAttributes(
+			label.Int("payloadLen", len(payload)),
+			label.String("error", fmt.Sprint(err)),
+			label.String("entrypoint", c.FullPath()),
+		)
 		span.End()
 	}()
 

@@ -5,6 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -12,10 +17,7 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"net/http"
-	"sort"
-	"strings"
-	"time"
+	"go.opentelemetry.io/otel/label"
 )
 
 // ElasticView describes flow
@@ -150,7 +152,9 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 
 	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
 	defer func() {
-		spanCollectMetrics.SetAttribute("error", err)
+		spanCollectMetrics.SetAttributes(
+			label.String("error", fmt.Sprint(err)),
+		)
 		spanCollectMetrics.End()
 	}()
 	_, spanMonitoringState := services.StartTraceSpan(ctx, "connectors", "initMonitoringState")
@@ -158,8 +162,10 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 	monitoringState := connector.config.initMonitoringState(connector.monitoringState, &connector.esClient)
 	connector.monitoringState = monitoringState
 
-	spanMonitoringState.SetAttribute("monitoringState.Hosts", len(monitoringState.Hosts))
-	spanMonitoringState.SetAttribute("monitoringState.Metrics", len(monitoringState.Metrics))
+	spanMonitoringState.SetAttributes(
+		label.Int("monitoringState.Hosts", len(monitoringState.Hosts)),
+		label.Int("monitoringState.Metrics", len(monitoringState.Metrics)),
+	)
 	spanMonitoringState.End()
 
 	for view, metrics := range connector.config.Views {

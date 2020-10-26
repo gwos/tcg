@@ -7,9 +7,10 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 )
 
 // SendRequest wraps HTTP methods
@@ -47,21 +48,21 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 		body = nil
 	}
 
-	request, err = http.NewRequest(httpMethod, requestURL, body)
+	if ctx == nil {
+		request, err = http.NewRequest(httpMethod, requestURL, body)
+	} else {
+		ctx = httptrace.WithClientTrace(ctx, otelhttptrace.NewClientTrace(ctx))
+		request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
+	}
 	if err != nil {
 		return -1, nil, err
 	}
-	request.Header.Set("Connection", "close")
 
+	request.Header.Set("Connection", "close")
 	if headers != nil {
 		for key, value := range headers {
 			request.Header.Add(key, value)
 		}
-	}
-
-	if ctx != nil {
-		ctx, request = httptrace.W3C(ctx, request)
-		httptrace.Inject(ctx, request)
 	}
 
 	response, err = client.Do(request)

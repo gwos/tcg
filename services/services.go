@@ -104,30 +104,27 @@ type AgentServices interface {
 
 // TransitServices defines TCG Agent services interface
 type TransitServices interface {
-	SendResourceWithMetrics(context.Context, []byte) error
-	SynchronizeInventory(context.Context, []byte) error
-}
-
-// GetBytesHandlerType defines handler type
-type GetBytesHandlerType func() ([]byte, error)
-
-// Controllers defines TCG Agent controllers interface
-type Controllers interface {
 	ListMetrics() ([]byte, error)
-	RegisterEntrypoints([]Entrypoint)
-	RemoveEntrypoints()
-	RegisterListMetricsHandler(GetBytesHandlerType)
+	RegisterListMetricsHandler(func() ([]byte, error))
 	RemoveListMetricsHandler()
 	SendEvents(context.Context, []byte) error
 	SendEventsAck(context.Context, []byte) error
 	SendEventsUnack(context.Context, []byte) error
+	SendResourceWithMetrics(context.Context, []byte) error
+	SynchronizeInventory(context.Context, []byte) error
+}
+
+// Controllers defines TCG Agent controllers interface
+type Controllers interface {
+	RegisterEntrypoints([]Entrypoint)
+	RemoveEntrypoints()
 }
 
 // TraceSpan aliases trace.Span interface
 type TraceSpan trace.Span
 
 // StartTraceSpan starts a span
-func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.StartOption) (context.Context, TraceSpan) {
+func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

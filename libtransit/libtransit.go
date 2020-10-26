@@ -73,10 +73,10 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
-// SendEvents is a C API for services.GetController().SendEvents
+// SendEvents is a C API for services.GetTransitService().SendEvents
 //export SendEvents
 func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetController().
+	if err := services.GetTransitService().
 		SendEvents(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
@@ -84,10 +84,10 @@ func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
-// SendEventsAck is a C API for services.GetController().SendEventsAck
+// SendEventsAck is a C API for services.GetTransitService().SendEventsAck
 //export SendEventsAck
 func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetController().
+	if err := services.GetTransitService().
 		SendEventsAck(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
@@ -95,10 +95,10 @@ func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
-// SendEventsUnack is a C API for services.GetController().SendEventsUnack
+// SendEventsUnack is a C API for services.GetTransitService().SendEventsUnack
 //export SendEventsUnack
 func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetController().
+	if err := services.GetTransitService().
 		SendEventsUnack(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
@@ -216,11 +216,11 @@ func IsTransportRunning() bool {
 	return services.GetTransitService().Status().Transport == services.Running
 }
 
-// RegisterListMetricsHandler is a C API for services.GetController().RegisterListMetricsHandler
+// RegisterListMetricsHandler is a C API for services.GetTransitService().RegisterListMetricsHandler
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	/* See notes on getTextHandlerType and invokeGetTextHandler */
-	services.GetController().RegisterListMetricsHandler(func() ([]byte, error) {
+	services.GetTransitService().RegisterListMetricsHandler(func() ([]byte, error) {
 		textPtr := C.invokeGetTextHandler(fn)
 		res := []byte(C.GoString(textPtr))
 		C.free(unsafe.Pointer(textPtr))
@@ -228,10 +228,10 @@ func RegisterListMetricsHandler(fn C.getTextHandlerType) {
 	})
 }
 
-// RemoveListMetricsHandler is a C API for services.GetController().RemoveListMetricsHandler
+// RemoveListMetricsHandler is a C API for services.GetTransitService().RemoveListMetricsHandler
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
-	services.GetController().RemoveListMetricsHandler()
+	services.GetTransitService().RemoveListMetricsHandler()
 }
 
 // RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler

@@ -10,7 +10,7 @@ import (
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/log"
-	natsd "github.com/nats-io/nats-server/server"
+	natsd "github.com/nats-io/nats-server/v2/server"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
 	"github.com/nats-io/stan.go"
