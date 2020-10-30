@@ -963,3 +963,25 @@ func (metricDefinition MetricDefinition) String() string {
 		metricDefinition.CriticalThreshold, metricDefinition.Expression, metricDefinition.Format,
 	)
 }
+
+// HostServiceInDowntime describes downtime schedule
+type HostServiceInDowntime struct {
+	HostName               string `json:"hostName"`
+	ServiceDescription     string `json:"serviceDescription"`
+	ScheduledDowntimeDepth int    `json:"scheduledDowntimeDepth"`
+	EntityType             string `json:"entityType"`
+	EntityName             string `json:"entityName"`
+}
+
+// HostServiceInDowntimeList defines type used for ClearInDowntime API payload
+type HostServiceInDowntimeList []HostServiceInDowntime
+
+// HostsAndServices defines type used for SetInDowntime API payload
+type HostsAndServices struct {
+	HostNames                 []string `json:"hostNames"`
+	ServiceDescriptions       []string `json:"serviceDescriptions"`
+	HostGroupNames            []string `json:"hostGroupNames"`
+	ServiceGroupCategoryNames []string `json:"serviceGroupCategoryNames"`
+	SetHosts                  bool     `json:"setHosts"`
+	SetServices               bool     `json:"setServices"`
+}

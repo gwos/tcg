@@ -446,7 +446,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeEventsUnack:
 						_, err = gwClientRef.SendEventsUnack(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("dispatcher error on process payload type")
+						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjEvents)
 					}
 					return err
 				},
@@ -462,12 +462,28 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeMetrics:
 						_, err = gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
 					default:
-						err = fmt.Errorf("dispatcher error on process payload type")
+						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
 					}
 					if errors.Is(err, clients.ErrUnauthorized) {
 						/* it looks like an issue with credentialed user
 						so, wait for configuration update */
 						_ = service.StopTransport()
+					}
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				fmt.Sprintf("#%s#%s#", subjDowntime, gwClientRef.HostName),
+				subjDowntime,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeClearInDowntime:
+						_, err = gwClientRef.ClearInDowntime(ctx, p.Payload)
+					case typeSetInDowntime:
+						_, err = gwClientRef.SetInDowntime(ctx, p.Payload)
+					default:
+						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjDowntime)
 					}
 					return err
 				},

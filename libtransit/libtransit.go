@@ -73,6 +73,28 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
 	return true
 }
 
+// ClearInDowntime is a C API for services.GetTransitService().ClearInDowntime
+//export ClearInDowntime
+func ClearInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().
+		ClearInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// SetInDowntime is a C API for services.GetTransitService().SetInDowntime
+//export SetInDowntime
+func SetInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
+	if err := services.GetTransitService().
+		SetInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
 // SendEvents is a C API for services.GetTransitService().SendEvents
 //export SendEvents
 func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {

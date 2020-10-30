@@ -6,13 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/gwos/tcg/cache"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/log"
 )
 
 // GWOperations defines Groundwork operations interface
@@ -22,6 +23,8 @@ type GWOperations interface {
 	GetServicesByAgent(agentID string) ([]byte, error)
 	GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error)
 	ValidateToken(appName, apiToken string) error
+	ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error)
+	SetInDowntime(ctx context.Context, payload []byte) ([]byte, error)
 	SendEvents(ctx context.Context, payload []byte) ([]byte, error)
 	SendEventsAck(ctx context.Context, payload []byte) ([]byte, error)
 	SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error)
@@ -34,6 +37,8 @@ const (
 	GWEntrypointConnectRemote                  = "/api/users/authenticatePassword"
 	GWEntrypointConnect                        = "/api/auth/login"
 	GWEntrypointDisconnect                     = "/api/auth/logout"
+	GWEntrypointClearInDowntime                = "/api/biz/clearindowntime"
+	GWEntrypointSetInDowntime                  = "/api/biz/setindowntime"
 	GWEntrypointSendEvents                     = "/api/events"
 	GWEntrypointSendEventsAck                  = "/api/events/ack"
 	GWEntrypointSendEventsUnack                = "/api/events/unack"
@@ -56,6 +61,8 @@ type GWClient struct {
 	sync.Once
 	uriConnect                        string
 	uriDisconnect                     string
+	uriClearInDowntime                string
+	uriSetInDowntime                  string
 	uriSendEvents                     string
 	uriSendEventsAck                  string
 	uriSendEventsUnack                string
@@ -399,6 +406,34 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 	return client.sendData(ctx, client.uriSendResourceWithMetrics, payload)
 }
 
+// ClearInDowntime implements GWOperations.ClearInDowntime.
+func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
+	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(ctx, client.uriClearInDowntime, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
+	return client.sendData(ctx, client.uriClearInDowntime, payload)
+}
+
+// SetInDowntime implements GWOperations.SetInDowntime.
+func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
+	client.buildURIs()
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		return client.sendData(ctx, client.uriSetInDowntime, payload,
+			header{
+				"HostNamePrefix",
+				client.ResourceNamePrefix,
+			},
+		)
+	}
+	return client.sendData(ctx, client.uriSetInDowntime, payload)
+}
+
 // SendEvents implements GWOperations.SendEvents.
 func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
@@ -643,6 +678,8 @@ func (client *GWClient) buildURIs() {
 			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
 		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
+		uriClearInDowntime := buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
+		uriSetInDowntime := buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
 		uriSendEvents := buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
 		uriSendEventsAck := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
 		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
@@ -656,6 +693,8 @@ func (client *GWClient) buildURIs() {
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
 		client.uriDisconnect = uriDisconnect
+		client.uriClearInDowntime = uriClearInDowntime
+		client.uriSetInDowntime = uriSetInDowntime
 		client.uriSendEvents = uriSendEvents
 		client.uriSendEventsAck = uriSendEventsAck
 		client.uriSendEventsUnack = uriSendEventsUnack
