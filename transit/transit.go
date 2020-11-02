@@ -967,14 +967,14 @@ func (metricDefinition MetricDefinition) String() string {
 // HostServiceInDowntime describes downtime schedule
 type HostServiceInDowntime struct {
 	HostName               string `json:"hostName"`
-	ServiceDescription     string `json:"serviceDescription"`
+	ServiceDescription     string `json:"serviceDescription,omitempty"`
 	ScheduledDowntimeDepth int    `json:"scheduledDowntimeDepth"`
 	EntityType             string `json:"entityType"`
 	EntityName             string `json:"entityName"`
 }
 
-// HostServiceInDowntimeList defines type used for ClearInDowntime API payload
-type HostServiceInDowntimeList []HostServiceInDowntime
+// HostServicesInDowntime defines type used for ClearInDowntime API payload
+type HostServicesInDowntime []HostServiceInDowntime
 
 // HostsAndServices defines type used for SetInDowntime API payload
 type HostsAndServices struct {

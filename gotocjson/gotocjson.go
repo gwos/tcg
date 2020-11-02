@@ -936,14 +936,12 @@ node_loop:
 								// fmt.Fprintf(diag_file, "--- array element ident %#v\n", type_ident)
 							}
 							field_type_name = "[]" + type_ident.Name
-							// FIX MAJOR:  Trigger this case and get it handled correctly.
 							if print_diagnostics {
-								fmt.Fprintf(diag_file, "--- UNEXPECTED simple type declaration and array type:  %#v %#v\n", type_ident.Name, field_type_name)
+								fmt.Fprintf(diag_file, "--- simple type declaration and array type:  %#v %#v\n",
+									spec.(*ast.TypeSpec).Name.Name, field_type_name)
 							}
-							// simple_typedefs[spec.(*ast.TypeSpec).Name.Name] = field_type_name
-							// simple_typedef_nodes[spec.(*ast.TypeSpec).Name.Name] = gen_decl
-							panic_message = "aborting due to previous errors"
-							break node_loop
+							simple_typedefs[spec.(*ast.TypeSpec).Name.Name] = package_name + "_" + type_ident.Name + "_List"
+							simple_typedef_nodes[spec.(*ast.TypeSpec).Name.Name] = gen_decl
 						} else if type_starexpr, ok := type_array.Elt.(*ast.StarExpr); ok {
 							if print_diagnostics {
 								// fmt.Fprintf(diag_file, "--- array element starexpr %#v\n", type_starexpr)
@@ -986,6 +984,17 @@ node_loop:
 						}
 						// panic_message = "aborting due to previous errors"
 						// break node_loop
+					} else if type_ptr, ok := spec.(*ast.TypeSpec).Type.(*ast.StarExpr); ok {
+						// Dummy statement to satisfy Go.
+						type_ptr = type_ptr
+						// Strong clue:  this circumstance has been seen with a "type foop *foo" Go declaration.
+						// If we encounter such a thing in the code we are processing, this branch will need to be filled in.
+						if print_diagnostics {
+							fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
+							fmt.Fprintf(diag_file, "ERROR:  spec *ast.TypeSpec Type field is not of a recognized type\n")
+						}
+						panic_message = "aborting due to previous errors"
+						break node_loop
 					} else if type_map, ok := spec.(*ast.TypeSpec).Type.(*ast.MapType); ok {
 
 						if false {
@@ -1051,6 +1060,16 @@ node_loop:
 							if print_diagnostics {
 								fmt.Fprintf(diag_file, "    --- map type:  %#v\n", field_type_name)
 							}
+						}
+						// Diagnostics to flag the fact that we are not handling this case, until
+						// such time as the code block just above is corrected and put int play.
+						if true {
+							if print_diagnostics {
+								fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
+								fmt.Fprintf(diag_file, "ERROR:  spec *ast.TypeSpec Type field is not of a recognized type\n")
+							}
+							panic_message = "aborting due to previous errors"
+							break node_loop
 						}
 
 					} else {
@@ -1771,6 +1790,8 @@ func print_type_declarations(
 	}
 
 	trailing_Ptr_List := regexp.MustCompile(`(.+)_Ptr_List$`)
+	trailing_List     := regexp.MustCompile(`(.+)_List$`)
+	trailing_Ptr      := regexp.MustCompile(`(.+)_[Pp]tr$`)
 
 	for _, decl_kind := range final_type_order {
 		if print_diagnostics {
@@ -1779,8 +1800,6 @@ func print_type_declarations(
 		switch decl_kind.type_kind {
 		case "simple":
 			type_name := simple_typedefs[decl_kind.type_name]
-			// FIX LATER:  This code handles a _Ptr_List; if we ever need to process Go code that requires
-			// a simple _List or _Ptr, we'll need to extend this code to cover those cases as well.
 			if matches := trailing_Ptr_List.FindStringSubmatch(type_name); matches != nil {
 				base_type := matches[1]
 				array_base_type := base_type
@@ -1805,7 +1824,7 @@ func print_type_declarations(
 					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
 					fmt.Fprintf(header_file, "} %s;\n", list_type)
 					fmt.Fprintf(header_file, "\n")
-					fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
+					fmt.Fprintf(header_file, "extern bool  is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 					fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
 					fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
 					fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
@@ -1817,6 +1836,32 @@ func print_type_declarations(
 					struct_field_C_types[list_type]["items"] = array_base_type + " *"
 					list_base_types = append(list_base_types, array_base_type)
 				}
+			} else if matches := trailing_List.FindStringSubmatch(type_name); matches != nil {
+				base_type := matches[1]
+				array_base_type := base_type
+				list_type := array_base_type + "_List"
+				if !have_list_struct[list_type] {
+					have_list_struct[list_type] = true
+					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
+					fmt.Fprintf(header_file, "    size_t count;\n")
+					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
+					fmt.Fprintf(header_file, "} %s;\n", list_type)
+					fmt.Fprintf(header_file, "\n")
+					fmt.Fprintf(header_file, "extern bool  is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
+					fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
+					fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
+					fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
+					fmt.Fprintf(header_file, "\n")
+					struct_fields[list_type] = append(struct_fields[list_type], "count")
+					struct_fields[list_type] = append(struct_fields[list_type], "items")
+					struct_field_C_types[list_type] = map[string]string{}
+					struct_field_C_types[list_type]["count"] = "size_t"
+					struct_field_C_types[list_type]["items"] = array_base_type + " *"
+					list_base_types = append(list_base_types, array_base_type)
+				}
+			} else if matches := trailing_Ptr.FindStringSubmatch(type_name); matches != nil {
+			    // FIX LATER:  fill this in
+				panic(fmt.Sprintf("found unprocessed type declaration '%s'", type_name))
 			}
 			// If type_name is defined as a struct in this package, (that is, if we are defining a direct alias of the
 			// previous struct name, without any extra complexity) we must qualify its reference with the package name,
