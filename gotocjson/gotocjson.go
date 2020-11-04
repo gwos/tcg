@@ -80,7 +80,7 @@ import (
 // Globals.
 
 var PROGRAM = "gotocjson"
-var VERSION = "0.4.0"
+var VERSION = "0.4.1"
 
 var bad_args = false
 var exit_early = false
@@ -1851,9 +1851,9 @@ func print_type_declarations(
 					fmt.Fprintf(header_file, "\n")
 					fmt.Fprintf(header_file, "#define  make_empty_%[1]s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", list_type)
 					fmt.Fprintf(header_file, "#define  make_empty_%[1]s() make_empty_%[1]s_array(1)\n", list_type)
+					fmt.Fprintf(header_file, "extern bool      is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 					fmt.Fprintf(header_file, "extern json_t *     %[1]s_ptr_as_JSON_ptr(const %[1]s *%[1]s_ptr);\n", list_type)
 					fmt.Fprintf(header_file, "#define             %[1]s_ptr_as_JSON_str(%[1]s_ptr) JSON_as_str(%[1]s_ptr_as_JSON_ptr(%[1]s_ptr), 0)\n", list_type)
-					fmt.Fprintf(header_file, "extern bool      is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 					fmt.Fprintf(header_file, "\n")
 					struct_fields[list_type] = append(struct_fields[list_type], "count")
 					struct_fields[list_type] = append(struct_fields[list_type], "items")
@@ -1893,12 +1893,14 @@ func print_type_declarations(
 				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
 				fmt.Fprintf(header_file, "\n")
 				fmt.Fprintf(header_file, "#define  make_empty_%s_%s                make_empty_%s\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define          is_%s_%s_ptr_zero_value         is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
 				fmt.Fprintf(header_file, "extern void destroy_%s_%s_ptr_tree(transit_HostServicesInDowntime *%[1]s_%s_ptr, json_t *json, bool free_pointers);\n", package_name, decl_kind.type_name)
 				fmt.Fprintf(header_file, "#define        free_%s_%s_ptr_tree(obj_ptr, json_ptr) destroy_%[1]s_%s_ptr_tree(obj_ptr, json_ptr, true)\n", package_name, decl_kind.type_name)
-				fmt.Fprintf(header_file, "#define          is_%s_%s_ptr_zero_value         is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
 				fmt.Fprintf(header_file, "#define             %s_%s_ptr_as_JSON_ptr           %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
 				fmt.Fprintf(header_file, "#define             %s_%s_ptr_as_JSON_str           %s_ptr_as_JSON_str\n", package_name, decl_kind.type_name, list_type)
-				fmt.Fprintf(header_file, "#define     JSON_as_%s_%s_ptr               JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
+				// Available in working form if needed (this would require the target routines to also be both declared and defined, elsewhere):
+				// fmt.Fprintf(header_file, "#define     JSON_as_%s_%s_ptr               JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
+				// fmt.Fprintf(header_file, "#define JSON_str_as_%s_%s_ptr           JSON_str_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
 			} else {
 				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
 			}
@@ -2224,11 +2226,9 @@ func print_type_declarations(
 									fmt.Fprintf(header_file, "    %s *items;\n", star_base_type)
 									fmt.Fprintf(header_file, "} %s;\n", list_type)
 									fmt.Fprintf(header_file, "\n")
-									fmt.Fprintf(header_file, "#define make_empty_%s_List_array(n) (%[1]s_List *) calloc((n), sizeof (%[1]s_List))\n",
-										star_base_type)
-									fmt.Fprintf(header_file, "#define make_empty_%s_List() make_empty_%[1]s_List_array(1)\n", star_base_type)
-									fmt.Fprintf(header_file, "extern bool     is_%[1]s_List_ptr_zero_value(const %[1]s_List *%[1]s_List_ptr);\n",
-										star_base_type)
+									fmt.Fprintf(header_file, "#define make_empty_%s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", list_type)
+									fmt.Fprintf(header_file, "#define make_empty_%s() make_empty_%[1]s_array(1)\n", list_type)
+									fmt.Fprintf(header_file, "extern bool     is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 									fmt.Fprintf(header_file, "\n")
 									struct_fields[list_type] = append(struct_fields[list_type], "count")
 									struct_fields[list_type] = append(struct_fields[list_type], "items")
@@ -2302,7 +2302,10 @@ func print_type_declarations(
 								fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
 								fmt.Fprintf(header_file, "} %s;\n", list_type)
 								fmt.Fprintf(header_file, "\n")
-								fmt.Fprintf(header_file, "extern bool is_%[1]s_List_ptr_zero_value(const %[1]s_List *%[1]s_List_ptr);\n", array_base_type)
+								// Available in working form if needed:
+								// fmt.Fprintf(header_file, "#define make_empty_%s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", list_type)
+								// fmt.Fprintf(header_file, "#define make_empty_%s() make_empty_%[1]s_array(1)\n", list_type)
+								fmt.Fprintf(header_file, "extern bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 								fmt.Fprintf(header_file, "\n")
 								struct_fields[list_type] = append(struct_fields[list_type], "count")
 								struct_fields[list_type] = append(struct_fields[list_type], "items")
