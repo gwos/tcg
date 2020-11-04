@@ -80,7 +80,7 @@ import (
 // Globals.
 
 var PROGRAM = "gotocjson"
-var VERSION = "0.3.0"
+var VERSION = "0.4.0"
 
 var bad_args = false
 var exit_early = false
@@ -1062,7 +1062,7 @@ node_loop:
 							}
 						}
 						// Diagnostics to flag the fact that we are not handling this case, until
-						// such time as the code block just above is corrected and put int play.
+						// such time as the code block just above is corrected and put into play.
 						if true {
 							if print_diagnostics {
 								fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected spec.(*ast.TypeSpec).Type type:  %T\n", file_line(), spec.(*ast.TypeSpec).Type)
@@ -1800,6 +1800,9 @@ func print_type_declarations(
 		switch decl_kind.type_kind {
 		case "simple":
 			type_name := simple_typedefs[decl_kind.type_name]
+			have_new_Ptr_List := false
+			have_new_List := false
+			var list_type string
 			if matches := trailing_Ptr_List.FindStringSubmatch(type_name); matches != nil {
 				base_type := matches[1]
 				array_base_type := base_type
@@ -1816,18 +1819,16 @@ func print_type_declarations(
 					pointer_base_types[array_base_type_ptr] = array_base_type
 				}
 				array_base_type = array_base_type_ptr
-				list_type := array_base_type + "_List"
+				list_type = array_base_type + "_List"
 				if !have_list_struct[list_type] {
 					have_list_struct[list_type] = true
+					have_new_Ptr_List = true;
 					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
 					fmt.Fprintf(header_file, "    size_t count;\n")
 					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
 					fmt.Fprintf(header_file, "} %s;\n", list_type)
 					fmt.Fprintf(header_file, "\n")
 					fmt.Fprintf(header_file, "extern bool  is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
-					fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
-					fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
-					fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
 					fmt.Fprintf(header_file, "\n")
 					struct_fields[list_type] = append(struct_fields[list_type], "count")
 					struct_fields[list_type] = append(struct_fields[list_type], "items")
@@ -1839,18 +1840,20 @@ func print_type_declarations(
 			} else if matches := trailing_List.FindStringSubmatch(type_name); matches != nil {
 				base_type := matches[1]
 				array_base_type := base_type
-				list_type := array_base_type + "_List"
+				list_type = array_base_type + "_List"
 				if !have_list_struct[list_type] {
 					have_list_struct[list_type] = true
+					have_new_List = true
 					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
 					fmt.Fprintf(header_file, "    size_t count;\n")
 					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
 					fmt.Fprintf(header_file, "} %s;\n", list_type)
 					fmt.Fprintf(header_file, "\n")
-					fmt.Fprintf(header_file, "extern bool  is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
-					fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
-					fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
-					fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
+					fmt.Fprintf(header_file, "#define  make_empty_%[1]s_array(n) (%[1]s *) calloc((n), sizeof (%[1]s))\n", list_type)
+					fmt.Fprintf(header_file, "#define  make_empty_%[1]s() make_empty_%[1]s_array(1)\n", list_type)
+					fmt.Fprintf(header_file, "extern json_t *     %[1]s_ptr_as_JSON_ptr(const %[1]s *%[1]s_ptr);\n", list_type)
+					fmt.Fprintf(header_file, "#define             %[1]s_ptr_as_JSON_str(%[1]s_ptr) JSON_as_str(%[1]s_ptr_as_JSON_ptr(%[1]s_ptr), 0)\n", list_type)
+					fmt.Fprintf(header_file, "extern bool      is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr);\n", list_type)
 					fmt.Fprintf(header_file, "\n")
 					struct_fields[list_type] = append(struct_fields[list_type], "count")
 					struct_fields[list_type] = append(struct_fields[list_type], "items")
@@ -1877,9 +1880,25 @@ func print_type_declarations(
 				// FIX LATER:  Check C compilations to see if we need to declare arguments for these macro definitions
 				// so we can include some explicit typecasting.
 				fmt.Fprintf(header_file, "typedef %s_%s %[1]s_%[3]s;\n", package_name, type_name, decl_kind.type_name)
-				fmt.Fprintf(header_file, "#define is_%s_%s_ptr_zero_value is_%[1]s_%[3]s_ptr_zero_value\n", package_name, decl_kind.type_name, type_name)
-				fmt.Fprintf(header_file, "#define %s_%s_ptr_as_JSON_ptr %[1]s_%[3]s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, type_name)
+				fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value is_%[1]s_%[3]s_ptr_zero_value\n", package_name, decl_kind.type_name, type_name)
+				fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr %[1]s_%[3]s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, type_name)
 				fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr JSON_as_%[1]s_%[3]s_ptr\n", package_name, decl_kind.type_name, type_name)
+			} else if have_new_Ptr_List {
+				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
+				fmt.Fprintf(header_file, "\n")
+				fmt.Fprintf(header_file, "#define      is_%s_%s_ptr_zero_value       is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define         %s_%s_ptr_as_JSON_ptr         %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define JSON_as_%s_%s_ptr             JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
+			} else if have_new_List {
+				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
+				fmt.Fprintf(header_file, "\n")
+				fmt.Fprintf(header_file, "#define  make_empty_%s_%s                make_empty_%s\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "extern void destroy_%s_%s_ptr_tree(transit_HostServicesInDowntime *%[1]s_%s_ptr, json_t *json, bool free_pointers);\n", package_name, decl_kind.type_name)
+				fmt.Fprintf(header_file, "#define        free_%s_%s_ptr_tree(obj_ptr, json_ptr) destroy_%[1]s_%s_ptr_tree(obj_ptr, json_ptr, true)\n", package_name, decl_kind.type_name)
+				fmt.Fprintf(header_file, "#define          is_%s_%s_ptr_zero_value         is_%s_ptr_zero_value\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define             %s_%s_ptr_as_JSON_ptr           %s_ptr_as_JSON_ptr\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define             %s_%s_ptr_as_JSON_str           %s_ptr_as_JSON_str\n", package_name, decl_kind.type_name, list_type)
+				fmt.Fprintf(header_file, "#define     JSON_as_%s_%s_ptr               JSON_as_%s_ptr\n", package_name, decl_kind.type_name, list_type)
 			} else {
 				fmt.Fprintf(header_file, "typedef %s %s_%s;\n", type_name, package_name, decl_kind.type_name)
 			}
@@ -2416,9 +2435,9 @@ func print_type_declarations(
 				package_name, decl_kind.type_name)
 			struct_definition += fmt.Sprintf("#define             %s_%s_ptr_as_JSON_str(%[1]s_%[2]s_ptr) JSON_as_str(%[1]s_%[2]s_ptr_as_JSON_ptr(%[1]s_%[2]s_ptr), 0)\n",
 				package_name, decl_kind.type_name)
-			struct_definition += fmt.Sprintf("extern %s_%s *    JSON_as_%[1]s_%[2]s_ptr(json_t *json);\n",
+			struct_definition += fmt.Sprintf("extern              %s_%s *    JSON_as_%[1]s_%[2]s_ptr(json_t *json);\n",
 				package_name, decl_kind.type_name)
-			struct_definition += fmt.Sprintf("extern %s_%s *JSON_str_as_%[1]s_%[2]s_ptr(const char *json_str, json_t **json);\n",
+			struct_definition += fmt.Sprintf("extern              %s_%s *JSON_str_as_%[1]s_%[2]s_ptr(const char *json_str, json_t **json);\n",
 				package_name, decl_kind.type_name)
 
 			// For now, we suppress generation of structure definitions from a generic-datatype file,
