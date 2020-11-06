@@ -91,6 +91,9 @@ type Connector struct {
 	// ControllerPin accepts value from environment
 	// provides local access for debug
 	ControllerPin string `yaml:"-"`
+	// Custom HTTP configuration
+	ControllerReadTimeout  time.Duration `yaml:"controllerReadTimeout"`
+	ControllerWriteTimeout time.Duration `yaml:"controllerWriteTimeout"`
 	// NatsAckWait accepts number of seconds
 	// should be greater then the GWClient request duration
 	NatsAckWait int64 `yaml:"natsAckWait"`
@@ -102,6 +105,16 @@ type Connector struct {
 	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
+	// How long messages are kept
+	NatsStoreMaxAge time.Duration `yaml:"natsStoreMaxAge"`
+	// How many bytes are allowed per-channel
+	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
+	// NatsStoreBufferSize for FileStore type
+	// size (in bytes) of the buffer used during file store operations
+	NatsStoreBufferSize int `yaml:"natsStoreBufferSize"`
+	// NatsStoreReadBufferSize for FileStore type
+	// size of the buffer to preload messages
+	NatsStoreReadBufferSize int `yaml:"natsStoreReadBufferSize"`
 	// LogConsPeriod accepts number of seconds
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
@@ -290,13 +303,19 @@ type Config struct {
 func defaults() Config {
 	return Config{
 		Connector: &Connector{
-			ControllerAddr:   ":8099",
-			LogConsPeriod:    0,
-			LogLevel:         1,
-			NatsAckWait:      30,
-			NatsMaxInflight:  math.MaxInt32,
-			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "FILE",
+			ControllerAddr:          ":8099",
+			ControllerReadTimeout:   time.Duration(10 * time.Second),
+			ControllerWriteTimeout:  time.Duration(20 * time.Second),
+			LogConsPeriod:           0,
+			LogLevel:                1,
+			NatsAckWait:             30,
+			NatsMaxInflight:         math.MaxInt32,
+			NatsFilestoreDir:        "natsstore",
+			NatsStoreType:           "FILE",
+			NatsStoreMaxAge:         time.Duration(31 * 24 * time.Hour),
+			NatsStoreMaxBytes:       32 * 1024 * 1024 * 1024, // 32GB
+			NatsStoreBufferSize:     2 * 1024 * 1024,         // 2MB
+			NatsStoreReadBufferSize: 2 * 1024 * 1024,         // 2MB
 		},
 		DSConnection:  &DSConnection{},
 		Jaegertracing: &Jaegertracing{},
