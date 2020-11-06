@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 )
@@ -47,7 +46,6 @@ const (
 	GWEntrypointSynchronizeInventory           = "/api/synchronizer"
 	GWEntrypointServices                       = "/api/services"
 	GWEntrypointHostgroups                     = "/api/hostgroups"
-	GWEntrypointLicenseCheck                   = "/api/license/check"
 	GWEntrypointValidateToken                  = "/api/auth/validatetoken"
 )
 
@@ -71,7 +69,6 @@ type GWClient struct {
 	uriSynchronizeInventory           string
 	uriServices                       string
 	uriHostGroups                     string
-	uriLicenseCheck                   string
 	uriValidateToken                  string
 }
 
@@ -100,30 +97,6 @@ type GwHostGroups struct {
 			HostName string `json:"hostName"`
 		} `json:"hosts"`
 	} `json:"hostGroups"`
-}
-
-type LicenseCheck struct {
-	Success          bool   `json:"success"`
-	Message          string `json:"message"`
-	DevicesRequested int    `json:"devicesRequested"`
-	LimitDevices     int    `json:"hardLimitDevices"`
-	Devices          int    `json:"devices"`
-}
-
-// Returns whether it is OK to send inventory according to the latest license check result
-// (false only if the latest license check was failure with "Device allocation over hard limit" message
-// i.e. if license check is failure but because of license expired or something else it is still OK to send inventory)
-func (license LicenseCheck) isOkToSendInventory() bool {
-	if license.Success {
-		return true
-	} else {
-		// if license is for example simply expired or anything - that shouldn't prevent to send inventory
-		// we care only about device limit
-		if license.Message == "Device allocation over hard limit" {
-			return false
-		}
-		return true
-	}
 }
 
 // Connect implements GWOperations.Connect.
@@ -325,45 +298,6 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 // SynchronizeInventory implements GWOperations.SynchronizeInventory.
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
-	hostName := "unknown"
-	if client.GWConnection != nil {
-		hostName = client.GWConnection.HostName
-	}
-
-	// retrieve count of resources (hosts) to be sent and agentID
-	var payloadResources struct {
-		Context struct {
-			AgentID string `json:"agentId"`
-		} `json:"context"`
-		Resources []interface{} `json:"resources"`
-	}
-	err := json.Unmarshal(payload, &payloadResources)
-	if err != nil {
-		log.Error("|gwClient.go| : [SynchronizeInventory] : Unable to parse SynchronizeInventory payload: ", err)
-	}
-	currentHostsCount := len(payloadResources.Resources)
-
-	// get count of hosts sent last time from cache
-	// (if doesn't exist in cache count hosts owned curr agent in GWOS
-	// for a case if connector was stopped and then restarted)
-	lastSentHostsCount := 0
-	if lastSentHostsCountCache, exists := cache.LastSentHostsCountCache.Get(hostName); exists {
-		lastSentHostsCount = lastSentHostsCountCache.(int)
-	} else {
-		lastSentHostsCount = client.getLastSentHostsCount(payloadResources.Context.AgentID)
-		cache.LastSentHostsCountCache.SetDefault(hostName, lastSentHostsCount)
-	}
-
-	// count diff between curr hosts to send count and last i.e. how many hosts gonna be added
-	hostsToAllocate := currentHostsCount - lastSentHostsCount
-	// if gonna ad hosts
-	if hostsToAllocate > 0 {
-		// check whether license allows to allocate count of hosts
-		licenseCheckPassed, err := client.checkLicenseForHostLimit(hostsToAllocate)
-		if !licenseCheckPassed {
-			return nil, err
-		}
-	}
 	client.buildURIs()
 	mergeParam := make(map[string]string)
 	mergeHosts := true
@@ -381,9 +315,6 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		)
 	}
 	response, err := client.sendData(ctx, syncUri, payload)
-	if err == nil {
-		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
-	}
 	return response, err
 }
 
@@ -530,65 +461,6 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	return &gwHostGroups, nil
 }
 
-func (client *GWClient) checkLicenseForHostLimit(hostsToAllocate int) (bool, error) {
-	host := "unknown"
-	if client.GWConnection != nil {
-		host = client.GWConnection.HostName
-	}
-	log.Info("Checking license at ", host)
-
-	params := make(map[string]string)
-	params["allocate"] = strconv.Itoa(hostsToAllocate)
-	client.buildURIs()
-	reqUrl := client.uriLicenseCheck + BuildQueryParams(params)
-	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
-	if err != nil {
-		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to check license at ", host, ": ", err)
-		return false, errors.New("failed to check license at " + host + ": unable to get license")
-	}
-	var license LicenseCheck
-	err = json.Unmarshal(response, &license)
-	if err != nil {
-		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Unable to parse received license at ", host, ": ", err)
-		return false, errors.New("failed to check license at " + host + ": unable to get license")
-	}
-	if !license.isOkToSendInventory() {
-		hostSpace := license.LimitDevices - license.Devices
-		if hostSpace < 0 {
-			hostSpace = 0
-		}
-		log.Error("|gwClient.go| : [checkLicenseForHostLimit] : Host allocation over hard limit at " + host +
-			": hosts limit " + strconv.Itoa(license.LimitDevices) +
-			", hosts monitored " + strconv.Itoa(license.Devices) +
-			", license space for " + strconv.Itoa(hostSpace) + " hosts" +
-			", hosts to allocate " + strconv.Itoa(hostsToAllocate))
-		return false, errors.New("host allocation over hard limit at " + host +
-			": hosts to allocate " + strconv.Itoa(hostsToAllocate) +
-			" but only license space for " + strconv.Itoa(hostSpace))
-	}
-	return true, nil
-}
-
-func (client *GWClient) getLastSentHostsCount(agentID string) int {
-	gwServices, err := client.GetServicesByAgent(agentID)
-	if err != nil || gwServices == nil {
-		log.Warn("|gwClient.go| : [getLastSentHostsCount] : Unable to get GW hosts to init  last hosts sent count.")
-		if err != nil {
-			log.Warn("|gwClient.go| : [getLastSentHostsCount] : ", err)
-		} else {
-			log.Warn("|gwClient.go| : [getLastSentHostsCount] : Response is nil.")
-		}
-		return 0
-	}
-	hostNames := make(map[string]struct{})
-	for _, gwService := range gwServices.Services {
-		if _, exists := hostNames[gwService.HostName]; !exists {
-			hostNames[gwService.HostName] = struct{}{}
-		}
-	}
-	return len(hostNames)
-}
-
 func (client *GWClient) sendData(ctx context.Context, reqURL string, payload []byte, additionalHeaders ...header) ([]byte, error) {
 	return client.sendRequest(ctx, http.MethodPost, reqURL, payload, additionalHeaders...)
 }
@@ -688,7 +560,6 @@ func (client *GWClient) buildURIs() {
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
 		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
 		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
-		uriLicenseCheck := buildURI(client.GWConnection.HostName, GWEntrypointLicenseCheck)
 		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 		client.Mutex.Lock()
 		client.uriConnect = uriConnect
@@ -703,7 +574,6 @@ func (client *GWClient) buildURIs() {
 		client.uriSynchronizeInventory = uriSynchronizeInventory
 		client.uriServices = uriServices
 		client.uriHostGroups = uriHostGroups
-		client.uriLicenseCheck = uriLicenseCheck
 		client.uriValidateToken = uriValidateToken
 		client.Mutex.Unlock()
 	})
