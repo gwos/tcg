@@ -89,8 +89,10 @@ func (controller *Controller) startController() error {
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
 	controller.srv = &http.Server{
-		Addr:    addr,
-		Handler: router,
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  controller.Connector.ControllerReadTimeout,
+		WriteTimeout: controller.Connector.ControllerWriteTimeout,
 	}
 
 	go func() {

@@ -10,6 +10,7 @@ import (
 )
 
 func init() {
+	config.GetConfig().Connector.ControllerAddr = ":11099"
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
 	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
