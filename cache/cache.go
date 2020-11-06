@@ -28,7 +28,3 @@ type Credentials struct {
 	GwosAppName  string
 	GwosAPIToken string
 }
-
-// need to keep last hosts sent count and they must be shared between curr and next sync runs
-// and we cannot know an interval between two sync runs
-var LastSentHostsCountCache = cache.New(cache.NoExpiration, cache.NoExpiration)

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -303,10 +302,6 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 				}
 			}
 		}
-
-		// set count hosts to which services of curr agent are already assigned in GWOS
-		// as "last sent hosts count" in cache to not duplicate his when check license before send inventory
-		cache.LastSentHostsCountCache.SetDefault(gwConnection.HostName, len(hostNames))
 	}
 
 	return gwHosts
