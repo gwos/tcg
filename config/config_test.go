@@ -17,7 +17,7 @@ connector:
   agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
   appName: "test-app"
   appType: "test"
-  controllerAddr: ":8099"
+  controllerAddr: ":9999"
   natsAckWait: 15
 dsConnection:
   hostName: "localhost"
@@ -47,29 +47,22 @@ gwConnections:
 	defer os.Unsetenv("TCG_DSCONNECTION")
 	defer os.Unsetenv("TCG_GWCONNECTIONS")
 
-	expected := &Config{
-		Connector: &Connector{
-			AgentID:          "3dcd9a52-949d-4531-a3b0-b14622f7dd39",
-			AppName:          "test-app",
-			AppType:          "test",
-			ControllerAddr:   ":8099",
-			LogConsPeriod:    0,
-			LogLevel:         1,
-			NatsAckWait:      15,
-			NatsMaxInflight:  2147483647,
-			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "MEMORY",
-		},
-		DSConnection: &DSConnection{"localhost:3001"},
-		GWConnections: GWConnections{
-			&GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
-			&GWConnection{HostName: "localhost:3001"},
-		},
+	expected := defaults()
+	expected.Connector.AgentID = "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
+	expected.Connector.AppName = "test-app"
+	expected.Connector.AppType = "test"
+	expected.Connector.ControllerAddr = ":9999"
+	expected.Connector.NatsAckWait = 15
+	expected.Connector.NatsStoreType = "MEMORY"
+	expected.DSConnection = &DSConnection{"localhost:3001"}
+	expected.GWConnections = GWConnections{
+		&GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},
+		&GWConnection{HostName: "localhost:3001"},
 	}
 
 	cfg := GetConfig()
-	assert.Equal(t, *expected.Connector, *cfg.Connector)
-	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
+	assert.Equal(t, expected.Connector, cfg.Connector)
+	assert.Equal(t, expected.DSConnection, cfg.DSConnection)
 	assert.Equal(t, expected.GWConnections, cfg.GWConnections)
 }
 
@@ -96,25 +89,15 @@ dsConnection:
 	defer os.Unsetenv(string(ConfigEnv))
 	defer os.Unsetenv("TCG_CONNECTOR_CONTROLLERADDR")
 
-	expected := &Config{
-		Connector: &Connector{
-			AgentID:          "",
-			AppName:          "test-app",
-			AppType:          "test",
-			ControllerAddr:   ":8022",
-			LogConsPeriod:    0,
-			LogLevel:         1,
-			NatsAckWait:      30,
-			NatsMaxInflight:  2147483647,
-			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "FILE",
-		},
-		DSConnection: &DSConnection{"localhost"},
-	}
+	expected := defaults()
+	expected.Connector.AppName = "test-app"
+	expected.Connector.AppType = "test"
+	expected.Connector.ControllerAddr = ":8022"
+	expected.DSConnection = &DSConnection{"localhost"}
 
 	cfg := GetConfig()
-	assert.Equal(t, *expected.Connector, *cfg.Connector)
-	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
+	assert.Equal(t, expected.Connector, cfg.Connector)
+	assert.Equal(t, expected.DSConnection, cfg.DSConnection)
 
 	dto := []byte(`
 {
@@ -146,36 +129,29 @@ dsConnection:
 	_, err = cfg.LoadConnectorDTO(dto)
 	assert.NoError(t, err)
 
-	expected = &Config{
-		Connector: &Connector{
-			AgentID:          "99998888-7777-6666-a3b0-b14622f7dd39",
-			AppName:          "test-app-XX",
-			AppType:          "test-XX",
-			ControllerAddr:   ":8022",
-			LogConsPeriod:    30,
-			LogLevel:         2,
-			NatsAckWait:      30,
-			NatsMaxInflight:  2147483647,
-			NatsFilestoreDir: "natsstore",
-			NatsStoreType:    "FILE",
-		},
-		DSConnection: &DSConnection{"gw-host-xxx"},
-		GWConnections: GWConnections{
-			&GWConnection{
-				ID:                  101,
-				Enabled:             true,
-				LocalConnection:     false,
-				HostName:            "gw-host-xx",
-				UserName:            "-xx-",
-				Password:            "xx",
-				PrefixResourceNames: true,
-				ResourceNamePrefix:  "c1",
-			},
+	expected = defaults()
+	expected.Connector.AgentID = "99998888-7777-6666-a3b0-b14622f7dd39"
+	expected.Connector.AppName = "test-app-XX"
+	expected.Connector.AppType = "test-XX"
+	expected.Connector.ControllerAddr = ":8022"
+	expected.Connector.LogConsPeriod = 30
+	expected.Connector.LogLevel = 2
+	expected.DSConnection = &DSConnection{"gw-host-xxx"}
+	expected.GWConnections = GWConnections{
+		&GWConnection{
+			ID:                  101,
+			Enabled:             true,
+			LocalConnection:     false,
+			HostName:            "gw-host-xx",
+			UserName:            "-xx-",
+			Password:            "xx",
+			PrefixResourceNames: true,
+			ResourceNamePrefix:  "c1",
 		},
 	}
 
-	assert.Equal(t, *expected.Connector, *cfg.Connector)
-	assert.Equal(t, *expected.DSConnection, *cfg.DSConnection)
+	assert.Equal(t, expected.Connector, cfg.Connector)
+	assert.Equal(t, expected.DSConnection, cfg.DSConnection)
 	assert.Equal(t, expected.GWConnections, cfg.GWConnections)
 
 	data, err := ioutil.ReadFile(tmpFile.Name())

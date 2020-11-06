@@ -43,6 +43,10 @@ type Config struct {
 	MaxPubAcksInflight    int
 	FilestoreDir          string
 	StoreType             string
+	StoreMaxAge           time.Duration
+	StoreMaxBytes         int64
+	StoreBufferSize       int
+	StoreReadBufferSize   int
 }
 
 // DispatcherFn defines message processor
@@ -80,6 +84,10 @@ func StartServer(config Config) error {
 	default:
 		stanOpts.StoreType = stores.TypeFile
 	}
+	stanOpts.StoreLimits.MaxAge = cfg.StoreMaxAge
+	stanOpts.StoreLimits.MaxBytes = cfg.StoreMaxBytes
+	stanOpts.FileStoreOpts.BufferSize = cfg.StoreBufferSize
+	stanOpts.FileStoreOpts.ReadBufferSize = cfg.StoreReadBufferSize
 
 	mu.Lock()
 	defer mu.Unlock()
