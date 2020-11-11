@@ -13,6 +13,12 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 )
 
+var httpClient = &http.Client{
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
 // SendRequest wraps HTTP methods
 func SendRequest(httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
@@ -22,12 +28,6 @@ func SendRequest(httpMethod string, requestURL string,
 // SendRequestWithContext wraps HTTP methods
 func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-
-	client := http.Client{Transport: tr}
 
 	var request *http.Request
 	var response *http.Response
@@ -65,7 +65,7 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 		}
 	}
 
-	response, err = client.Do(request)
+	response, err = httpClient.Do(request)
 	if err != nil {
 		return -1, nil, err
 	}
