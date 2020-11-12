@@ -13,7 +13,8 @@ import (
 	natsd "github.com/nats-io/nats-server/v2/server"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
-	"github.com/nats-io/stan.go"
+	// "github.com/nats-io/stan.go"
+	stan "github.com/nats-io/go-nats-streaming"
 )
 
 // Define NATS IDs
@@ -87,7 +88,7 @@ func StartServer(config Config) error {
 	stanOpts.StoreLimits.MaxAge = cfg.StoreMaxAge
 	stanOpts.StoreLimits.MaxBytes = cfg.StoreMaxBytes
 	stanOpts.FileStoreOpts.BufferSize = cfg.StoreBufferSize
-	stanOpts.FileStoreOpts.ReadBufferSize = cfg.StoreReadBufferSize
+	// stanOpts.FileStoreOpts.ReadBufferSize = cfg.StoreReadBufferSize
 
 	mu.Lock()
 	defer mu.Unlock()

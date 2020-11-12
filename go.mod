@@ -13,11 +13,16 @@ require (
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.2
+	github.com/hashicorp/raft v1.1.1 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kr/pretty v0.2.1 // indirect
+	github.com/lib/pq v1.8.0 // indirect
+	github.com/nats-io/gnatsd v1.4.1 // indirect
+	github.com/nats-io/go-nats v1.7.2 // indirect
+	github.com/nats-io/go-nats-streaming v0.4.4
+	github.com/nats-io/nats-server v1.4.1 // indirect
 	github.com/nats-io/nats-server/v2 v2.1.8
-	github.com/nats-io/nats-streaming-server v0.18.0
-	github.com/nats-io/stan.go v0.7.0
+	github.com/nats-io/nats-streaming-server v0.14.3
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.8.0
 	github.com/prometheus/client_model v0.2.0
