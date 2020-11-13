@@ -32,7 +32,6 @@ var (
 	connPublisher  stan.Conn
 	ctrlChan       chan DispatcherOption
 	onceDispatcher sync.Once
-	natsServer     *natsd.Server
 	stanServer     *stand.StanServer
 )
 
@@ -72,6 +71,7 @@ func StartServer(config Config) error {
 
 	natsOpts := stand.DefaultNatsServerOptions.Clone()
 	natsOpts.MaxPayload = math.MaxInt32
+	natsOpts.Port = natsd.RANDOM_PORT
 
 	stanOpts := stand.GetDefaultOptions().Clone()
 	stanOpts.ID = clusterID
@@ -93,23 +93,6 @@ func StartServer(config Config) error {
 	defer mu.Unlock()
 
 	if len(natsURL) == 0 {
-		nopts := &natsd.Options{}
-		nopts.Host = "127.0.0.1"
-		nopts.Port = -1 //  automatically chosen
-		nopts.MaxPayload = math.MaxInt32
-		// Create the NATS Server
-		natsServer = natsd.New(nopts)
-		// Start it as a go routine
-		go natsServer.Start()
-		// Wait for it to be able to accept connections
-		if !natsServer.ReadyForConnections(10 * time.Second) {
-			err = fmt.Errorf("[NATS]: Start NATS Server failed")
-			log.Warn(err)
-			return err
-		}
-		log.Info("[NATS]: Start listen: ", natsServer.Addr())
-		// Now run the server with the streaming and streaming/nats options
-		stanOpts.NATSServerURL = fmt.Sprintf("nats://%s", natsServer.Addr())
 		if stanServer, err = stand.RunServerWithOpts(stanOpts, natsOpts); err != nil {
 			log.With(log.Fields{
 				"error":    err,
@@ -118,7 +101,8 @@ func StartServer(config Config) error {
 			}).Log(log.WarnLevel, "[NATS]: RunServerWithOpts failed")
 			return err
 		}
-		natsURL = stanOpts.NATSServerURL
+		log.Info("[NATS]: Started at: ", stanServer.ClientURL())
+		natsURL = stanServer.ClientURL()
 	}
 	return nil
 }
@@ -140,10 +124,6 @@ func StopServer() {
 	if stanServer != nil {
 		stanServer.Shutdown()
 		stanServer = nil
-	}
-	if natsServer != nil {
-		natsServer.Shutdown()
-		natsServer = nil
 	}
 }
 

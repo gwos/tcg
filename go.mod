@@ -15,8 +15,8 @@ require (
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kr/pretty v0.2.1 // indirect
-	github.com/nats-io/nats-server/v2 v2.1.8
-	github.com/nats-io/nats-streaming-server v0.18.0
+	github.com/nats-io/nats-server/v2 v2.1.9
+	github.com/nats-io/nats-streaming-server v0.19.0
 	github.com/nats-io/stan.go v0.7.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.8.0
