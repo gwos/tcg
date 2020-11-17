@@ -22,17 +22,17 @@ import (
 )
 
 const (
-	TestMessagesCount          = 3
-	PerformanceServicesCount   = 1
-	PerformanceResourcesCount  = 1000
-	TestAgentID                = "INTEGRATION-TEST"
-	TestAppName                = "INTEGRATION-TEST"
-	TestAppType                = "VEMA"
-	GWAccountEnvVar            = "TEST_GW_USERNAME"
-	GWPasswordEnvVar           = "TEST_GW_PASSWORD"
-	GWValidHost                = "http://localhost:80"
-	GWInvalidHost              = "http://localhost:23"
-	TestConfigNatsFileStoreDir = "natsstore.test"
+	TestMessagesCount         = 3
+	PerformanceServicesCount  = 1
+	PerformanceResourcesCount = 1000
+	TestAgentID               = "INTEGRATION-TEST"
+	TestAppName               = "INTEGRATION-TEST"
+	TestAppType               = "VEMA"
+	GWAccountEnvVar           = "TEST_GW_USERNAME"
+	GWPasswordEnvVar          = "TEST_GW_PASSWORD"
+	GWValidHost               = "http://localhost:80"
+	GWInvalidHost             = "http://localhost:23"
+	TestConfigNatsStoreDir    = "natsstore.test"
 )
 
 // Test for ensuring that all data is stored in NATS and later resent
@@ -40,7 +40,7 @@ const (
 // TCG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, 5)
+	setupIntegration(t, time.Duration(5*time.Second))
 	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
 	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
@@ -79,7 +79,7 @@ func TestNatsQueue_1(t *testing.T) {
 // TCG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, 30)
+	setupIntegration(t, time.Duration(30*time.Second))
 	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
 	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
@@ -123,7 +123,7 @@ func TestNatsQueue_2(t *testing.T) {
 //Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, 30)
+	setupIntegration(t, time.Duration(30*time.Second))
 	m0 := services.GetTransitService().Stats().MessagesSent
 
 	var resources []transit.DynamicMonitoredResource
@@ -174,7 +174,7 @@ func TestNatsPerformance(t *testing.T) {
 	defer removeHost(t)
 }
 
-func setupIntegration(t *testing.T, natsAckWait int64) {
+func setupIntegration(t *testing.T, natsAckWait time.Duration) {
 	testGroundworkUserName := os.Getenv(GWAccountEnvVar)
 	testGroundworkPassword := os.Getenv(GWPasswordEnvVar)
 	if testGroundworkUserName == "" || testGroundworkPassword == "" {
@@ -189,7 +189,7 @@ func setupIntegration(t *testing.T, natsAckWait int64) {
 	cfg.Connector.AppType = TestAppType
 	cfg.Connector.LogLevel = 2
 	cfg.Connector.NatsAckWait = natsAckWait
-	cfg.Connector.NatsFilestoreDir = TestConfigNatsFileStoreDir
+	cfg.Connector.NatsStoreDir = TestConfigNatsStoreDir
 	cfg.GWConnections = []*config.GWConnection{
 		{
 			Enabled:         true,
@@ -209,7 +209,7 @@ func setupIntegration(t *testing.T, natsAckWait int64) {
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", TestConfigNatsFileStoreDir)
+	cmd := exec.Command("rm", "-rf", TestConfigNatsStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
 	cache.DispatcherDoneCache.Flush()

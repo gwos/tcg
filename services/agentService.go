@@ -573,15 +573,19 @@ func (service *AgentService) stopController() error {
 
 func (service *AgentService) startNats() error {
 	err := nats.StartServer(nats.Config{
-		DispatcherAckWait:     time.Second * time.Duration(service.Connector.NatsAckWait),
-		DispatcherMaxInflight: service.Connector.NatsMaxInflight,
-		MaxPubAcksInflight:    service.Connector.NatsMaxInflight,
-		FilestoreDir:          service.Connector.NatsFilestoreDir,
-		StoreType:             service.Connector.NatsStoreType,
-		StoreMaxAge:           service.Connector.NatsStoreMaxAge,
-		StoreMaxBytes:         service.Connector.NatsStoreMaxBytes,
-		StoreBufferSize:       service.Connector.NatsStoreBufferSize,
-		StoreReadBufferSize:   service.Connector.NatsStoreReadBufferSize,
+		AckWait:             service.Connector.NatsAckWait,
+		MaxInflight:         service.Connector.NatsMaxInflight,
+		MaxPubAcksInflight:  service.Connector.NatsMaxPubAcksInflight,
+		MaxPayload:          service.Connector.NatsMaxPayload,
+		MaxPendingBytes:     service.Connector.NatsMaxPendingBytes,
+		MaxPendingMsgs:      service.Connector.NatsMaxPendingMsgs,
+		MonitorPort:         service.Connector.NatsMonitorPort,
+		StoreDir:            service.Connector.NatsStoreDir,
+		StoreType:           service.Connector.NatsStoreType,
+		StoreMaxAge:         service.Connector.NatsStoreMaxAge,
+		StoreMaxBytes:       service.Connector.NatsStoreMaxBytes,
+		StoreBufferSize:     service.Connector.NatsStoreBufferSize,
+		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
 	})
 	if err == nil {
 		service.agentStatus.Nats = Running

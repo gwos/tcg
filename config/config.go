@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"os"
 	"path"
 	"strings"
@@ -92,17 +91,36 @@ type Connector struct {
 	// provides local access for debug
 	ControllerPin string `yaml:"-"`
 	// Custom HTTP configuration
-	ControllerReadTimeout  time.Duration `yaml:"controllerReadTimeout"`
-	ControllerWriteTimeout time.Duration `yaml:"controllerWriteTimeout"`
-	// NatsAckWait accepts number of seconds
-	// should be greater then the GWClient request duration
-	NatsAckWait int64 `yaml:"natsAckWait"`
-	// NatsMaxInflight accepts number of unacknowledged messages
+	ControllerReadTimeout  time.Duration `yaml:"-"`
+	ControllerWriteTimeout time.Duration `yaml:"-"`
+	// NatsAckWait is the time the NATS server will wait before resending a message
+	// Should be greater then the GWClient request duration
+	NatsAckWait time.Duration `yaml:"-"`
+	// designates the maximum number of outstanding acknowledgements
+	// (messages that have been delivered but not acknowledged)
+	// that NATS Streaming will allow for a given subscription.
+	// When this limit is reached, NATS Streaming will suspend delivery of messages
+	// to this subscription until the number of unacknowledged messages falls below the specified limit
+	NatsMaxInflight int `yaml:"-"`
+	// NatsMaxPubAcksInflight accepts number of unacknowledged messages
 	// that a publisher may have in-flight at any given time.
 	// When this maximum is reached, further async publish calls will block
 	// until the number of unacknowledged messages falls below the specified limit
-	NatsMaxInflight  int    `yaml:"natsMaxInflight"`
-	NatsFilestoreDir string `yaml:"natsFilestoreDir"`
+	NatsMaxPubAcksInflight int   `yaml:"-"`
+	NatsMaxPayload         int32 `yaml:"-"`
+	// NatsMaxPendingBytes. Deprecated. Use NatsMaxInflight instead.
+	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
+	// Zero is not allowed. Any negative value means that the given metric is not limited.
+	NatsMaxPendingBytes int `yaml:"-"`
+	// NatsMaxPendingMsgs. Deprecated. Use NatsMaxInflight instead.
+	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
+	// Zero is not allowed. Any negative value means that the given metric is not limited.
+	NatsMaxPendingMsgs int `yaml:"-"`
+	// NatsMonitorPort enables monitoring on http port usefull for debug
+	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
+	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
+	NatsMonitorPort int    `yaml:"-"`
+	NatsStoreDir    string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
 	// How long messages are kept
@@ -111,10 +129,10 @@ type Connector struct {
 	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
 	// NatsStoreBufferSize for FileStore type
 	// size (in bytes) of the buffer used during file store operations
-	NatsStoreBufferSize int `yaml:"natsStoreBufferSize"`
+	NatsStoreBufferSize int `yaml:"-"`
 	// NatsStoreReadBufferSize for FileStore type
 	// size of the buffer to preload messages
-	NatsStoreReadBufferSize int `yaml:"natsStoreReadBufferSize"`
+	NatsStoreReadBufferSize int `yaml:"-"`
 	// LogConsPeriod accepts number of seconds
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
@@ -308,14 +326,19 @@ func defaults() Config {
 			ControllerWriteTimeout:  time.Duration(20 * time.Second),
 			LogConsPeriod:           0,
 			LogLevel:                1,
-			NatsAckWait:             30,
-			NatsMaxInflight:         math.MaxInt32,
-			NatsFilestoreDir:        "natsstore",
+			NatsAckWait:             time.Duration(30 * time.Second),
+			NatsMaxInflight:         1024,
+			NatsMaxPubAcksInflight:  1024,
+			NatsMaxPayload:          1024 * 1024 * 80, // 80MB
+			NatsMaxPendingBytes:     -1,
+			NatsMaxPendingMsgs:      1024,
+			NatsMonitorPort:         0,
+			NatsStoreDir:            "natsstore",
 			NatsStoreType:           "FILE",
 			NatsStoreMaxAge:         0,               // unlimited
 			NatsStoreMaxBytes:       0,               // unlimited
-			NatsStoreBufferSize:     2 * 1024 * 1024, // 2MB
-			NatsStoreReadBufferSize: 2 * 1024 * 1024, // 2MB
+			NatsStoreBufferSize:     1024 * 1024 * 2, // 2MB
+			NatsStoreReadBufferSize: 1024 * 1024 * 2, // 2MB
 		},
 		DSConnection:  &DSConnection{},
 		Jaegertracing: &Jaegertracing{},

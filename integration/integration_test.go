@@ -35,7 +35,7 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	setupIntegration(t, 5)
+	setupIntegration(t, time.Duration(5*time.Second))
 	headers, err = connect(t)
 	defer cleanNats(t)
 	defer clean(t, headers)
@@ -199,7 +199,7 @@ func clean(t *testing.T, headers map[string]string) {
 	_, _, err := clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
 	assert.NoError(t, err)
 
-	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsFilestoreDir)
+	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsStoreDir)
 	_, err = cmd.Output()
 	assert.NoError(t, err)
 }
