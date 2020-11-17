@@ -18,7 +18,6 @@ connector:
   appName: "test-app"
   appType: "test"
   controllerAddr: ":9999"
-  natsAckWait: 15
 dsConnection:
   hostName: "localhost"
 gwConnections:
@@ -52,7 +51,6 @@ gwConnections:
 	expected.Connector.AppName = "test-app"
 	expected.Connector.AppType = "test"
 	expected.Connector.ControllerAddr = ":9999"
-	expected.Connector.NatsAckWait = 15
 	expected.Connector.NatsStoreType = "MEMORY"
 	expected.DSConnection = &DSConnection{"localhost:3001"}
 	expected.GWConnections = GWConnections{

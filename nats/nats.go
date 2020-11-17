@@ -3,7 +3,6 @@ package nats
 import (
 	"errors"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
@@ -28,24 +27,28 @@ var (
 	natsURL = "" //  ensures connections to proper NATS instance
 
 	cfg            Config
-	connDispatcher stan.Conn
-	connPublisher  stan.Conn
 	ctrlChan       chan DispatcherOption
 	onceDispatcher sync.Once
 	stanServer     *stand.StanServer
+	// if a client is too slow the server will eventually cut them off by closing the connection
+	connDispatcher, connPublisher stan.Conn
 )
 
 // Config defines NATS configurable options
 type Config struct {
-	DispatcherAckWait     time.Duration
-	DispatcherMaxInflight int
-	MaxPubAcksInflight    int
-	FilestoreDir          string
-	StoreType             string
-	StoreMaxAge           time.Duration
-	StoreMaxBytes         int64
-	StoreBufferSize       int
-	StoreReadBufferSize   int
+	AckWait             time.Duration
+	MaxInflight         int
+	MaxPubAcksInflight  int
+	MaxPayload          int32
+	MaxPendingBytes     int
+	MaxPendingMsgs      int
+	MonitorPort         int
+	StoreDir            string
+	StoreType           string
+	StoreMaxAge         time.Duration
+	StoreMaxBytes       int64
+	StoreBufferSize     int
+	StoreReadBufferSize int
 }
 
 // DispatcherFn defines message processor
@@ -70,12 +73,13 @@ func StartServer(config Config) error {
 	cfg = config
 
 	natsOpts := stand.DefaultNatsServerOptions.Clone()
-	natsOpts.MaxPayload = math.MaxInt32
+	natsOpts.MaxPayload = cfg.MaxPayload
+	natsOpts.HTTPPort = cfg.MonitorPort
 	natsOpts.Port = natsd.RANDOM_PORT
 
 	stanOpts := stand.GetDefaultOptions().Clone()
 	stanOpts.ID = clusterID
-	stanOpts.FilestoreDir = cfg.FilestoreDir
+	stanOpts.FilestoreDir = cfg.StoreDir
 	switch cfg.StoreType {
 	case "MEMORY":
 		stanOpts.StoreType = stores.TypeMemory
@@ -215,6 +219,8 @@ func listenCtrlChan() {
 						"error": err,
 						"opt":   opt,
 					}).Log(log.WarnLevel, "[NATS]: startWorker failed")
+				} else {
+					cache.DispatcherWorkersCache.Set(ckWorker, 0, -1)
 				}
 			}
 		}
@@ -229,8 +235,18 @@ func startWorker(opt DispatcherOption) error {
 	subscription, errSb = connDispatcher.Subscribe(
 		opt.Subject,
 		func(msg *stan.Msg) {
+			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
+			// ..when the subscription starts and has a lot of backlog messages,
+			// is that the server is going to send all pending messages for this consumer "at once",
+			// that is, without releasing the consumer lock.
+			// The application may get them and ack, but the ack won't be processed
+			// because the server is still sending messages to this consumer.
+			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
+			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
+			// and it may in that case resend again, so you should Ack the message there.
 			ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
 			if _, isDone := cache.DispatcherDoneCache.Get(ckDone); isDone {
+				_ = msg.Ack()
 				return
 			}
 
@@ -247,11 +263,16 @@ func startWorker(opt DispatcherOption) error {
 			}).Log(log.InfoLevel, "[NATS]: Delivered")
 		},
 		stan.SetManualAckMode(),
-		stan.AckWait(cfg.DispatcherAckWait),
-		stan.MaxInflight(cfg.DispatcherMaxInflight),
+		stan.AckWait(cfg.AckWait),
+		stan.MaxInflight(cfg.MaxInflight),
 		stan.DurableName(opt.DurableName),
 		stan.StartWithLastReceived(),
 	)
+
+	// Workaround v8.1.3 to fix processing large natsstore from prior versions
+	// Modern envs should use the correct value of MaxInflight setting
+	subscription.SetPendingLimits(cfg.MaxPendingMsgs, cfg.MaxPendingBytes)
+
 	return errSb
 }
 

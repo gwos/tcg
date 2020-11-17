@@ -3,8 +3,6 @@ connector:
   appName: "ELASTIC"
   appType: "ELASTIC"
   controllerAddr: "0.0.0.0:8099"
-  natsAckWait: 30
-  natsMaxInflight: 2147483647 # math.MaxInt32
   natsFilestoreDir: "natsstore"
   natsStoreType: "FILE"
   logConsPeriod: 0 # seconds; 0 - off consolidation
