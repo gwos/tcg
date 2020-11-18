@@ -974,7 +974,9 @@ type HostServiceInDowntime struct {
 }
 
 // HostServicesInDowntime defines type used for ClearInDowntime API payload
-type HostServicesInDowntime []HostServiceInDowntime
+type HostServicesInDowntime struct {
+	BizHostServiceInDowntimes []HostServiceInDowntime `json:"bizHostServiceInDowntimes"`
+}
 
 // HostsAndServices defines type used for SetInDowntime API payload
 type HostsAndServices struct {
