@@ -39,6 +39,9 @@ typedef struct_timespec time_Time;
 #define string char *
 #endif  // string
 
+#define make_empty_string_array(n) (string *) calloc((n), sizeof (string))
+#define make_empty_string() make_empty_string_array(1)
+
 #define stringify(x)                    #x
 #define expand_and_stringify(x)         stringify(x)
 
