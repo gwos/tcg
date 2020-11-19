@@ -65,11 +65,12 @@ func (resource *Resource) UnmarshalJSON(input []byte) error {
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups        []transit.ResourceGroup   `json:"groups"`
-	Resources     []Resource                `json:"resources"`
-	Services      []string                  `json:"services"`
-	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
-	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	Groups           []transit.ResourceGroup   `json:"groups"`
+	Resources        []Resource                `json:"resources"`
+	Services         []string                  `json:"services"`
+	CheckInterval    time.Duration             `json:"checkIntervalMinutes"`
+	Ownership        transit.HostOwnershipType `json:"ownership,omitempty"`
+	MonitorConnector bool                      `json:"connectorMonitored"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.

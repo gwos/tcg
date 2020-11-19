@@ -461,6 +461,10 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 						_, err = gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
 					case typeMetrics:
 						_, err = gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
+					case typeMonitorConnector:
+						_, err = gwClientRef.MonitorConnector(ctx, service.fixTracerContext(p.Payload))
+					case typeStopConnectorMonitoring:
+						_, err = gwClientRef.StopConnectorMonitoring(ctx, service.fixTracerContext(p.Payload))
 					default:
 						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
 					}
@@ -613,9 +617,10 @@ func (service *AgentService) startTransport() error {
 	gwClients := make([]*clients.GWClient, len(cons))
 	for i := range cons {
 		gwClients[i] = &clients.GWClient{
-			AppName:      service.AppName,
-			AppType:      service.AppType,
-			GWConnection: cons[i],
+			ConnectorName: service.DisplayName,
+			AppName:       service.AppName,
+			AppType:       service.AppType,
+			GWConnection:  cons[i],
 		}
 	}
 	service.gwClients = gwClients

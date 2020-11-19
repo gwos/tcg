@@ -71,6 +71,7 @@ func configHandler(data []byte) {
 		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
 		CheckInterval:      connectors.DefaultCheckInterval,
+		MonitorConnector:   false,
 		AppType:            config.GetConfig().Connector.AppType,
 		AgentID:            config.GetConfig().Connector.AgentID,
 		GWConnections:      config.GetConfig().GWConnections,
@@ -177,6 +178,14 @@ func periodicHandler() {
 		err := connectors.SendMetrics(context.Background(), metrics, nil)
 		if err != nil {
 			log.Error("[Elastic Connector]: ", err.Error())
+		}
+	}
+	if extConfig.MonitorConnector {
+		serviceName := transit.BuildConnectorServiceName(config.GetConfig().Connector.AppType,
+			config.GetConfig().Connector.DisplayName)
+		err := connectors.MonitorConnector(context.Background(), serviceName, true)
+		if err != nil {
+			log.Error("[Elastic Connector]: ", err)
 		}
 	}
 }

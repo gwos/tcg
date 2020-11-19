@@ -149,10 +149,10 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 		services := make([]transit.DynamicInventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
-			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
+			services[serviceIndex] = transit.CreateInventoryService(service.Name, service.Owner)
 			serviceIndex = serviceIndex + 1
 		}
-		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
+		inventory[index] = transit.CreateInventoryResource(resource.Name, services)
 		// convert monitored state
 		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
 		serviceIndex = 0

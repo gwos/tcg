@@ -115,6 +115,8 @@ type TransitServices interface {
 	SendEventsUnack(context.Context, []byte) error
 	SendResourceWithMetrics(context.Context, []byte) error
 	SynchronizeInventory(context.Context, []byte) error
+	MonitorConnector(context.Context, []byte) error
+	StopConnectorMonitoring(context.Context, []byte) error
 }
 
 // Controllers defines TCG Agent controllers interface
@@ -144,6 +146,8 @@ const (
 	typeEventsUnack
 	typeInventory
 	typeMetrics
+	typeMonitorConnector
+	typeStopConnectorMonitoring
 	typeClearInDowntime
 	typeSetInDowntime
 )

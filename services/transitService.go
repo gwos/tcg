@@ -195,3 +195,47 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	err = nats.Publish(subjInventoryMetrics, b)
 	return err
 }
+
+func (service *TransitService) MonitorConnector(ctx context.Context, payload []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "MonitorConnector")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+	payload, err = service.mixTracerContext(payload)
+	if err != nil {
+		return err
+	}
+	b, err = natsPayload{payload, span.SpanContext(), typeMonitorConnector}.MarshalText()
+	err = nats.Publish(subjInventoryMetrics, b)
+	return err
+}
+
+func (service *TransitService) StopConnectorMonitoring(ctx context.Context, tracerContext []byte) error {
+	var (
+		b   []byte
+		err error
+	)
+	_, span := StartTraceSpan(ctx, "services", "StopConnectorMonitoring")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+	tracerContext, err = service.mixTracerContext(tracerContext)
+	if err != nil {
+		return err
+	}
+	b, err = natsPayload{tracerContext, span.SpanContext(), typeStopConnectorMonitoring}.MarshalText()
+	err = nats.Publish(subjInventoryMetrics, b)
+	return err
+}

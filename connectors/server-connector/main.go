@@ -18,8 +18,9 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	chksum            []byte
-	ctxCancel, cancel = context.WithCancel(context.Background())
+	chksum             []byte
+	monitoredConnector bool
+	ctxCancel, cancel  = context.WithCancel(context.Background())
 )
 
 // @title TCG API Documentation
@@ -65,9 +66,10 @@ func configHandler(data []byte) {
 			GroupName: defaultHostGroupName,
 			Type:      transit.HostGroup,
 		}},
-		Processes:     []string{},
-		CheckInterval: connectors.DefaultCheckInterval,
-		Ownership:     transit.Yield,
+		Processes:        []string{},
+		CheckInterval:    connectors.DefaultCheckInterval,
+		Ownership:        transit.Yield,
+		MonitorConnector: false,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -103,6 +105,13 @@ func configHandler(data []byte) {
 			extConfig.Ownership,
 		)
 	}
+	if !extConfig.MonitorConnector && monitoredConnector {
+		err := connectors.StopConnectorMonitoring(context.Background())
+		if err != nil {
+			log.Error("[Server Connector]: ", err)
+		}
+	}
+	monitoredConnector = extConfig.MonitorConnector
 	if err == nil {
 		chksum = chk
 	}
@@ -119,6 +128,14 @@ func periodicHandler() {
 		if err := connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{
 			*CollectMetrics(metricsProfile.Metrics),
 		}, nil); err != nil {
+			log.Error("[Server Connector]: ", err)
+		}
+	}
+	if extConfig.MonitorConnector {
+		serviceName := transit.BuildConnectorServiceName(config.GetConfig().Connector.AppType,
+			config.GetConfig().Connector.DisplayName)
+		err := connectors.MonitorConnector(context.Background(), serviceName, true)
+		if err != nil {
 			log.Error("[Server Connector]: ", err)
 		}
 	}

@@ -6,6 +6,7 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"strconv"
+	"strings"
 )
 
 // VersionString defines type of constant
@@ -150,6 +151,16 @@ const (
 	Critical                  = "Critical"
 	Min                       = "Min"
 	Max                       = "Max"
+)
+
+// Monitor Connectors constants
+const (
+	// TODO must be the same for tcg and cloudhub
+	TcgAlias                = "cloudhub"
+	SystemAppType           = "SYSTEM"
+	MonitorHostName         = "ConnectorMonitor"
+	ConnectorsHostGroup     = "Connectors"
+	ConnectorsHostGroupDesc = "Monitored CloudHub Connectors"
 )
 
 // TimeInterval defines a closed time interval. It extends from the start time
@@ -986,4 +997,57 @@ type HostsAndServices struct {
 	ServiceGroupCategoryNames []string `json:"serviceGroupCategoryNames"`
 	SetHosts                  bool     `json:"setHosts"`
 	SetServices               bool     `json:"setServices"`
+}
+
+// Inventory Constructors
+func CreateInventoryService(name string, owner string) DynamicInventoryService {
+	return DynamicInventoryService{
+		BaseTransitData: BaseTransitData{
+			Name:  name,
+			Type:  Service,
+			Owner: owner,
+		},
+	}
+}
+
+// makes and modifies a copy, doesn't modify services
+func CreateInventoryResource(name string, services []DynamicInventoryService) DynamicInventoryResource {
+	resource := DynamicInventoryResource{
+		BaseResource: BaseResource{
+			BaseTransitData: BaseTransitData{
+				Name: name,
+				Type: Host,
+			},
+		},
+	}
+	for _, s := range services {
+		resource.Services = append(resource.Services, s)
+	}
+	return resource
+}
+
+func CreateMonitoredResourceRef(name string, owner string, resourceType ResourceType) MonitoredResourceRef {
+	resource := MonitoredResourceRef{
+		Name:  name,
+		Type:  resourceType,
+		Owner: owner,
+	}
+	return resource
+}
+
+func CreateResourceGroup(name string, description string, groupType GroupType, resources []MonitoredResourceRef) ResourceGroup {
+	group := ResourceGroup{
+		GroupName:   name,
+		Type:        groupType,
+		Description: description,
+	}
+	for _, r := range resources {
+		group.Resources = append(group.Resources, r)
+	}
+	return group
+}
+
+func BuildConnectorServiceName(appType string, connectorName string) string {
+	connectorServiceName := appType + "-" + connectorName
+	return strings.ReplaceAll(connectorServiceName, " ", "_")
 }

@@ -63,6 +63,72 @@ func Start() error {
 	return nil
 }
 
+func MonitorConnector(ctx context.Context, name string, up bool) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "MonitorConnector")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+
+	tracerContext := services.GetTransitService().MakeTracerContext()
+	tracerContext.AgentID = transit.TcgAlias
+	tracerContext.AppType = transit.SystemAppType
+
+	connectorService, _ := CreateService(name, transit.MonitorHostName)
+	if !up {
+		connectorService.Status = transit.ServiceUnknown
+	}
+	connectorsHost, _ := CreateResource(transit.MonitorHostName, []transit.DynamicMonitoredService{*connectorService})
+	connectorHostRef := transit.CreateMonitoredResourceRef(transit.MonitorHostName, "", transit.Host)
+	connectorsGroup := transit.CreateResourceGroup(transit.ConnectorsHostGroup, transit.ConnectorsHostGroupDesc,
+		transit.HostGroup, []transit.MonitoredResourceRef{connectorHostRef})
+
+	request := transit.DynamicResourcesWithServicesRequest{
+		Context:   tracerContext,
+		Resources: []transit.DynamicMonitoredResource{*connectorsHost},
+		Groups:    []transit.ResourceGroup{connectorsGroup},
+	}
+
+	b, err = json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	return services.GetTransitService().MonitorConnector(ctxN, b)
+}
+
+func StopConnectorMonitoring(ctx context.Context) error {
+	var (
+		b   []byte
+		err error
+	)
+	ctxN, span := services.StartTraceSpan(ctx, "connectors", "StopConnectorMonitoring")
+	defer func() {
+		span.SetAttributes(
+			label.Int("payloadLen", len(b)),
+			label.String("error", fmt.Sprint(err)),
+		)
+		span.End()
+	}()
+
+	tracerContext := services.GetTransitService().MakeTracerContext()
+	tracerContext.AgentID = transit.TcgAlias
+	tracerContext.AppType = transit.SystemAppType
+
+	b, err = json.Marshal(tracerContext)
+	if err != nil {
+		return err
+	}
+
+	return services.GetTransitService().StopConnectorMonitoring(ctxN, b)
+}
+
 // SendMetrics processes metrics payload
 func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResource, groups *[]transit.ResourceGroup) error {
 	var (
@@ -123,54 +189,6 @@ func SendInventory(ctx context.Context, resources []transit.DynamicInventoryReso
 	}
 	err = services.GetTransitService().SynchronizeInventory(ctxN, b)
 	return err
-}
-
-// Inventory Constructors
-func CreateInventoryService(name string, owner string) transit.DynamicInventoryService {
-	return transit.DynamicInventoryService{
-		BaseTransitData: transit.BaseTransitData{
-			Name:  name,
-			Type:  transit.Service,
-			Owner: owner,
-		},
-	}
-}
-
-// makes and modifies a copy, doesn't modify services
-func CreateInventoryResource(name string, services []transit.DynamicInventoryService) transit.DynamicInventoryResource {
-	resource := transit.DynamicInventoryResource{
-		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
-				Name: name,
-				Type: transit.Host,
-			},
-		},
-	}
-	for _, s := range services {
-		resource.Services = append(resource.Services, s)
-	}
-	return resource
-}
-
-func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
-	resource := transit.MonitoredResourceRef{
-		Name:  name,
-		Type:  resourceType,
-		Owner: owner,
-	}
-	return resource
-}
-
-func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
-	group := transit.ResourceGroup{
-		GroupName:   name,
-		Type:        groupType,
-		Description: description,
-	}
-	for _, r := range resources {
-		group.Resources = append(group.Resources, r)
-	}
-	return group
 }
 
 func FillGroupWithResources(group transit.ResourceGroup, resources []transit.DynamicInventoryResource) transit.ResourceGroup {

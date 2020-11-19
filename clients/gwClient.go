@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/gwos/tcg/transit"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,6 +47,7 @@ const (
 	GWEntrypointSendResourceWithMetrics        = "/api/monitoring"
 	GWEntrypointSendResourceWithMetricsDynamic = "/api/monitoring?dynamic=true"
 	GWEntrypointSynchronizeInventory           = "/api/synchronizer"
+	GWEntrypointHosts                          = "/api/hosts"
 	GWEntrypointServices                       = "/api/services"
 	GWEntrypointHostgroups                     = "/api/hostgroups"
 	GWEntrypointLicenseCheck                   = "/api/license/check"
@@ -53,8 +56,9 @@ const (
 
 // GWClient implements GWOperations interface
 type GWClient struct {
-	AppName string
-	AppType string
+	ConnectorName string
+	AppName       string
+	AppType       string
 	*config.GWConnection
 	sync.Mutex
 	token string
@@ -69,6 +73,7 @@ type GWClient struct {
 	uriSendResourceWithMetrics        string
 	uriSendResourceWithMetricsDynamic string
 	uriSynchronizeInventory           string
+	uriHosts                          string
 	uriServices                       string
 	uriHostGroups                     string
 	uriLicenseCheck                   string
@@ -87,10 +92,18 @@ type UserResponse struct {
 	AccessToken string `json:"accessToken"`
 }
 
+type GwHost struct {
+	HostName string      `json:"hostName"`
+	Services []GwService `json:"services"`
+}
+
 type GwServices struct {
-	Services []struct {
-		HostName string `json:"hostName"`
-	} `json:"services"`
+	Services []GwService `json:"services"`
+}
+
+type GwService struct {
+	Description string `json:"description"`
+	HostName    string `json:"hostName"`
 }
 
 type GwHostGroups struct {
@@ -365,13 +378,7 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		}
 	}
 	client.buildURIs()
-	mergeParam := make(map[string]string)
-	mergeHosts := true
-	if client.GWConnection != nil {
-		mergeHosts = client.GWConnection.MergeHosts
-	}
-	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
-	syncUri := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
+	syncUri := client.getSyncUri()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendData(ctx, syncUri, payload,
 			header{
@@ -385,6 +392,80 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		cache.LastSentHostsCountCache.SetDefault(hostName, currentHostsCount)
 	}
 	return response, err
+}
+
+func (client *GWClient) MonitorConnector(ctx context.Context, payload []byte) ([]byte, error) {
+	// TODO prefixes?
+	return client.sendData(ctx, client.uriSendResourceWithMetricsDynamic, payload)
+}
+
+func (client *GWClient) StopConnectorMonitoring(ctx context.Context, tracerContextPayload []byte) ([]byte, error) {
+	// retrieve existing connectors services
+	gwConnectorsHost, _ := client.getHost(transit.MonitorHostName)
+	// no need to do anything if host does not exist
+	if gwConnectorsHost == nil {
+		log.Info("|gwClient.go| : [StopConnectorMonitoring] : Connectors Host does not exist yet")
+		return nil, nil
+	}
+
+	// build request for connectors host containing all existing services except current one
+	var (
+		services       []transit.DynamicInventoryService
+		resources      []transit.DynamicInventoryResource
+		resourceGroups []transit.ResourceGroup
+	)
+	// no need to take ownership
+	ownershipType := transit.Yield
+
+	serviceName := transit.BuildConnectorServiceName(client.AppType, client.ConnectorName)
+	for _, gwService := range gwConnectorsHost.Services {
+		if gwService.Description != serviceName {
+			service := transit.CreateInventoryService(gwService.Description, transit.MonitorHostName)
+			services = append(services, service)
+		}
+	}
+	if len(services) > 0 {
+		connectorHost := transit.CreateInventoryResource(transit.MonitorHostName,
+			services)
+		connectorHostRef := transit.CreateMonitoredResourceRef(transit.MonitorHostName, "", transit.Host)
+		connectorsGroup := transit.CreateResourceGroup(transit.ConnectorsHostGroup, transit.ConnectorsHostGroupDesc,
+			transit.HostGroup, []transit.MonitoredResourceRef{connectorHostRef})
+
+		resources = append(resources, connectorHost)
+		resourceGroups = append(resourceGroups, connectorsGroup)
+	}
+	// if current connector's service was the only one i.e. no monitored connectors left
+	// send empty inventory i.e. remove connector's host and group
+
+	// retrieve tracer context from payload
+	var tracerContext transit.TracerContext
+	err := json.Unmarshal(tracerContextPayload, &tracerContext)
+	if err != nil {
+		return nil, err
+	}
+	request := transit.DynamicInventoryRequest{
+		Context:       &tracerContext,
+		OwnershipType: ownershipType,
+		Resources:     resources,
+		Groups:        resourceGroups,
+	}
+
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return nil, err
+	}
+	// TODO should merge depend on settings or must be true anyway?
+	return client.sendData(ctx, client.getSyncUri(), payload)
+}
+
+func (client *GWClient) getSyncUri() string {
+	mergeParam := make(map[string]string)
+	mergeHosts := true
+	if client.GWConnection != nil {
+		mergeHosts = client.GWConnection.MergeHosts
+	}
+	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
+	return client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
 }
 
 // SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
@@ -474,6 +555,25 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 		)
 	}
 	return client.sendData(ctx, client.uriSendEventsUnack, payload)
+}
+
+func (client *GWClient) getHost(hostname string) (*GwHost, error) {
+	params := make(map[string]string)
+	params["depth"] = "Deep"
+	client.buildURIs()
+	reqUrl := client.uriHosts + "/" + url.QueryEscape(hostname) + BuildQueryParams(params)
+	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	if err != nil {
+		log.Warn("|gwClient.go| : [getHost] : Unable to get GW host: ", err)
+		return nil, err
+	}
+	var gwHost GwHost
+	err = json.Unmarshal(response, &gwHost)
+	if err != nil {
+		log.Warn("|gwClient.go| : [getHost] : Unable to parse received GW host: ", err)
+		return nil, err
+	}
+	return &gwHost, nil
 }
 
 // GetServicesByAgent implements GWOperations.GetServicesByAgent.
@@ -686,6 +786,7 @@ func (client *GWClient) buildURIs() {
 		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
 		uriSendResourceWithMetricsDynamic := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
 		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+		uriHosts := buildURI(client.GWConnection.HostName, GWEntrypointHosts)
 		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
 		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
 		uriLicenseCheck := buildURI(client.GWConnection.HostName, GWEntrypointLicenseCheck)
@@ -701,6 +802,7 @@ func (client *GWClient) buildURIs() {
 		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
 		client.uriSendResourceWithMetricsDynamic = uriSendResourceWithMetricsDynamic
 		client.uriSynchronizeInventory = uriSynchronizeInventory
+		client.uriHosts = uriHosts
 		client.uriServices = uriServices
 		client.uriHostGroups = uriHostGroups
 		client.uriLicenseCheck = uriLicenseCheck

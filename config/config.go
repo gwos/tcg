@@ -80,9 +80,10 @@ func (l LogLevel) String() string {
 // Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
-	AgentID string `yaml:"agentId"`
-	AppName string `yaml:"appName"`
-	AppType string `yaml:"appType"`
+	DisplayName string `yaml:"displayName"`
+	AgentID     string `yaml:"agentId"`
+	AppName     string `yaml:"appName"`
+	AppType     string `yaml:"appType"`
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
@@ -115,6 +116,7 @@ type Connector struct {
 
 // ConnectorDTO defines TCG Connector configuration
 type ConnectorDTO struct {
+	DisplayName   string        `json:"displayName"`
 	AgentID       string        `json:"agentId"`
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
@@ -354,6 +356,7 @@ func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 		log.Error("|config.go| : [loadConnector] : ", err.Error())
 		return nil, err
 	}
+	cfg.Connector.DisplayName = dto.DisplayName
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType

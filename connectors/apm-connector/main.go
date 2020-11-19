@@ -45,11 +45,12 @@ func configHandler(data []byte) {
 	log.Info("[APM Connector]: Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
-		Groups:        []transit.ResourceGroup{},
-		Resources:     []Resource{},
-		Services:      []string{},
-		CheckInterval: connectors.DefaultCheckInterval,
-		Ownership:     transit.Yield,
+		Groups:           []transit.ResourceGroup{},
+		Resources:        []Resource{},
+		Services:         []string{},
+		CheckInterval:    connectors.DefaultCheckInterval,
+		Ownership:        transit.Yield,
+		MonitorConnector: false,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -73,4 +74,12 @@ func configHandler(data []byte) {
 
 func periodicHandler() {
 	pull(extConfig.Resources)
+	if extConfig.MonitorConnector {
+		serviceName := transit.BuildConnectorServiceName(config.GetConfig().Connector.AppType,
+			config.GetConfig().Connector.DisplayName)
+		err := connectors.MonitorConnector(context.Background(), serviceName, true)
+		if err != nil {
+			log.Error("[APM Connector]: ", err)
+		}
+	}
 }

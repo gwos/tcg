@@ -113,7 +113,7 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.DynamicM
 	for _, host := range hosts {
 		monitoredServices, inventoryServices := host.toTransitResources(monitoringState.Metrics)
 
-		inventoryResource := connectors.CreateInventoryResource(host.name, inventoryServices)
+		inventoryResource := transit.CreateInventoryResource(host.name, inventoryServices)
 		irs[i] = inventoryResource
 
 		monitoredResource, err := connectors.CreateResource(host.name, monitoredServices)
@@ -140,7 +140,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 		if metricDefinition, has := metricDefinitions[serviceName]; has {
 			customServiceName := connectors.Name(serviceName, metricDefinition.CustomName)
 
-			inventoryService := connectors.CreateInventoryService(customServiceName, host.name)
+			inventoryService := transit.CreateInventoryService(customServiceName, host.name)
 			inventoryServices[i] = inventoryService
 
 			metricBuilder := connectors.MetricBuilder{
@@ -181,11 +181,11 @@ func (monitoringState *MonitoringState) toResourceGroups() []transit.ResourceGro
 		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
 		k := 0
 		for host := range hostsInGroup {
-			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.Host)
+			monitoredResourceRef := transit.CreateMonitoredResourceRef(host, "", transit.Host)
 			monitoredResourceRefs[k] = monitoredResourceRef
 			k++
 		}
-		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
+		resourceGroup := transit.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
 		rgs[j] = resourceGroup
 		j++
 	}

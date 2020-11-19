@@ -38,10 +38,10 @@ func main() {
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
 	var iServices []transit.DynamicInventoryService
-	is1 := connectors.CreateInventoryService(Service1, Resource1)
-	is2 := connectors.CreateInventoryService(Service2, Resource1)
+	is1 := transit.CreateInventoryService(Service1, Resource1)
+	is2 := transit.CreateInventoryService(Service2, Resource1)
 	iServices = append(iServices, is1, is2)
-	iResource1 := connectors.CreateInventoryResource(Resource1, iServices)
+	iResource1 := transit.CreateInventoryResource(Resource1, iServices)
 	println(iResource1.Services[0].Description)
 	println(iResource1.Description)
 	//if (enableTransit) {

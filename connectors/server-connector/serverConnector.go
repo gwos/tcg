@@ -22,10 +22,11 @@ import (
 
 // ExtConfig defines the MonitorConnection extensions configuration
 type ExtConfig struct {
-	Groups        []transit.ResourceGroup   `json:"groups"`
-	Processes     []string                  `json:"processes"`
-	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
-	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	Groups           []transit.ResourceGroup   `json:"groups"`
+	Processes        []string                  `json:"processes"`
+	CheckInterval    time.Duration             `json:"checkIntervalMinutes"`
+	Ownership        transit.HostOwnershipType `json:"ownership,omitempty"`
+	MonitorConnector bool                      `json:"connectorMonitored"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -74,6 +75,7 @@ var hostName string
 
 // temporary solution, will be removed
 var templateMetricName = "$view_Template#"
+
 const EnvTcgHostName = "TCG_HOST_NAME"
 
 // Synchronize inventory for necessary processes
@@ -98,12 +100,12 @@ func Synchronize(processes []transit.MetricDefinition) *transit.DynamicInventory
 		if pr.Name == templateMetricName {
 			continue
 		}
-		service := connectors.CreateInventoryService(connectors.Name(pr.Name, pr.CustomName),
+		service := transit.CreateInventoryService(connectors.Name(pr.Name, pr.CustomName),
 			hostName)
 		srvs = append(srvs, service)
 	}
 
-	inventoryResource := connectors.CreateInventoryResource(hostName, srvs)
+	inventoryResource := transit.CreateInventoryResource(hostName, srvs)
 
 	return &inventoryResource
 }
