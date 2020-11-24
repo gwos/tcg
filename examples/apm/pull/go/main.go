@@ -17,21 +17,21 @@ const (
 )
 
 var (
-	dynamicLabels  = []string{"service"}
+	dynamicLabels  = []string{"resource", "service"}
 	requestsLabels = prometheus.Labels{
-		"resource": HostName,
+		// "resource": HostName,
 		"group":    HostGroupName,
 		"warning":  "85",
 		"critical": "95",
 	}
 	bytesLabels = prometheus.Labels{
-		"resource": HostName,
+		// "resource": HostName,
 		"group":    HostGroupName,
 		"warning":  "45000",
 		"critical": "48000",
 	}
 	responseLabels = prometheus.Labels{
-		"resource": HostName,
+		// "resource": HostName,
 		"group":    HostGroupName,
 		"warning":  "2.5",
 		"critical": "2.8",
@@ -100,21 +100,25 @@ func salesHandler(w http.ResponseWriter, r *http.Request) {
 func instrumentedHandler(w http.ResponseWriter, r *http.Request, serviceName string) {
 	// instrument your http handler, start the timer ...
 	start := time.Now()
-	labels := prometheus.Labels{"service": serviceName}
+	for ix := 1; ix <= 1000; ix++ {
+		hostName := fmt.Sprintf("%s-%d", HostName, ix)
+		for iy := 1; iy <= 10; iy++ {
+			serviceFullName := fmt.Sprintf("service-%d", ix)
+			labels := prometheus.Labels{"service": serviceFullName, "resource": hostName}
 
-	// call your application logic here... this returns simulated random instrumentation numbers
-	requestsNumber, bytesNumber, responseTimeNumber := processRequest()
+			// call your application logic here... this returns simulated random instrumentation numbers
+			requestsNumber, bytesNumber, responseTimeNumber := processRequest()
 
+			// instrument requestsPerMinute with random number, this could also be done with a histogram
+			requestsPerMinute.With(labels).Set(requestsNumber)
+			// instrument bytes per minute with random number, this could also be done with a histogram
+			bytesPerMinute.With(labels).Set(bytesNumber)
+			// instrument response time with random number, you would normally use the elapsed variable
+			responseTime.With(labels).Set(responseTimeNumber)
+		}
+	}
 	// calculate responseTime, you would normally set instrument this on responseTime
 	elapsed := float64(time.Since(start).Nanoseconds())
-
-	// instrument requestsPerMinute with random number, this could also be done with a histogram
-	requestsPerMinute.With(labels).Set(requestsNumber)
-	// instrument bytes per minute with random number, this could also be done with a histogram
-	bytesPerMinute.With(labels).Set(bytesNumber)
-	// instrument response time with random number, you would normally use the elapsed variable
-	responseTime.With(labels).Set(responseTimeNumber)
-
 	message := fmt.Sprintf("Groundwork Prometheus Metrics example response for %s in %f ns\n", serviceName, elapsed)
 	_, _ = w.Write([]byte(message))
 }
