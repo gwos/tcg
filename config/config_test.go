@@ -38,10 +38,12 @@ gwConnections:
 	assert.NoError(t, err)
 
 	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	_ = os.Setenv("TCG_CONNECTOR_NATSSTOREMAXAGE", "1h")
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
 	_ = os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	_ = os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
 	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv("TCG_CONNECTOR_NATSSTOREMAXAGE")
 	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
 	defer os.Unsetenv("TCG_DSCONNECTION")
 	defer os.Unsetenv("TCG_GWCONNECTIONS")
@@ -52,6 +54,7 @@ gwConnections:
 	expected.Connector.AppType = "test"
 	expected.Connector.ControllerAddr = ":9999"
 	expected.Connector.NatsStoreType = "MEMORY"
+	expected.Connector.NatsStoreMaxAge = 3600000000000
 	expected.DSConnection = &DSConnection{"localhost:3001"}
 	expected.GWConnections = GWConnections{
 		&GWConnection{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},

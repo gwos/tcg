@@ -322,11 +322,11 @@ func defaults() Config {
 	return Config{
 		Connector: &Connector{
 			ControllerAddr:          ":8099",
-			ControllerReadTimeout:   time.Duration(10 * time.Second),
-			ControllerWriteTimeout:  time.Duration(20 * time.Second),
+			ControllerReadTimeout:   time.Duration(time.Second * 10),
+			ControllerWriteTimeout:  time.Duration(time.Second * 20),
 			LogConsPeriod:           0,
 			LogLevel:                1,
-			NatsAckWait:             time.Duration(30 * time.Second),
+			NatsAckWait:             time.Duration(time.Second * 30),
 			NatsMaxInflight:         1024,
 			NatsMaxPubAcksInflight:  1024,
 			NatsMaxPayload:          1024 * 1024 * 80, // 80MB
@@ -335,10 +335,10 @@ func defaults() Config {
 			NatsMonitorPort:         0,
 			NatsStoreDir:            "natsstore",
 			NatsStoreType:           "FILE",
-			NatsStoreMaxAge:         0,               // unlimited
-			NatsStoreMaxBytes:       0,               // unlimited
-			NatsStoreBufferSize:     1024 * 1024 * 2, // 2MB
-			NatsStoreReadBufferSize: 1024 * 1024 * 2, // 2MB
+			NatsStoreMaxAge:         time.Duration(time.Hour * 24 * 10), // 10days
+			NatsStoreMaxBytes:       1024 * 1024 * 1024 * 50,            // 50GB
+			NatsStoreBufferSize:     1024 * 1024 * 2,                    // 2MB
+			NatsStoreReadBufferSize: 1024 * 1024 * 2,                    // 2MB
 		},
 		DSConnection:  &DSConnection{},
 		Jaegertracing: &Jaegertracing{},
