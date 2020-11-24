@@ -103,7 +103,7 @@ func instrumentedHandler(w http.ResponseWriter, r *http.Request, serviceName str
 	for ix := 1; ix <= 1000; ix++ {
 		hostName := fmt.Sprintf("%s-%d", HostName, ix)
 		for iy := 1; iy <= 10; iy++ {
-			serviceFullName := fmt.Sprintf("service-%d", ix)
+			serviceFullName := fmt.Sprintf("service-%d", iy)
 			labels := prometheus.Labels{"service": serviceFullName, "resource": hostName}
 
 			// call your application logic here... this returns simulated random instrumentation numbers
