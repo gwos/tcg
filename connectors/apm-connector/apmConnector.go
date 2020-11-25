@@ -153,11 +153,11 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 // modifies hostsMap parameter
 func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 	groups map[string][]transit.MonitoredResourceRef,
-	hostsMap map[string]map[string][]connectors.MetricBuilder, resourceIndex int) {
-	var groupName, hostName, serviceName string
+	hostsMap map[string]map[string][]connectors.MetricBuilder, resourceIndex int, hostToDeviceMap map[string]string) {
+	var groupName, hostName, serviceName, device string
 
 	for _, metric := range prometheusService.GetMetric() {
-		groupName, hostName, serviceName = "", "", ""
+		groupName, hostName, serviceName, device = "", "", "", ""
 		var timestamp = time.Now()
 		if metric.TimestampMs != nil {
 			timestamp = time.Unix(*metric.TimestampMs, 0)
@@ -200,6 +200,8 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					serviceName = *label.Value
 				case "group":
 					groupName = *label.Value
+				case "device":
+					device = *label.Value
 				default:
 					metricBuilder.Tags[*label.Name] = *label.Value
 				}
@@ -223,6 +225,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 			if serviceName == "" {
 				serviceName = name
 			}
+			hostToDeviceMap[hostName] = device
 
 			// build the host->service->metric tree
 			host, hostFound := hostsMap[hostName]
@@ -249,7 +252,9 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					Type: transit.Host,
 				})
 			}
-			inventoryGroupsStorage[extConfig.Resources[resourceIndex].URL] = groups
+			if resourceIndex != -1 {
+				inventoryGroupsStorage[extConfig.Resources[resourceIndex].URL] = groups
+			}
 		}
 	}
 }
@@ -279,6 +284,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.DynamicMonitoredResource, error) {
 	var monitoredResources []transit.DynamicMonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
+	hostToDeviceMap := make(map[string]string)
 	for _, prometheusService := range prometheusServices {
 		if len(prometheusService.GetMetric()) == 0 {
 			continue
@@ -288,10 +294,10 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 			log.Error(fmt.Sprintf("[APM Connector]: %s", err.Error()))
 			continue
 		}
-		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex)
+		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
 	}
 	for hostName, host := range hostsMap {
-		monitoredResource, err := connectors.CreateResource(hostName)
+		monitoredResource, err := connectors.CreateResource(hostName, hostToDeviceMap[hostName])
 		if err != nil {
 			return nil, err
 		}
