@@ -254,6 +254,7 @@ func main() {
 		struct_fields, struct_field_Go_packages, struct_field_Go_types,
 		struct_field_foreign_C_types, struct_field_C_types, struct_field_tags, generated_C_code,
 		err := print_type_declarations(
+		other_headers,
 		package_name,
 		final_type_order,
 		simple_typedefs, enum_typedefs, const_groups, struct_typedefs, struct_field_typedefs,
@@ -265,7 +266,6 @@ func main() {
 		os.Exit(1)
 	}
 	err = print_type_conversions(
-		other_headers,
 		generated_C_code,
 		package_name,
 		final_type_order, pointer_base_types, pointer_list_base_types, simple_list_base_types, list_base_types, key_value_pair_types,
@@ -1833,6 +1833,7 @@ extern "C" {
 #include "jansson.h"
 
 {{.GenericHeader}}
+{{.OtherHeaders}}
 
 #ifndef NUL_TERM_LEN
 // Size of a NUL-termination byte.  Generally useful for documenting the
@@ -1941,7 +1942,6 @@ var C_code_boilerplate = `//
 
 #include "convert_go_to_c.h"
 
-{{.OtherHeaders}}
 #include "{{.HeaderFilename}}"
 
 `
@@ -2180,6 +2180,7 @@ func foreign_type_C_type(field_package string, field_type_name string) (base_C_t
 }
 
 func print_type_declarations(
+	other_headers string,
 	package_name string,
 	final_type_order []declaration_kind,
 	simple_typedefs map[string]string,
@@ -2293,6 +2294,7 @@ func print_type_declarations(
 	}
 	type C_header_boilerplate_fields struct {
 		Year           int
+		OtherHeaders   string
 		HeaderFilename string
 		HeaderSymbol   string
 		GenericHeader  string
@@ -2300,6 +2302,7 @@ func print_type_declarations(
 
 	boilerplate_variables := C_header_boilerplate_fields{
 		Year:             current_year,
+		OtherHeaders:     other_headers,
 		HeaderFilename:   header_filename,
 		HeaderSymbol:     header_symbol,
 		GenericHeader:    generic_header,
@@ -5938,7 +5941,6 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 //     extern void destroy_PackageName_StructTypeName_ptr_tree(PackageName_StructTypeName *PackageName_StructTypeName_ptr, json_t *json, bool free_pointers);
 //
 func print_type_conversions(
-	other_headers string,
 	generated_C_code string,
 	package_name string,
 	final_type_order []declaration_kind,
@@ -5968,7 +5970,6 @@ func print_type_conversions(
 	type C_code_boilerplate_fields struct {
 		Year           int
 		CodeFilename   string
-		OtherHeaders   string
 		HeaderFilename string
 	}
 
@@ -5979,7 +5980,6 @@ func print_type_conversions(
 	boilerplate_variables := C_code_boilerplate_fields{
 		Year:           current_year,
 		CodeFilename:   code_filename,
-		OtherHeaders:   other_headers,
 		HeaderFilename: header_filename,
 	}
 
