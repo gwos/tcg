@@ -89,9 +89,8 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-var parser expfmt.TextParser
-
 func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
+	var parser expfmt.TextParser
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, nil, err
