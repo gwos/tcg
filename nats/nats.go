@@ -142,24 +142,6 @@ func StartDispatcher(options []DispatcherOption) error {
 		return err
 	}
 
-	var err error
-	mu.Lock()
-	defer mu.Unlock()
-
-	if len(natsURL) == 0 {
-		err = fmt.Errorf("[NATS]: unavailable")
-		log.Warn(err)
-		return err
-	}
-	if connDispatcher == nil {
-		if connDispatcher, err = stan.Connect(
-			clusterID,
-			dispatcherID,
-			stan.NatsURL(natsURL),
-		); err != nil {
-			return err
-		}
-	}
 	cache.DispatcherWorkersCache.Flush()
 	for _, opt := range options {
 		ctrlChan <- opt
@@ -197,6 +179,13 @@ func Publish(subject string, msg []byte) error {
 			publisherID,
 			stan.NatsURL(natsURL),
 			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
+			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
+				log.Warn("[NATS]: ConnectionLostHandler at connPublisher: ", e.Error())
+				mu.Lock()
+				_ = c.Close()
+				connPublisher = nil
+				mu.Unlock()
+			}),
 		); err != nil {
 			log.With(log.Fields{
 				"error":   err,
@@ -209,19 +198,16 @@ func Publish(subject string, msg []byte) error {
 }
 
 func listenCtrlChan() {
-	for {
-		opt := <-ctrlChan
-		if connDispatcher != nil {
-			ckWorker := opt.DurableName
-			if _, isWorker := cache.DispatcherWorkersCache.Get(ckWorker); !isWorker {
-				if err := startWorker(opt); err != nil {
-					log.With(log.Fields{
-						"error": err,
-						"opt":   opt,
-					}).Log(log.WarnLevel, "[NATS]: startWorker failed")
-				} else {
-					cache.DispatcherWorkersCache.Set(ckWorker, 0, -1)
-				}
+	for opt := range ctrlChan {
+		ckWorker := opt.DurableName
+		if _, isWorker := cache.DispatcherWorkersCache.Get(ckWorker); !isWorker {
+			if err := startWorker(opt); err != nil {
+				log.With(log.Fields{
+					"error": err,
+					"opt":   opt,
+				}).Log(log.WarnLevel, "[NATS]: startWorker failed")
+			} else {
+				cache.DispatcherWorkersCache.Set(ckWorker, 0, -1)
 			}
 		}
 	}
@@ -229,10 +215,44 @@ func listenCtrlChan() {
 
 func startWorker(opt DispatcherOption) error {
 	var (
-		errSb        error
+		errConn      error
+		errSubs      error
 		subscription stan.Subscription
 	)
-	subscription, errSb = connDispatcher.Subscribe(
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	if len(natsURL) == 0 {
+		errConn = fmt.Errorf("[NATS]: unavailable")
+		log.Warn(errConn)
+		return errConn
+	}
+	if connDispatcher == nil {
+		if connDispatcher, errConn = stan.Connect(
+			clusterID,
+			dispatcherID,
+			stan.NatsURL(natsURL),
+			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
+				log.Warn("[NATS]: ConnectionLostHandler at connDispatcher: ", e.Error())
+				mu.Lock()
+				ckWorker := opt.DurableName
+				cache.DispatcherWorkersCache.Delete(ckWorker)
+				_ = c.Close()
+				connDispatcher = nil
+				mu.Unlock()
+				ctrlChan <- opt
+			}),
+		); errConn != nil {
+			log.With(log.Fields{
+				"error":   errConn,
+				"natsURL": natsURL,
+			}).Log(log.WarnLevel, "[NATS]: connDispatcher failed")
+			return errConn
+		}
+	}
+
+	if subscription, errSubs = connDispatcher.Subscribe(
 		opt.Subject,
 		func(msg *stan.Msg) {
 			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
@@ -267,13 +287,13 @@ func startWorker(opt DispatcherOption) error {
 		stan.MaxInflight(cfg.MaxInflight),
 		stan.DurableName(opt.DurableName),
 		stan.StartWithLastReceived(),
-	)
+	); errSubs != nil {
+		return errSubs
+	}
 
 	// Workaround v8.1.3 to fix processing large natsstore from prior versions
 	// Modern envs should use the correct value of MaxInflight setting
-	subscription.SetPendingLimits(cfg.MaxPendingMsgs, cfg.MaxPendingBytes)
-
-	return errSb
+	return subscription.SetPendingLimits(cfg.MaxPendingMsgs, cfg.MaxPendingBytes)
 }
 
 func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
@@ -313,9 +333,12 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 			logEntry.WithField("retry", retry).Log(log.InfoLevel, "[NATS]: Not delivered: Will retry")
 
 			go func() {
+				mu.Lock()
 				ckWorker := opt.DurableName
 				cache.DispatcherWorkersCache.Delete(ckWorker)
 				_ = subscription.Close()
+				mu.Unlock()
+
 				time.Sleep(delay)
 				ctrlChan <- opt
 			}()
