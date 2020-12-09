@@ -12,6 +12,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
+	github.com/gosnmp/gosnmp v1.28.0
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kr/pretty v0.2.1 // indirect

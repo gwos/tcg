@@ -987,3 +987,24 @@ type HostsAndServices struct {
 	SetHosts                  bool     `json:"setHosts"`
 	SetServices               bool     `json:"setServices"`
 }
+
+func (mr *DynamicMonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
+	return MonitoredResourceRef{Name: mr.Name, Type: Host, Owner: mr.Owner}
+}
+
+func (mr *DynamicMonitoredResource) ToInventoryResource() DynamicInventoryResource {
+	var services []DynamicInventoryService
+	for _, ms := range mr.Services {
+		services = append(services, ms.ToInventoryService())
+	}
+	return DynamicInventoryResource{
+		BaseResource: mr.BaseResource,
+		Services:     services,
+	}
+}
+
+func (ms *DynamicMonitoredService) ToInventoryService() DynamicInventoryService {
+	return DynamicInventoryService{
+		BaseTransitData: ms.BaseTransitData,
+	}
+}
