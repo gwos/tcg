@@ -10,9 +10,19 @@ import (
 	"github.com/gwos/tcg/transit"
 	"strings"
 	"sync"
+	"time"
 )
 
 var doOnce sync.Once
+
+var initStatusMessages = map[transit.MonitorStatus]string{
+	transit.ServiceOk:                  "Query matched {value} messages in the last {interval}.",
+	transit.ServiceWarning:             "Query matched {value} messages in the last {interval}.",
+	transit.ServiceUnscheduledCritical: "Query matched {value} messages in the last {interval}.",
+	transit.ServiceScheduledCritical:   "Query matched {value} messages in the last {interval}.",
+	transit.ServicePending:             "Service Pending.",
+	transit.ServiceUnknown:             "Service Unknown.",
+}
 
 // MonitoringState describes state
 type MonitoringState struct {
@@ -88,20 +98,18 @@ func (connectorConfig *ExtConfig) initMonitoringState(previousState MonitoringSt
 	return currentState
 }
 
-func (monitoringState *MonitoringState) updateHost(hostName string, serviceName string, value int, timeInterval *transit.TimeInterval) {
-	if host, exists := monitoringState.Hosts[hostName]; exists {
+func (monitoringState *MonitoringState) updateHosts(values map[string]int, serviceName string,
+	timeInterval *transit.TimeInterval) {
+	for hostName, host := range monitoringState.Hosts {
 		if host.services != nil {
 			if service, exists := host.services[serviceName]; exists {
-				service.hits = value
+				service.hits = values[hostName]
 				if service.timeInterval == nil {
 					service.timeInterval = timeInterval
 				}
 				host.services[serviceName] = service
 			}
 		}
-		monitoringState.Hosts[hostName] = host
-	} else {
-		log.Error("|elasticConnectorModel.go| : [updateHost] : Host not found in monitoring state: ", hostName)
 	}
 }
 
@@ -154,12 +162,31 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				Critical:    metricDefinition.CriticalThreshold,
 				Graphed:     metricDefinition.Graphed,
 			}
+
+			var intervalReplacement string
 			if service.timeInterval != nil {
 				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
 				metricBuilder.EndTimestamp = &service.timeInterval.EndTime
+
+				endTimeNano := service.timeInterval.EndTime.UnixNano()
+				startTimeNano := service.timeInterval.StartTime.UnixNano()
+				timeInterval := time.Duration(endTimeNano - startTimeNano)
+				intervalReplacement = connectors.FormatTimeForStatusMessage(timeInterval, time.Minute)
 			}
 
-			monitoredService, err := connectors.BuildServiceForMetric(host.name, metricBuilder)
+			statusMessages := make(map[transit.MonitorStatus]string)
+			for status, statusMessage := range initStatusMessages {
+				var message string
+				// if service has its own interval replace "{interval}" pattern in all status messages with this value now
+				// otherwise it will be replaced by check interval in minutes
+				if strings.Contains(statusMessage, "{interval}") && intervalReplacement != "" {
+					message = strings.ReplaceAll(statusMessage, "{interval}", intervalReplacement)
+				} else {
+					message = statusMessage
+				}
+				statusMessages[status] = message
+			}
+			monitoredService, err := connectors.BuildServiceForMetricWithStatusText(host.name, metricBuilder, statusMessages)
 			if err != nil {
 				log.Error("|elasticConnectorModel.go| : [toTransitResources] : Error when creating service ",
 					host.name, ":", customServiceName, " Reason: ", err)
