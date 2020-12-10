@@ -274,17 +274,16 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 			log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] : Unable to proceed as ES client could not be initialized.")
 			return err
 		}
+		var result map[string]int
 		if isAggregatable[connector.config.HostNameField] {
-			result, err := connector.esClient.CountHits(connector.config.HostNameField, indexes, &query)
+			result, err = connector.esClient.CountHits(connector.config.HostNameField, indexes, &query)
 			if err != nil {
 				log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] :" +
 					" Unable to proceed as ES client could not be initialized.")
 				return err
 			}
-			for hostName, docsCount := range result {
-				connector.monitoringState.updateHost(hostName, storedQuery.Attributes.Title, docsCount, timeInterval)
-			}
 		} else {
+			result := make(map[string]int)
 			for hostName := range connector.monitoringState.Hosts {
 				hits, err := connector.esClient.CountHitsForHost(hostName, connector.config.HostNameField, indexes, &query)
 				if err != nil {
@@ -292,10 +291,10 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 						" Unable to proceed as ES client could not be initialized.")
 					return err
 				}
-				connector.monitoringState.updateHost(hostName, storedQuery.Attributes.Title,
-					hits, timeInterval)
+				result[hostName] = hits
 			}
 		}
+		connector.monitoringState.updateHosts(result, storedQuery.Attributes.Title, timeInterval)
 	}
 
 	return nil
