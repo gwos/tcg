@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"hash/fnv"
 	"reflect"
+	regexp2 "regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -26,6 +28,14 @@ const DefaultCheckInterval = time.Duration(2) * time.Minute
 
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
+
+const statusTextPattern = `\{(.*?)\}`
+const thresholdStatusText = " [W/C={w}/{cr}]"
+
+var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredService) (string, error){
+	"{value}":    extractValueForStatusText,
+	"{interval}": extractIntervalForStatusText,
+}
 
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
@@ -388,6 +398,19 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
 }
 
+func BuildServiceForMetricWithStatusText(hostName string, metricBuilder MetricBuilder,
+	statusMessages map[transit.MonitorStatus]string) (*transit.DynamicMonitoredService, error) {
+	service, err := BuildServiceForMetric(hostName, metricBuilder)
+	if err != nil {
+		log.Error("|connectors.go| : [BuildServiceForMetricWithStatusText] : Error when creating service ",
+			hostName, ":", metricBuilder.CustomName, " Reason: ", err)
+		return service, err
+	}
+	patternMessage := statusMessages[service.Status]
+	addServiceStatusText(patternMessage, service)
+	return service, err
+}
+
 func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.DynamicMonitoredService, error) {
 	metrics := make([]transit.TimeSeries, len(metricBuilders))
 	for index, metricBuilder := range metricBuilders {
@@ -727,4 +750,119 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 	}()
 	/* call handler immediately */
 	go handler()
+}
+
+// TODO: move methods below from connectors.go to separated 'utils' file?
+func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) string {
+	h := value.Hours()
+	m := value.Minutes()
+	s := value.Seconds()
+	if h > 3 || minRound > time.Minute {
+		if h < 73 || minRound == time.Hour {
+			return fmt.Sprintf("%.0f hour(s)", h)
+		} else {
+			d, _ := time.ParseDuration(fmt.Sprintf("%.0fh", h))
+			days := d.Hours() / 24
+			return fmt.Sprintf("%.0f day(s)", days)
+		}
+		// extend with months, years
+	}
+	if m > 3 || minRound > time.Second {
+		return fmt.Sprintf("%.0f minute(s)", m)
+	}
+	return fmt.Sprintf("%.0f second(s)", s)
+}
+
+func addServiceStatusText(patternMessage string, service *transit.DynamicMonitoredService) {
+	if service == nil {
+		log.Error("|connectors.go| : [addServiceStatusText] : service is nil")
+		return
+	}
+	re := regexp2.MustCompile(statusTextPattern)
+	patterns := re.FindAllString(patternMessage, -1)
+	for _, pattern := range patterns {
+		if fn, has := statusTextValGetters[pattern]; has {
+			replacement, err := fn(service)
+			if err != nil {
+				log.Warn("|connectors.go| : [addServiceStatusText] : Failed to replace pattern: ",
+					pattern, " in message ", pattern, "for service ", service.Name, " : ", err)
+			} else {
+				patternMessage = strings.ReplaceAll(patternMessage, pattern, replacement)
+			}
+		} else {
+			log.Warn("|connectors.go| : [addServiceStatusText] : No method to get service value for pattern: ", pattern)
+		}
+	}
+	statusText := addThresholdsToStatusText(patternMessage, service)
+	service.LastPlugInOutput = statusText
+}
+
+func addThresholdsToStatusText(statusText string, service *transit.DynamicMonitoredService) string {
+	if service == nil {
+		log.Error("|connectors.go| : [addThresholdsStatusText] : service is nil")
+		return statusText
+	}
+	if len(service.Metrics) == 1 {
+		wt := "-1"
+		crt := "-1"
+		metric := service.Metrics[0]
+		if metric.Thresholds != nil {
+			for _, th := range *metric.Thresholds {
+				thresholdType := th.SampleType
+				if transit.Warning == thresholdType || transit.Critical == thresholdType {
+					value, err := getValueText(th.Value)
+					if err == nil {
+						switch thresholdType {
+						case transit.Warning:
+							wt = value
+						case transit.Critical:
+							crt = value
+						}
+					} else {
+						log.Warn("|connectors.go| : [addThresholdsToStatusText] :"+
+							" Failed to get ", thresholdType, " threshold for service ", service.Name, " : ", err)
+					}
+				}
+			}
+			text := strings.ReplaceAll(thresholdStatusText, "{w}", wt)
+			text = strings.ReplaceAll(text, "{cr}", crt)
+			statusText = statusText + text
+		}
+	} else {
+		log.Warn("|connectors.go| : [addThresholdsToStatusText] : Not supported for service with more than one metric")
+	}
+	return statusText
+}
+
+func extractValueForStatusText(service *transit.DynamicMonitoredService) (string, error) {
+	if len(service.Metrics) == 1 {
+		return getValueText(service.Metrics[0].Value)
+	}
+	log.Warn("|connectors.go| : [extractValueForStatusText] : Not supported for service with more than one metric")
+	return "", errors.New("not supported for service with more than one metric")
+}
+
+func getValueText(value *transit.TypedValue) (string, error) {
+	if value == nil {
+		log.Warn("|connectors.go| : [getValueText] : no value")
+		return "", errors.New("no value")
+	}
+	switch value.ValueType {
+	case transit.IntegerType:
+		return strconv.Itoa(int(value.IntegerValue)), nil
+	case transit.DoubleType:
+		return fmt.Sprintf("%f", value.DoubleValue), nil
+	case transit.StringType:
+		return value.StringValue, nil
+	case transit.BooleanType:
+		return strconv.FormatBool(value.BoolValue), nil
+	case transit.TimeType:
+		return FormatTimeForStatusMessage(time.Duration(value.TimeValue.UnixNano()), time.Second), nil
+	}
+	log.Warn("|connectors.go| : [getValueText] : Unknown value type")
+	return "", errors.New("unknown value type")
+}
+
+func extractIntervalForStatusText(service *transit.DynamicMonitoredService) (string, error) {
+	return FormatTimeForStatusMessage(CheckInterval, time.Minute), nil
 }
