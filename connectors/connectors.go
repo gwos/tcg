@@ -30,7 +30,7 @@ const DefaultCheckInterval = time.Duration(2) * time.Minute
 var CheckInterval = DefaultCheckInterval
 
 const statusTextPattern = `\{(.*?)\}`
-const thresholdStatusText = " [W/C={w}/{cr}]"
+const noneThresholdText = "-1"
 
 var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredService) (string, error){
 	"{value}":    extractValueForStatusText,
@@ -805,8 +805,8 @@ func addThresholdsToStatusText(statusText string, service *transit.DynamicMonito
 		return statusText
 	}
 	if len(service.Metrics) == 1 {
-		wt := "-1"
-		crt := "-1"
+		wt := noneThresholdText
+		crt := noneThresholdText
 		metric := service.Metrics[0]
 		if metric.Thresholds != nil {
 			for _, th := range *metric.Thresholds {
@@ -826,9 +826,16 @@ func addThresholdsToStatusText(statusText string, service *transit.DynamicMonito
 					}
 				}
 			}
-			text := strings.ReplaceAll(thresholdStatusText, "{w}", wt)
-			text = strings.ReplaceAll(text, "{cr}", crt)
-			statusText = statusText + text
+			var thText string
+			if noneThresholdText != wt && noneThresholdText != crt {
+				thText = strings.ReplaceAll(" [W/C={w}/{cr}]", "{w}", wt)
+				thText = strings.ReplaceAll(thText, "{cr}", crt)
+			} else if noneThresholdText != wt {
+				thText = strings.ReplaceAll(" [WARN={w}]", "{w}", wt)
+			} else if noneThresholdText != crt {
+				thText = strings.ReplaceAll(" [CRITICAL={cr}]", "{cr}", crt)
+			}
+			statusText = statusText + thText
 		}
 	} else {
 		log.Warn("|connectors.go| : [addThresholdsToStatusText] : Not supported for service with more than one metric")
