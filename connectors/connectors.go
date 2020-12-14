@@ -29,13 +29,22 @@ const DefaultCheckInterval = time.Duration(2) * time.Minute
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
 
+// statusTextPattern is a pattern to be found in status message template and replaced by the value extracted with appropriate method stored in statusTextValGetters
+// For example: status message template is "The value is {value}"
+//    pattern "{value}" will be extracted by statusTextPattern expression
+//    getter stored in statusTextValGetters with key="{value}" will be used to build text to replace such pattern,
+//       for example it returned "100"
+//    pattern "{value}" will be replaced in status message template with the value returned by appropriate method,
+//       in this example status text will be "The value is 100"
+// if no method for pattern found template won't be modified and will be left containing "{value}" text: "The value is {value}"
 const statusTextPattern = `\{(.*?)\}`
-const noneThresholdText = "-1"
 
 var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredService) (string, error){
 	"{value}":    extractValueForStatusText,
 	"{interval}": extractIntervalForStatusText,
 }
+
+const noneThresholdText = "-1"
 
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
@@ -406,6 +415,7 @@ func BuildServiceForMetricWithStatusText(hostName string, metricBuilder MetricBu
 			hostName, ":", metricBuilder.CustomName, " Reason: ", err)
 		return service, err
 	}
+	// if no message for status provided in a map patternMessage is "", thresholds will be texted anyway if they exist
 	patternMessage := statusMessages[service.Status]
 	addServiceStatusText(patternMessage, service)
 	return service, err
@@ -752,24 +762,38 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 	go handler()
 }
 
-// TODO: move methods below from connectors.go to separated 'utils' file?
+// Returns duration provided as a "human-readable" string, like: "N second(s)/minute(s)/hour(s)/day(s)"
+// Following formatting rules are being applied by default (not considering minRound):
+//    if the value is less than 3 minutes it will be formatted to seconds
+//    if the value is between 3 minutes and 3 hours it will be formatted to minutes
+//    if the value is between 3 hours and 3 days (<73 hours) it will be formatted to hours
+//    values higher than 72 hours (3 days) will be formatted to days
+// minRound arg determines time unit "limit" lower than that formatting is not allowed
+// i.e. if the value is for example 120 seconds which is gonna be returned as "120 second(s)" by default rules
+//  will be returned as "2 minute(s)" if minRound="minute" (i.e. formatting to lower than minute is not allowed)
+//  or "0 hour(s)" if minRound="hour" (i.e. formatting to lower than hour is not allowed)
 func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) string {
 	h := value.Hours()
 	m := value.Minutes()
 	s := value.Seconds()
+	// if duration is more than 3 hours or minRound doesn't allow to format to "lower" than hour
 	if h > 3 || minRound > time.Minute {
-		if h < 73 || minRound == time.Hour {
+		if h < 73 {
+			// if duration is between 3 and 73 hours format to hours
 			return fmt.Sprintf("%.0f hour(s)", h)
 		} else {
+			// if duration is 73 hours or more (i.e. 3+ days) format to days
 			d, _ := time.ParseDuration(fmt.Sprintf("%.0fh", h))
 			days := d.Hours() / 24
 			return fmt.Sprintf("%.0f day(s)", days)
 		}
 		// extend with months, years
 	}
+	// if duration is less than 3 hours but more than 3 minutes or minRound doesn't allow to format to "lower" than minute format to minutes
 	if m > 3 || minRound > time.Second {
 		return fmt.Sprintf("%.0f minute(s)", m)
 	}
+	// if duration is less than 3 minutes and minRound allows formatting to seconds format to seconds
 	return fmt.Sprintf("%.0f second(s)", s)
 }
 

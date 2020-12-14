@@ -15,6 +15,9 @@ import (
 
 var doOnce sync.Once
 
+// status message templates for different statuses
+// if template for service's status not listed service's status text will be only thresholds if they exist,
+//     otherwise empty
 var initStatusMessages = map[transit.MonitorStatus]string{
 	transit.ServiceOk:                  "Query matched {value} messages in the last {interval}.",
 	transit.ServiceWarning:             "Query matched {value} messages in the last {interval}.",
@@ -174,6 +177,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				intervalReplacement = connectors.FormatTimeForStatusMessage(timeInterval, time.Minute)
 			}
 
+			// copy status message templates already replacing {interval} where applicable
 			statusMessages := make(map[transit.MonitorStatus]string)
 			for status, statusMessage := range initStatusMessages {
 				var message string
