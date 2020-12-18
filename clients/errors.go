@@ -1,13 +1,15 @@
 package clients
 
 import (
-	"errors"
+	"fmt"
+
+	tcgerr "github.com/gwos/tcg/errors"
 )
 
-// define error types used in dispatcher
+// define custom error types
 var (
-	ErrGateway      = errors.New("gateway error")
-	ErrSynchronizer = errors.New("synchronizer error")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrUndecided    = errors.New("undecided error")
+	ErrGateway      = fmt.Errorf("%w: %v", tcgerr.ErrTransient, "gateway error")
+	ErrSynchronizer = fmt.Errorf("%w: %v", tcgerr.ErrTransient, "synchronizer error")
+	ErrUnauthorized = fmt.Errorf("%w: %v", tcgerr.ErrPermanent, "unauthorized")
+	ErrUndecided    = fmt.Errorf("%w: %v", tcgerr.ErrPermanent, "undecided error")
 )
