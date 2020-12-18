@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/clients"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	natsd "github.com/nats-io/nats-server/v2/server"
 	stand "github.com/nats-io/nats-streaming-server/server"
@@ -304,7 +304,7 @@ func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error,
 		"message": msg,
 	})
 
-	if errors.Is(err, clients.ErrGateway) || errors.Is(err, clients.ErrSynchronizer) {
+	if errors.Is(err, tcgerr.ErrTransient) {
 		ckRetry := opt.DurableName
 		retry := DispatcherRetry{
 			LastError: nil,
