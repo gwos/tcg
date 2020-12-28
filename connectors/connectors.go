@@ -105,7 +105,9 @@ func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResour
 		request.Groups = *groups
 	}
 	for i := range request.Resources {
-		request.Resources[i].Services = EvaluateExpressions(request.Resources[i].Services)
+		monitoredServices := EvaluateExpressions(request.Resources[i].Services)
+		request.Resources[i].Services = monitoredServices
+		request.Resources[i].LastPlugInOutput = buildHostStatusText(monitoredServices)
 	}
 	b, err = json.Marshal(request)
 	if err != nil {
@@ -896,4 +898,27 @@ func getValueText(value *transit.TypedValue) (string, error) {
 
 func extractIntervalForStatusText(service *transit.DynamicMonitoredService) (string, error) {
 	return FormatTimeForStatusMessage(CheckInterval, time.Minute), nil
+}
+
+func buildHostStatusText(services []transit.DynamicMonitoredService) string {
+	var ok, warn, critical, other int
+	for _, service := range services {
+		switch service.Status {
+		case transit.ServiceOk:
+			ok = ok + 1
+			break
+		case transit.ServiceWarning:
+			warn = warn + 1
+			break
+		case transit.ServiceScheduledCritical:
+		case transit.ServiceUnscheduledCritical:
+			critical = critical + 1
+			break
+		default:
+			other = other + 1
+			break
+		}
+	}
+	return fmt.Sprintf("Host has %d OK, %d WARNING, %d CRITICAL and %d other services.",
+		ok, warn, critical, other)
 }
