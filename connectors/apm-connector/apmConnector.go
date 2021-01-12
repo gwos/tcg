@@ -311,6 +311,12 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		for _, serviceName := range keys {
 			metrics := host[serviceName]
 			if service, err := connectors.BuildServiceForMetrics(serviceName, hostName, metrics); err == nil {
+				for _, m := range metrics {
+					if message, ok := m.Tags["message"]; ok {
+						service.LastPlugInOutput = message
+						delete(m.Tags, "message")
+					}
+				}
 				monitoredResource.Services = append(monitoredResource.Services, *service)
 			}
 		}
