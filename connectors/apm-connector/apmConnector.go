@@ -106,8 +106,8 @@ func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMoni
 }
 
 func processMetrics(body []byte, resourceIndex int) error {
-	if monitoredResources, _, err := parsePrometheusBody(body, resourceIndex); err == nil {
-		if err := connectors.SendMetrics(context.Background(), *monitoredResources, groups()); err != nil {
+	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex); err == nil {
+		if err := connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups); err != nil {
 			return err
 		}
 	} else {
@@ -367,20 +367,4 @@ func pull(resources []Resource) {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
 	}
-}
-
-func groups() *[]transit.ResourceGroup {
-	var groups []transit.ResourceGroup
-
-	for _, groupsMap := range inventoryGroupsStorage {
-		for groupName, resources := range groupsMap {
-			groups = append(groups, transit.ResourceGroup{
-				GroupName: groupName,
-				Type:      transit.HostGroup,
-				Resources: resources,
-			})
-		}
-	}
-
-	return &groups
 }
