@@ -46,6 +46,16 @@ var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredServ
 
 const noneThresholdText = "-1"
 
+// MonitorStatusWeightService defines weight of Monitor Status for multi-state comparison
+var MonitorStatusWeightService = map[transit.MonitorStatus]int{
+	transit.ServiceOk:                  0,
+	transit.ServicePending:             10,
+	transit.ServiceUnknown:             20,
+	transit.ServiceWarning:             30,
+	transit.ServiceScheduledCritical:   50,
+	transit.ServiceUnscheduledCritical: 100,
+}
+
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
 	/* grab CheckInterval from MonitorConnection extensions */
@@ -534,22 +544,12 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 				}
 			}
 			status := CalculateStatus(metric.Value, warning.Value, critical.Value)
-			if monitorStatusWeightService[status] > monitorStatusWeightService[previousStatus] {
+			if MonitorStatusWeightService[status] > MonitorStatusWeightService[previousStatus] {
 				previousStatus = status
 			}
 		}
 	}
 	return previousStatus, nil
-}
-
-// Weight of Monitor Status for multi-state comparison
-var monitorStatusWeightService = map[transit.MonitorStatus]int{
-	transit.ServiceOk:                  0,
-	transit.ServicePending:             10,
-	transit.ServiceUnknown:             20,
-	transit.ServiceWarning:             30,
-	transit.ServiceScheduledCritical:   50,
-	transit.ServiceUnscheduledCritical: 100,
 }
 
 func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, critical *transit.TypedValue) transit.MonitorStatus {
