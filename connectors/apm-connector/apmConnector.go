@@ -311,11 +311,23 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		for _, serviceName := range keys {
 			metrics := host[serviceName]
 			if service, err := connectors.BuildServiceForMetrics(serviceName, hostName, metrics); err == nil {
+				var mStatus *transit.MonitorStatus = nil
 				for _, m := range metrics {
+					if status, ok := m.Tags["status"]; ok {
+						if monitorStatus, err := parseStatus(status); err == nil {
+							delete(m.Tags, "status")
+							if mStatus == nil || connectors.MonitorStatusWeightService[monitorStatus] > connectors.MonitorStatusWeightService[*mStatus] {
+								mStatus = &monitorStatus
+							}				
+						}
+					}
 					if message, ok := m.Tags["message"]; ok {
 						service.LastPlugInOutput = message
 						delete(m.Tags, "message")
 					}
+				}
+				if mStatus != nil {
+					service.Status = *mStatus
 				}
 				monitoredResource.Services = append(monitoredResource.Services, *service)
 			}
@@ -323,6 +335,25 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		monitoredResources = append(monitoredResources, *monitoredResource)
 	}
 	return &monitoredResources, nil
+}
+
+func parseStatus(str string) (transit.MonitorStatus, error) {
+	switch strings.ToUpper(str) {
+	case "OK", "SERVICE_OK":
+		return transit.ServiceOk, nil
+	case "WARNING", "SERVICE_WARNING":
+		return transit.ServiceWarning, nil
+	case "CRITICAL", "UNSCHEDULED_CRITICAL", "SERVICE_UNSCHEDULED_CRITICAL":
+		return transit.ServiceUnscheduledCritical, nil
+	case "PENDING", "SERVICE_PENDING":
+		return transit.ServicePending, nil
+	case "SCHEDULED_CRITICAL", "SERVICE_SCHEDULED_CRITICAL":
+		return transit.ServiceScheduledCritical, nil
+	case "UNKNOWN", "SERVICE_UNKNOWN":
+		return transit.ServiceUnknown, nil
+	default:
+		return transit.ServiceUnknown, errors.New("unknown status provided")
+	}
 }
 
 // initializeEntrypoints - function for setting entrypoints,
