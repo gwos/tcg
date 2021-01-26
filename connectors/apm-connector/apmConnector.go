@@ -159,7 +159,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 		groupName, hostName, serviceName, device = "", "", "", ""
 		var timestamp = time.Now()
 		if metric.TimestampMs != nil {
-			timestamp = time.Unix(*metric.TimestampMs, 0)
+			timestamp = time.Unix(0, *metric.TimestampMs*int64(time.Millisecond))
 		}
 		values := makeValue(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
@@ -288,7 +288,6 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		if len(prometheusService.GetMetric()) == 0 {
 			continue
 		}
-
 		if err := validatePrometheusService(prometheusService); err != nil {
 			log.Error(fmt.Sprintf("[APM Connector]: %s", err.Error()))
 			continue
@@ -296,19 +295,14 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
 	}
 	for hostName, host := range hostsMap {
-		monitoredResource, err := connectors.CreateResource(hostName, hostToDeviceMap[hostName])
-		if err != nil {
-			return nil, err
+		services := make([]transit.DynamicMonitoredService, 0, len(host))
+		/* sort names for hashSum consistency */
+		serviceNames := make([]string, 0, len(host))
+		for s := range host {
+			serviceNames = append(serviceNames, s)
 		}
-
-		// sort the keys for hashSum consistency
-		keys := make([]string, 0, len(host))
-		for k := range host {
-			keys = append(keys, k)
-		}
-		sort.Strings(keys)
-		// for serviceName, metrics := range host {
-		for _, serviceName := range keys {
+		sort.Strings(serviceNames)
+		for _, serviceName := range serviceNames {
 			metrics := host[serviceName]
 			if service, err := connectors.BuildServiceForMetrics(serviceName, hostName, metrics); err == nil {
 				var mStatus *transit.MonitorStatus = nil
@@ -318,7 +312,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 							delete(m.Tags, "status")
 							if mStatus == nil || connectors.MonitorStatusWeightService[monitorStatus] > connectors.MonitorStatusWeightService[*mStatus] {
 								mStatus = &monitorStatus
-							}				
+							}
 						}
 					}
 					if message, ok := m.Tags["message"]; ok {
@@ -329,8 +323,12 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 				if mStatus != nil {
 					service.Status = *mStatus
 				}
-				monitoredResource.Services = append(monitoredResource.Services, *service)
+				services = append(services, *service)
 			}
+		}
+		monitoredResource, err := connectors.CreateResource(hostName, hostToDeviceMap[hostName], services)
+		if err != nil {
+			return nil, err
 		}
 		monitoredResources = append(monitoredResources, *monitoredResource)
 	}

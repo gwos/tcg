@@ -480,6 +480,9 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 		switch arg.(type) {
 		case []transit.TimeSeries:
 			service.Metrics = arg.([]transit.TimeSeries)
+			endTime := service.Metrics[len(service.Metrics)-1].Interval.EndTime.Time
+			service.LastCheckTime = milliseconds.MillisecondTimestamp{Time: endTime}
+			service.NextCheckTime = milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)}
 		case map[string]interface{}:
 			service.CreateProperties(arg.(map[string]interface{}))
 		default:
@@ -511,6 +514,8 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 		switch arg.(type) {
 		case []transit.DynamicMonitoredService:
 			resource.Services = arg.([]transit.DynamicMonitoredService)
+			resource.LastCheckTime = resource.Services[0].LastCheckTime
+			resource.NextCheckTime = resource.Services[0].NextCheckTime
 		case string:
 			resource.Device = arg.(string)
 		default:
@@ -655,6 +660,8 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
 					continue
 				} else {
+					endTime := metric.Interval.EndTime.Time
+					startTime := metric.Interval.StartTime.Time
 					result[i] = transit.DynamicMonitoredService{
 						BaseTransitData: transit.BaseTransitData{
 							Name:  result[i].Name,
@@ -662,15 +669,15 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 							Owner: result[i].Owner,
 						},
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
-						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
+						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: endTime},
+						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
 								SampleType: transit.Value,
 								Interval: &transit.TimeInterval{
-									EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
-									StartTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
+									EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
+									StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
 								},
 								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
