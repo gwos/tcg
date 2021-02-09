@@ -466,6 +466,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // required params: name, owner(resource)
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.DynamicMonitoredService, error) {
+	checkTime := time.Now().Local()
 	service := transit.DynamicMonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
@@ -473,16 +474,18 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 			Owner: owner,
 		},
 		Status:        transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.TimeSeries:
 			service.Metrics = arg.([]transit.TimeSeries)
-			endTime := service.Metrics[len(service.Metrics)-1].Interval.EndTime.Time
-			service.LastCheckTime = milliseconds.MillisecondTimestamp{Time: endTime}
-			service.NextCheckTime = milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)}
+			if len(service.Metrics) > 0 {
+				checkTime = service.Metrics[len(service.Metrics)-1].Interval.EndTime.Time
+				service.LastCheckTime = milliseconds.MillisecondTimestamp{Time: checkTime}
+				service.NextCheckTime = milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)}
+			}
 		case map[string]interface{}:
 			service.CreateProperties(arg.(map[string]interface{}))
 		default:
@@ -499,6 +502,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 // required params: name
 // optional params: services
 func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitoredResource, error) {
+	checkTime := time.Now().Local()
 	resource := transit.DynamicMonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
@@ -507,15 +511,17 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Local().Add(CheckInterval)},
+		LastCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime},
+		NextCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.DynamicMonitoredService:
 			resource.Services = arg.([]transit.DynamicMonitoredService)
-			resource.LastCheckTime = resource.Services[0].LastCheckTime
-			resource.NextCheckTime = resource.Services[0].NextCheckTime
+			if len(resource.Services) > 0 {
+				resource.LastCheckTime = resource.Services[0].LastCheckTime
+				resource.NextCheckTime = resource.Services[0].NextCheckTime
+			}
 		case string:
 			resource.Device = arg.(string)
 		default:
