@@ -65,6 +65,7 @@ func (client *NediClient) GetDevices() ([]Device, error) {
 	err = json.Unmarshal(r, &resp)
 	if err != nil {
 		log.Error("|nediClient.go| : [getDevices]: Failed to parse NeDi response: ", err)
+		log.Error("result: ", string(r[:]))
 		return nil, errors.New("failed to parse NeDi response")
 	}
 
@@ -87,6 +88,7 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 	r, err := executeGet(*path)
 	if err != nil {
 		log.Error("|nediClient.go| : [GetDeviceInterfaces]: Failed to execute NeDi request: ", err)
+		log.Error("result: ", string(r[:]))
 		return nil, errors.New("failed to execute NeDi request")
 	}
 	log.Debug("[NediClient]: NeDi Get Interfaces response: ", r)
@@ -95,6 +97,7 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 	err = json.Unmarshal(r, &resp)
 	if err != nil {
 		log.Error("|nediClient.go| : [getDeviceInterfaces]: Failed to parse NeDi response: ", err)
+		log.Error("result: ", string(r[:]))
 		return nil, errors.New("failed to parse NeDi response")
 	}
 
