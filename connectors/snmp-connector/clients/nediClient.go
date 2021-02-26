@@ -119,6 +119,7 @@ func (client *NediClient) getConnectionString(table string, query string, order 
 		o = "&o=" + url.QueryEscape(order)
 	}
 	connStr := "http://" + client.Server + "/nedi/query.php?c=1&t=" + table + q + o
+	log.Error("connection string = ", connStr)
 	return &connStr, nil
 }
 
