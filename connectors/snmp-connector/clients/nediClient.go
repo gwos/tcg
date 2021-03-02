@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 )
 
 const (
@@ -21,6 +22,8 @@ const (
 	colIfName   = "ifname"
 	colIfIndex  = "ifidx"
 )
+
+var reQueryFilter = regexp.MustCompile(`[^0-9A-Za-z_\-]`)
 
 type NediClient struct {
 	Server string
@@ -77,7 +80,8 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 		return nil, errors.New("missing device")
 	}
 
-	query := colDevice + " = " + device
+	// API has own filter
+	query := colDevice + " = " + reQueryFilter.ReplaceAllLiteralString(device, "")
 	path, err := client.getConnectionString(tableInterfaces, query, "")
 	if err != nil {
 		log.Error("|nediClient.go| : [GetDeviceInterfaces]: Failed to get NeDi connection string: ", err)
