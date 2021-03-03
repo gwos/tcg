@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	tableDevices    = "monitored"
+	tableDevices    = "monitoring"
 	tableInterfaces = "interfaces"
 
 	colDevice   = "device"
