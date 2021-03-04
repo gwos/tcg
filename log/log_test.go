@@ -20,12 +20,12 @@ func TestConfig(t *testing.T) {
 
 	writerHook.cache = cache.New(10*time.Minute, 100*time.Millisecond)
 
-	Config(logFile1.Name(), 3, 0)
+	Config(logFile1.Name(), 1<<20, 3, 0)
 	Debug("message debug1")
 	Info("message info1")
 	Warn("message warn1")
 
-	Config(logFile2.Name(), 2, 200*time.Millisecond)
+	Config(logFile2.Name(), 1<<20, 2, 200*time.Millisecond)
 	Debug("message debug")
 	Info("message info")
 	Info("message info")
@@ -48,7 +48,7 @@ func TestConfig(t *testing.T) {
 func TestSanitizeEntries(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "log")
 	defer os.Remove(tmpFile.Name())
-	Config(tmpFile.Name(), 3, 0)
+	Config(tmpFile.Name(), 1<<20, 3, 0)
 	payload1, _ := json.Marshal(struct{ Password, Token string }{
 		Password: `PASS
 		WORD`,

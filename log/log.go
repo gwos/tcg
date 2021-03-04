@@ -42,11 +42,12 @@ var (
 		handler: preformat,
 	}
 	writerHook = &multiWriterHook{
-		cache:    cache.New(10*time.Minute, 10*time.Second),
-		consolid: 0,
-		file:     nil,
-		once:     sync.Once{},
-		writer:   os.Stdout,
+		cache:       cache.New(10*time.Minute, 10*time.Second),
+		consolid:    0,
+		fileMaxSize: 1 << 20,
+		file:        nil,
+		once:        sync.Once{},
+		writer:      os.Stdout,
 	}
 )
 
@@ -71,7 +72,7 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, level int, consolid time.Duration) {
+func Config(filePath string, maxSize int64, level int, consolid time.Duration) {
 	once.Do(func() {
 		logger.AddHook(preFormatterHook)
 		logger.AddHook(writerHook)
@@ -93,7 +94,10 @@ func Config(filePath string, level int, consolid time.Duration) {
 	}
 
 	if writerHook.file != nil {
-		writerHook.file.Close()
+		_ = writerHook.file.Close()
+	}
+	if maxSize > 0 {
+		writerHook.fileMaxSize = maxSize
 	}
 	if len(filePath) > 0 {
 		if file, err := os.OpenFile(filePath,
@@ -134,11 +138,12 @@ func (entry *Entry) WithInfo(fields Fields) *Entry {
 }
 
 type multiWriterHook struct {
-	cache    *cache.Cache
-	consolid time.Duration
-	file     *os.File
-	once     sync.Once
-	writer   io.Writer
+	cache       *cache.Cache
+	consolid    time.Duration
+	file        *os.File
+	fileMaxSize int64
+	once        sync.Once
+	writer      io.Writer
 }
 
 func (h *multiWriterHook) onEvicted() func(string, interface{}) {
@@ -183,6 +188,11 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 			_ = h.cache.Add(ck, uint16(0), h.consolid)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
+		if stat, err := h.file.Stat(); err == nil {
+			if stat.Size() > h.fileMaxSize {
+				h.bak()
+			}
+		}
 		_, _ = h.writer.Write(output)
 	}
 	/* debug hits */
@@ -226,7 +236,7 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	colors := []int{31, 31, 31, 33, 36, 37}
 	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
+	_, _ = fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
 		entry.Time.Format(f.TimestampFormat),
 		colors[entry.Level],
 		strings.ToUpper(entry.Level.String()),
@@ -257,4 +267,15 @@ func preformat(entry Entry) error {
 	}
 	entry.Context = context.WithValue(ctx, entry.Entry, formattedData)
 	return nil
+}
+
+func (h *multiWriterHook) bak() {
+	filename := h.file.Name()
+	_ = h.file.Close()
+	_ = os.Rename(filename, filename+".bak")
+	if file, err := os.OpenFile(filename,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		h.writer = io.MultiWriter(os.Stdout, file)
+		h.file = file
+	}
 }
