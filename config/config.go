@@ -137,13 +137,14 @@ type Connector struct {
 	// if 0 turn off consolidation
 	LogConsPeriod int `yaml:"logConsPeriod"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile            string   `yaml:"logFile"`
-	LogFileMaxSize     int64    `yaml:"logFileMaxSize"`
-	LogFileMaxAge      int64    `yaml:"logFileMaxAge"`
-	LogLevel           LogLevel `yaml:"logLevel"`
-	Enabled            bool     `yaml:"enabled"`
-	InstallationMode   string   `yaml:"installationMode,omitempty"`
-	IsDynamicInventory bool     `yaml:"-"`
+	LogFile        string        `yaml:"logFile"`
+	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
+	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
+	LogLevel       LogLevel      `yaml:"logLevel"`
+
+	Enabled            bool   `yaml:"enabled"`
+	InstallationMode   string `yaml:"installationMode,omitempty"`
+	IsDynamicInventory bool   `yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -327,6 +328,8 @@ func defaults() Config {
 			ControllerReadTimeout:   time.Duration(time.Second * 10),
 			ControllerWriteTimeout:  time.Duration(time.Second * 20),
 			LogConsPeriod:           0,
+			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
+			LogFileMaxSize:          0,
 			LogLevel:                1,
 			NatsAckWait:             time.Duration(time.Second * 30),
 			NatsMaxInflight:         1024,
@@ -368,8 +371,8 @@ func GetConfig() *Config {
 
 		log.Config(
 			cfg.Connector.LogFile,
-			cfg.Connector.LogFileMaxSize,
 			cfg.Connector.LogFileMaxAge,
+			cfg.Connector.LogFileMaxSize,
 			int(cfg.Connector.LogLevel),
 			time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 		)
@@ -514,8 +517,8 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* update logger */
 	log.Config(
 		cfg.Connector.LogFile,
-		cfg.Connector.LogFileMaxSize,
 		cfg.Connector.LogFileMaxAge,
+		cfg.Connector.LogFileMaxSize,
 		int(cfg.Connector.LogLevel),
 		time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 	)
