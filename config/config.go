@@ -139,6 +139,7 @@ type Connector struct {
 	// LogFile accepts file path to log in addition to stdout
 	LogFile            string   `yaml:"logFile"`
 	LogFileMaxSize     int64    `yaml:"logFileMaxSize"`
+	LogFileMaxAge      int64    `yaml:"logFileMaxAge"`
 	LogLevel           LogLevel `yaml:"logLevel"`
 	Enabled            bool     `yaml:"enabled"`
 	InstallationMode   string   `yaml:"installationMode,omitempty"`
@@ -368,6 +369,7 @@ func GetConfig() *Config {
 		log.Config(
 			cfg.Connector.LogFile,
 			cfg.Connector.LogFileMaxSize,
+			cfg.Connector.LogFileMaxAge,
 			int(cfg.Connector.LogLevel),
 			time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 		)
@@ -513,6 +515,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	log.Config(
 		cfg.Connector.LogFile,
 		cfg.Connector.LogFileMaxSize,
+		cfg.Connector.LogFileMaxAge,
 		int(cfg.Connector.LogLevel),
 		time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 	)

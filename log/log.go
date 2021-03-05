@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -45,6 +46,7 @@ var (
 		cache:       cache.New(10*time.Minute, 10*time.Second),
 		consolid:    0,
 		fileMaxSize: 1 << 20,
+		fileMaxAge:  30,
 		file:        nil,
 		once:        sync.Once{},
 		writer:      os.Stdout,
@@ -72,7 +74,7 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, maxSize int64, level int, consolid time.Duration) {
+func Config(filePath string, maxSize, maxAge int64, level int, consolid time.Duration) {
 	once.Do(func() {
 		logger.AddHook(preFormatterHook)
 		logger.AddHook(writerHook)
@@ -98,6 +100,9 @@ func Config(filePath string, maxSize int64, level int, consolid time.Duration) {
 	}
 	if maxSize > 0 {
 		writerHook.fileMaxSize = maxSize
+	}
+	if maxAge > 0 {
+		writerHook.fileMaxAge = maxAge
 	}
 	if len(filePath) > 0 {
 		if file, err := os.OpenFile(filePath,
@@ -142,6 +147,7 @@ type multiWriterHook struct {
 	consolid    time.Duration
 	file        *os.File
 	fileMaxSize int64
+	fileMaxAge  int64
 	once        sync.Once
 	writer      io.Writer
 }
@@ -188,8 +194,12 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 			_ = h.cache.Add(ck, uint16(0), h.consolid)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
+
+		fileInfo, _ := os.Stat(h.file.Name())
+		fileStat := fileInfo.Sys().(*syscall.Stat_t)
 		if stat, err := h.file.Stat(); err == nil {
-			if stat.Size() > h.fileMaxSize {
+			if stat.Size() > h.fileMaxSize ||
+				time.Now().Sub(time.Unix(fileStat.Ctim.Sec, fileStat.Ctim.Nsec)).Hours()/24 > float64(h.fileMaxAge) {
 				h.bak()
 			}
 		}
