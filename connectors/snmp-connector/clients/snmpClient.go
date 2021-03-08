@@ -238,12 +238,13 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	data.SnmpMetric = *snmpMetric
 
 	walkHandler := func(dataUnit snmp.SnmpPDU) error {
-		log.Debug("|snmpClient.go| : [getSnmpData]: Parsing data unit name: ", dataUnit.Name, " value: ", dataUnit.Value)
+		log.Info("|snmpClient.go| : [getSnmpData]: Parsing data unit name: ", dataUnit.Name, " value: ", dataUnit.Value)
 		var val SnmpValue
 		val.Name = dataUnit.Name
 		switch v := dataUnit.Value.(type) {
 		case uint:
 			val.Value = int(v)
+			log.Info("*** parsed value: ", val.Value)
 			break
 		default:
 			log.Warn("|snmpClient.go| : [getSnmpData]: Value '", v, "' of unsupported type for ", dataUnit.Name)

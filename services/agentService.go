@@ -154,7 +154,7 @@ func (service *AgentService) DemandConfig() error {
 		return nil
 	}
 	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
-		log.Info("[Demand Config]: Config Server is not configured")
+			log.Info("[Demand Config]: Config Server is not configured")
 		// expect the config api call
 		return nil
 	}
