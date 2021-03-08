@@ -231,7 +231,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 			log.Error("|snmpClient.go| : [getSnmpData]: SNMP connect failed: ", err)
 			return nil, errors.New("SNMP connect failed")
 		}
-		defer goSnmp.Conn.Close()
+		// defer goSnmp.Conn.Close()
 	}
 
 	var data SnmpMetricData
@@ -258,7 +258,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	err := goSnmp.Walk(oid, walkHandler)
 	if err != nil {
 		log.Error("|snmpClient.go| : [getSnmpData]: SNMP Walk failed: ", err)
-		return nil, errors.New("failed to get metric " + mib + " data")
+		// DST: return nil, errors.New("failed to get metric " + mib + " data")
 	}
 
 	return &data, nil

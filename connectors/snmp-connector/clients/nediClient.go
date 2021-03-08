@@ -101,7 +101,7 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 		log.Error("result: ", string(r[:]))
 		return nil, errors.New("failed to execute NeDi request")
 	}
-	log.Debug("[NediClient]: NeDi Get Interfaces response: ", r)
+	// log.Debug("[NediClient]: NeDi Get Interfaces response: ", r)
 
 	var resp []interface{}
 	err = json.Unmarshal(r, &resp)
@@ -244,7 +244,7 @@ func parseResponse(response []interface{}) []map[string]interface{} {
 			continue
 		}
 	}
-	log.Debug("[NediClient]: Parsing NeDi response completed: ", res)
+	// log.Debug("[NediClient]: Parsing NeDi response completed: ", res)
 	return res
 }
 
