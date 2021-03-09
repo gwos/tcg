@@ -20,12 +20,12 @@ func TestConfig(t *testing.T) {
 
 	writerHook.cache = cache.New(10*time.Minute, 100*time.Millisecond)
 
-	Config(logFile1.Name(), 3, 0)
+	Config(logFile1.Name(), 0, 0, 3, 0)
 	Debug("message debug1")
 	Info("message info1")
 	Warn("message warn1")
 
-	Config(logFile2.Name(), 2, 200*time.Millisecond)
+	Config(logFile2.Name(), 0, 0, 2, 200*time.Millisecond)
 	Debug("message debug")
 	Info("message info")
 	Info("message info")
@@ -45,10 +45,42 @@ func TestConfig(t *testing.T) {
 	assert.Equal(t, 2, bytes.Count(log2, []byte("\n")))
 }
 
+func TestLogrotate(t *testing.T) {
+	logFile1, _ := ioutil.TempFile("", "log1")
+	defer os.Remove(logFile1.Name())
+	defer os.Remove(logFile1.Name() + ".bak")
+
+	Config(logFile1.Name(), 200*time.Millisecond, 100, 3, 0)
+	Debug("message debug1")
+	Info("message info1")
+	Warn("message warn1")
+
+	log1, elog1 := ioutil.ReadFile(logFile1.Name())
+	assert.NoError(t, elog1)
+	assert.Equal(t, 1, bytes.Count(log1, []byte("\n")))
+
+	bak1, ebak1 := ioutil.ReadFile(logFile1.Name() + ".bak")
+	assert.NoError(t, ebak1)
+	assert.Equal(t, 2, bytes.Count(bak1, []byte("\n")))
+
+	erm := os.Remove(logFile1.Name() + ".bak")
+	assert.NoError(t, erm)
+	time.Sleep(200 * time.Millisecond)
+	Warn("message warn2")
+
+	log1, elog1 = ioutil.ReadFile(logFile1.Name())
+	assert.NoError(t, elog1)
+	assert.Equal(t, 0, bytes.Count(log1, []byte("\n")))
+
+	bak1, ebak1 = ioutil.ReadFile(logFile1.Name() + ".bak")
+	assert.NoError(t, ebak1)
+	assert.Equal(t, 2, bytes.Count(bak1, []byte("\n")))
+}
+
 func TestSanitizeEntries(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "log")
 	defer os.Remove(tmpFile.Name())
-	Config(tmpFile.Name(), 3, 0)
+	Config(tmpFile.Name(), 0, 0, 3, 0)
 	payload1, _ := json.Marshal(struct{ Password, Token string }{
 		Password: `PASS
 		WORD`,

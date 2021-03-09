@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -42,11 +43,13 @@ var (
 		handler: preformat,
 	}
 	writerHook = &multiWriterHook{
-		cache:    cache.New(10*time.Minute, 10*time.Second),
-		consolid: 0,
-		file:     nil,
-		once:     sync.Once{},
-		writer:   os.Stdout,
+		cache:       cache.New(10*time.Minute, 10*time.Second),
+		consolid:    0,
+		file:        nil,
+		fileMaxAge:  0,
+		fileMaxSize: 0,
+		once:        sync.Once{},
+		writer:      os.Stdout,
 	}
 )
 
@@ -71,7 +74,7 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, level int, consolid time.Duration) {
+func Config(filePath string, maxAge time.Duration, maxSize int64, level int, consolid time.Duration) {
 	once.Do(func() {
 		logger.AddHook(preFormatterHook)
 		logger.AddHook(writerHook)
@@ -92,16 +95,11 @@ func Config(filePath string, level int, consolid time.Duration) {
 		logger.SetLevel(logrus.DebugLevel)
 	}
 
-	if writerHook.file != nil {
-		writerHook.file.Close()
-	}
 	if len(filePath) > 0 {
-		if file, err := os.OpenFile(filePath,
-			os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
-			writerHook.writer = io.MultiWriter(os.Stdout, file)
-			writerHook.file = file
-		}
+		writerHook.openFile(filePath)
 	}
+	writerHook.fileMaxAge = maxAge
+	writerHook.fileMaxSize = maxSize
 	writerHook.consolid = consolid
 }
 
@@ -134,11 +132,15 @@ func (entry *Entry) WithInfo(fields Fields) *Entry {
 }
 
 type multiWriterHook struct {
-	cache    *cache.Cache
-	consolid time.Duration
-	file     *os.File
-	once     sync.Once
-	writer   io.Writer
+	cache       *cache.Cache
+	consolid    time.Duration
+	file        *os.File
+	fileCTime   time.Time
+	fileMaxAge  time.Duration
+	fileMaxSize int64
+	fileSize    int64
+	once        sync.Once
+	writer      io.Writer
 }
 
 func (h *multiWriterHook) onEvicted() func(string, interface{}) {
@@ -183,11 +185,42 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 			_ = h.cache.Add(ck, uint16(0), h.consolid)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-		_, _ = h.writer.Write(output)
+
+		if n, err := h.writer.Write(output); err == nil {
+			h.fileSize += int64(n)
+		}
+		if h.file != nil &&
+			((h.fileMaxAge > 0 && h.fileMaxAge < time.Now().Sub(h.fileCTime)) ||
+				(h.fileMaxSize > 0 && h.fileMaxSize < h.fileSize)) {
+			h.rotateFile()
+		}
 	}
 	/* debug hits */
 	// fmt.Println("\n##", ck, entry.Time, "\n##:", entry.Data)
 	return nil
+}
+
+func (h *multiWriterHook) rotateFile() {
+	filename := h.file.Name()
+	_ = h.file.Close()
+	_ = os.Rename(filename, filename+".bak")
+	h.openFile(filename)
+}
+
+func (h *multiWriterHook) openFile(filePath string) {
+	if h.file != nil {
+		_ = h.file.Close()
+	}
+	if file, err := os.OpenFile(filePath,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644); err == nil {
+		h.writer = io.MultiWriter(os.Stdout, file)
+		h.file = file
+		if fileInfo, err := file.Stat(); err == nil {
+			fileStat := fileInfo.Sys().(*syscall.Stat_t)
+			h.fileCTime = time.Unix(fileStat.Ctim.Sec, fileStat.Ctim.Nsec)
+			h.fileSize = fileInfo.Size()
+		}
+	}
 }
 
 type genHook struct {
@@ -226,7 +259,7 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	colors := []int{31, 31, 31, 33, 36, 37}
 	buf := &bytes.Buffer{}
-	fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
+	_, _ = fmt.Fprintf(buf, "%s \x1b[%dm[%s] %s%s\x1b[0m\n",
 		entry.Time.Format(f.TimestampFormat),
 		colors[entry.Level],
 		strings.ToUpper(entry.Level.String()),
