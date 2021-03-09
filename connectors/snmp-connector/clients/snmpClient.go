@@ -6,7 +6,11 @@ import (
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
 	"github.com/gwos/tcg/log"
 	"strings"
+	"time"
 )
+
+type SnmpClient struct {
+}
 
 type SnmpUnitType string
 
@@ -65,18 +69,18 @@ type SnmpMetricData struct {
 	Values     []SnmpValue
 }
 
-func GetSnmpData(mibs []string, target string, secData *utils.SecurityData) ([]SnmpMetricData, error) {
+// retrieve all mibs for one target IP
+func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *utils.SecurityData) ([]SnmpMetricData, error) {
 	if len(mibs) == 0 {
 		return nil, errors.New("no metrics (mibs) provided")
 	}
 
-	log.Debug("|snmpClient.go| : [GetSnmpData]: Setting up SNMP")
+	log.Info("------8 starting SNMP metric gathering for target ", target)
 	goSnmp, err := setup(target, secData)
 	if err != nil {
 		log.Error("|snmpClient.go| : [GetSnmpData]: SNMP setup failed: ", err)
 		return nil, errors.New("SNMP setup failed")
 	}
-	log.Debug("|snmpClient.go| : [GetSnmpData]: SNMP setup completed")
 
 	err = goSnmp.Connect()
 	if err != nil {
@@ -87,15 +91,16 @@ func GetSnmpData(mibs []string, target string, secData *utils.SecurityData) ([]S
 
 	var data []SnmpMetricData
 	for _, mib := range mibs {
-		mibData, err := getSnmpData(mib, goSnmp)
+		mibData, err := getSnmpData(mib, goSnmp) // go get the snmp
 		if err != nil {
-			log.Error("|snmpClient.go| : [GetSnmpData]: Failed to get data for mib ", mib, ": ", err)
+			log.Error("|snmpClient.go| : [GetSnmpData]: Failed to get data for target ", target, " + mib ", mib, ": ", err)
 			continue
 		}
 		if mibData != nil {
 			data = append(data, *mibData)
 		}
 	}
+	log.Info("------ completed for target ", target)
 	return data, nil
 }
 
@@ -116,6 +121,9 @@ func setupV2c(target string, community *utils.SecurityData) (*snmp.GoSNMP, error
 	goSnmp := snmp.Default
 	goSnmp.Target = target
 	goSnmp.Community = community.Name
+	//  TODO: make this configurable
+	goSnmp.Timeout = time.Duration(1) * time.Second
+	goSnmp.Retries = 0
 	return goSnmp, nil
 }
 
@@ -215,7 +223,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		return nil, errors.New("missing mib")
 	}
 
-	log.Debug("|snmpClient.go| : [getSnmpData]: Getting data for mib: ", mib)
+	log.Info("-- start getting MIB: ", mib)
 
 	snmpMetric := AvailableMetrics[mib]
 	if snmpMetric == nil {
@@ -238,13 +246,13 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	data.SnmpMetric = *snmpMetric
 
 	walkHandler := func(dataUnit snmp.SnmpPDU) error {
-		log.Info("|snmpClient.go| : [getSnmpData]: Parsing data unit name: ", dataUnit.Name, " value: ", dataUnit.Value)
+		log.Info("-- walk Handler: data unit name: ", dataUnit.Name, " value: ", dataUnit.Value)
 		var val SnmpValue
 		val.Name = dataUnit.Name
 		switch v := dataUnit.Value.(type) {
 		case uint:
 			val.Value = int(v)
-			log.Info("*** parsed value: ", val.Value)
+			log.Info("*** parsed value for ", val.Name, ": ", val.Value)
 			break
 		default:
 			log.Warn("|snmpClient.go| : [getSnmpData]: Value '", v, "' of unsupported type for ", dataUnit.Name)
@@ -259,6 +267,8 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	if err != nil {
 		log.Error("|snmpClient.go| : [getSnmpData]: SNMP Walk failed: ", err)
 		// DST: return nil, errors.New("failed to get metric " + mib + " data")
+	} else {
+		log.Info("-- end getting MIB: ", mib)
 	}
 
 	return &data, nil
