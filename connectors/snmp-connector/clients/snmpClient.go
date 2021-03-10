@@ -75,7 +75,7 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 		return nil, errors.New("no metrics (mibs) provided")
 	}
 
-	log.Info("------8 starting SNMP metric gathering for target ", target)
+	log.Info("------ starting SNMP metric gathering for target ", target)
 	goSnmp, err := setup(target, secData)
 	if err != nil {
 		log.Error("|snmpClient.go| : [GetSnmpData]: SNMP setup failed: ", err)
@@ -239,7 +239,6 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 			log.Error("|snmpClient.go| : [getSnmpData]: SNMP connect failed: ", err)
 			return nil, errors.New("SNMP connect failed")
 		}
-		// defer goSnmp.Conn.Close()
 	}
 
 	var data SnmpMetricData
