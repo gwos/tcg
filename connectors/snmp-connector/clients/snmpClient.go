@@ -93,7 +93,7 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 	for _, mib := range mibs {
 		mibData, err := getSnmpData(mib, goSnmp) // go get the snmp
 		if err != nil {
-			log.Error("|snmpClient.go| : [GetSnmpData]: Failed to get data for target ", target, " + mib ", mib, ": ", err)
+			log.Error("C|snmpClient.go| : [GetSnmpData]: Failed to get data for target ", target, " + mib ", mib, ": ", err)
 			continue
 		}
 		if mibData != nil {
@@ -234,11 +234,8 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		return nil, errors.New("snmp client is not configured")
 	}
 	if goSnmp.Conn == nil {
-		err := goSnmp.Connect()
-		if err != nil {
-			log.Error("|snmpClient.go| : [getSnmpData]: SNMP connect failed: ", err)
-			return nil, errors.New("SNMP connect failed")
-		}
+		log.Error("|snmpClient.go| : [getSnmpData]: SNMP no connection ")
+		return nil, errors.New("SNMP connect failed")
 	}
 
 	var data SnmpMetricData
@@ -264,8 +261,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	oid := data.SnmpMetric.Oid
 	err := goSnmp.Walk(oid, walkHandler)
 	if err != nil {
-		log.Error("|snmpClient.go| : [getSnmpData]: SNMP Walk failed: ", err)
-		// DST: return nil, errors.New("failed to get metric " + mib + " data")
+		return nil, err
 	} else {
 		log.Info("-- end getting MIB: ", mib)
 	}
