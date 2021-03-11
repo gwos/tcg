@@ -73,6 +73,7 @@ func configHandler(data []byte) {
 	if tMonConn.Server != "" {
 		tExt.NediServer = tMonConn.Server
 	}
+
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		if templateMetricName == metric.Name || !metric.Monitored {
@@ -86,6 +87,7 @@ func configHandler(data []byte) {
 			tExt.Views[metric.ServiceType] = metrics
 		}
 	}
+
 	if len(tExt.GWConnections) > 0 {
 		for _, conn := range tExt.GWConnections {
 			if conn.DeferOwnership != "" {
@@ -97,27 +99,18 @@ func configHandler(data []byte) {
 			}
 		}
 	}
+
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
+
 	if err != nil || !bytes.Equal(cfgChksum, chk) {
+
 		if err := connector.LoadConfig(*extConfig); err != nil {
+
 			log.Error("[SNMP Connector]: Cannot reload SnmpConnector config: ", err)
-		} else {
-			_, inventory, groups, err := connector.CollectMetrics()
-			if err != nil {
-				log.Error("[SNMP Connector]: Failed to collect metrics: ", err)
-			} else {
-				log.Info("[SNMP Connector]: Sending inventory ...")
-				if err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership); err != nil {
-					log.Error("[SNMP Connector]: ", err.Error())
-				}
-				if invChk, err := connector.getInventoryHashSum(); err == nil {
-					invChksum = invChk
-				}
-			}
 		}
 	}
 	if err == nil {

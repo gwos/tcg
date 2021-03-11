@@ -12,7 +12,7 @@ require (
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
-	github.com/gosnmp/gosnmp v1.28.0
+	github.com/gosnmp/gosnmp v1.30.0
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kr/pretty v0.2.1 // indirect
@@ -26,7 +26,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/shirou/gopsutil v2.20.9+incompatible
 	github.com/sirupsen/logrus v1.7.0
-	github.com/stretchr/testify v1.6.1
+	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/gin-swagger v1.2.0
 	github.com/swaggo/swag v1.6.9
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.13.0
