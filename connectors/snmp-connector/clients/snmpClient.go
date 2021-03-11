@@ -2,6 +2,7 @@ package clients
 
 import (
 	"errors"
+	"fmt"
 	snmp "github.com/gosnmp/gosnmp"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
 	"github.com/gwos/tcg/log"
@@ -91,9 +92,14 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 
 	var data []SnmpMetricData
 	for _, mib := range mibs {
-		mibData, err := getSnmpData(mib, goSnmp) // go get the snmp
-		if err != nil {
-			log.Error("C|snmpClient.go| : [GetSnmpData]: Failed to get data for target ", target, " + mib ", mib, ": ", err)
+		mibData, e := getSnmpData(mib, goSnmp) // go get the snmp
+		if e != nil {
+			goSnmp.Conn.Close()
+			err = goSnmp.Connect()
+			if err != nil {
+				log.Error("NEW : |snmpClient.go| : [GetSnmpData]: SNMP connect failed: ", err)
+			}
+			log.Error("C|snmpClient.go| : [GetSnmpData]: Failed to get data for target ", target, " + mib ", mib, ": ", e)
 			continue
 		}
 		if mibData != nil {
@@ -101,6 +107,8 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 		}
 	}
 	log.Info("------ completed for target ", target)
+	fmt.Print("Data: ")
+	fmt.Println(data)
 	return data, nil
 }
 
@@ -114,17 +122,21 @@ func setup(target string, secData *utils.SecurityData) (*snmp.GoSNMP, error) {
 
 func setupV2c(target string, community *utils.SecurityData) (*snmp.GoSNMP, error) {
 	err := validate(target, community)
+
 	if err != nil {
 		log.Error("|snmpClient.go| : [setupV2c] : Failed to setup snmp v3: ", err)
 		return nil, errors.New("validation failed")
 	}
-	goSnmp := snmp.Default
-	goSnmp.Target = target
-	goSnmp.Community = community.Name
-	//  TODO: make this configurable
-	goSnmp.Timeout = time.Duration(1) * time.Second
-	goSnmp.Retries = 0
-	return goSnmp, nil
+
+	return &snmp.GoSNMP{
+		Target:         target,
+		Port:           161,
+		Community:      community.Name,
+		Version:        snmp.Version2c,
+		Timeout:        time.Duration(2) * time.Second,
+		MaxRepetitions: 2,
+		MaxOids:        1,
+	}, nil
 }
 
 func setupV3(target string, community *utils.SecurityData) (*snmp.GoSNMP, error) {

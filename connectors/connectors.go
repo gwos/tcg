@@ -554,12 +554,19 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 					return transit.ServiceOk, fmt.Errorf("unsupported threshold Sample type")
 				}
 			}
+
 			status := CalculateStatus(metric.Value, warning.Value, critical.Value)
+			fmt.Print(metric.MetricName)
+			fmt.Print(" ---> ")
+			fmt.Println(status)
 			if MonitorStatusWeightService[status] > MonitorStatusWeightService[previousStatus] {
+				fmt.Println("RESETTING STATUS")
 				previousStatus = status
 			}
 		}
 	}
+
+	fmt.Println("RESULT: " + previousStatus)
 	return previousStatus, nil
 }
 
