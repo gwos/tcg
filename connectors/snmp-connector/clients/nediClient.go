@@ -24,6 +24,7 @@ const (
 	colReadComm = "readcomm"
 	colIfName   = "ifname"
 	colIfIndex  = "ifidx"
+	colLastOK   = "lastok"
 )
 
 type NediClient struct {
@@ -34,12 +35,14 @@ type Device struct {
 	Name      string
 	Ip        string
 	Community string
+	LastOK    int
 }
 
 type Monitoring struct {
 	Name      string
 	Ip        string
 	Device    string
+	LastOK    int
 }
 
 type Interface struct {
@@ -156,7 +159,9 @@ func parseDevices(response []interface{}, client *NediClient) ([]Device, error) 
 			continue
 		}
 		// filter out un-monitored devices
-		if _, ok := monitoredDevices[device.Name]; !ok {
+		if mon, ok := monitoredDevices[device.Name]; ok {
+			device.LastOK = mon.LastOK
+		} else {
 			continue
 		}
 
@@ -330,6 +335,7 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		var monitor Monitoring
 		monitor.Name = fields[colName].(string)
 		monitor.Device = fields[colDevice].(string)
+		monitor.LastOK = fields[colLastOK].(int)
 
 		ip := fields[colMonIp]
 		ipVal, err := getInt(ip)
@@ -342,4 +348,8 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		monitors[monitor.Device] = monitor
 	}
 	return monitors, nil
+}
+
+func calculateHostStatus(device Device) string {
+	return "" // TODO: implement same algorithm as CloudHub
 }
