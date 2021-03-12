@@ -540,9 +540,16 @@ func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit
 }
 
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
+	if metrics == nil || len(*metrics) == 0 {
+		return transit.ServiceUnknown, nil
+	}
 	previousStatus := transit.ServiceOk
 	for _, metric := range *metrics {
 		if metric.Thresholds != nil {
+			if metric.MetricName == "Interface Speed" {
+				str, _ := json.Marshal(metric)
+				fmt.Println(string(str))
+			}
 			var warning, critical transit.ThresholdValue
 			for _, threshold := range *metric.Thresholds {
 				switch threshold.SampleType {
@@ -565,7 +572,6 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 			}
 		}
 	}
-
 	fmt.Println("RESULT: " + previousStatus)
 	return previousStatus, nil
 }
