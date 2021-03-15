@@ -530,7 +530,13 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
 		}
 	}
-	// TODO: trickle up calculation from services?
+
+	if resource.Services != nil && len(resource.Services) != 0 {
+		resource.Status = CalculateResourceStatus(resource.Services)
+	} else {
+		resource.Status = transit.HostUp
+	}
+
 	return &resource, nil
 }
 
@@ -538,7 +544,7 @@ func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit
 
 	// TODO: implement logic
 
-	return transit.HostUp
+	return transit.HostUnscheduledDown
 }
 
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
