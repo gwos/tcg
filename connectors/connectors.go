@@ -494,6 +494,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 	}
 	if service.Metrics != nil {
 		service.Status, _ = CalculateServiceStatus(&service.Metrics)
+	} else {
+		service.Status = transit.ServiceUnknown
 	}
 	return &service, nil
 }
@@ -528,7 +530,13 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
 		}
 	}
-	// TODO: trickle up calculation from services?
+
+	if resource.Services != nil && len(resource.Services) != 0 {
+		resource.Status = CalculateResourceStatus(resource.Services)
+	} else {
+		resource.Status = transit.HostUp
+	}
+
 	return &resource, nil
 }
 
@@ -536,7 +544,7 @@ func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit
 
 	// TODO: implement logic
 
-	return transit.HostUp
+	return transit.HostUnscheduledDown
 }
 
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
@@ -580,71 +588,93 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 	if warning == nil && critical == nil {
 		return transit.ServiceOk
 	}
+
+	var warningValue float64
+	var criticalValue float64
+
+	if warning != nil {
+		switch warning.ValueType {
+		case transit.IntegerType:
+			warningValue = float64(warning.IntegerValue)
+		case transit.DoubleType:
+			warningValue = warning.DoubleValue
+		}
+	}
+
+	if critical != nil {
+		switch critical.ValueType {
+		case transit.IntegerType:
+			criticalValue = float64(critical.IntegerValue)
+		case transit.DoubleType:
+			criticalValue = critical.DoubleValue
+		}
+	}
+
 	switch value.ValueType {
 	case transit.IntegerType:
-		if warning == nil && critical.IntegerValue == -1 {
-			if value.IntegerValue >= critical.IntegerValue {
+		if warning == nil && criticalValue == -1 {
+			if float64(value.IntegerValue) >= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && (warning != nil && warning.IntegerValue == -1) {
-			if value.IntegerValue >= warning.IntegerValue {
+		if critical == nil && (warning != nil && warningValue == -1) {
+			if float64(value.IntegerValue) >= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if (warning != nil && warning.IntegerValue == -1) && (critical != nil && critical.IntegerValue == -1) {
+		if (warning != nil && warningValue == -1) && (critical != nil && criticalValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
-		if (warning != nil && critical != nil) && warning.IntegerValue > critical.IntegerValue {
-			if value.IntegerValue <= critical.IntegerValue {
+		if (warning != nil && critical != nil) && warningValue > criticalValue {
+			if float64(value.IntegerValue) <= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.IntegerValue <= warning.IntegerValue {
+			if float64(value.IntegerValue) <= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		} else {
-			if (warning != nil && critical != nil) && value.IntegerValue >= critical.IntegerValue {
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if (warning != nil && critical != nil) && value.IntegerValue >= warning.IntegerValue {
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
 	case transit.DoubleType:
-		if warning == nil && critical.DoubleValue == -1 {
-			if value.DoubleValue >= critical.DoubleValue {
+		if warning == nil && criticalValue == -1 {
+			if value.DoubleValue >= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
 			return transit.ServiceOk
 		}
-		if critical == nil && (warning != nil && warning.DoubleValue == -1) {
-			if value.DoubleValue >= warning.DoubleValue {
+		if critical == nil && (warning != nil && warningValue == -1) {
+			if value.DoubleValue >= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		}
-		if (warning != nil && critical != nil) && (warning.DoubleValue == -1 || critical.DoubleValue == -1) {
+		if (warning != nil && critical != nil) && (warningValue == -1 || criticalValue == -1) {
 			return transit.ServiceOk
 		}
 		// is it a reverse comparison (low to high)
-		if warning.DoubleValue > critical.DoubleValue {
-			if value.DoubleValue <= critical.DoubleValue {
+		if warningValue > criticalValue {
+			if value.DoubleValue <= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.DoubleValue <= warning.DoubleValue {
+			if value.DoubleValue <= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk
 		} else {
-			if value.DoubleValue >= critical.DoubleValue {
+			if value.DoubleValue >= criticalValue {
 				return transit.ServiceUnscheduledCritical
 			}
-			if value.DoubleValue >= warning.DoubleValue {
+			if value.DoubleValue >= warningValue {
 				return transit.ServiceWarning
 			}
 			return transit.ServiceOk

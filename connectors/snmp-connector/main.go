@@ -77,7 +77,11 @@ func configHandler(data []byte) {
 	if tMonConn.Server != "" {
 		tExt.NediServer = tMonConn.Server
 	}
+<<<<<<< HEAD
 	fmt.Println("DEBUG 3")
+=======
+
+>>>>>>> a75109e46a58f801c18ca695b3e1fddecb941762
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		if templateMetricName == metric.Name || !metric.Monitored {
@@ -91,7 +95,11 @@ func configHandler(data []byte) {
 			tExt.Views[metric.ServiceType] = metrics
 		}
 	}
+<<<<<<< HEAD
 	fmt.Println("DEBUG 4")
+=======
+
+>>>>>>> a75109e46a58f801c18ca695b3e1fddecb941762
 	if len(tExt.GWConnections) > 0 {
 		for _, conn := range tExt.GWConnections {
 			if conn.DeferOwnership != "" {
@@ -103,7 +111,11 @@ func configHandler(data []byte) {
 			}
 		}
 	}
+<<<<<<< HEAD
 	fmt.Println("DEBUG 5")
+=======
+
+>>>>>>> a75109e46a58f801c18ca695b3e1fddecb941762
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 

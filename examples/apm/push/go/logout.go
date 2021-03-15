@@ -1,8 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/log"
 	"net/http"
 )
 
@@ -18,8 +18,8 @@ func logout(host, gwosAppName, gwosApiToken string) {
 
 	statusCode, body, err := clients.SendRequest(http.MethodPost, host+logoutUrl, headers, formValues, nil)
 	if err != nil {
-		fmt.Println(err.Error())
+		log.Error(err.Error())
 	}
 
-	fmt.Println(statusCode, string(body))
+	log.Warn(statusCode, string(body))
 }
