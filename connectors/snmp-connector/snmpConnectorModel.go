@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// FiveMinutes NeDi interval in seconds
+const FiveMinutes = 300
+
 type MonitoringState struct {
 	// [deviceName]Device
 	devices map[string]DeviceExt
@@ -48,6 +51,7 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 			log.Error("|snmpConnectorModel.go| : [retrieveMonitoredResources] : Error when create monitored resource '", device.Name,
 				"'. Reason: ", err)
 		}
+		mResource.Status = calculateHostStatus(device.LastOK)
 		if mResource != nil {
 			mResources[i] = *mResource
 		}
@@ -118,4 +122,13 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	}
 
 	return mServices
+}
+
+func calculateHostStatus(lastOk float64) transit.MonitorStatus {
+	now := time.Now().Unix() // in seconds
+	if (float64(now) - lastOk) < FiveMinutes {
+		return transit.HostUp
+	}
+
+	return transit.HostUnreachable
 }

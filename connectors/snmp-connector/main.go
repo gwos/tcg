@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
@@ -51,7 +50,6 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	fmt.Println("DEBUG 1")
 	log.Info("[SNMP Connector]: Configuration received")
 
 	/* Init config with default values */
@@ -71,13 +69,11 @@ func configHandler(data []byte) {
 		return
 	}
 
-	fmt.Println("DEBUG 2")
-
 	/* Update config with received values */
 	if tMonConn.Server != "" {
 		tExt.NediServer = tMonConn.Server
 	}
-	fmt.Println("DEBUG 3")
+
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		if templateMetricName == metric.Name || !metric.Monitored {
@@ -91,7 +87,6 @@ func configHandler(data []byte) {
 			tExt.Views[metric.ServiceType] = metrics
 		}
 	}
-	fmt.Println("DEBUG 4")
 	if len(tExt.GWConnections) > 0 {
 		for _, conn := range tExt.GWConnections {
 			if conn.DeferOwnership != "" {
@@ -103,55 +98,24 @@ func configHandler(data []byte) {
 			}
 		}
 	}
-	fmt.Println("DEBUG 5")
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
-	fmt.Println("DEBUG 6")
+
 	if err != nil || !bytes.Equal(cfgChksum, chk) {
-		fmt.Println("DEBUG 7")
 		if err := connector.LoadConfig(*extConfig); err != nil {
-			fmt.Println("DEBUG 8")
 			log.Error("[SNMP Connector]: Cannot reload SnmpConnector config: ", err)
-		} else {
-			fmt.Println("DEBUG 9")
-			//_, inventory, groups, err := connector.CollectMetrics()
-			//fmt.Println("DEBUG 10")
-			//if err != nil {
-			//	fmt.Println("DEBUG 11")
-			//	log.Error("[SNMP Connector]: Failed to collect metrics: ", err)
-			//	fmt.Println("DEBUG 12")
-			//} else {
-			//	fmt.Println("DEBUG 13")
-			//	log.Info("[SNMP Connector]: Sending inventory ...")
-			//	fmt.Println("DEBUG 14")
-			//	if err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership); err != nil {
-			//		fmt.Println("DEBUG 15")
-			//		log.Error("[SNMP Connector]: ", err.Error())
-			//	}
-			//	fmt.Println("DEBUG 16")
-			//	if invChk, err := connector.getInventoryHashSum(); err == nil {
-			//		fmt.Println("DEBUG 17")
-			//		invChksum = invChk
-			//	}
-			//}
-			//fmt.Println("DEBUG 18")
 		}
 	}
-	fmt.Println("DEBUG 19")
 	if err == nil {
 		cfgChksum = chk
 	}
-	fmt.Println("DEBUG 20")
 	/* Restart periodic loop */
 	cancel()
-	fmt.Println("DEBUG 21")
 	ctxCancel, cancel = context.WithCancel(context.Background())
-	fmt.Println("DEBUG 22")
 	services.GetTransitService().RegisterExitHandler(cancel)
-	fmt.Println("DEBUG 23")
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 }
 

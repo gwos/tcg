@@ -544,7 +544,7 @@ func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit
 
 	// TODO: implement logic
 
-	return transit.HostUnscheduledDown
+	return transit.HostUp
 }
 
 func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
@@ -554,10 +554,6 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 	previousStatus := transit.ServiceOk
 	for _, metric := range *metrics {
 		if metric.Thresholds != nil {
-			if metric.MetricName == "Interface Speed" {
-				str, _ := json.Marshal(metric)
-				fmt.Println(string(str))
-			}
 			var warning, critical transit.ThresholdValue
 			for _, threshold := range *metric.Thresholds {
 				switch threshold.SampleType {
@@ -571,16 +567,11 @@ func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatu
 			}
 
 			status := CalculateStatus(metric.Value, warning.Value, critical.Value)
-			fmt.Print(metric.MetricName)
-			fmt.Print(" ---> ")
-			fmt.Println(status)
 			if MonitorStatusWeightService[status] > MonitorStatusWeightService[previousStatus] {
-				fmt.Println("RESETTING STATUS")
 				previousStatus = status
 			}
 		}
 	}
-	fmt.Println("RESULT: " + previousStatus)
 	return previousStatus, nil
 }
 

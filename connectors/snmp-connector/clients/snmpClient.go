@@ -2,7 +2,6 @@ package clients
 
 import (
 	"errors"
-	"fmt"
 	snmp "github.com/gosnmp/gosnmp"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
 	"github.com/gwos/tcg/log"
@@ -107,8 +106,6 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 		}
 	}
 	log.Info("------ completed for target ", target)
-	fmt.Print("Data: ")
-	fmt.Println(data)
 	return data, nil
 }
 

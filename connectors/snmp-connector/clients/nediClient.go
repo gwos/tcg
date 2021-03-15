@@ -17,7 +17,7 @@ const (
 	tableMonitoring = "monitoring"
 	tableInterfaces = "interfaces"
 
-	colName   = "name"
+	colName     = "name"
 	colDevice   = "device"
 	colDevIp    = "devip"
 	colMonIp    = "monip"
@@ -35,14 +35,14 @@ type Device struct {
 	Name      string
 	Ip        string
 	Community string
-	LastOK    int
+	LastOK    float64
 }
 
 type Monitoring struct {
-	Name      string
-	Ip        string
-	Device    string
-	LastOK    int
+	Name   string
+	Ip     string
+	Device string
+	LastOK float64
 }
 
 type Interface struct {
@@ -292,7 +292,7 @@ func getInt(val interface{}) (int, error) {
 		// big := big.Int(numVal)
 		return 99, nil
 	default:
-		return 0, errors.New("unsupported type: " )
+		return 0, errors.New("unsupported type: ")
 	}
 }
 
@@ -335,7 +335,7 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		var monitor Monitoring
 		monitor.Name = fields[colName].(string)
 		monitor.Device = fields[colDevice].(string)
-		monitor.LastOK = fields[colLastOK].(int)
+		monitor.LastOK = fields[colLastOK].(float64)
 
 		ip := fields[colMonIp]
 		ipVal, err := getInt(ip)
@@ -348,8 +348,4 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		monitors[monitor.Device] = monitor
 	}
 	return monitors, nil
-}
-
-func calculateHostStatus(device Device) string {
-	return "" // TODO: implement same algorithm as CloudHub
 }
