@@ -9,6 +9,7 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	"github.com/patrickmn/go-cache"
+	"strings"
 	"time"
 )
 
@@ -16,7 +17,7 @@ import (
 const FiveMinutes = 300
 
 // PreviousValueCache cache to handle "Delta" metrics
-var PreviousValueCache = cache.New(-1, -1)
+var previousValueCache = cache.New(-1, -1)
 
 type MonitoringState struct {
 	// [deviceName]Device
@@ -142,22 +143,22 @@ func calculateHostStatus(lastOk float64) transit.MonitorStatus {
 
 func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 	metricName string, currentValue interface{}) interface{} {
-	if metricKind == transit.Delta {
-		if previousValue, present := PreviousValueCache.Get(metricName); present {
+	if strings.EqualFold(string(metricKind), transit.Delta) {
+		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
 			case transit.UnitCounter:
-				PreviousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
 				currentValue = int(float64(currentValue.(int)) - previousValue.(float64))
 			case transit.MB:
-				PreviousValueCache.SetDefault(metricName, currentValue.(float64))
+				previousValueCache.SetDefault(metricName, currentValue.(float64))
 				currentValue = currentValue.(float64) - previousValue.(float64)
 			}
 		} else {
 			switch unitType {
 			case transit.UnitCounter:
-				PreviousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
 			case transit.MB:
-				PreviousValueCache.SetDefault(metricName, currentValue.(float64))
+				previousValueCache.SetDefault(metricName, currentValue.(float64))
 			}
 		}
 	}

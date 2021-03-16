@@ -186,6 +186,7 @@ func setupV3(target string, community *utils.SecurityData) (*snmp.GoSNMP, error)
 		Version:       snmp.Version3,
 		SecurityModel: snmp.UserSecurityModel,
 		MsgFlags:      msgFlags,
+		Timeout:       time.Duration(2) * time.Second,
 		SecurityParameters: &snmp.UsmSecurityParameters{
 			UserName:                 community.Name,
 			AuthenticationProtocol:   authProtocol,
