@@ -38,7 +38,7 @@ type MetricKind string
 const (
 	MetricKindUnspecified MetricKind = "METRIC_KIND_UNSPECIFIED"
 	Gauge                            = "GAUGE"
-	Delta                            = "DELTA"
+	Delta                            = "Delta"
 	Cumulative                       = "CUMULATIVE"
 )
 

@@ -98,6 +98,7 @@ func configHandler(data []byte) {
 			}
 		}
 	}
+
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 

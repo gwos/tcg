@@ -1,17 +1,22 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/patrickmn/go-cache"
 	"time"
 )
 
 // FiveMinutes NeDi interval in seconds
 const FiveMinutes = 300
+
+// PreviousValueCache cache to handle "Delta" metrics
+var PreviousValueCache = cache.New(-1, -1)
 
 type MonitoringState struct {
 	// [deviceName]Device
@@ -98,13 +103,15 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					CustomName:     metricDefinition.CustomName,
 					ComputeType:    metricDefinition.ComputeType,
 					Expression:     metricDefinition.Expression,
-					Value:          value,
 					UnitType:       unitType,
 					Warning:        metricDefinition.WarningThreshold,
 					Critical:       metricDefinition.CriticalThreshold,
 					StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 					EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 					Graphed:        metricDefinition.Graphed,
+
+					Value: calculateValue(metricDefinition.MetricType, unitType,
+						fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, metricName), value),
 				}
 				metricsBuilder = append(metricsBuilder, metricBuilder)
 			}
@@ -131,4 +138,28 @@ func calculateHostStatus(lastOk float64) transit.MonitorStatus {
 	}
 
 	return transit.HostUnreachable
+}
+
+func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
+	metricName string, currentValue interface{}) interface{} {
+	if metricKind == transit.Delta {
+		if previousValue, present := PreviousValueCache.Get(metricName); present {
+			switch unitType {
+			case transit.UnitCounter:
+				PreviousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+				currentValue = int(float64(currentValue.(int)) - previousValue.(float64))
+			case transit.MB:
+				PreviousValueCache.SetDefault(metricName, currentValue.(float64))
+				currentValue = currentValue.(float64) - previousValue.(float64)
+			}
+		} else {
+			switch unitType {
+			case transit.UnitCounter:
+				PreviousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+			case transit.MB:
+				PreviousValueCache.SetDefault(metricName, currentValue.(float64))
+			}
+		}
+	}
+	return currentValue
 }
