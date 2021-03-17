@@ -150,10 +150,8 @@ func setupV3(target string, community *utils.SecurityData) (*snmp.GoSNMP, error)
 	switch strings.ToLower(community.AuthProtocol) {
 	case md5:
 		authProtocol = snmp.MD5
-		break
 	case sha:
 		authProtocol = snmp.SHA
-		break
 	default:
 		log.Error("|snmpClient.go| : [setupV3] : Failed to setup snmp v3, unknown authentication protocol: ",
 			strings.ToLower(community.AuthProtocol))
@@ -166,10 +164,8 @@ func setupV3(target string, community *utils.SecurityData) (*snmp.GoSNMP, error)
 			privProtocol = snmp.AES
 			// NoPriv, DES implemented, AES planned
 			log.Warn("|snmpClient.go| : [setupV3] : AES privacy protocol may be unsupported yet.")
-			break
 		case des:
 			privProtocol = snmp.DES
-			break
 		default:
 			log.Error("|snmpClient.go| : [setupV3] : Failed to setup snmp v3, unknown privacy protocol: ",
 				strings.ToLower(community.PrivacyProtocol))
@@ -259,10 +255,8 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		case uint:
 			val.Value = int(v)
 			log.Info("*** parsed value for ", val.Name, ": ", val.Value)
-			break
 		default:
 			log.Warn("|snmpClient.go| : [getSnmpData]: Value '", v, "' of unsupported type for ", dataUnit.Name)
-			break
 		}
 		data.Values = append(data.Values, val)
 		return nil
