@@ -195,11 +195,11 @@ type TypedValue struct {
 	// DoubleValue: A 64-bit double-precision floating-point number. Its
 	// magnitude is approximately &plusmn;10<sup>&plusmn;300</sup> and it
 	// has 16 significant digits of precision.
-	DoubleValue float64 `json:"doubleValue,omitempty"`
+	DoubleValue float64 `json:"doubleValue"`
 
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	IntegerValue int64 `json:"integerValue,omitempty"`
+	IntegerValue int64 `json:"integerValue"`
 
 	// StringValue: A variable-length string value.
 	StringValue string `json:"stringValue,omitempty"`

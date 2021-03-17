@@ -128,6 +128,7 @@ func GetSecurityData(community string) (*SecurityData, error) {
 }
 
 func decrypt(encrypted string) (string, error) {
+	// TODO: rewrite it without invoking perl
 	cmd := exec.Command("perl", scriptFilepath, encrypted)
 	var out, errOut bytes.Buffer
 	cmd.Stdout = &out
@@ -141,7 +142,7 @@ func decrypt(encrypted string) (string, error) {
 		log.Error("|nediConfUtils.go| : [decrypt]: Error when running script to decrypt: ", string(errOut.Bytes()))
 		return "", errors.New("error when running script to decrypt")
 	}
-	return string(out.Bytes()), nil
+	return out.String(), nil
 }
 
 func retrieveConfFilepath() {

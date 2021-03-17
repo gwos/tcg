@@ -34,6 +34,7 @@ const (
 type SnmpConnector struct {
 	config     ExtConfig
 	nediClient clients.NediClient
+	snmpClient clients.SnmpClient
 	mState     MonitoringState
 }
 
@@ -129,6 +130,7 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredReso
 }
 
 func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
+	log.Info("========= starting collection of interface metrics...")
 	for deviceName, device := range connector.mState.devices {
 		interfaces, err := connector.nediClient.GetDeviceInterfaces(deviceName)
 		if err != nil {
@@ -157,7 +159,7 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 			continue
 		}
 
-		snmpData, err := clients.GetSnmpData(mibs, device.Ip, device.SecData)
+		snmpData, err := connector.snmpClient.GetSnmpData(mibs, device.Ip, device.SecData)
 		if err != nil {
 			log.Error("|snmpConnector.go| : [collectInterfaceMetrics]: Failed to get SNMP data for device '",
 				deviceName, "': ", err)
@@ -190,6 +192,7 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 			}
 		}
 	}
+	log.Info("========= ending collection of interface metrics...")
 }
 
 func (connector *SnmpConnector) listSuggestions(view string, name string) []string {

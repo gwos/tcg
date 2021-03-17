@@ -1,14 +1,23 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/patrickmn/go-cache"
+	"strings"
 	"time"
 )
+
+// FiveMinutes NeDi interval in seconds
+const FiveMinutes = 300
+
+// PreviousValueCache cache to handle "Delta" metrics
+var previousValueCache = cache.New(-1, -1)
 
 type MonitoringState struct {
 	// [deviceName]Device
@@ -48,6 +57,7 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 			log.Error("|snmpConnectorModel.go| : [retrieveMonitoredResources] : Error when create monitored resource '", device.Name,
 				"'. Reason: ", err)
 		}
+		mResource.Status = calculateHostStatus(device.LastOK)
 		if mResource != nil {
 			mResources[i] = *mResource
 		}
@@ -94,13 +104,15 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					CustomName:     metricDefinition.CustomName,
 					ComputeType:    metricDefinition.ComputeType,
 					Expression:     metricDefinition.Expression,
-					Value:          value,
 					UnitType:       unitType,
 					Warning:        metricDefinition.WarningThreshold,
 					Critical:       metricDefinition.CriticalThreshold,
 					StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
 					EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 					Graphed:        metricDefinition.Graphed,
+
+					Value: calculateValue(metricDefinition.MetricType, unitType,
+						fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, metricName), value),
 				}
 				metricsBuilder = append(metricsBuilder, metricBuilder)
 			}
@@ -118,4 +130,37 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	}
 
 	return mServices
+}
+
+func calculateHostStatus(lastOk float64) transit.MonitorStatus {
+	now := time.Now().Unix() // in seconds
+	if (float64(now) - lastOk) < FiveMinutes {
+		return transit.HostUp
+	}
+
+	return transit.HostUnreachable
+}
+
+func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
+	metricName string, currentValue interface{}) interface{} {
+	if strings.EqualFold(string(metricKind), transit.Delta) {
+		if previousValue, present := previousValueCache.Get(metricName); present {
+			switch unitType {
+			case transit.UnitCounter:
+				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+				currentValue = int(float64(currentValue.(int)) - previousValue.(float64))
+			case transit.MB:
+				previousValueCache.SetDefault(metricName, currentValue.(float64))
+				currentValue = currentValue.(float64) - previousValue.(float64)
+			}
+		} else {
+			switch unitType {
+			case transit.UnitCounter:
+				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
+			case transit.MB:
+				previousValueCache.SetDefault(metricName, currentValue.(float64))
+			}
+		}
+	}
+	return currentValue
 }
