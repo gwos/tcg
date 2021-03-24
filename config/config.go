@@ -265,7 +265,7 @@ func (cons *GWConnections) Decode(value string) error {
 		buf := GWConnections(make([]*GWConnection, len(overrides)))
 		copy(buf, overrides)
 		copy(buf, *cons)
-		*cons = *(&buf)
+		*cons = buf
 	}
 	for i, v := range overrides {
 		if v.HostName != "" {
@@ -542,8 +542,7 @@ func (cfg *Config) IsConfiguringPMC() bool {
 // golang.org/x/crypto/nacl/secretbox
 func Decrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
-	var secretKey [32]byte
-	secretKey = sha256.Sum256(secret)
+	var secretKey [32]byte = sha256.Sum256(secret)
 	copy(nonce[:], message[:24])
 	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
 	if !ok {
@@ -556,8 +555,7 @@ func Decrypt(message, secret []byte) ([]byte, error) {
 // golang.org/x/crypto/nacl/secretbox
 func Encrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
-	var secretKey [32]byte
-	secretKey = sha256.Sum256(secret)
+	var secretKey [32]byte = sha256.Sum256(secret)
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 		return nil, err
 	}
