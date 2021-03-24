@@ -140,7 +140,10 @@ type Connector struct {
 	LogFile        string        `yaml:"logFile"`
 	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
 	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
-	LogLevel       LogLevel      `yaml:"logLevel"`
+	// Log files are rotated count times before being removed.
+	// If count is 0, old versions are removed rather than rotated.
+	LogFileRotate int      `yaml:"logFileRotate"`
+	LogLevel      LogLevel `yaml:"logLevel"`
 
 	Enabled            bool   `yaml:"enabled"`
 	InstallationMode   string `yaml:"installationMode,omitempty"`
@@ -329,7 +332,8 @@ func defaults() Config {
 			ControllerWriteTimeout:  time.Duration(time.Second * 20),
 			LogConsPeriod:           0,
 			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
-			LogFileMaxSize:          0,
+			LogFileMaxSize:          1024 * 1024 * 10,                   // 10MB
+			LogFileRotate:           5,
 			LogLevel:                1,
 			NatsAckWait:             time.Duration(time.Second * 30),
 			NatsMaxInflight:         1024,
@@ -373,6 +377,7 @@ func GetConfig() *Config {
 			cfg.Connector.LogFile,
 			cfg.Connector.LogFileMaxAge,
 			cfg.Connector.LogFileMaxSize,
+			cfg.Connector.LogFileRotate,
 			int(cfg.Connector.LogLevel),
 			time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 		)
@@ -519,6 +524,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		cfg.Connector.LogFile,
 		cfg.Connector.LogFileMaxAge,
 		cfg.Connector.LogFileMaxSize,
+		cfg.Connector.LogFileRotate,
 		int(cfg.Connector.LogLevel),
 		time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
 	)

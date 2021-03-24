@@ -48,6 +48,7 @@ var (
 		file:        nil,
 		fileMaxAge:  0,
 		fileMaxSize: 0,
+		fileRotate:  0,
 		once:        sync.Once{},
 		writer:      os.Stdout,
 	}
@@ -74,7 +75,14 @@ func Error(args ...interface{}) {
 }
 
 // Config configures logger
-func Config(filePath string, maxAge time.Duration, maxSize int64, level int, consolid time.Duration) {
+func Config(
+	filePath string,
+	maxAge time.Duration,
+	maxSize int64,
+	rotate int,
+	level int,
+	consolid time.Duration,
+) {
 	once.Do(func() {
 		logger.AddHook(preFormatterHook)
 		logger.AddHook(writerHook)
@@ -100,6 +108,7 @@ func Config(filePath string, maxAge time.Duration, maxSize int64, level int, con
 	}
 	writerHook.fileMaxAge = maxAge
 	writerHook.fileMaxSize = maxSize
+	writerHook.fileRotate = rotate
 	writerHook.consolid = consolid
 }
 
@@ -138,6 +147,7 @@ type multiWriterHook struct {
 	fileCTime   time.Time
 	fileMaxAge  time.Duration
 	fileMaxSize int64
+	fileRotate  int
 	fileSize    int64
 	once        sync.Once
 	writer      io.Writer
@@ -185,14 +195,13 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 			_ = h.cache.Add(ck, uint16(0), h.consolid)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
-
+		if h.file != nil &&
+			((h.fileMaxAge > 0 && h.fileMaxAge < time.Since(h.fileCTime)) ||
+				(h.fileMaxSize > 0 && h.fileMaxSize < h.fileSize+int64(len(output)))) {
+			h.rotateFile()
+		}
 		if n, err := h.writer.Write(output); err == nil {
 			h.fileSize += int64(n)
-		}
-		if h.file != nil &&
-			((h.fileMaxAge > 0 && h.fileMaxAge < time.Now().Sub(h.fileCTime)) ||
-				(h.fileMaxSize > 0 && h.fileMaxSize < h.fileSize)) {
-			h.rotateFile()
 		}
 	}
 	/* debug hits */
@@ -203,7 +212,14 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 func (h *multiWriterHook) rotateFile() {
 	filename := h.file.Name()
 	_ = h.file.Close()
-	_ = os.Rename(filename, filename+".bak")
+	if h.fileRotate == 0 {
+		_ = os.Remove(filename)
+	} else {
+		for i := h.fileRotate; i > 0; i-- {
+			_ = os.Rename(fmt.Sprintf("%s.%d", filename, i-1), fmt.Sprintf("%s.%d", filename, i))
+		}
+		_ = os.Rename(filename, fmt.Sprintf("%s.%d", filename, 1))
+	}
 	h.openFile(filename)
 }
 
