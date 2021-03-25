@@ -82,6 +82,7 @@ type Connector struct {
 	AgentID string `yaml:"agentId"`
 	AppName string `yaml:"appName"`
 	AppType string `yaml:"appType"`
+
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
@@ -93,6 +94,23 @@ type Connector struct {
 	// Custom HTTP configuration
 	ControllerReadTimeout  time.Duration `yaml:"-"`
 	ControllerWriteTimeout time.Duration `yaml:"-"`
+
+	Enabled            bool   `yaml:"enabled"`
+	InstallationMode   string `yaml:"installationMode,omitempty"`
+	IsDynamicInventory bool   `yaml:"-"`
+
+	// LogCondense accepts time duration for condensing similar records
+	// if 0 turn off condensing
+	LogCondense time.Duration `yaml:"logCondense"`
+	// LogFile accepts file path to log in addition to stdout
+	LogFile        string        `yaml:"logFile"`
+	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
+	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
+	// Log files are rotated count times before being removed.
+	// If count is 0, old versions are removed rather than rotated.
+	LogFileRotate int      `yaml:"logFileRotate"`
+	LogLevel      LogLevel `yaml:"logLevel"`
+
 	// NatsAckWait is the time the NATS server will wait before resending a message
 	// Should be greater then the GWClient request duration
 	NatsAckWait time.Duration `yaml:"-"`
@@ -133,21 +151,6 @@ type Connector struct {
 	// NatsStoreReadBufferSize for FileStore type
 	// size of the buffer to preload messages
 	NatsStoreReadBufferSize int `yaml:"-"`
-	// LogConsPeriod accepts number of seconds
-	// if 0 turn off consolidation
-	LogConsPeriod int `yaml:"logConsPeriod"`
-	// LogFile accepts file path to log in addition to stdout
-	LogFile        string        `yaml:"logFile"`
-	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
-	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
-	// Log files are rotated count times before being removed.
-	// If count is 0, old versions are removed rather than rotated.
-	LogFileRotate int      `yaml:"logFileRotate"`
-	LogLevel      LogLevel `yaml:"logLevel"`
-
-	Enabled            bool   `yaml:"enabled"`
-	InstallationMode   string `yaml:"installationMode,omitempty"`
-	IsDynamicInventory bool   `yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -156,7 +159,6 @@ type ConnectorDTO struct {
 	AppName       string        `json:"appName"`
 	AppType       string        `json:"appType"`
 	TcgURL        string        `json:"tcgUrl"`
-	LogConsPeriod int           `json:"logConsPeriod"`
 	LogLevel      LogLevel      `json:"logLevel"`
 	Enabled       bool          `json:"enabled"`
 	DSConnection  DSConnection  `json:"dalekservicesConnection"`
@@ -330,7 +332,7 @@ func defaults() Config {
 			ControllerAddr:          ":8099",
 			ControllerReadTimeout:   time.Duration(time.Second * 10),
 			ControllerWriteTimeout:  time.Duration(time.Second * 20),
-			LogConsPeriod:           0,
+			LogCondense:             0,
 			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
 			LogFileMaxSize:          1024 * 1024 * 10,                   // 10MB
 			LogFileRotate:           5,
@@ -379,7 +381,7 @@ func GetConfig() *Config {
 			cfg.Connector.LogFileMaxSize,
 			cfg.Connector.LogFileRotate,
 			int(cfg.Connector.LogLevel),
-			time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
+			cfg.Connector.LogCondense,
 		)
 		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
 		if len(logBuf) > 0 {
@@ -411,7 +413,6 @@ func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	cfg.Connector.AgentID = dto.AgentID
 	cfg.Connector.AppName = dto.AppName
 	cfg.Connector.AppType = dto.AppType
-	cfg.Connector.LogConsPeriod = dto.LogConsPeriod
 	cfg.Connector.LogLevel = dto.LogLevel
 	cfg.Connector.Enabled = dto.Enabled
 	cfg.GWConnections = dto.GWConnections
@@ -526,7 +527,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		cfg.Connector.LogFileMaxSize,
 		cfg.Connector.LogFileRotate,
 		int(cfg.Connector.LogLevel),
-		time.Duration(cfg.Connector.LogConsPeriod)*time.Second,
+		cfg.Connector.LogCondense,
 	)
 
 	return dto, nil

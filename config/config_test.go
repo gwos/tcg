@@ -18,6 +18,7 @@ connector:
   appName: "test-app"
   appType: "test"
   controllerAddr: ":9999"
+  logCondense: "30s"
 dsConnection:
   hostName: "localhost"
 gwConnections:
@@ -53,6 +54,7 @@ gwConnections:
 	expected.Connector.AppName = "test-app"
 	expected.Connector.AppType = "test"
 	expected.Connector.ControllerAddr = ":9999"
+	expected.Connector.LogCondense = 30000000000
 	expected.Connector.NatsStoreType = "MEMORY"
 	expected.Connector.NatsStoreMaxAge = 3600000000000
 	expected.DSConnection = &DSConnection{"localhost:3001"}
@@ -105,7 +107,6 @@ dsConnection:
   "agentId": "99998888-7777-6666-a3b0-b14622f7dd39",
   "appName": "test-app-XX",
   "appType": "test-XX",
-  "logConsPeriod": 30,
   "logLevel": 2,
   "tcgUrl": "http://tcg-host/",
   "dalekservicesConnection": {
@@ -135,7 +136,6 @@ dsConnection:
 	expected.Connector.AppName = "test-app-XX"
 	expected.Connector.AppType = "test-XX"
 	expected.Connector.ControllerAddr = ":8022"
-	expected.Connector.LogConsPeriod = 30
 	expected.Connector.LogLevel = 2
 	expected.DSConnection = &DSConnection{"gw-host-xxx"}
 	expected.GWConnections = GWConnections{
