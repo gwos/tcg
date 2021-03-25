@@ -105,8 +105,13 @@ func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMoni
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(body []byte, resourceIndex int) error {
+func processMetrics(body []byte, resourceIndex int, statusDown bool) error {
 	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex); err == nil {
+		if statusDown {
+			for i := 0; i < len(*monitoredResources); i++ {
+				(*monitoredResources)[i].Status = transit.HostUnscheduledDown
+			}
+		}
 		if err := connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups); err != nil {
 			return err
 		}
@@ -371,7 +376,7 @@ func receiverHandler(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = processMetrics(body, -1)
+	err = processMetrics(body, -1, false)
 	if err != nil {
 		log.Error(fmt.Sprintf("[APM Connector]~[Push]: %s", err))
 	}
@@ -386,12 +391,12 @@ func pull(resources []Resource) {
 				resource.URL, err.Error()))
 			continue
 		}
-		if !(statusCode == 200 || statusCode == 201) {
+		if !(statusCode == 200 || statusCode == 201 || statusCode == 220) {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
 				resource.URL, string(byteResponse)))
 			continue
 		}
-		err = processMetrics(byteResponse, index)
+		err = processMetrics(byteResponse, index, statusCode == 220)
 		if err != nil {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
