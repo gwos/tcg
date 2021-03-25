@@ -5,7 +5,6 @@ connector:
   controllerAddr: 0.0.0.0:8099
   natsFilestoreDir: natsstore
   natsStoreType: FILE
-  logConsPeriod: 0 # seconds; 0 - off consolidation
   logLevel: 1 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
   hostName: ""

@@ -44,7 +44,7 @@ var (
 	}
 	writerHook = &multiWriterHook{
 		cache:       cache.New(10*time.Minute, 10*time.Second),
-		consolid:    0,
+		condense:    0,
 		file:        nil,
 		fileMaxAge:  0,
 		fileMaxSize: 0,
@@ -81,7 +81,7 @@ func Config(
 	maxSize int64,
 	rotate int,
 	level int,
-	consolid time.Duration,
+	condense time.Duration,
 ) {
 	once.Do(func() {
 		logger.AddHook(preFormatterHook)
@@ -109,7 +109,7 @@ func Config(
 	writerHook.fileMaxAge = maxAge
 	writerHook.fileMaxSize = maxSize
 	writerHook.fileRotate = rotate
-	writerHook.consolid = consolid
+	writerHook.condense = condense
 }
 
 // Entry wraps logrus.Entry
@@ -142,7 +142,7 @@ func (entry *Entry) WithInfo(fields Fields) *Entry {
 
 type multiWriterHook struct {
 	cache       *cache.Cache
-	consolid    time.Duration
+	condense    time.Duration
 	file        *os.File
 	fileCTime   time.Time
 	fileMaxAge  time.Duration
@@ -157,9 +157,9 @@ func (h *multiWriterHook) onEvicted() func(string, interface{}) {
 	return func(ck string, i interface{}) {
 		v := i.(uint16)
 		if v > 0 {
-			_, _ = fmt.Fprintf(h.writer, "%s [consolidate: %d more entries last %.f seconds] %s\n",
+			_, _ = fmt.Fprintf(h.writer, "%s [condense: %d more entries last %.f seconds] %s\n",
 				time.Now().Format(timestampFormat),
-				v, h.consolid.Seconds(), ck)
+				v, h.condense.Seconds(), ck)
 		}
 	}
 }
@@ -190,9 +190,9 @@ func (h *multiWriterHook) Fire(entry *logrus.Entry) error {
 	if _, ok := h.cache.Get(ck); ok {
 		_ = h.cache.Increment(ck, 1)
 	} else {
-		/* skip caching if consolidation off */
-		if h.consolid.Milliseconds() > 0 {
-			_ = h.cache.Add(ck, uint16(0), h.consolid)
+		/* skip caching if condensing off */
+		if h.condense.Milliseconds() > 0 {
+			_ = h.cache.Add(ck, uint16(0), h.condense)
 		}
 		output, _ := entry.Logger.Formatter.Format(entry)
 		if h.file != nil &&
