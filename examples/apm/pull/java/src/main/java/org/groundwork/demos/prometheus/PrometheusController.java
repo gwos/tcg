@@ -1,4 +1,4 @@
-package org.example;
+package org.groundwork.demos.prometheus;
 
 import io.prometheus.client.*;
 import io.prometheus.client.exporter.common.TextFormat;
@@ -14,7 +14,7 @@ import java.util.Collections;
 import java.util.List;
 
 @RestController
-public class Controller {
+public class PrometheusController {
     List<String> services = new ArrayList<String>() {{
         add("analytics");
         add("distribution");
