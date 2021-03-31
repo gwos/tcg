@@ -1,10 +1,10 @@
 connector:
   agentId: ""
-  appName: "ELASTIC"
-  appType: "ELASTIC"
-  controllerAddr: "0.0.0.0:8099"
-  natsFilestoreDir: "natsstore"
-  natsStoreType: "FILE"
+  appName: ELASTIC
+  appType: ELASTIC
+  controllerAddr: 0.0.0.0:8099
+  natsFilestoreDir: natsstore
+  natsStoreType: FILE
   logLevel: 1 # 0 - Error; 1 - Warn; 2 - Info; 3 - Debug
 dsConnection:
   hostName: ""
