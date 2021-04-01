@@ -111,10 +111,16 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
 					Graphed:        metricDefinition.Graphed,
 
-					Value: calculateValue(metricDefinition.MetricType, unitType,
-						fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, metricName), value),
+					Value: nil,
 				}
-				metricsBuilder = append(metricsBuilder, metricBuilder)
+
+				isDelta, isPreviousPresent, valueToSet := calculateValue(metricDefinition.MetricType, unitType,
+					fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, metricName), value)
+
+				if !isDelta || (isDelta && isPreviousPresent) {
+					metricBuilder.Value = valueToSet
+					metricsBuilder = append(metricsBuilder, metricBuilder)
+				}
 			}
 		}
 
@@ -142,7 +148,7 @@ func calculateHostStatus(lastOk float64) transit.MonitorStatus {
 }
 
 func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
-	metricName string, currentValue interface{}) interface{} {
+	metricName string, currentValue interface{}) (bool, bool, interface{}) {
 	if strings.EqualFold(string(metricKind), transit.Delta) {
 		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
@@ -153,6 +159,7 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 				previousValueCache.SetDefault(metricName, currentValue.(float64))
 				currentValue = currentValue.(float64) - previousValue.(float64)
 			}
+			return true, true, currentValue
 		} else {
 			switch unitType {
 			case transit.UnitCounter:
@@ -160,7 +167,8 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 			case transit.MB:
 				previousValueCache.SetDefault(metricName, currentValue.(float64))
 			}
+			return true, false, currentValue
 		}
 	}
-	return currentValue
+	return false, false, currentValue
 }
