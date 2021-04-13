@@ -104,9 +104,9 @@ func GetAgentService() *AgentService {
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
 			&AgentStatus{
-				Controller: Stopped,
-				Nats:       Stopped,
-				Transport:  Stopped,
+				Controller: StatusStopped,
+				Nats:       StatusStopped,
+				Transport:  StatusStopped,
 			},
 			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
 			nil,
@@ -542,7 +542,7 @@ func (service *AgentService) startController() error {
 
 func (service *AgentService) stopController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	if service.agentStatus.Controller == Stopped {
+	if service.agentStatus.Controller == StatusStopped {
 		return nil
 	}
 	return GetController().stopController()
@@ -565,13 +565,13 @@ func (service *AgentService) startNats() error {
 		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
 	})
 	if err == nil {
-		service.agentStatus.Nats = Running
+		service.agentStatus.Nats = StatusRunning
 	}
 	return err
 }
 
 func (service *AgentService) stopNats() error {
-	if service.agentStatus.Nats == Stopped {
+	if service.agentStatus.Nats == StatusStopped {
 		return nil
 	}
 
@@ -579,7 +579,7 @@ func (service *AgentService) stopNats() error {
 	err := service.stopTransport()
 	// skip Stop Transport error checking
 	nats.StopServer()
-	service.agentStatus.Nats = Stopped
+	service.agentStatus.Nats = StatusStopped
 	return err
 }
 
@@ -606,7 +606,7 @@ func (service *AgentService) startTransport() error {
 	service.gwClients = gwClients
 	/* Process dispatcher */
 	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
-		service.agentStatus.Transport = Running
+		service.agentStatus.Transport = StatusRunning
 	} else {
 		return sdErr
 	}
@@ -615,13 +615,13 @@ func (service *AgentService) startTransport() error {
 }
 
 func (service *AgentService) stopTransport() error {
-	if service.agentStatus.Transport == Stopped {
+	if service.agentStatus.Transport == StatusStopped {
 		return nil
 	}
 	if err := nats.StopDispatcher(); err != nil {
 		return err
 	}
-	service.agentStatus.Transport = Stopped
+	service.agentStatus.Transport = StatusStopped
 	log.Info("[StopTransport]: Stopped")
 	return nil
 }

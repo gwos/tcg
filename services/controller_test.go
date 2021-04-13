@@ -29,11 +29,11 @@ func TestController_StartStopNats(t *testing.T) {
 		switch req.URL.String() {
 		case "/nats/start":
 			assert.NoError(t, controller.StartNats())
-			assert.Equal(t, string(controller.Status().Nats), Running,
+			assert.Equal(t, StatusRunning, controller.Status().Nats,
 				"nats server status should match the expected one [Running]")
 		case "/nats/stop":
 			assert.NoError(t, controller.StopNats())
-			assert.Equal(t, string(controller.Status().Nats), Stopped,
+			assert.Equal(t, StatusStopped, controller.Status().Nats,
 				"nats server status should match the expected one [Stopped]")
 		}
 		res.WriteHeader(http.StatusOK)
@@ -62,11 +62,11 @@ func TestController_StartStopTransport(t *testing.T) {
 		switch req.URL.String() {
 		case "/nats/transport/start":
 			assert.NoError(t, controller.StartTransport())
-			assert.Equal(t, string(controller.Status().Transport), Running,
+			assert.Equal(t, StatusRunning, controller.Status().Transport,
 				"nats transport status should match the expected one [Running]")
 		case "/nats/transport/stop":
 			assert.NoError(t, controller.StopTransport())
-			assert.Equal(t, string(controller.Status().Transport), Stopped,
+			assert.Equal(t, StatusStopped, controller.Status().Transport,
 				"nats transport status should match the expected one [Stopped]")
 		}
 		res.WriteHeader(http.StatusOK)

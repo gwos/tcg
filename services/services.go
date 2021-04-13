@@ -25,10 +25,10 @@ type Status string
 
 // Status
 const (
-	Processing Status = "processing"
-	Running           = "running"
-	Stopped           = "stopped"
-	Unknown           = "unknown"
+	StatusProcessing Status = "processing"
+	StatusRunning    Status = "running"
+	StatusStopped    Status = "stopped"
+	StatusUnknown    Status = "unknown"
 )
 
 // AgentStats defines TCG Agent statistics

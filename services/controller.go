@@ -96,7 +96,7 @@ func (controller *Controller) startController() error {
 	}
 
 	go func() {
-		controller.agentStatus.Controller = Running
+		controller.agentStatus.Controller = StatusRunning
 
 		var err error
 		if certFile != "" && keyFile != "" {
@@ -111,7 +111,7 @@ func (controller *Controller) startController() error {
 			}
 		}
 
-		controller.agentStatus.Controller = Stopped
+		controller.agentStatus.Controller = StatusStopped
 	}()
 	// TODO: ensure signal processing in case of linked library
 	// // Wait for interrupt signal to gracefully shutdown the server
@@ -177,7 +177,7 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -327,8 +327,8 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Running && status.task == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Running, 0})
+	if status.Transport == StatusRunning && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusRunning, 0})
 		return
 	}
 	task, err := controller.StartTransportAsync()
@@ -336,7 +336,7 @@ func (controller *Controller) start(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -352,8 +352,8 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Stopped && status.task == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Stopped, 0})
+	if status.Transport == StatusStopped && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusStopped, 0})
 		return
 	}
 	task, err := controller.StopTransportAsync()
@@ -361,7 +361,7 @@ func (controller *Controller) stop(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -408,7 +408,7 @@ func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
 	statusDTO := ConnectorStatusDTO{status.Transport, 0}
 	if status.task != nil {
-		statusDTO = ConnectorStatusDTO{Processing, status.task.Idx}
+		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
 	}
 	c.JSON(http.StatusOK, statusDTO)
 }
