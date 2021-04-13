@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
 	"sync"
@@ -21,6 +20,7 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	apitrace "go.opentelemetry.io/otel/api/trace"
@@ -31,29 +31,22 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*sync.Mutex
 	*config.Connector
-	agentStats            *AgentStats
-	agentStatus           *AgentStatus
-	dsClient              *clients.DSClient
-	gwClients             []*clients.GWClient
-	ctrlIdx               uint8
-	ctrlChan              chan *CtrlAction
-	statsChan             chan statsCounter
-	tracerToken           []byte
-	configHandler         func([]byte)
-	demandConfigHandler   func() bool
-	exitHandler           func()
+
+	agentStats  *AgentStats
+	agentStatus *AgentStatus
+	dsClient    *clients.DSClient
+	gwClients   []*clients.GWClient
+	statsChan   chan statsCounter
+	taskQueue   *taskQueue.TaskQueue
+	tracerToken []byte
+
+	configHandler       func([]byte)
+	demandConfigHandler func() bool
+	exitHandler         func()
+
 	telemetryFlushHandler func()
 	telemetryProvider     apitrace.TracerProvider
-}
-
-// CtrlAction defines queued controll action
-type CtrlAction struct {
-	Data     interface{}
-	Idx      uint8
-	Subj     ctrlSubj
-	SyncChan chan error
 }
 
 type statsCounter struct {
@@ -63,24 +56,26 @@ type statsCounter struct {
 	timestamp   time.Time
 }
 
-type ctrlSubj string
+type taskSubject string
 
 const (
-	ctrlSubjConfig          ctrlSubj = "config"
-	ctrlSubjStartController          = "startController"
-	ctrlSubjStopController           = "stopController"
-	ctrlSubjStartNats                = "startNats"
-	ctrlSubjStopNats                 = "stopNats"
-	ctrlSubjStartTransport           = "startTransport"
-	ctrlSubjStopTransport            = "stopTransport"
+	taskConfig          taskSubject = "config"
+	taskStartController taskSubject = "startController"
+	taskStopController  taskSubject = "stopController"
+	taskStartNats       taskSubject = "startNats"
+	taskStopNats        taskSubject = "stopNats"
+	taskStartTransport  taskSubject = "startTransport"
+	taskStopTransport   taskSubject = "stopTransport"
 )
 
-const ctrlLimit = 9
-const ckTraceToken = "ckTraceToken"
-const statsLastErrorsLim = 10
-const defaultDeadlineTimer = 9 * time.Second
-const traceOnDemandAgentID = "#traceOnDemandAgentID#"
-const traceOnDemandAppType = "#traceOnDemandAppType#"
+const (
+	ckTraceToken         = "ckTraceToken"
+	statsLastErrorsLim   = 10
+	taskQueueAlarm       = time.Second * 9
+	taskQueueCapacity    = 8
+	traceOnDemandAgentID = "#traceOnDemandAgentID#"
+	traceOnDemandAppType = "#traceOnDemandAppType#"
+)
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -103,8 +98,8 @@ func GetAgentService() *AgentService {
 
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
-			&sync.Mutex{},
 			agentConnector,
+
 			&AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
@@ -115,19 +110,20 @@ func GetAgentService() *AgentService {
 			},
 			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
 			nil,
-			0,
-			make(chan *CtrlAction, ctrlLimit),
 			make(chan statsCounter),
+			nil,
 			tracerToken,
+
 			defaultConfigHandler,
 			defaultDemandConfigHandler,
 			defaultExitHandler,
+
 			telemetryFlushHandler,
 			telemetryProvider,
 		}
 
-		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+		agentService.handleTasks()
 		agentService.handleExit()
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
@@ -244,63 +240,63 @@ func (service *AgentService) RemoveExitHandler() {
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
-func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartController, syncChan)
+func (service *AgentService) StartControllerAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartController)
 }
 
 // StopControllerAsync implements AgentServices.StopControllerAsync interface
-func (service *AgentService) StopControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopController, syncChan)
+func (service *AgentService) StopControllerAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopController)
 }
 
 // StartNatsAsync implements AgentServices.StartNatsAsync interface
-func (service *AgentService) StartNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartNats, syncChan)
+func (service *AgentService) StartNatsAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartNats)
 }
 
 // StopNatsAsync implements AgentServices.StopNatsAsync interface
-func (service *AgentService) StopNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopNats, syncChan)
+func (service *AgentService) StopNatsAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopNats)
 }
 
 // StartTransportAsync implements AgentServices.StartTransportAsync interface.
-func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartTransport, syncChan)
+func (service *AgentService) StartTransportAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartTransport)
 }
 
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
-func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
+func (service *AgentService) StopTransportAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopTransport)
 }
 
 // StartController implements AgentServices.StartController interface
 func (service *AgentService) StartController() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartController)
+	return service.taskQueue.PushSync(taskStartController)
 }
 
 // StopController implements AgentServices.StopController interface
 func (service *AgentService) StopController() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopController)
+	return service.taskQueue.PushSync(taskStopController)
 }
 
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartNats)
+	return service.taskQueue.PushSync(taskStartNats)
 }
 
 // StopNats implements AgentServices.StopNats interface
 func (service *AgentService) StopNats() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopNats)
+	return service.taskQueue.PushSync(taskStopNats)
 }
 
 // StartTransport implements AgentServices.StartTransport interface.
 func (service *AgentService) StartTransport() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartTransport)
+	return service.taskQueue.PushSync(taskStartTransport)
 }
 
 // StopTransport implements AgentServices.StopTransport interface
 func (service *AgentService) StopTransport() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopTransport)
+	return service.taskQueue.PushSync(taskStopTransport)
 }
 
 // Stats implements AgentServices.Stats interface
@@ -319,71 +315,53 @@ func (service *AgentService) Status() AgentStatus {
 	return *service.agentStatus
 }
 
-func (service *AgentService) ctrlPushAsync(data interface{}, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
-	ctrl := &CtrlAction{data, service.ctrlIdx + 1, subj, syncChan}
-	select {
-	case service.ctrlChan <- ctrl:
-		service.ctrlIdx = ctrl.Idx
-		if service.ctrlIdx > (math.MaxUint8 - 1) {
-			service.ctrlIdx = 0
-		}
-		return ctrl, nil
-	default:
-		return nil, fmt.Errorf("Ctrl limit reached: %v ", ctrlLimit)
+// handleTasks handles task queue
+func (service *AgentService) handleTasks() {
+	hAlarm := func(task *taskQueue.Task) error {
+		log.Error("#AgentService.taskQueue timed over:", task.Subject)
+		return nil
 	}
-}
-
-func (service *AgentService) ctrlPushSync(data interface{}, subj ctrlSubj) error {
-	syncChan := make(chan error)
-	if _, err := service.ctrlPushAsync(data, subj, syncChan); err != nil {
-		return err
-	}
-	return <-syncChan
-}
-
-func (service *AgentService) listenCtrlChan() {
-	deadlineTimer := time.NewTimer(defaultDeadlineTimer)
-	deadlineTimer.Stop()
-	var subject ctrlSubj
-	go deadlineTimerHandler(deadlineTimer, &subject)
-	for {
-		ctrl := <-service.ctrlChan
+	hTask := func(task *taskQueue.Task) error {
 		logEntry := log.With(log.Fields{
-			"Idx":  ctrl.Idx,
-			"Subj": ctrl.Subj,
-			// "Data": string(ctrl.Data),
+			"Idx":     task.Idx,
+			"Subject": task.Subject,
 		})
-		logEntry.Log(log.DebugLevel, "#AgentService.ctrlChan")
-		subject = ctrl.Subj
-
-		deadlineTimer.Reset(defaultDeadlineTimer)
-
-		service.agentStatus.Ctrl = ctrl
+		logEntry.Log(log.DebugLevel, "#AgentService.taskQueue")
+		service.agentStatus.task = task
 		var err error
-		switch ctrl.Subj {
-		case ctrlSubjConfig:
-			err = service.config(ctrl.Data.([]byte))
-		case ctrlSubjStartController:
+		switch task.Subject {
+		case taskConfig:
+			err = service.config(task.Args[0].([]byte))
+		case taskStartController:
 			err = service.startController()
-		case ctrlSubjStopController:
+		case taskStopController:
 			err = service.stopController()
-		case ctrlSubjStartNats:
+		case taskStartNats:
 			err = service.startNats()
-		case ctrlSubjStopNats:
+		case taskStopNats:
 			err = service.stopNats()
-		case ctrlSubjStartTransport:
+		case taskStartTransport:
 			err = service.startTransport()
-		case ctrlSubjStopTransport:
+		case taskStopTransport:
 			err = service.stopTransport()
 		}
-
-		deadlineTimer.Stop()
-
-		if ctrl.SyncChan != nil {
-			ctrl.SyncChan <- err
-		}
-		service.agentStatus.Ctrl = nil
+		service.agentStatus.task = nil
+		return err
 	}
+
+	service.taskQueue = taskQueue.NewTaskQueue(
+		taskQueue.WithAlarm(taskQueueAlarm, hAlarm),
+		taskQueue.WithCapacity(taskQueueCapacity),
+		taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
+			taskConfig:          hTask,
+			taskStartController: hTask,
+			taskStopController:  hTask,
+			taskStartNats:       hTask,
+			taskStopNats:        hTask,
+			taskStartTransport:  hTask,
+			taskStopTransport:   hTask,
+		}),
+	)
 }
 
 func (service *AgentService) listenStatsChan() {
@@ -544,14 +522,12 @@ func (service *AgentService) config(data []byte) error {
 	// stop nats processing
 	_ = service.stopTransport()
 	// flush uploading telemetry and configure provider while processing stopped
-	service.Mutex.Lock()
 	if service.telemetryFlushHandler != nil {
 		service.telemetryFlushHandler()
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
 	service.telemetryFlushHandler = telemetryFlushHandler
 	service.telemetryProvider = telemetryProvider
-	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -750,13 +726,4 @@ func initTelemetryProvider() (apitrace.TracerProvider, func(), error) {
 		}),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
-}
-
-func deadlineTimerHandler(deadlineTimer *time.Timer, subject *ctrlSubj) {
-	for {
-		select {
-		case <-deadlineTimer.C:
-			log.Error("#AgentService.ctrlChan timed over:", *subject)
-		}
-	}
 }

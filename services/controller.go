@@ -168,13 +168,16 @@ func (controller *Controller) config(c *gin.Context) {
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
-	err = controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
-	if err != nil {
+	if err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName); err != nil {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
-	_, _ = controller.ctrlPushAsync(payload, ctrlSubjConfig, nil)
-	c.JSON(http.StatusOK, nil)
+	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
 }
 
 //
@@ -324,16 +327,16 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Running && status.Ctrl == nil {
+	if status.Transport == Running && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{Running, 0})
 		return
 	}
-	ctrl, err := controller.StartTransportAsync(nil)
+	task, err := controller.StartTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
 }
 
 //
@@ -349,16 +352,16 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Stopped && status.Ctrl == nil {
+	if status.Transport == Stopped && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{Stopped, 0})
 		return
 	}
-	ctrl, err := controller.StopTransportAsync(nil)
+	task, err := controller.StopTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, task.Idx})
 }
 
 //
@@ -404,8 +407,8 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
 	statusDTO := ConnectorStatusDTO{status.Transport, 0}
-	if status.Ctrl != nil {
-		statusDTO = ConnectorStatusDTO{Processing, status.Ctrl.Idx}
+	if status.task != nil {
+		statusDTO = ConnectorStatusDTO{Processing, status.task.Idx}
 	}
 	c.JSON(http.StatusOK, statusDTO)
 }

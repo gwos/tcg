@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel/api/trace"
 )
@@ -65,7 +66,7 @@ type AgentIdentityStats struct {
 
 // AgentStatus defines TCG Agent status
 type AgentStatus struct {
-	Ctrl       *CtrlAction
+	task       *taskQueue.Task
 	Controller Status
 	Nats       Status
 	Transport  Status
@@ -87,12 +88,12 @@ type AgentServices interface {
 	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
-	StartControllerAsync(chan error) (*CtrlAction, error)
-	StopControllerAsync(chan error) (*CtrlAction, error)
-	StartNatsAsync(chan error) (*CtrlAction, error)
-	StopNatsAsync(chan error) (*CtrlAction, error)
-	StartTransportAsync(chan error) (*CtrlAction, error)
-	StopTransportAsync(chan error) (*CtrlAction, error)
+	StartControllerAsync() (*taskQueue.Task, error)
+	StopControllerAsync() (*taskQueue.Task, error)
+	StartNatsAsync() (*taskQueue.Task, error)
+	StopNatsAsync() (*taskQueue.Task, error)
+	StartTransportAsync() (*taskQueue.Task, error)
+	StopTransportAsync() (*taskQueue.Task, error)
 	StartController() error
 	StopController() error
 	StartNats() error
