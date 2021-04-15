@@ -1,13 +1,10 @@
 package nats
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/cache"
-	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	natsd "github.com/nats-io/nats-server/v2/server"
 	stand "github.com/nats-io/nats-streaming-server/server"
@@ -23,16 +20,21 @@ const (
 )
 
 var (
-	mu      = &sync.Mutex{}
-	natsURL = "" //  ensures connections to proper NATS instance
+	ErrNATS       = fmt.Errorf("nats error")
+	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 
-	cfg            Config
-	ctrlChan       chan DispatcherOption
-	onceDispatcher sync.Once
-	stanServer     *stand.StanServer
-	// if a client is too slow the server will eventually cut them off by closing the connection
-	connDispatcher, connPublisher stan.Conn
+	s = new(state)
 )
+
+type state struct {
+	sync.Mutex
+
+	config     Config
+	stanServer *stand.StanServer
+	// if a client is too slow the server will eventually cut them off by closing the connection
+	connDispatcher stan.Conn
+	connPublisher  stan.Conn
+}
 
 // Config defines NATS configurable options
 type Config struct {
@@ -51,36 +53,24 @@ type Config struct {
 	StoreReadBufferSize int
 }
 
-// DispatcherFn defines message processor
-type DispatcherFn func([]byte) error
-
 // DispatcherOption defines subscription
 type DispatcherOption struct {
 	DurableName string
 	Subject     string
-	Handler     DispatcherFn
-}
-
-// DispatcherRetry defines retry
-type DispatcherRetry struct {
-	LastError error
-	Retry     int
+	Handler     func([]byte) error
 }
 
 // StartServer runs NATS
 func StartServer(config Config) error {
-	var err error
-	cfg = config
-
 	natsOpts := stand.DefaultNatsServerOptions.Clone()
-	natsOpts.MaxPayload = cfg.MaxPayload
-	natsOpts.HTTPPort = cfg.MonitorPort
+	natsOpts.MaxPayload = config.MaxPayload
+	natsOpts.HTTPPort = config.MonitorPort
 	natsOpts.Port = natsd.RANDOM_PORT
 
 	stanOpts := stand.GetDefaultOptions().Clone()
 	stanOpts.ID = clusterID
-	stanOpts.FilestoreDir = cfg.StoreDir
-	switch cfg.StoreType {
+	stanOpts.FilestoreDir = config.StoreDir
+	switch config.StoreType {
 	case "MEMORY":
 		stanOpts.StoreType = stores.TypeMemory
 	case "FILE":
@@ -88,16 +78,20 @@ func StartServer(config Config) error {
 	default:
 		stanOpts.StoreType = stores.TypeFile
 	}
-	stanOpts.StoreLimits.MaxAge = cfg.StoreMaxAge
-	stanOpts.StoreLimits.MaxBytes = cfg.StoreMaxBytes
-	stanOpts.FileStoreOpts.BufferSize = cfg.StoreBufferSize
-	stanOpts.FileStoreOpts.ReadBufferSize = cfg.StoreReadBufferSize
+	stanOpts.StoreLimits.MaxAge = config.StoreMaxAge
+	stanOpts.StoreLimits.MaxBytes = config.StoreMaxBytes
+	stanOpts.FileStoreOpts.BufferSize = config.StoreBufferSize
+	stanOpts.FileStoreOpts.ReadBufferSize = config.StoreReadBufferSize
 
-	mu.Lock()
-	defer mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
-	if len(natsURL) == 0 {
-		if stanServer, err = stand.RunServerWithOpts(stanOpts, natsOpts); err != nil {
+	s.config = config
+	if s.stanServer == nil {
+		if stanServer, err := stand.RunServerWithOpts(stanOpts, natsOpts); err == nil {
+			s.stanServer = stanServer
+			log.Info("[NATS]: Started at: ", s.stanServer.ClientURL())
+		} else {
 			log.With(log.Fields{
 				"error":    err,
 				"stanOpts": stanOpts,
@@ -105,249 +99,121 @@ func StartServer(config Config) error {
 			}).Log(log.WarnLevel, "[NATS]: RunServerWithOpts failed")
 			return err
 		}
-		log.Info("[NATS]: Started at: ", stanServer.ClientURL())
-		natsURL = stanServer.ClientURL()
 	}
 	return nil
 }
 
 // StopServer shutdowns NATS
 func StopServer() {
-	mu.Lock()
-	defer mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
-	natsURL = ""
-	if connDispatcher != nil {
-		_ = connDispatcher.Close()
-		connDispatcher = nil
+	if s.connDispatcher != nil {
+		_ = s.connDispatcher.Close()
+		s.connDispatcher = nil
 	}
-	if connPublisher != nil {
-		_ = connPublisher.Close()
-		connPublisher = nil
+	if s.connPublisher != nil {
+		_ = s.connPublisher.Close()
+		s.connPublisher = nil
 	}
-	if stanServer != nil {
-		stanServer.Shutdown()
-		stanServer = nil
+	if s.stanServer != nil {
+		s.stanServer.Shutdown()
+		s.stanServer = nil
 	}
 }
 
-// StartDispatcher subscribes processors by subject
+// StartDispatcher connects to stan and adds durable subscriptions
 func StartDispatcher(options []DispatcherOption) error {
-	onceDispatcher.Do(func() {
-		ctrlChan = make(chan DispatcherOption)
-		go listenCtrlChan()
-	})
-
 	if err := StopDispatcher(); err != nil {
 		return err
 	}
+	d := getDispatcher()
+	d.Lock()
+	defer d.Unlock()
 
-	cache.DispatcherWorkersCache.Flush()
+	if d.connDispatcher == nil {
+		if d.stanServer == nil {
+			err := fmt.Errorf("%v: unavailable", ErrNATS)
+			log.Warn("[NATS]: Dispatcher failed: ", err)
+			return err
+		}
+		var err error
+		if d.connDispatcher, err = stan.Connect(
+			clusterID,
+			dispatcherID,
+			stan.NatsURL(d.stanServer.ClientURL()),
+			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
+				log.Warn("[NATS]: ConnectionLostHandler at Dispatcher: ", e.Error())
+				d.Lock()
+				_ = c.Close()
+				d.connDispatcher = nil
+				d.Unlock()
+				StartDispatcher(options)
+			}),
+		); err != nil {
+			log.With(log.Fields{
+				"error": err,
+			}).Log(log.WarnLevel, "[NATS]: Dispatcher failed to connect")
+			return err
+		}
+	}
+
+	d.durables.Flush()
 	for _, opt := range options {
-		ctrlChan <- opt
+		if err := d.retryDurable(opt); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
 // StopDispatcher ends dispatching
 func StopDispatcher() error {
-	var err error
-	mu.Lock()
-	defer mu.Unlock()
+	d := getDispatcher()
+	d.Lock()
+	defer d.Unlock()
 
-	if connDispatcher != nil {
-		err = connDispatcher.Close()
-		connDispatcher = nil
+	var err error
+	if d.connDispatcher != nil {
+		err = d.connDispatcher.Close()
+		d.connDispatcher = nil
 	}
+	d.durables.Flush()
+	d.msgsDone.Flush()
+	d.retryes.Flush()
 	return err
 }
 
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
-	var err error
-	mu.Lock()
-	defer mu.Unlock()
+	s.Lock()
+	defer s.Unlock()
 
-	if len(natsURL) == 0 {
-		err = fmt.Errorf("[NATS]: unavailable")
-		log.Warn(err)
-		return err
-	}
-	if connPublisher == nil {
-		if connPublisher, err = stan.Connect(
+	if s.connPublisher == nil {
+		if s.stanServer == nil {
+			err := fmt.Errorf("%v: unavailable", ErrNATS)
+			log.Warn("[NATS]: Publisher failed: ", err)
+			return err
+		}
+		var err error
+		if s.connPublisher, err = stan.Connect(
 			clusterID,
 			publisherID,
-			stan.NatsURL(natsURL),
-			stan.MaxPubAcksInflight(cfg.MaxPubAcksInflight),
+			stan.NatsURL(s.stanServer.ClientURL()),
+			stan.MaxPubAcksInflight(s.config.MaxPubAcksInflight),
 			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
 				log.Warn("[NATS]: ConnectionLostHandler at connPublisher: ", e.Error())
-				mu.Lock()
+				s.Lock()
 				_ = c.Close()
-				connPublisher = nil
-				mu.Unlock()
+				s.connPublisher = nil
+				s.Unlock()
 			}),
 		); err != nil {
 			log.With(log.Fields{
-				"error":   err,
-				"natsURL": natsURL,
-			}).Log(log.WarnLevel, "[NATS]: connPublisher failed")
+				"error": err,
+			}).Log(log.WarnLevel, "[NATS]: Publisher failed to connect")
 			return err
 		}
 	}
-	return connPublisher.Publish(subject, msg)
-}
-
-func listenCtrlChan() {
-	for opt := range ctrlChan {
-		ckWorker := opt.DurableName
-		if _, isWorker := cache.DispatcherWorkersCache.Get(ckWorker); !isWorker {
-			if err := startWorker(opt); err != nil {
-				log.With(log.Fields{
-					"error": err,
-					"opt":   opt,
-				}).Log(log.WarnLevel, "[NATS]: startWorker failed")
-			} else {
-				cache.DispatcherWorkersCache.Set(ckWorker, 0, -1)
-			}
-		}
-	}
-}
-
-func startWorker(opt DispatcherOption) error {
-	var (
-		errConn      error
-		errSubs      error
-		subscription stan.Subscription
-	)
-
-	mu.Lock()
-	defer mu.Unlock()
-
-	if len(natsURL) == 0 {
-		errConn = fmt.Errorf("[NATS]: unavailable")
-		log.Warn(errConn)
-		return errConn
-	}
-	if connDispatcher == nil {
-		if connDispatcher, errConn = stan.Connect(
-			clusterID,
-			dispatcherID,
-			stan.NatsURL(natsURL),
-			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
-				log.Warn("[NATS]: ConnectionLostHandler at connDispatcher: ", e.Error())
-				mu.Lock()
-				ckWorker := opt.DurableName
-				cache.DispatcherWorkersCache.Delete(ckWorker)
-				_ = c.Close()
-				connDispatcher = nil
-				mu.Unlock()
-				ctrlChan <- opt
-			}),
-		); errConn != nil {
-			log.With(log.Fields{
-				"error":   errConn,
-				"natsURL": natsURL,
-			}).Log(log.WarnLevel, "[NATS]: connDispatcher failed")
-			return errConn
-		}
-	}
-
-	if subscription, errSubs = connDispatcher.Subscribe(
-		opt.Subject,
-		func(msg *stan.Msg) {
-			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
-			// ..when the subscription starts and has a lot of backlog messages,
-			// is that the server is going to send all pending messages for this consumer "at once",
-			// that is, without releasing the consumer lock.
-			// The application may get them and ack, but the ack won't be processed
-			// because the server is still sending messages to this consumer.
-			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
-			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
-			// and it may in that case resend again, so you should Ack the message there.
-			ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
-			if _, isDone := cache.DispatcherDoneCache.Get(ckDone); isDone {
-				_ = msg.Ack()
-				return
-			}
-
-			if err := opt.Handler(msg.Data); err != nil {
-				handleWorkerError(subscription, msg, err, opt)
-				return
-			}
-			_ = msg.Ack()
-			_ = cache.DispatcherDoneCache.Add(ckDone, 0, 10*time.Minute)
-			log.With(log.Fields{
-				"durableName": opt.DurableName,
-			}).WithDebug(log.Fields{
-				"message": msg,
-			}).Log(log.InfoLevel, "[NATS]: Delivered")
-		},
-		stan.SetManualAckMode(),
-		stan.AckWait(cfg.AckWait),
-		stan.MaxInflight(cfg.MaxInflight),
-		stan.DurableName(opt.DurableName),
-		stan.StartWithLastReceived(),
-	); errSubs != nil {
-		return errSubs
-	}
-
-	// Workaround v8.1.3 to fix processing large natsstore from prior versions
-	// Modern envs should use the correct value of MaxInflight setting
-	return subscription.SetPendingLimits(cfg.MaxPendingMsgs, cfg.MaxPendingBytes)
-}
-
-func handleWorkerError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
-	logEntry := log.With(log.Fields{
-		"durableName": opt.DurableName,
-	}).WithDebug(log.Fields{
-		"error":   err,
-		"message": msg,
-	})
-
-	if errors.Is(err, tcgerr.ErrTransient) {
-		ckRetry := opt.DurableName
-		retry := DispatcherRetry{
-			LastError: nil,
-			Retry:     0,
-		}
-		if r, isRetry := cache.DispatcherRetryCache.Get(ckRetry); isRetry {
-			retry = r.(DispatcherRetry)
-		}
-
-		var delay time.Duration
-		retry.LastError = err
-		retry.Retry++
-		switch retry.Retry {
-		case 1:
-			delay = 30 * time.Second
-		case 2:
-			delay = 1 * time.Minute
-		case 3:
-			delay = 5 * time.Minute
-		case 4:
-			delay = 20 * time.Minute
-		}
-
-		if retry.Retry < 5 {
-			cache.DispatcherRetryCache.Set(ckRetry, retry, 0)
-			logEntry.WithField("retry", retry).Log(log.InfoLevel, "[NATS]: Not delivered: Will retry")
-
-			go func() {
-				mu.Lock()
-				ckWorker := opt.DurableName
-				cache.DispatcherWorkersCache.Delete(ckWorker)
-				_ = subscription.Close()
-				mu.Unlock()
-
-				time.Sleep(delay)
-				ctrlChan <- opt
-			}()
-		} else {
-			cache.DispatcherRetryCache.Delete(ckRetry)
-			logEntry.Log(log.InfoLevel, "[NATS]: Not delivered: Stop retrying")
-		}
-
-	} else {
-		logEntry.Log(log.InfoLevel, "[NATS]: Not delivered: Will not retry")
-	}
+	return s.connPublisher.Publish(subject, msg)
 }

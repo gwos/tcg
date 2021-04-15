@@ -409,60 +409,55 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	var dispatcherOptions []nats.DispatcherOption
 	for _, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
-		gwClientRef := gwClient
+		gwClient := gwClient /* hold loop var copy */
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjEvents, gwClientRef.HostName),
-				subjEvents,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeEvents:
-						_, err = gwClientRef.SendEvents(ctx, p.Payload)
-					case typeEventsAck:
-						_, err = gwClientRef.SendEventsAck(ctx, p.Payload)
-					case typeEventsUnack:
-						_, err = gwClientRef.SendEventsUnack(ctx, p.Payload)
-					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjEvents)
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClientRef.HostName),
-				subjInventoryMetrics,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeInventory:
-						_, err = gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
-					case typeMetrics:
-						_, err = gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
-					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
-					}
-					if errors.Is(err, tcgerr.ErrPermanent) {
-						/* it looks like an issue with credentialed user
-						so, wait for configuration update */
-						_ = service.StopTransport()
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjDowntime, gwClientRef.HostName),
+				fmt.Sprintf("#%s#%s#", subjDowntime, gwClient.HostName),
 				subjDowntime,
 				func(ctx context.Context, p natsPayload) error {
 					var err error
 					switch p.Type {
 					case typeClearInDowntime:
-						_, err = gwClientRef.ClearInDowntime(ctx, p.Payload)
+						_, err = gwClient.ClearInDowntime(ctx, p.Payload)
 					case typeSetInDowntime:
-						_, err = gwClientRef.SetInDowntime(ctx, p.Payload)
+						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjDowntime)
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntime)
+					}
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				fmt.Sprintf("#%s#%s#", subjEvents, gwClient.HostName),
+				subjEvents,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeEvents:
+						_, err = gwClient.SendEvents(ctx, p.Payload)
+					case typeEventsAck:
+						_, err = gwClient.SendEventsAck(ctx, p.Payload)
+					case typeEventsUnack:
+						_, err = gwClient.SendEventsUnack(ctx, p.Payload)
+					default:
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
+					}
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClient.HostName),
+				subjInventoryMetrics,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeInventory:
+						_, err = gwClient.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
+					case typeMetrics:
+						_, err = gwClient.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
+					default:
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
 					}
 					return err
 				},
@@ -472,7 +467,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func(context.Context, natsPayload) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durableName, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
 		DurableName: durableName,
 		Subject:     subj,
@@ -499,8 +494,13 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 				span.End()
 			}()
 
-			if err = subjFn(ctx, p); err == nil {
+			if err = handler(ctx, p); err == nil {
 				service.updateStats(len(p.Payload), err, p.Type, time.Now())
+			}
+			if errors.Is(err, tcgerr.ErrPermanent) {
+				/* it looks like an issue with credentialed user
+				so, wait for configuration update */
+				_ = service.StopTransport()
 			}
 			return err
 		},
