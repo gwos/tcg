@@ -35,7 +35,8 @@ type Entrypoint struct {
 	Handler func(c *gin.Context)
 }
 
-const shutdownTimeout = 500 * time.Millisecond
+const startTimeout = time.Millisecond * 200
+const shutdownTimeout = time.Millisecond * 200
 
 var onceController sync.Once
 var controller *Controller
@@ -97,20 +98,19 @@ func (controller *Controller) startController() error {
 
 	go func() {
 		controller.agentStatus.Controller = Running
-
-		var err error
 		if certFile != "" && keyFile != "" {
 			log.Info("[Controller]: Start listen TLS: ", addr)
-			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: Start error: ", err)
+			if err := controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				log.Error("[Controller]: http.Server error: ", err)
 			}
 		} else {
 			log.Info("[Controller]: Start listen: ", addr)
-			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: Start error: ", err)
+			if err := controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Error("[Controller]: http.Server error: ", err)
 			}
 		}
-
+		/* getting here after http.Server exit */
+		controller.srv = nil
 		controller.agentStatus.Controller = Stopped
 	}()
 	// TODO: ensure signal processing in case of linked library
@@ -123,6 +123,8 @@ func (controller *Controller) startController() error {
 	// <-quit
 	// StopServer()
 
+	// prevent misbehavior on immediate shutdown
+	time.Sleep(startTimeout)
 	return nil
 }
 
@@ -133,11 +135,14 @@ func (controller *Controller) stopController() error {
 	log.Info("[Controller]: Shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Warn("[Controller]: Shutdown:", err)
+
+	if controller.srv != nil {
+		if err := controller.srv.Shutdown(ctx); err != nil {
+			log.Warn("[Controller]: Shutdown:", err)
+		}
 	}
 	log.Info("[Controller]: Exiting")
-	controller.srv = nil
+	<-ctx.Done()
 	return nil
 }
 
