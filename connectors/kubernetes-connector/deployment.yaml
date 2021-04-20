@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubernetes-connector
+spec:
+  selector:
+    matchLabels:
+      app: kubernetes-connector
+  replicas: 2 # tells deployment to run 2 pods matching the template
+  template:
+    metadata:
+      labels:
+        app: kubernetes-connector
+    spec:
+      containers:
+        - name: application
+          image: groundworkdevelopment/tcg:master
+          command: [ "/app/docker_cmd.sh", "kubernetes-connector" ]
+          env:
+            - name: TCG_CONNECTOR_LOGLEVEL
+              value: "3"
+            - name: TCG_CONNECTOR_CONTROLLERPIN
+              value: "999"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8099
