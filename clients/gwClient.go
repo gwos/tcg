@@ -54,9 +54,11 @@ type GWClient struct {
 	AppName string
 	AppType string
 	*config.GWConnection
-	sync.Mutex
-	token string
-	sync.Once
+
+	mu   sync.Mutex
+	once sync.Once
+
+	token                             string
 	uriConnect                        string
 	uriDisconnect                     string
 	uriClearInDowntime                string
@@ -104,8 +106,8 @@ func (client *GWClient) Connect() error {
 	client.buildURIs()
 	prevToken := client.token
 	/* restrict by mutex for one-thread at one-time */
-	client.Lock()
-	defer client.Unlock()
+	client.mu.Lock()
+	defer client.mu.Unlock()
 	if prevToken != client.token {
 		/* token already changed */
 		return nil
@@ -414,7 +416,7 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	params["depth"] = "Shallow"
 	client.buildURIs()
 	reqUrl := client.uriServices + BuildQueryParams(params)
-	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	response, err := client.sendRequest(context.Background(), http.MethodGet, reqUrl, nil)
 	if err != nil {
 		log.Warn("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
 		return nil, err
@@ -429,7 +431,7 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 }
 
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) (*GwHostGroups, error) {
-	if hostNames == nil || len(hostNames) == 0 {
+	if len(hostNames) == 0 {
 		return nil, errors.New("unable to get host groups of host: host names are not provided")
 	}
 	query := "( hosts.hostName in ("
@@ -447,7 +449,7 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	params["depth"] = "Shallow"
 	client.buildURIs()
 	reqUrl := client.uriHostGroups + BuildQueryParams(params)
-	response, err := client.sendRequest(nil, http.MethodGet, reqUrl, nil)
+	response, err := client.sendRequest(context.Background(), http.MethodGet, reqUrl, nil)
 	if err != nil {
 		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to get GW host groups: ", err)
 		return nil, err
@@ -544,38 +546,23 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 }
 
 func (client *GWClient) buildURIs() {
-	client.Once.Do(func() {
-		uriConnect := buildURI(client.GWConnection.HostName, GWEntrypointConnect)
+	client.once.Do(func() {
+		client.uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnect)
 		if !client.LocalConnection {
-			uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
+			client.uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
 		}
-		uriDisconnect := buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
-		uriClearInDowntime := buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
-		uriSetInDowntime := buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
-		uriSendEvents := buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
-		uriSendEventsAck := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
-		uriSendEventsUnack := buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
-		uriSendResourceWithMetrics := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
-		uriSendResourceWithMetricsDynamic := buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
-		uriSynchronizeInventory := buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
-		uriServices := buildURI(client.GWConnection.HostName, GWEntrypointServices)
-		uriHostGroups := buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
-		uriValidateToken := buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
-		client.Mutex.Lock()
-		client.uriConnect = uriConnect
-		client.uriDisconnect = uriDisconnect
-		client.uriClearInDowntime = uriClearInDowntime
-		client.uriSetInDowntime = uriSetInDowntime
-		client.uriSendEvents = uriSendEvents
-		client.uriSendEventsAck = uriSendEventsAck
-		client.uriSendEventsUnack = uriSendEventsUnack
-		client.uriSendResourceWithMetrics = uriSendResourceWithMetrics
-		client.uriSendResourceWithMetricsDynamic = uriSendResourceWithMetricsDynamic
-		client.uriSynchronizeInventory = uriSynchronizeInventory
-		client.uriServices = uriServices
-		client.uriHostGroups = uriHostGroups
-		client.uriValidateToken = uriValidateToken
-		client.Mutex.Unlock()
+		client.uriDisconnect = buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
+		client.uriClearInDowntime = buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
+		client.uriSetInDowntime = buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
+		client.uriSendEvents = buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
+		client.uriSendEventsAck = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
+		client.uriSendEventsUnack = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
+		client.uriSendResourceWithMetrics = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
+		client.uriSendResourceWithMetricsDynamic = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
+		client.uriServices = buildURI(client.GWConnection.HostName, GWEntrypointServices)
+		client.uriSynchronizeInventory = buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+		client.uriHostGroups = buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
+		client.uriValidateToken = buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
 	})
 }
 
