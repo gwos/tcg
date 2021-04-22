@@ -22,13 +22,13 @@ $ cd connectors/kubernetes-connector
 $ kubectl apply -f deployment.yaml
 $ kubectl expose deployment kubernetes-connector --type=NodePort --name=kubernetes-connector-service
 
-// To restart deployment
+To restart deployment:
 $ kubectl rollout restart deployment kubernetes-connector
 
-// to delete deployment
+To delete deployment:
 $ kubectl delete deployment kubernetes-connector
 
-// To delete kubctl service
+To delete kubctl service:
 $ kubectl delete svc kubernetes-connector-service
 
 To make sure the connector works:
