@@ -24,3 +24,24 @@ spec:
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8099
+          volumeMounts:
+            - name: config-storage
+              mountPath: /tcg
+      volumes:
+        - name: config-storage
+          persistentVolumeClaim:
+            claimName: config-claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-claim
+  labels:
+    app: kubernetes-connector
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+---
