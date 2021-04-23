@@ -23,10 +23,10 @@ import (
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
-	apitrace "go.opentelemetry.io/otel/api/trace"
-	"go.opentelemetry.io/otel/exporters/trace/jaeger"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // AgentService implements AgentServices interface
@@ -39,15 +39,14 @@ type AgentService struct {
 	gwClients   []*clients.GWClient
 	statsChan   chan statsCounter
 	taskQueue   *taskQueue.TaskQueue
-	tracerCache *cache.Cache
-	tracerToken []byte
+
+	tracerCache    *cache.Cache
+	tracerToken    []byte                   // gw tracing
+	tracerProvider *sdktrace.TracerProvider // otel tracing
 
 	configHandler       func([]byte)
 	demandConfigHandler func() bool
 	exitHandler         func()
-
-	telemetryFlushHandler func()
-	telemetryProvider     apitrace.TracerProvider
 }
 
 type statsCounter struct {
@@ -84,8 +83,6 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
-
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
@@ -104,13 +101,11 @@ func GetAgentService() *AgentService {
 			configHandler:       defaultConfigHandler,
 			demandConfigHandler: defaultDemandConfigHandler,
 			exitHandler:         defaultExitHandler,
-
-			telemetryFlushHandler: telemetryFlushHandler,
-			telemetryProvider:     telemetryProvider,
 		}
 
 		go agentService.listenStatsChan()
 		agentService.initTracerToken()
+		agentService.initTracerProvider()
 		agentService.handleTasks()
 		agentService.handleExit()
 
@@ -461,23 +456,23 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 		Subject:     subj,
 		Handler: func(b []byte) error {
 			var err error
-			getCtx := func(sc apitrace.SpanContext) context.Context {
+			getCtx := func(sc trace.SpanContext) context.Context {
 				if sc.IsValid() {
-					return apitrace.ContextWithRemoteSpanContext(context.Background(), sc)
+					return trace.ContextWithRemoteSpanContext(context.Background(), sc)
 				}
 				return context.Background()
 			}
 
-			p := natsPayload{SpanContext: apitrace.EmptySpanContext()}
+			p := natsPayload{}
 			if err = p.UnmarshalText(b); err != nil {
 				log.Warn("dispatcher error on unmarshal payload: ", err)
 			}
 			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
 			defer func() {
 				span.SetAttributes(
-					label.Int("payloadLen", len(b)),
-					label.String("error", fmt.Sprint(err)),
-					label.String("durableName", durableName),
+					attribute.Int("payloadLen", len(b)),
+					attribute.String("error", fmt.Sprint(err)),
+					attribute.String("durableName", durableName),
 				)
 				span.End()
 			}()
@@ -510,12 +505,10 @@ func (service *AgentService) config(data []byte) error {
 	// stop nats processing
 	_ = service.stopTransport()
 	// flush uploading telemetry and configure provider while processing stopped
-	if service.telemetryFlushHandler != nil {
-		service.telemetryFlushHandler()
+	if service.tracerProvider != nil {
+		service.tracerProvider.ForceFlush(context.Background())
 	}
-	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
-	service.telemetryFlushHandler = telemetryFlushHandler
-	service.telemetryProvider = telemetryProvider
+	service.initTracerProvider()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -696,36 +689,10 @@ func (service *AgentService) initTracerToken() {
 	service.tracerToken = tracerToken
 }
 
-// initTelemetryProvider creates a new provider instance
-func initTelemetryProvider() (apitrace.TracerProvider, func(), error) {
-	var jaegerEndpoint jaeger.EndpointOption
-	jaegerAgent := config.GetConfig().Jaegertracing.Agent
-	jaegerCollector := config.GetConfig().Jaegertracing.Collector
-	if (len(jaegerAgent) == 0) && (len(jaegerCollector) == 0) {
-		log.Debug("telemetry not configured")
-		return apitrace.NoopTracerProvider(), func() {}, nil
+// initTracerProvider inits provider
+func (service *AgentService) initTracerProvider() {
+	if tp, err := config.GetConfig().InitTracerProvider(); err == nil {
+		service.tracerProvider = tp
+		otel.SetTracerProvider(tp)
 	}
-	if len(jaegerAgent) == 0 {
-		jaegerEndpoint = jaeger.WithCollectorEndpoint(jaegerCollector)
-	} else {
-		jaegerEndpoint = jaeger.WithAgentEndpoint(jaegerAgent)
-	}
-
-	connector := config.GetConfig().Connector
-	serviceName := fmt.Sprintf("%s:%s:%s",
-		connector.AppType, connector.AppName, connector.AgentID)
-	tags := []label.KeyValue{
-		label.String("runtime", "golang"),
-	}
-	for k, v := range config.GetConfig().Jaegertracing.Tags {
-		tags = append(tags, label.String(k, v))
-	}
-	return jaeger.NewExportPipeline(
-		jaegerEndpoint,
-		jaeger.WithProcess(jaeger.Process{
-			ServiceName: serviceName,
-			Tags:        tags,
-		}),
-		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
-	)
 }

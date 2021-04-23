@@ -17,7 +17,7 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -93,9 +93,9 @@ func makeEntrypointHandler(dataFormat DataFormat) func(*gin.Context) {
 		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
 		defer func() {
 			span.SetAttributes(
-				label.Int("payloadLen", len(payload)),
-				label.String("error", fmt.Sprint(err)),
-				label.String("entrypoint", c.FullPath()),
+				attribute.Int("payloadLen", len(payload)),
+				attribute.String("error", fmt.Sprint(err)),
+				attribute.String("entrypoint", c.FullPath()),
 			)
 			span.End()
 		}()
@@ -127,8 +127,8 @@ func processMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) 
 	monitoredResources, err = parseBody(payload, dataFormat)
 
 	span.SetAttributes(
-		label.Int("payloadLen", len(payload)),
-		label.String("error", fmt.Sprint(err)),
+		attribute.Int("payloadLen", len(payload)),
+		attribute.String("error", fmt.Sprint(err)),
 	)
 	span.End()
 

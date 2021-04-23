@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/gwos/tcg/nats"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces
@@ -57,8 +57,8 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 	_, span := StartTraceSpan(ctx, "services", "ClearInDowntime")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -77,8 +77,8 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 	_, span := StartTraceSpan(ctx, "services", "SetInDowntime")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -97,8 +97,8 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 	_, span := StartTraceSpan(ctx, "services", "SendEvents")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -117,8 +117,8 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 	_, span := StartTraceSpan(ctx, "services", "SendEventsAck")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -137,8 +137,8 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 	_, span := StartTraceSpan(ctx, "services", "SendEventsUnack")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -157,8 +157,8 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	_, span := StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(b)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(b)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()
@@ -181,8 +181,8 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	_, span := StartTraceSpan(ctx, "services", "SynchronizeInventory")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(b)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(b)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		span.End()
 	}()

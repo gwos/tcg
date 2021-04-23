@@ -8,7 +8,8 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Define NATS subjects
@@ -129,10 +130,7 @@ type TraceSpan trace.Span
 
 // StartTraceSpan starts a span
 func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return GetAgentService().telemetryProvider.
+	return otel.GetTracerProvider().
 		Tracer(tracerName).Start(ctx, spanName, opts...)
 }
 
@@ -169,18 +167,23 @@ type natsPayload struct {
 }
 
 // MarshalText implements json.Marshaler.
+// TODO: provide format versioning
+// TODO: support modern SpanContext structure
 func (t natsPayload) MarshalText() ([]byte, error) {
+	spanID := t.SpanContext.SpanID()
+	traceID := t.SpanContext.TraceID()
+	traceFlags := t.SpanContext.TraceFlags()
 	var b bytes.Buffer
 	if err := b.WriteByte(byte(t.Type)); err != nil {
 		return nil, err
 	}
-	if _, err := b.Write(t.SpanContext.SpanID[:]); err != nil {
+	if _, err := b.Write(spanID[:]); err != nil {
 		return nil, err
 	}
-	if _, err := b.Write(t.SpanContext.TraceID[:]); err != nil {
+	if _, err := b.Write(traceID[:]); err != nil {
 		return nil, err
 	}
-	if err := b.WriteByte(byte(t.SpanContext.TraceFlags)); err != nil {
+	if err := b.WriteByte(byte(traceFlags)); err != nil {
 		return nil, err
 	}
 	if _, err := b.Write(t.Payload[:]); err != nil {
@@ -190,16 +193,28 @@ func (t natsPayload) MarshalText() ([]byte, error) {
 }
 
 // UnmarshalText implements json.Unmarshaler.
+// TODO: provide format versioning
+// TODO: support modern SpanContext structure
 func (t *natsPayload) UnmarshalText(input []byte) error {
+	var (
+		spanID     [8]byte
+		traceID    [16]byte
+		traceFlags byte
+	)
 	b := bytes.NewBuffer(input)
 	t.Type = payloadType(b.Next(1)[0])
-	if _, err := b.Read(t.SpanContext.SpanID[:]); err != nil {
+	if _, err := b.Read(spanID[:]); err != nil {
 		return err
 	}
-	if _, err := b.Read(t.SpanContext.TraceID[:]); err != nil {
+	if _, err := b.Read(traceID[:]); err != nil {
 		return err
 	}
-	t.SpanContext.TraceFlags = b.Next(1)[0]
+	traceFlags = b.Next(1)[0]
 	t.Payload = b.Bytes()
+	t.SpanContext = trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     spanID,
+		TraceID:    traceID,
+		TraceFlags: trace.TraceFlags(traceFlags),
+	})
 	return nil
 }

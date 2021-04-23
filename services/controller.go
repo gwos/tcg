@@ -18,7 +18,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // Controller implements AgentServices, Controllers interface
@@ -211,9 +211,9 @@ func (controller *Controller) events(c *gin.Context) {
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
+			attribute.String("entrypoint", c.FullPath()),
 		)
 		span.End()
 	}()
@@ -249,9 +249,9 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
+			attribute.String("entrypoint", c.FullPath()),
 		)
 		span.End()
 	}()
@@ -287,9 +287,9 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
 		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+			attribute.Int("payloadLen", len(payload)),
+			attribute.String("error", fmt.Sprint(err)),
+			attribute.String("entrypoint", c.FullPath()),
 		)
 		span.End()
 	}()

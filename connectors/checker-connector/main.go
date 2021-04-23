@@ -11,7 +11,7 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -116,9 +116,9 @@ func taskHandler(task ScheduleTask) func() {
 		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
 			span.SetAttributes(
-				label.Int("payloadLen", len(res)),
-				label.String("error", fmt.Sprint(err)),
-				label.String("task", task.String()),
+				attribute.Int("payloadLen", len(res)),
+				attribute.String("error", fmt.Sprint(err)),
+				attribute.String("task", task.String()),
 			)
 			span.End()
 		}()
@@ -127,9 +127,9 @@ func taskHandler(task ScheduleTask) func() {
 		res, err = handler()
 
 		span.SetAttributes(
-			label.Int("payloadLen", len(res)),
-			label.String("error", fmt.Sprint(err)),
-			label.Array("command", task.Command),
+			attribute.Int("payloadLen", len(res)),
+			attribute.String("error", fmt.Sprint(err)),
+			attribute.Array("command", task.Command),
 		)
 		spanN.End()
 
@@ -147,8 +147,8 @@ func taskHandler(task ScheduleTask) func() {
 		}
 
 		span.SetAttributes(
-			label.Int("payloadLen", len(res)),
-			label.String("error", fmt.Sprint(err)),
+			attribute.Int("payloadLen", len(res)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		spanN.End()
 	}

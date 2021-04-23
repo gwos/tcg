@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +16,11 @@ import (
 
 	"github.com/gwos/tcg/log"
 	"github.com/kelseyhightower/envconfig"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/semconv"
 	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
 )
@@ -305,14 +311,12 @@ func (con *DSConnection) Decode(value string) error {
 
 // Jaegertracing defines the configuration of telemetry provider
 type Jaegertracing struct {
-	// Agent defines address for communicating via UDP,
-	// like jaeger-agent:6831
-	// Is ignored if the Collector is specified
+	// Agent defines address for communicating with AgentJaegerThriftCompactUDP,
+	// hostport, like jaeger-agent:6831
 	Agent string `yaml:"agent"`
 	// Collector defines traces endpoint,
-	// in case the client should connect directly to the Collector,
-	// like http://jaeger-collector:14268/api/traces
-	// If specified, the AgentAddress is ignored
+	// in case the client should connect directly to the CollectorHTTP,
+	// endpoint, like http://jaeger-collector:14268/api/traces
 	Collector string `yaml:"collector"`
 	// Tags defines tracer-level tags, which get added to all reported spans
 	Tags map[string]string `yaml:"tags"`
@@ -537,6 +541,89 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 func (cfg *Config) IsConfiguringPMC() bool {
 	return os.Getenv(InstallationModeEnv) == InstallationModePMC &&
 		cfg.Connector.InstallationMode != InstallationModePMC
+}
+
+// InitTracerProvider inits provider
+func (cfg Config) InitTracerProvider() (*sdktrace.TracerProvider, error) {
+	return cfg.initJaegertracing()
+}
+
+// initJaegertracing inits tracing provider with Jaeger exporter
+func (cfg Config) initJaegertracing() (*sdktrace.TracerProvider, error) {
+	var errNotConfigured = fmt.Errorf("telemetry is not configured")
+	/* Jaegertracing supports a few options to receive spans
+	[https://github.com/jaegertracing/jaeger/blob/master/ports/ports.go]
+	// AgentJaegerThriftCompactUDP is the default port for receiving Jaeger Thrift over UDP in compact encoding
+	AgentJaegerThriftCompactUDP = 6831
+	// AgentJaegerThriftBinaryUDP is the default port for receiving Jaeger Thrift over UDP in binary encoding
+	AgentJaegerThriftBinaryUDP = 6832
+	// AgentZipkinThriftCompactUDP is the default port for receiving Zipkin Thrift over UDP in binary encoding
+	AgentZipkinThriftCompactUDP = 5775
+	// CollectorGRPC is the default port for gRPC server for sending spans
+	CollectorGRPC = 14250
+	// CollectorHTTP is the default port for HTTP server for sending spans (e.g. /api/traces endpoint)
+	CollectorHTTP = 14268
+
+	The otel jaeger exporter supports AgentJaegerThriftCompactUDP and CollectorHTTP protocols.
+	otel-v0.20.0 Note the possible mistakes in defaults:
+		* "6832" for jaeger.WithAgentPort()
+		* "http://localhost:14250" for jaeger.WithCollectorEndpoint()
+
+	Checking configuration to prevent exporter run with internal defaults in environment without receiver.
+	The OTEL_EXPORTER_ env vars take precedence on the TCG config (with TCG_JAEGERTRACING_ env vars).
+	And the Agent entrypoint setting takes precedence on the Collector entrypoint. */
+	otelExporterJaegerAgentHost := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_HOST")
+	otelExporterJaegerAgentPort := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_PORT")
+	otelExporterJaegerEndpoint := os.Getenv("OTEL_EXPORTER_JAEGER_ENDPOINT")
+	otelExporterJaegerPassword := os.Getenv("OTEL_EXPORTER_JAEGER_PASSWORD")
+	otelExporterJaegerUser := os.Getenv("OTEL_EXPORTER_JAEGER_USER")
+	tcgJaegerAgent := cfg.Jaegertracing.Agent
+	tcgJaegerCollector := cfg.Jaegertracing.Collector
+
+	var endpointOption jaeger.EndpointOption
+	switch {
+	case len(otelExporterJaegerAgentHost)+len(otelExporterJaegerAgentPort) != 0:
+		endpointOption = jaeger.WithAgentEndpoint()
+	case len(otelExporterJaegerEndpoint)+len(otelExporterJaegerPassword)+len(otelExporterJaegerUser) != 0:
+		endpointOption = jaeger.WithCollectorEndpoint()
+	case len(tcgJaegerAgent) != 0:
+		if host, port, err := net.SplitHostPort(tcgJaegerAgent); err == nil {
+			endpointOption = jaeger.WithAgentEndpoint(
+				jaeger.WithAgentHost(host),
+				jaeger.WithAgentPort(port),
+			)
+		} else {
+			log.Warn(err)
+			return nil, err
+		}
+	case len(tcgJaegerCollector) != 0:
+		endpointOption = jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(tcgJaegerCollector))
+	default:
+		log.Debug(errNotConfigured)
+		return nil, errNotConfigured
+	}
+
+	attrs := []attribute.KeyValue{
+		semconv.ServiceNameKey.String(fmt.Sprintf("%s:%s:%s",
+			cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID)),
+		attribute.String("runtime", "golang"),
+	}
+	for k, v := range cfg.Jaegertracing.Tags {
+		attrs = append(attrs, attribute.String(k, v))
+	}
+
+	exporter, err := jaeger.NewRawExporter(endpointOption)
+	if err != nil {
+		log.Warn(err)
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		/* Always be sure to batch in production */
+		sdktrace.WithBatcher(exporter),
+		/* Record information about this application in an Resource */
+		sdktrace.WithResource(resource.NewWithAttributes(attrs...)),
+	)
+	return tp, nil
 }
 
 // Decrypt decrypts small messages
