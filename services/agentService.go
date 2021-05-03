@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
@@ -23,6 +22,7 @@ import (
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
+	"github.com/patrickmn/go-cache"
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	"go.opentelemetry.io/otel/label"
@@ -39,6 +39,7 @@ type AgentService struct {
 	gwClients   []*clients.GWClient
 	statsChan   chan statsCounter
 	taskQueue   *taskQueue.TaskQueue
+	tracerCache *cache.Cache
 	tracerToken []byte
 
 	configHandler       func([]byte)
@@ -69,7 +70,7 @@ const (
 )
 
 const (
-	ckTraceToken         = "ckTraceToken"
+	ckTracerToken        = "ckTraceToken"
 	statsLastErrorsLim   = 10
 	taskQueueAlarm       = time.Second * 9
 	taskQueueCapacity    = 8
@@ -85,44 +86,31 @@ func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
 		telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
 
-		/* prepare random tracerToken */
-		tracerToken := []byte("aaaabbbbccccdddd")
-		if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
-			copy(tracerToken, randBuf)
-		} else {
-			/* fallback with multiplied timestamp */
-			binary.PutVarint(tracerToken, time.Now().UnixNano())
-			binary.PutVarint(tracerToken[6:], time.Now().UnixNano())
-		}
-		cache.TraceTokenCache.Set(ckTraceToken, uint64(1), -1)
-
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
-			agentConnector,
-
-			&AgentStats{
+			Connector: agentConnector,
+			agentStats: &AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
-			&AgentStatus{
+			agentStatus: &AgentStatus{
 				Controller: StatusStopped,
 				Nats:       StatusStopped,
 				Transport:  StatusStopped,
 			},
-			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
-			nil,
-			make(chan statsCounter),
-			nil,
-			tracerToken,
+			dsClient:    &clients.DSClient{DSConnection: config.GetConfig().DSConnection},
+			statsChan:   make(chan statsCounter),
+			tracerCache: cache.New(-1, -1),
 
-			defaultConfigHandler,
-			defaultDemandConfigHandler,
-			defaultExitHandler,
+			configHandler:       defaultConfigHandler,
+			demandConfigHandler: defaultDemandConfigHandler,
+			exitHandler:         defaultExitHandler,
 
-			telemetryFlushHandler,
-			telemetryProvider,
+			telemetryFlushHandler: telemetryFlushHandler,
+			telemetryProvider:     telemetryProvider,
 		}
 
 		go agentService.listenStatsChan()
+		agentService.initTracerToken()
 		agentService.handleTasks()
 		agentService.handleExit()
 
@@ -175,7 +163,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	/* combine TraceToken from fixed and incremental parts */
 	tokenBuf := make([]byte, 16)
 	copy(tokenBuf, service.tracerToken)
-	if tokenInc, err := cache.TraceTokenCache.IncrementUint64(ckTraceToken, 1); err == nil {
+	if tokenInc, err := service.tracerCache.IncrementUint64(ckTracerToken, 1); err == nil {
 		binary.PutUvarint(tokenBuf, tokenInc)
 	} else {
 		/* fallback with timestamp */
@@ -692,6 +680,20 @@ func (service AgentService) handleExit() {
 func (service AgentService) hookLogErrors(entry log.Entry) error {
 	service.updateStats(0, fmt.Errorf("%s%s", entry.Context.Value(entry.Entry), entry.Message), typeUndefined, entry.Time)
 	return nil
+}
+
+func (service *AgentService) initTracerToken() {
+	/* prepare random tracerToken */
+	tracerToken := []byte("aaaabbbbccccdddd")
+	if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
+		copy(tracerToken, randBuf)
+	} else {
+		/* fallback with multiplied timestamp */
+		binary.PutVarint(tracerToken, time.Now().UnixNano())
+		binary.PutVarint(tracerToken[6:], time.Now().UnixNano())
+	}
+	service.tracerCache.Set(ckTracerToken, uint64(1), -1)
+	service.tracerToken = tracerToken
 }
 
 // initTelemetryProvider creates a new provider instance

@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
+	"github.com/patrickmn/go-cache"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"go.opentelemetry.io/otel/label"
@@ -24,8 +24,15 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*TransitService
+	authCache   *cache.Cache
 	entrypoints []Entrypoint
 	srv         *http.Server
+}
+
+// Credentials defines type of AuthCache items
+type Credentials struct {
+	GwosAppName  string
+	GwosAPIToken string
 }
 
 // Entrypoint describes controller API
@@ -46,6 +53,7 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetTransitService(),
+			cache.New(8*time.Hour, time.Hour),
 			[]Entrypoint{},
 			nil,
 		}
@@ -169,7 +177,7 @@ func (controller *Controller) config(c *gin.Context) {
 		return
 	}
 
-	credentials := cache.Credentials{
+	credentials := Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
@@ -439,7 +447,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 		return
 	}
 
-	credentials := cache.Credentials{
+	credentials := Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
@@ -452,7 +460,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosAPIToken)
 
-	_, isCached := cache.AuthCache.Get(key)
+	_, isCached := controller.authCache.Get(key)
 	if !isCached {
 		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
@@ -460,7 +468,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 			return
 		}
 
-		err = cache.AuthCache.Add(key, credentials, 8*time.Hour)
+		err = controller.authCache.Add(key, credentials, 8*time.Hour)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
