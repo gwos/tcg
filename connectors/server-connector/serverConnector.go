@@ -2,8 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
@@ -14,10 +18,6 @@ import (
 	"github.com/shirou/gopsutil/host"
 	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/process"
-	"net/http"
-	"os"
-	"strings"
-	"time"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -74,6 +74,7 @@ var hostName string
 
 // temporary solution, will be removed
 var templateMetricName = "$view_Template#"
+
 const EnvTcgHostName = "TCG_HOST_NAME"
 
 // Synchronize inventory for necessary processes
@@ -494,7 +495,7 @@ func collectMonitoredProcesses(monitoredProcesses []transit.MetricDefinition) ma
 }
 
 func listSuggestions(name string) []string {
-	hostProcesses, _ := cache.ProcessesCache.Get("processes")
+	hostProcesses, _ := connectors.ProcessesCache.Get("processes")
 
 	var processes []string
 	for n := range hostProcesses.(map[string]float64) {
@@ -532,7 +533,7 @@ func collectProcesses() map[string]float64 {
 }
 
 func updateCache() {
-	cache.ProcessesCache.SetDefault("processes", collectProcesses())
+	connectors.ProcessesCache.SetDefault("processes", collectProcesses())
 }
 
 // initializeEntrypoints - function for setting entrypoints,
@@ -569,28 +570,9 @@ func initializeEntrypoints() []services.Entrypoint {
 			},
 		},
 		{
-			URL:    "/expressions/evaluate",
-			Method: http.MethodPost,
-			Handler: func(c *gin.Context) {
-				var expression connectors.ExpressionToEvaluate
-				body, err := c.GetRawData()
-				if err != nil {
-					c.JSON(http.StatusBadRequest, err.Error())
-					return
-				}
-				err = json.Unmarshal(body, &expression)
-				if err != nil {
-					c.JSON(http.StatusBadRequest, err.Error())
-					return
-				}
-				result, err := connectors.EvaluateExpression(expression, c.Request.URL.Query().Get("override") == "true")
-				if err == nil {
-					c.JSON(http.StatusOK, result)
-					return
-				}
-				log.Error("[Server Connector]: ", err)
-				c.IndentedJSON(http.StatusBadRequest, err.Error())
-			},
+			URL:     "/expressions/evaluate",
+			Method:  http.MethodPost,
+			Handler: connectors.EvaluateExpressionHandler,
 		},
 	}
 }

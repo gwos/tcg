@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"github.com/gwos/tcg/cache"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	_ "github.com/gwos/tcg/docs"
@@ -54,7 +54,7 @@ func main() {
 }
 
 func handleCache() {
-	cache.ProcessesCache.SetDefault("processes", collectProcesses())
+	connectors.ProcessesCache.SetDefault("processes", collectProcesses())
 }
 
 func configHandler(data []byte) {
