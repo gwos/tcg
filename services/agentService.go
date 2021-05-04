@@ -464,7 +464,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			}
 
 			p := natsPayload{}
-			if err = p.UnmarshalText(b); err != nil {
+			if err = p.Unmarshal(b); err != nil {
 				log.Warn("dispatcher error on unmarshal payload: ", err)
 			}
 			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)

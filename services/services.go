@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	"github.com/gwos/tcg/milliseconds"
@@ -147,8 +149,8 @@ const (
 	typeSetInDowntime
 )
 
-func (s payloadType) String() string {
-	return [...]string{
+func (t payloadType) all() []string {
+	return []string{
 		"undefined",
 		"events",
 		"eventsAck",
@@ -157,64 +159,164 @@ func (s payloadType) String() string {
 		"metrics",
 		"clearInDowntime",
 		"setInDowntime",
-	}[s]
+	}
+}
+
+func (t payloadType) String() string {
+	return t.all()[t]
+}
+
+func (t *payloadType) FromString(s string) error {
+	for i, v := range t.all() {
+		if s == v {
+			*t = payloadType(i)
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown payload type")
 }
 
 type natsPayload struct {
-	Payload     []byte
 	SpanContext trace.SpanContext
-	Type        payloadType
+
+	Payload []byte
+	Type    payloadType
 }
 
-// MarshalText implements json.Marshaler.
-// TODO: provide format versioning
-// TODO: support modern SpanContext structure
-func (t natsPayload) MarshalText() ([]byte, error) {
-	spanID := t.SpanContext.SpanID()
-	traceID := t.SpanContext.TraceID()
-	traceFlags := t.SpanContext.TraceFlags()
-	var b bytes.Buffer
-	if err := b.WriteByte(byte(t.Type)); err != nil {
+// Marshal implements Marshaler
+// internally it applyes the latest format version
+func (p natsPayload) Marshal() ([]byte, error) {
+	if b, err := p.marshalV2(); err == nil {
+		return append([]byte("v2:"), b...), nil
+	} else {
 		return nil, err
 	}
-	if _, err := b.Write(spanID[:]); err != nil {
-		return nil, err
-	}
-	if _, err := b.Write(traceID[:]); err != nil {
-		return nil, err
-	}
-	if err := b.WriteByte(byte(traceFlags)); err != nil {
-		return nil, err
-	}
-	if _, err := b.Write(t.Payload[:]); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
 }
 
-// UnmarshalText implements json.Unmarshaler.
-// TODO: provide format versioning
-// TODO: support modern SpanContext structure
-func (t *natsPayload) UnmarshalText(input []byte) error {
+// Unmarshal implements Unmarshaler
+// internally it applyes implementation based on format version
+func (p *natsPayload) Unmarshal(input []byte) error {
+	if len(input) == 0 {
+		return nil
+	}
+	switch {
+	case input[0] < 8:
+		return p.unmarshalV1(input)
+	case bytes.HasPrefix(input, []byte("v1:")):
+		return p.unmarshalV1(input[3:])
+	case bytes.HasPrefix(input, []byte("v2:")):
+		return p.unmarshalV2(input[3:])
+	default:
+		return fmt.Errorf("unknown payload format")
+	}
+}
+
+func (p natsPayload) marshalV1() ([]byte, error) {
+	spanID := p.SpanContext.SpanID()
+	traceID := p.SpanContext.TraceID()
+	traceFlags := p.SpanContext.TraceFlags()
+	var buf bytes.Buffer
+	if err := buf.WriteByte(byte(p.Type)); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write(spanID[:]); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write(traceID[:]); err != nil {
+		return nil, err
+	}
+	if err := buf.WriteByte(byte(traceFlags)); err != nil {
+		return nil, err
+	}
+	if _, err := buf.Write(p.Payload[:]); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (p *natsPayload) unmarshalV1(input []byte) error {
+	/* process input bytes as:
+	byte     payloadType
+	[8]byte  SpanContext SpanID
+	[16]byte SpanContext TraceID
+	byte     SpanContext TraceFlags
+	[]byte   Payload */
 	var (
 		spanID     [8]byte
 		traceID    [16]byte
 		traceFlags byte
 	)
-	b := bytes.NewBuffer(input)
-	t.Type = payloadType(b.Next(1)[0])
-	if _, err := b.Read(spanID[:]); err != nil {
+	buf := bytes.NewBuffer(input)
+	p.Type = payloadType(buf.Next(1)[0])
+	if _, err := buf.Read(spanID[:]); err != nil {
 		return err
 	}
-	if _, err := b.Read(traceID[:]); err != nil {
+	if _, err := buf.Read(traceID[:]); err != nil {
 		return err
 	}
-	traceFlags = b.Next(1)[0]
-	t.Payload = b.Bytes()
-	t.SpanContext = trace.NewSpanContext(trace.SpanContextConfig{
+	traceFlags = buf.Next(1)[0]
+	p.Payload = buf.Bytes()
+	p.SpanContext = trace.NewSpanContext(trace.SpanContextConfig{
 		SpanID:     spanID,
 		TraceID:    traceID,
 		TraceFlags: trace.TraceFlags(traceFlags),
 	})
+	return nil
+}
+
+/* natsPayload2 used for json encoding
+takes only simple fields from SpanContext because of
+trace.SpanContextConfig doesn't support unmarshaling (otel-v.0.20.0)
+trace.SpanIDFromHex and trace.TraceIDFromHex don't support zero values
+suitable in case of NoopTracerProvider */
+type natsPayload2 struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+
+	SpanID     string `json:"spanID"`
+	TraceID    string `json:"traceID"`
+	TraceFlags uint8  `json:"traceFlags"`
+}
+
+func (p natsPayload) marshalV2() ([]byte, error) {
+	spanID := p.SpanContext.SpanID()
+	traceID := p.SpanContext.TraceID()
+	p2 := natsPayload2{
+		Type:       p.Type.String(),
+		Payload:    p.Payload,
+		SpanID:     hex.EncodeToString(spanID[:]),
+		TraceID:    hex.EncodeToString(traceID[:]),
+		TraceFlags: uint8(p.SpanContext.TraceFlags()),
+	}
+	return json.Marshal(p2)
+}
+
+func (p *natsPayload) unmarshalV2(input []byte) error {
+	var p2 natsPayload2
+	if err := json.Unmarshal(input, &p2); err != nil {
+		return err
+	}
+	spanCtxCfg := trace.SpanContextConfig{
+		TraceFlags: trace.TraceFlags(p2.TraceFlags),
+	}
+	if v, err := hex.DecodeString(p2.SpanID); err == nil {
+		copy(spanCtxCfg.SpanID[:], v)
+	} else {
+		return err
+	}
+	if v, err := hex.DecodeString(p2.TraceID); err == nil {
+		copy(spanCtxCfg.TraceID[:], v)
+	} else {
+		return err
+	}
+	var pt payloadType
+	if err := pt.FromString(p2.Type); err != nil {
+		return err
+	}
+	*p = natsPayload{
+		Type:        pt,
+		Payload:     p2.Payload,
+		SpanContext: trace.NewSpanContext(spanCtxCfg),
+	}
 	return nil
 }
