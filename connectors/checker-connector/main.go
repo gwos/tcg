@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
@@ -11,7 +10,6 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 var (
@@ -115,23 +113,21 @@ func taskHandler(task ScheduleTask) func() {
 
 		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
-			span.SetAttributes(
-				attribute.Int("payloadLen", len(res)),
-				attribute.String("error", fmt.Sprint(err)),
-				attribute.String("task", task.String()),
+			services.EndTraceSpan(span,
+				services.TraceAttrError(err),
+				services.TraceAttrPayloadLen(res),
+				services.TraceAttrString("task", task.String()),
 			)
-			span.End()
 		}()
 		_, spanN = services.StartTraceSpan(ctx, "connectors", "command")
 
 		res, err = handler()
 
-		span.SetAttributes(
-			attribute.Int("payloadLen", len(res)),
-			attribute.String("error", fmt.Sprint(err)),
-			attribute.Array("command", task.Command),
+		services.EndTraceSpan(spanN,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(res),
+			services.TraceAttrArray("command", task.Command),
 		)
-		spanN.End()
 
 		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
 		if err != nil {
@@ -146,10 +142,9 @@ func taskHandler(task ScheduleTask) func() {
 			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
 		}
 
-		span.SetAttributes(
-			attribute.Int("payloadLen", len(res)),
-			attribute.String("error", fmt.Sprint(err)),
+		services.EndTraceSpan(spanN,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(res),
 		)
-		spanN.End()
 	}
 }

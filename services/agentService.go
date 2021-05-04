@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -469,12 +468,11 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			}
 			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
 			defer func() {
-				span.SetAttributes(
-					attribute.Int("payloadLen", len(b)),
-					attribute.String("error", fmt.Sprint(err)),
-					attribute.String("durableName", durableName),
+				EndTraceSpan(span,
+					TraceAttrError(err),
+					TraceAttrPayloadLen(b),
+					TraceAttrString("durableName", durableName),
 				)
-				span.End()
 			}()
 
 			if err = handler(ctx, p); err == nil {

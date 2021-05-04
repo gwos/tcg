@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -130,10 +132,51 @@ type Controllers interface {
 // TraceSpan aliases trace.Span interface
 type TraceSpan trace.Span
 
+// TraceAttrOption defines option to set span attribute
+type TraceAttrOption func(span TraceSpan)
+
 // StartTraceSpan starts a span
 func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
 	return otel.GetTracerProvider().
 		Tracer(tracerName).Start(ctx, spanName, opts...)
+}
+
+// EndTraceSpan ends span, optionally sets attributes
+func EndTraceSpan(span TraceSpan, opts ...TraceAttrOption) {
+	for _, optFn := range opts {
+		optFn(span)
+	}
+	span.End()
+}
+
+// TraceAttrArray sets an int attribute
+func TraceAttrArray(k string, v interface{}) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Array(k, v)) }
+}
+
+// TraceAttrInt sets an int attribute
+func TraceAttrInt(k string, v int) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Int(k, v)) }
+}
+
+// TraceAttrString sets a string attribute
+func TraceAttrString(k, v string) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String(k, v)) }
+}
+
+// TraceAttrEntrypoint sets an entrypoint attribute
+func TraceAttrEntrypoint(v string) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String("entrypoint", v)) }
+}
+
+// TraceAttrError sets an error attribute
+func TraceAttrError(v error) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String("error", fmt.Sprint(v))) }
+}
+
+// TraceAttrPayloadLen sets a payloadLen attribute
+func TraceAttrPayloadLen(v []byte) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Int("payloadLen", len(v))) }
 }
 
 type payloadType byte
