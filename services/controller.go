@@ -13,9 +13,9 @@ import (
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
+	"github.com/patrickmn/go-cache"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 	"go.opentelemetry.io/otel/label"
@@ -24,8 +24,15 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*TransitService
+	authCache   *cache.Cache
 	entrypoints []Entrypoint
 	srv         *http.Server
+}
+
+// Credentials defines type of AuthCache items
+type Credentials struct {
+	GwosAppName  string
+	GwosAPIToken string
 }
 
 // Entrypoint describes controller API
@@ -35,7 +42,8 @@ type Entrypoint struct {
 	Handler func(c *gin.Context)
 }
 
-const shutdownTimeout = 500 * time.Millisecond
+const startTimeout = time.Millisecond * 200
+const shutdownTimeout = time.Millisecond * 200
 
 var onceController sync.Once
 var controller *Controller
@@ -45,6 +53,7 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetTransitService(),
+			cache.New(8*time.Hour, time.Hour),
 			[]Entrypoint{},
 			nil,
 		}
@@ -96,22 +105,21 @@ func (controller *Controller) startController() error {
 	}
 
 	go func() {
-		controller.agentStatus.Controller = Running
-
-		var err error
+		controller.agentStatus.Controller = StatusRunning
 		if certFile != "" && keyFile != "" {
 			log.Info("[Controller]: Start listen TLS: ", addr)
-			if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: Start error: ", err)
+			if err := controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+				log.Error("[Controller]: http.Server error: ", err)
 			}
 		} else {
 			log.Info("[Controller]: Start listen: ", addr)
-			if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: Start error: ", err)
+			if err := controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Error("[Controller]: http.Server error: ", err)
 			}
 		}
-
-		controller.agentStatus.Controller = Stopped
+		/* getting here after http.Server exit */
+		controller.srv = nil
+		controller.agentStatus.Controller = StatusStopped
 	}()
 	// TODO: ensure signal processing in case of linked library
 	// // Wait for interrupt signal to gracefully shutdown the server
@@ -123,6 +131,8 @@ func (controller *Controller) startController() error {
 	// <-quit
 	// StopServer()
 
+	// prevent misbehavior on immediate shutdown
+	time.Sleep(startTimeout)
 	return nil
 }
 
@@ -133,11 +143,14 @@ func (controller *Controller) stopController() error {
 	log.Info("[Controller]: Shutdown ...")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	if err := controller.srv.Shutdown(ctx); err != nil {
-		log.Warn("[Controller]: Shutdown:", err)
+
+	if controller.srv != nil {
+		if err := controller.srv.Shutdown(ctx); err != nil {
+			log.Warn("[Controller]: Shutdown:", err)
+		}
 	}
 	log.Info("[Controller]: Exiting")
-	controller.srv = nil
+	<-ctx.Done()
 	return nil
 }
 
@@ -164,17 +177,20 @@ func (controller *Controller) config(c *gin.Context) {
 		return
 	}
 
-	credentials := cache.Credentials{
+	credentials := Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
-	err = controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
-	if err != nil {
+	if err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName); err != nil {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
 	}
 
-	_, _ = controller.ctrlPushAsync(payload, ctrlSubjConfig, nil)
-	c.JSON(http.StatusOK, nil)
+	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -324,16 +340,16 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Running && status.Ctrl == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Running, 0})
+	if status.Transport == StatusRunning && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusRunning, 0})
 		return
 	}
-	ctrl, err := controller.StartTransportAsync(nil)
+	task, err := controller.StartTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -349,16 +365,16 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Stopped && status.Ctrl == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Stopped, 0})
+	if status.Transport == StatusStopped && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusStopped, 0})
 		return
 	}
-	ctrl, err := controller.StopTransportAsync(nil)
+	task, err := controller.StopTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -404,8 +420,8 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
 	statusDTO := ConnectorStatusDTO{status.Transport, 0}
-	if status.Ctrl != nil {
-		statusDTO = ConnectorStatusDTO{Processing, status.Ctrl.Idx}
+	if status.task != nil {
+		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
 	}
 	c.JSON(http.StatusOK, statusDTO)
 }
@@ -431,7 +447,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 		return
 	}
 
-	credentials := cache.Credentials{
+	credentials := Credentials{
 		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
@@ -444,7 +460,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 
 	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosAPIToken)
 
-	_, isCached := cache.AuthCache.Get(key)
+	_, isCached := controller.authCache.Get(key)
 	if !isCached {
 		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
 		if err != nil {
@@ -452,7 +468,7 @@ func (controller *Controller) validateToken(c *gin.Context) {
 			return
 		}
 
-		err = cache.AuthCache.Add(key, credentials, 8*time.Hour)
+		err = controller.authCache.Add(key, credentials, 8*time.Hour)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

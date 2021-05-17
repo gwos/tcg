@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/milliseconds"
@@ -212,7 +211,6 @@ func cleanNats(t *testing.T) {
 	cmd := exec.Command("rm", "-rf", TestConfigNatsStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
-	cache.DispatcherDoneCache.Flush()
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
 

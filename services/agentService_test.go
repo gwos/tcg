@@ -26,9 +26,13 @@ func init() {
 func TestAgentService_StartStopNats(t *testing.T) {
 	assert.NoError(t, GetAgentService().StartNats())
 	assert.NoError(t, GetAgentService().StopNats())
+	assert.NoError(t, GetAgentService().StartNats())
+	assert.NoError(t, GetAgentService().StopNats())
 }
 
 func TestAgentService_StartStopController(t *testing.T) {
+	assert.NoError(t, GetAgentService().StartController())
+	assert.NoError(t, GetAgentService().StopController())
 	assert.NoError(t, GetAgentService().StartController())
 	assert.NoError(t, GetAgentService().StopController())
 }

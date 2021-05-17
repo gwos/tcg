@@ -7,22 +7,22 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
+	"github.com/patrickmn/go-cache"
 	apitrace "go.opentelemetry.io/otel/api/trace"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
 	"go.opentelemetry.io/otel/label"
@@ -31,29 +31,23 @@ import (
 
 // AgentService implements AgentServices interface
 type AgentService struct {
-	*sync.Mutex
 	*config.Connector
-	agentStats            *AgentStats
-	agentStatus           *AgentStatus
-	dsClient              *clients.DSClient
-	gwClients             []*clients.GWClient
-	ctrlIdx               uint8
-	ctrlChan              chan *CtrlAction
-	statsChan             chan statsCounter
-	tracerToken           []byte
-	configHandler         func([]byte)
-	demandConfigHandler   func() bool
-	exitHandler           func()
+
+	agentStats  *AgentStats
+	agentStatus *AgentStatus
+	dsClient    *clients.DSClient
+	gwClients   []*clients.GWClient
+	statsChan   chan statsCounter
+	taskQueue   *taskQueue.TaskQueue
+	tracerCache *cache.Cache
+	tracerToken []byte
+
+	configHandler       func([]byte)
+	demandConfigHandler func() bool
+	exitHandler         func()
+
 	telemetryFlushHandler func()
 	telemetryProvider     apitrace.TracerProvider
-}
-
-// CtrlAction defines queued controll action
-type CtrlAction struct {
-	Data     interface{}
-	Idx      uint8
-	Subj     ctrlSubj
-	SyncChan chan error
 }
 
 type statsCounter struct {
@@ -63,24 +57,26 @@ type statsCounter struct {
 	timestamp   time.Time
 }
 
-type ctrlSubj string
+type taskSubject string
 
 const (
-	ctrlSubjConfig          ctrlSubj = "config"
-	ctrlSubjStartController          = "startController"
-	ctrlSubjStopController           = "stopController"
-	ctrlSubjStartNats                = "startNats"
-	ctrlSubjStopNats                 = "stopNats"
-	ctrlSubjStartTransport           = "startTransport"
-	ctrlSubjStopTransport            = "stopTransport"
+	taskConfig          taskSubject = "config"
+	taskStartController taskSubject = "startController"
+	taskStopController  taskSubject = "stopController"
+	taskStartNats       taskSubject = "startNats"
+	taskStopNats        taskSubject = "stopNats"
+	taskStartTransport  taskSubject = "startTransport"
+	taskStopTransport   taskSubject = "stopTransport"
 )
 
-const ctrlLimit = 9
-const ckTraceToken = "ckTraceToken"
-const statsLastErrorsLim = 10
-const defaultDeadlineTimer = 9 * time.Second
-const traceOnDemandAgentID = "#traceOnDemandAgentID#"
-const traceOnDemandAppType = "#traceOnDemandAppType#"
+const (
+	ckTracerToken        = "ckTraceToken"
+	statsLastErrorsLim   = 10
+	taskQueueAlarm       = time.Second * 9
+	taskQueueCapacity    = 8
+	traceOnDemandAgentID = "#traceOnDemandAgentID#"
+	traceOnDemandAppType = "#traceOnDemandAppType#"
+)
 
 var onceAgentService sync.Once
 var agentService *AgentService
@@ -90,44 +86,32 @@ func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
 		telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
 
-		/* prepare random tracerToken */
-		tracerToken := []byte("aaaabbbbccccdddd")
-		if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
-			copy(tracerToken, randBuf)
-		} else {
-			/* fallback with multiplied timestamp */
-			binary.PutVarint(tracerToken, time.Now().UnixNano())
-			binary.PutVarint(tracerToken[6:], time.Now().UnixNano())
-		}
-		cache.TraceTokenCache.Set(ckTraceToken, uint64(1), -1)
-
 		agentConnector := config.GetConfig().Connector
 		agentService = &AgentService{
-			&sync.Mutex{},
-			agentConnector,
-			&AgentStats{
+			Connector: agentConnector,
+			agentStats: &AgentStats{
 				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 			},
-			&AgentStatus{
-				Controller: Stopped,
-				Nats:       Stopped,
-				Transport:  Stopped,
+			agentStatus: &AgentStatus{
+				Controller: StatusStopped,
+				Nats:       StatusStopped,
+				Transport:  StatusStopped,
 			},
-			&clients.DSClient{DSConnection: config.GetConfig().DSConnection},
-			nil,
-			0,
-			make(chan *CtrlAction, ctrlLimit),
-			make(chan statsCounter),
-			tracerToken,
-			defaultConfigHandler,
-			defaultDemandConfigHandler,
-			defaultExitHandler,
-			telemetryFlushHandler,
-			telemetryProvider,
+			dsClient:    &clients.DSClient{DSConnection: config.GetConfig().DSConnection},
+			statsChan:   make(chan statsCounter),
+			tracerCache: cache.New(-1, -1),
+
+			configHandler:       defaultConfigHandler,
+			demandConfigHandler: defaultDemandConfigHandler,
+			exitHandler:         defaultExitHandler,
+
+			telemetryFlushHandler: telemetryFlushHandler,
+			telemetryProvider:     telemetryProvider,
 		}
 
-		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
+		agentService.initTracerToken()
+		agentService.handleTasks()
 		agentService.handleExit()
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
@@ -179,7 +163,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	/* combine TraceToken from fixed and incremental parts */
 	tokenBuf := make([]byte, 16)
 	copy(tokenBuf, service.tracerToken)
-	if tokenInc, err := cache.TraceTokenCache.IncrementUint64(ckTraceToken, 1); err == nil {
+	if tokenInc, err := service.tracerCache.IncrementUint64(ckTracerToken, 1); err == nil {
 		binary.PutUvarint(tokenBuf, tokenInc)
 	} else {
 		/* fallback with timestamp */
@@ -244,63 +228,63 @@ func (service *AgentService) RemoveExitHandler() {
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
-func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartController, syncChan)
+func (service *AgentService) StartControllerAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartController)
 }
 
 // StopControllerAsync implements AgentServices.StopControllerAsync interface
-func (service *AgentService) StopControllerAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopController, syncChan)
+func (service *AgentService) StopControllerAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopController)
 }
 
 // StartNatsAsync implements AgentServices.StartNatsAsync interface
-func (service *AgentService) StartNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartNats, syncChan)
+func (service *AgentService) StartNatsAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartNats)
 }
 
 // StopNatsAsync implements AgentServices.StopNatsAsync interface
-func (service *AgentService) StopNatsAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopNats, syncChan)
+func (service *AgentService) StopNatsAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopNats)
 }
 
 // StartTransportAsync implements AgentServices.StartTransportAsync interface.
-func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStartTransport, syncChan)
+func (service *AgentService) StartTransportAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStartTransport)
 }
 
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
-func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
-	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
+func (service *AgentService) StopTransportAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskStopTransport)
 }
 
 // StartController implements AgentServices.StartController interface
 func (service *AgentService) StartController() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartController)
+	return service.taskQueue.PushSync(taskStartController)
 }
 
 // StopController implements AgentServices.StopController interface
 func (service *AgentService) StopController() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopController)
+	return service.taskQueue.PushSync(taskStopController)
 }
 
 // StartNats implements AgentServices.StartNats interface
 func (service *AgentService) StartNats() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartNats)
+	return service.taskQueue.PushSync(taskStartNats)
 }
 
 // StopNats implements AgentServices.StopNats interface
 func (service *AgentService) StopNats() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopNats)
+	return service.taskQueue.PushSync(taskStopNats)
 }
 
 // StartTransport implements AgentServices.StartTransport interface.
 func (service *AgentService) StartTransport() error {
-	return service.ctrlPushSync(nil, ctrlSubjStartTransport)
+	return service.taskQueue.PushSync(taskStartTransport)
 }
 
 // StopTransport implements AgentServices.StopTransport interface
 func (service *AgentService) StopTransport() error {
-	return service.ctrlPushSync(nil, ctrlSubjStopTransport)
+	return service.taskQueue.PushSync(taskStopTransport)
 }
 
 // Stats implements AgentServices.Stats interface
@@ -319,71 +303,53 @@ func (service *AgentService) Status() AgentStatus {
 	return *service.agentStatus
 }
 
-func (service *AgentService) ctrlPushAsync(data interface{}, subj ctrlSubj, syncChan chan error) (*CtrlAction, error) {
-	ctrl := &CtrlAction{data, service.ctrlIdx + 1, subj, syncChan}
-	select {
-	case service.ctrlChan <- ctrl:
-		service.ctrlIdx = ctrl.Idx
-		if service.ctrlIdx > (math.MaxUint8 - 1) {
-			service.ctrlIdx = 0
-		}
-		return ctrl, nil
-	default:
-		return nil, fmt.Errorf("Ctrl limit reached: %v ", ctrlLimit)
+// handleTasks handles task queue
+func (service *AgentService) handleTasks() {
+	hAlarm := func(task *taskQueue.Task) error {
+		log.Error("#AgentService.taskQueue timed over:", task.Subject)
+		return nil
 	}
-}
-
-func (service *AgentService) ctrlPushSync(data interface{}, subj ctrlSubj) error {
-	syncChan := make(chan error)
-	if _, err := service.ctrlPushAsync(data, subj, syncChan); err != nil {
-		return err
-	}
-	return <-syncChan
-}
-
-func (service *AgentService) listenCtrlChan() {
-	deadlineTimer := time.NewTimer(defaultDeadlineTimer)
-	deadlineTimer.Stop()
-	var subject ctrlSubj
-	go deadlineTimerHandler(deadlineTimer, &subject)
-	for {
-		ctrl := <-service.ctrlChan
+	hTask := func(task *taskQueue.Task) error {
 		logEntry := log.With(log.Fields{
-			"Idx":  ctrl.Idx,
-			"Subj": ctrl.Subj,
-			// "Data": string(ctrl.Data),
+			"Idx":     task.Idx,
+			"Subject": task.Subject,
 		})
-		logEntry.Log(log.DebugLevel, "#AgentService.ctrlChan")
-		subject = ctrl.Subj
-
-		deadlineTimer.Reset(defaultDeadlineTimer)
-
-		service.agentStatus.Ctrl = ctrl
+		logEntry.Log(log.DebugLevel, "#AgentService.taskQueue")
+		service.agentStatus.task = task
 		var err error
-		switch ctrl.Subj {
-		case ctrlSubjConfig:
-			err = service.config(ctrl.Data.([]byte))
-		case ctrlSubjStartController:
+		switch task.Subject {
+		case taskConfig:
+			err = service.config(task.Args[0].([]byte))
+		case taskStartController:
 			err = service.startController()
-		case ctrlSubjStopController:
+		case taskStopController:
 			err = service.stopController()
-		case ctrlSubjStartNats:
+		case taskStartNats:
 			err = service.startNats()
-		case ctrlSubjStopNats:
+		case taskStopNats:
 			err = service.stopNats()
-		case ctrlSubjStartTransport:
+		case taskStartTransport:
 			err = service.startTransport()
-		case ctrlSubjStopTransport:
+		case taskStopTransport:
 			err = service.stopTransport()
 		}
-
-		deadlineTimer.Stop()
-
-		if ctrl.SyncChan != nil {
-			ctrl.SyncChan <- err
-		}
-		service.agentStatus.Ctrl = nil
+		service.agentStatus.task = nil
+		return err
 	}
+
+	service.taskQueue = taskQueue.NewTaskQueue(
+		taskQueue.WithAlarm(taskQueueAlarm, hAlarm),
+		taskQueue.WithCapacity(taskQueueCapacity),
+		taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
+			taskConfig:          hTask,
+			taskStartController: hTask,
+			taskStopController:  hTask,
+			taskStartNats:       hTask,
+			taskStopNats:        hTask,
+			taskStartTransport:  hTask,
+			taskStopTransport:   hTask,
+		}),
+	)
 }
 
 func (service *AgentService) listenStatsChan() {
@@ -431,60 +397,55 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	var dispatcherOptions []nats.DispatcherOption
 	for _, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
-		gwClientRef := gwClient
+		gwClient := gwClient /* hold loop var copy */
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjEvents, gwClientRef.HostName),
-				subjEvents,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeEvents:
-						_, err = gwClientRef.SendEvents(ctx, p.Payload)
-					case typeEventsAck:
-						_, err = gwClientRef.SendEventsAck(ctx, p.Payload)
-					case typeEventsUnack:
-						_, err = gwClientRef.SendEventsUnack(ctx, p.Payload)
-					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjEvents)
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClientRef.HostName),
-				subjInventoryMetrics,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeInventory:
-						_, err = gwClientRef.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
-					case typeMetrics:
-						_, err = gwClientRef.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
-					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
-					}
-					if errors.Is(err, tcgerr.ErrPermanent) {
-						/* it looks like an issue with credentialed user
-						so, wait for configuration update */
-						_ = service.StopTransport()
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjDowntime, gwClientRef.HostName),
+				fmt.Sprintf("#%s#%s#", subjDowntime, gwClient.HostName),
 				subjDowntime,
 				func(ctx context.Context, p natsPayload) error {
 					var err error
 					switch p.Type {
 					case typeClearInDowntime:
-						_, err = gwClientRef.ClearInDowntime(ctx, p.Payload)
+						_, err = gwClient.ClearInDowntime(ctx, p.Payload)
 					case typeSetInDowntime:
-						_, err = gwClientRef.SetInDowntime(ctx, p.Payload)
+						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjDowntime)
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntime)
+					}
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				fmt.Sprintf("#%s#%s#", subjEvents, gwClient.HostName),
+				subjEvents,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeEvents:
+						_, err = gwClient.SendEvents(ctx, p.Payload)
+					case typeEventsAck:
+						_, err = gwClient.SendEventsAck(ctx, p.Payload)
+					case typeEventsUnack:
+						_, err = gwClient.SendEventsUnack(ctx, p.Payload)
+					default:
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
+					}
+					return err
+				},
+			),
+			service.makeDispatcherOption(
+				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClient.HostName),
+				subjInventoryMetrics,
+				func(ctx context.Context, p natsPayload) error {
+					var err error
+					switch p.Type {
+					case typeInventory:
+						_, err = gwClient.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
+					case typeMetrics:
+						_, err = gwClient.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
+					default:
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
 					}
 					return err
 				},
@@ -494,7 +455,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, subjFn func(context.Context, natsPayload) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durableName, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
 		DurableName: durableName,
 		Subject:     subj,
@@ -521,8 +482,13 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 				span.End()
 			}()
 
-			if err = subjFn(ctx, p); err == nil {
+			if err = handler(ctx, p); err == nil {
 				service.updateStats(len(p.Payload), err, p.Type, time.Now())
+			}
+			if errors.Is(err, tcgerr.ErrPermanent) {
+				/* it looks like an issue with credentialed user
+				so, wait for configuration update */
+				_ = service.StopTransport()
 			}
 			return err
 		},
@@ -544,14 +510,12 @@ func (service *AgentService) config(data []byte) error {
 	// stop nats processing
 	_ = service.stopTransport()
 	// flush uploading telemetry and configure provider while processing stopped
-	service.Mutex.Lock()
 	if service.telemetryFlushHandler != nil {
 		service.telemetryFlushHandler()
 	}
 	telemetryProvider, telemetryFlushHandler, _ := initTelemetryProvider()
 	service.telemetryFlushHandler = telemetryFlushHandler
 	service.telemetryProvider = telemetryProvider
-	service.Mutex.Unlock()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -566,7 +530,7 @@ func (service *AgentService) startController() error {
 
 func (service *AgentService) stopController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	if service.agentStatus.Controller == Stopped {
+	if service.agentStatus.Controller == StatusStopped {
 		return nil
 	}
 	return GetController().stopController()
@@ -589,13 +553,13 @@ func (service *AgentService) startNats() error {
 		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
 	})
 	if err == nil {
-		service.agentStatus.Nats = Running
+		service.agentStatus.Nats = StatusRunning
 	}
 	return err
 }
 
 func (service *AgentService) stopNats() error {
-	if service.agentStatus.Nats == Stopped {
+	if service.agentStatus.Nats == StatusStopped {
 		return nil
 	}
 
@@ -603,7 +567,7 @@ func (service *AgentService) stopNats() error {
 	err := service.stopTransport()
 	// skip Stop Transport error checking
 	nats.StopServer()
-	service.agentStatus.Nats = Stopped
+	service.agentStatus.Nats = StatusStopped
 	return err
 }
 
@@ -630,7 +594,7 @@ func (service *AgentService) startTransport() error {
 	service.gwClients = gwClients
 	/* Process dispatcher */
 	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
-		service.agentStatus.Transport = Running
+		service.agentStatus.Transport = StatusRunning
 	} else {
 		return sdErr
 	}
@@ -639,13 +603,13 @@ func (service *AgentService) startTransport() error {
 }
 
 func (service *AgentService) stopTransport() error {
-	if service.agentStatus.Transport == Stopped {
+	if service.agentStatus.Transport == StatusStopped {
 		return nil
 	}
 	if err := nats.StopDispatcher(); err != nil {
 		return err
 	}
-	service.agentStatus.Transport = Stopped
+	service.agentStatus.Transport = StatusStopped
 	log.Info("[StopTransport]: Stopped")
 	return nil
 }
@@ -718,6 +682,20 @@ func (service AgentService) hookLogErrors(entry log.Entry) error {
 	return nil
 }
 
+func (service *AgentService) initTracerToken() {
+	/* prepare random tracerToken */
+	tracerToken := []byte("aaaabbbbccccdddd")
+	if randBuf, err := uuid.GenerateRandomBytes(16); err == nil {
+		copy(tracerToken, randBuf)
+	} else {
+		/* fallback with multiplied timestamp */
+		binary.PutVarint(tracerToken, time.Now().UnixNano())
+		binary.PutVarint(tracerToken[6:], time.Now().UnixNano())
+	}
+	service.tracerCache.Set(ckTracerToken, uint64(1), -1)
+	service.tracerToken = tracerToken
+}
+
 // initTelemetryProvider creates a new provider instance
 func initTelemetryProvider() (apitrace.TracerProvider, func(), error) {
 	var jaegerEndpoint jaeger.EndpointOption
@@ -750,13 +728,4 @@ func initTelemetryProvider() (apitrace.TracerProvider, func(), error) {
 		}),
 		jaeger.WithSDK(&sdktrace.Config{DefaultSampler: sdktrace.AlwaysSample()}),
 	)
-}
-
-func deadlineTimerHandler(deadlineTimer *time.Timer, subject *ctrlSubj) {
-	for {
-		select {
-		case <-deadlineTimer.C:
-			log.Error("#AgentService.ctrlChan timed over:", *subject)
-		}
-	}
 }
