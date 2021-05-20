@@ -17,7 +17,7 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/label"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // ElasticView describes flow
@@ -153,7 +153,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
 	defer func() {
 		spanCollectMetrics.SetAttributes(
-			label.String("error", fmt.Sprint(err)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		spanCollectMetrics.End()
 	}()
@@ -163,8 +163,8 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 	connector.monitoringState = monitoringState
 
 	spanMonitoringState.SetAttributes(
-		label.Int("monitoringState.Hosts", len(monitoringState.Hosts)),
-		label.Int("monitoringState.Metrics", len(monitoringState.Metrics)),
+		attribute.Int("monitoringState.Hosts", len(monitoringState.Hosts)),
+		attribute.Int("monitoringState.Metrics", len(monitoringState.Metrics)),
 	)
 	spanMonitoringState.End()
 

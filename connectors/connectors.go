@@ -17,7 +17,6 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/label"
 )
 
 // ExtKeyCheckInterval defines field name
@@ -100,11 +99,10 @@ func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResour
 	)
 	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendMetrics")
 	defer func() {
-		span.SetAttributes(
-			label.Int("payloadLen", len(b)),
-			label.String("error", fmt.Sprint(err)),
+		services.EndTraceSpan(span,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(b),
 		)
-		span.End()
 	}()
 
 	request := transit.DynamicResourcesWithServicesRequest{
@@ -135,11 +133,10 @@ func SendInventory(ctx context.Context, resources []transit.DynamicInventoryReso
 	)
 	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendInventory")
 	defer func() {
-		span.SetAttributes(
-			label.Int("payloadLen", len(b)),
-			label.String("error", fmt.Sprint(err)),
+		services.EndTraceSpan(span,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(b),
 		)
-		span.End()
 	}()
 
 	request := transit.DynamicInventoryRequest{
