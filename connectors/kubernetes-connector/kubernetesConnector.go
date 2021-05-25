@@ -22,13 +22,16 @@ import (
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	AppType   string
-	AppName   string
-	AgentID   string
-	EndPoint  string
-	Ownership transit.HostOwnershipType
-	Views     map[KubernetesView]map[string]transit.MetricDefinition
-	Groups    []transit.ResourceGroup
+	EndPoint      string                                                 `json:"kubernetesClusterEndpoint"`
+	Views         map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
+	Groups        []transit.ResourceGroup                                `json:"groups"`
+	CheckInterval time.Duration                                          `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType                              `json:"ownership,omitempty"`
+	AuthType      AuthType                                               `json:"authType"`
+
+	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
+	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
+	KubernetesBearerToken  string `json:"kubernetesBearerToken,omitempty"`
 }
 
 type KubernetesView string
@@ -38,11 +41,21 @@ const (
 	ViewPods  KubernetesView = "Pods"
 )
 
+type AuthType string
+
 const (
-	ClusterHostGroup = "cluster-"
-	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
-	PodsHostGroup    = "pods-"
-	NamespaceDefault = "default"
+	InCluster   AuthType = "InCluster"
+	Credentials          = "UsernamePassword"
+	BearerToken          = "BearerToken"
+	ConfigFile           = "ConfigFile"
+)
+
+const (
+	ClusterHostGroup                 = "cluster-"
+	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
+	PodsHostGroup                    = "pods-"
+	NamespaceDefault                 = "default"
+	defaultKubernetesClusterEndpoint = "gwos.bluesunrise.com:8001"
 )
 
 type KubernetesConnector struct {

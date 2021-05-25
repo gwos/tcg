@@ -14,7 +14,6 @@ import (
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -51,22 +50,22 @@ func main() {
 
 func configHandler(data []byte) {
 	log.Info("[K8 Connector]: Configuration received")
+
 	/* Init config with default values */
 	tExt := &ExtConfig{
-		AppType:   config.GetConfig().Connector.AppType,
-		AppName:   config.GetConfig().Connector.AppName,
-		AgentID:   config.GetConfig().Connector.AgentID,
-		EndPoint:  "gwos.bluesunrise.com:8001", // TODO: hardcoded
+		EndPoint:  defaultKubernetesClusterEndpoint,
 		Ownership: transit.Yield,
 		Views:     make(map[KubernetesView]map[string]transit.MetricDefinition),
 		Groups:    []transit.ResourceGroup{},
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
+
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
 		log.Error("[K8 Connector]: Error during parsing config.", err.Error())
 		return
 	}
+
 	/* Update config with received values */
 	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
 	tExt.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
@@ -74,7 +73,7 @@ func configHandler(data []byte) {
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		// TODO: push down into connectors - metric.Monitored breaks synthetics
-		//if templateMetricName == metric.Name || !metric.Monitored {
+		// if templateMetricName == metric.Name || !metric.Monitored {
 		//	continue
 		//}
 		if metrics, has := tExt.Views[KubernetesView(metric.ServiceType)]; has {
@@ -88,6 +87,7 @@ func configHandler(data []byte) {
 			}
 		}
 	}
+
 	gwConnections := config.GetConfig().GWConnections
 	if len(gwConnections) > 0 {
 		for _, conn := range gwConnections {
@@ -100,8 +100,10 @@ func configHandler(data []byte) {
 			}
 		}
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+
+	extConfig, monitorConnection = tExt, tMonConn
 	monitorConnection.Extensions = extConfig
+
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
 	if err != nil || !bytes.Equal(chksum, chk) {
@@ -110,6 +112,7 @@ func configHandler(data []byte) {
 	if err == nil {
 		chksum = chk
 	}
+
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -133,7 +136,7 @@ func periodicHandler() {
 			}
 			count = count + 1
 		}
-		time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
+		time.Sleep(3 * time.Second) // TODO: better way to assure sync completion?
 		if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
 			log.Error("[K8 Connector]: Error during sending metrics.", err)
 		}
