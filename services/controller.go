@@ -322,6 +322,26 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 }
 
 //
+// @Description The following API endpoint can be used to reset NATS queues.
+// @Tags    agent, connector
+// @Accept  json
+// @Produce json
+// @Success 200 {object} services.ConnectorStatusDTO
+// @Failure 401 {string} string "Unauthorized"
+// @Failure 500 {string} string "Internal server error"
+// @Router  /reset-nats [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) resetNats(c *gin.Context) {
+	ctrl, err := controller.ResetNatsAsync(nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+}
+
+//
 // @Description The following API endpoint can be used to start NATS dispatcher.
 // @Tags    agent, connector
 // @Accept  json
@@ -485,6 +505,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
 	apiV1Group.GET("/metrics", controller.listMetrics)
+	apiV1Group.POST("/reset-nats", controller.resetNats)
 	apiV1Group.POST("/start", controller.start)
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)

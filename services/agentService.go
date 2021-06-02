@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -67,6 +68,7 @@ type ctrlSubj string
 
 const (
 	ctrlSubjConfig          ctrlSubj = "config"
+	ctrlSubjResetNats                = "resetNats"
 	ctrlSubjStartController          = "startController"
 	ctrlSubjStopController           = "stopController"
 	ctrlSubjStartNats                = "startNats"
@@ -243,6 +245,11 @@ func (service *AgentService) RemoveExitHandler() {
 	service.exitHandler = defaultExitHandler
 }
 
+// ResetNatsAsync implements AgentServices.ResetNatsAsync interface
+func (service *AgentService) ResetNatsAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(nil, ctrlSubjResetNats, syncChan)
+}
+
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
 func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStartController, syncChan)
@@ -271,6 +278,11 @@ func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlActi
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
+}
+
+// ResetNats implements AgentServices.ResetNats interface
+func (service *AgentService) ResetNats() error {
+	return service.ctrlPushSync(nil, ctrlSubjResetNats)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -363,6 +375,8 @@ func (service *AgentService) listenCtrlChan() {
 		switch ctrl.Subj {
 		case ctrlSubjConfig:
 			err = service.config(ctrl.Data.([]byte))
+		case ctrlSubjResetNats:
+			err = service.resetNats()
 		case ctrlSubjStartController:
 			err = service.startController()
 		case ctrlSubjStopController:
@@ -555,6 +569,40 @@ func (service *AgentService) config(data []byte) error {
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
+	}
+	return nil
+}
+
+func (service *AgentService) resetNats() error {
+	st0 := *(service.agentStatus)
+	if err := service.stopNats(); err != nil {
+		log.Warn("could not stop nats: ", err)
+	}
+	globs := [...]string{
+		"*/msgs.*.dat",
+		"*/msgs.*.idx",
+		"*/subs.dat",
+		"clients.dat",
+		"server.dat",
+	}
+	for _, glob := range globs {
+		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
+		for _, f := range files {
+			log.Debug("removing: ", f)
+			if err := os.Remove(f); err != nil {
+				log.Warn("could not remove: ", f)
+			}
+		}
+	}
+	if st0.Nats == Running {
+		if err := service.startNats(); err != nil {
+			log.Warn("could not start nats: ", err)
+		}
+	}
+	if st0.Transport == Running {
+		if err := service.startTransport(); err != nil {
+			log.Warn("could not start nats dispatcher: ", err)
+		}
 	}
 	return nil
 }

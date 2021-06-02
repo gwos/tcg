@@ -87,12 +87,14 @@ type AgentServices interface {
 	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
+	ResetNatsAsync(chan error) (*CtrlAction, error)
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)
 	StartNatsAsync(chan error) (*CtrlAction, error)
 	StopNatsAsync(chan error) (*CtrlAction, error)
 	StartTransportAsync(chan error) (*CtrlAction, error)
 	StopTransportAsync(chan error) (*CtrlAction, error)
+	ResetNats() error
 	StartController() error
 	StopController() error
 	StartNats() error
