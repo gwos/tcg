@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -59,6 +60,7 @@ type taskSubject string
 
 const (
 	taskConfig          taskSubject = "config"
+	taskResetNats       taskSubject = "resetNats"
 	taskStartController taskSubject = "startController"
 	taskStopController  taskSubject = "stopController"
 	taskStartNats       taskSubject = "startNats"
@@ -221,6 +223,11 @@ func (service *AgentService) RemoveExitHandler() {
 	service.exitHandler = defaultExitHandler
 }
 
+// ResetNatsAsync implements AgentServices.ResetNatsAsync interface
+func (service *AgentService) ResetNatsAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskResetNats)
+}
+
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
 func (service *AgentService) StartControllerAsync() (*taskQueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStartController)
@@ -249,6 +256,11 @@ func (service *AgentService) StartTransportAsync() (*taskQueue.Task, error) {
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync() (*taskQueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStopTransport)
+}
+
+// ResetNats implements AgentServices.ResetNats interface
+func (service *AgentService) ResetNats() error {
+	return service.taskQueue.PushSync(taskResetNats)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -314,6 +326,8 @@ func (service *AgentService) handleTasks() {
 		switch task.Subject {
 		case taskConfig:
 			err = service.config(task.Args[0].([]byte))
+		case taskResetNats:
+			err = service.resetNats()
 		case taskStartController:
 			err = service.startController()
 		case taskStopController:
@@ -336,6 +350,7 @@ func (service *AgentService) handleTasks() {
 		taskQueue.WithCapacity(taskQueueCapacity),
 		taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
 			taskConfig:          hTask,
+			taskResetNats:       hTask,
 			taskStartController: hTask,
 			taskStopController:  hTask,
 			taskStartNats:       hTask,
@@ -510,6 +525,40 @@ func (service *AgentService) config(data []byte) error {
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
+	}
+	return nil
+}
+
+func (service *AgentService) resetNats() error {
+	st0 := *(service.agentStatus)
+	if err := service.stopNats(); err != nil {
+		log.Warn("could not stop nats: ", err)
+	}
+	globs := [...]string{
+		"*/msgs.*.dat",
+		"*/msgs.*.idx",
+		"*/subs.dat",
+		"clients.dat",
+		"server.dat",
+	}
+	for _, glob := range globs {
+		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
+		for _, f := range files {
+			log.Debug("removing: ", f)
+			if err := os.Remove(f); err != nil {
+				log.Warn("could not remove: ", f)
+			}
+		}
+	}
+	if st0.Nats == StatusRunning {
+		if err := service.startNats(); err != nil {
+			log.Warn("could not start nats: ", err)
+		}
+	}
+	if st0.Transport == StatusRunning {
+		if err := service.startTransport(); err != nil {
+			log.Warn("could not start nats dispatcher: ", err)
+		}
 	}
 	return nil
 }

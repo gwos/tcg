@@ -93,12 +93,14 @@ type AgentServices interface {
 	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
+	ResetNatsAsync() (*taskQueue.Task, error)
 	StartControllerAsync() (*taskQueue.Task, error)
 	StopControllerAsync() (*taskQueue.Task, error)
 	StartNatsAsync() (*taskQueue.Task, error)
 	StopNatsAsync() (*taskQueue.Task, error)
 	StartTransportAsync() (*taskQueue.Task, error)
 	StopTransportAsync() (*taskQueue.Task, error)
+	ResetNats() error
 	StartController() error
 	StopController() error
 	StartNats() error
