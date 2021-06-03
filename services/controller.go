@@ -15,8 +15,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/gwos/tcg/log"
 	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
 )
@@ -74,7 +74,7 @@ func (controller *Controller) RemoveEntrypoints() {
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
 	if controller.srv != nil {
-		log.Warn("StartController: already started")
+		log.Warn().Msg("controller already started")
 		return nil
 	}
 
@@ -110,10 +110,10 @@ func (controller *Controller) startController() error {
 			}
 			var err error
 			if certFile != "" && keyFile != "" {
-				log.Info("[Controller]: Start listen TLS: ", addr)
+				log.Info().Msgf("controller starts listen TLS: %s", addr)
 				err = controller.srv.ListenAndServeTLS(certFile, keyFile)
 			} else {
-				log.Info("[Controller]: Start listen: ", addr)
+				log.Info().Msgf("controller starts listen: %s", addr)
 				err = controller.srv.ListenAndServe()
 			}
 			/* getting here after http.Server exit */
@@ -121,12 +121,12 @@ func (controller *Controller) startController() error {
 			/* catch the "bind: address already in use" error */
 			if err != nil && tcgerr.IsErrorAddressInUse(err) &&
 				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
-				log.Warn("[Controller]: ", err, ": retrying http.Server start")
+				log.Warn().Err(err).Msg("controller retrying http.Server start")
 				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
 				continue
 			} else if err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+				log.Err(err).Msg("controller got http.Server error")
 			}
 			idleTimer.Stop()
 			break
@@ -147,9 +147,9 @@ func (controller *Controller) stopController() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), controller.Connector.ControllerStopTimeout)
 	go func() {
-		log.Info("[Controller]: Shutdown ...")
+		log.Info().Msg("controller shutdown ...")
 		if err := controller.srv.Shutdown(ctx); err != nil {
-			log.Warn("[Controller]: Shutdown:", err)
+			log.Warn().Msgf("controller got %s", err)
 		}
 		cancel()
 	}()
@@ -176,8 +176,8 @@ func (controller *Controller) config(c *gin.Context) {
 	}
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(payload, &dto); err != nil {
-		log.Error("|controller.go| : [config] : ", err)
-		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
+		log.Err(err).Msg("could not unmarshal connector dto")
+		c.JSON(http.StatusBadRequest, "could not unmarshal connector dto")
 		return
 	}
 
@@ -186,7 +186,7 @@ func (controller *Controller) config(c *gin.Context) {
 		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
 	}
 	if err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName); err != nil {
-		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
+		c.JSON(http.StatusBadRequest, fmt.Sprintf("could not validate config token request: %s", dto.DSConnection.HostName))
 	}
 
 	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
@@ -403,7 +403,7 @@ func (controller *Controller) stop(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentIdentityStats
+// @Success 200 {object} services.AgentStatsExt
 // @Failure 401 {string} string "Unauthorized"
 // @Router  /stats [get]
 // @Param   gwos-app-name    header    string     true        "Auth header"
