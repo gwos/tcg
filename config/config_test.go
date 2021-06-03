@@ -54,7 +54,6 @@ gwConnections:
 	expected.Connector.AppName = "test-app"
 	expected.Connector.AppType = "test"
 	expected.Connector.ControllerAddr = ":9999"
-	expected.Connector.LogCondense = 30000000000
 	expected.Connector.NatsStoreType = "MEMORY"
 	expected.Connector.NatsStoreMaxAge = 3600000000000
 	expected.DSConnection = &DSConnection{"localhost:3001"}
