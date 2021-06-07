@@ -32,6 +32,7 @@ type ExtConfig struct {
 	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
 	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
 	KubernetesBearerToken  string `json:"kubernetesBearerToken,omitempty"`
+	KubernetesConfigFile   string `json:"kubernetesConfigFile,omitempty"`
 }
 
 type KubernetesView string
@@ -100,6 +101,22 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		Timeout:             0,
 		Dial:                nil,
 	}
+
+	switch config.AuthType {
+	case InCluster:
+		log.Info("[K8 Connector]: Using InCluster auth")
+	case Credentials:
+		kConfig.Username = extConfig.KubernetesUserName
+		kConfig.Password = extConfig.KubernetesUserPassword
+		log.Info("[K8 Connector]: Using Credentials auth")
+	case BearerToken:
+		kConfig.BearerToken = extConfig.KubernetesBearerToken
+		log.Info("[K8 Connector]: Using Bearer Token auth")
+	case ConfigFile:
+		// TODO:
+		log.Info("[K8 Connector]: Using YAML File auth")
+	}
+
 	x, err := kubernetes.NewForConfig(&kConfig)
 	if err != nil {
 		return err
@@ -144,7 +161,7 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 	monitoredState := make(map[string]KubernetesResource)
 	groups := make(map[string]transit.ResourceGroup)
 	connector.collectNodeInventory(monitoredState, groups, cfg)
-	connector.collectPodInventory(monitoredState, groups, cfg, metricsPerContainer)
+	connector.collectPodInventory(monitoredState, groups, cfg, &metricsPerContainer)
 	connector.collectNodeMetrics(monitoredState, cfg)
 	if metricsPerContainer {
 		connector.collectPodMetricsPerContainer(monitoredState, cfg)
@@ -181,8 +198,8 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{time.Now()}, // TODO: interval
+			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}
@@ -286,12 +303,13 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 // Pod Inventory also retrieves status
 // inventory also contains status, pod counts, capacity and allocation metrics
-func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig, metricsPerContainer bool) {
+func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig, metricsPerContainer *bool) {
 	// TODO: filter pods by namespace(s)
 	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		// TODO:
+		log.Error("[K8 Connector]: " + err.Error())
+		return
 	}
 	for _, pod := range pods.Items {
 		labels := make(map[string]string)
@@ -299,7 +317,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			labels[key] = element
 		}
 		podName := pod.Name
-		if metricsPerContainer {
+		if *metricsPerContainer {
 			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
 		}
 		monitorStatus, message := connector.calculatePodStatus(&pod)
@@ -347,7 +365,8 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Error("[K8 Connector]: " + err.Error())
+		return
 	}
 	for _, node := range nodes.Items {
 		if resource, ok := monitoredState[node.Name]; ok {
@@ -394,7 +413,8 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Error("[K8 Connector]: " + err.Error())
+		return
 	}
 	for _, pod := range pods.Items {
 		if resource, ok := monitoredState[pod.Name]; ok {
@@ -445,7 +465,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Error("[K8 Connector]: " + err.Error())
+		return
 	}
 	builderMap := make(map[string][]connectors.MetricBuilder)
 	serviceMap := make(map[string]transit.DynamicMonitoredService)
@@ -548,7 +569,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 
 func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.MonitorStatus, string) {
 	var message strings.Builder
-	var upMessage string = "Pod is healthy"
+	var upMessage = "Pod is healthy"
 	var status transit.MonitorStatus = transit.HostUp
 	for _, condition := range pod.Status.Conditions {
 		if condition.Status != v1.ConditionTrue {

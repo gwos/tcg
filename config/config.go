@@ -367,7 +367,7 @@ func GetConfig() *Config {
 		c := defaults()
 		cfg = &c
 
-		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
+		if data, err := ioutil.ReadFile(cfg.ConfigPath()); err != nil {
 			logBuf["ioutil.ReadFile"] = err
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
@@ -395,7 +395,7 @@ func GetConfig() *Config {
 	return cfg
 }
 
-func (cfg Config) configPath() string {
+func (cfg Config) ConfigPath() string {
 	configPath := os.Getenv(string(ConfigEnv))
 	if configPath == "" {
 		wd, err := os.Getwd()
@@ -482,7 +482,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
 	newCfg := &c
 	/* load config file */
-	if data, err := ioutil.ReadFile(newCfg.configPath()); err != nil {
+	if data, err := ioutil.ReadFile(newCfg.ConfigPath()); err != nil {
 		log.Warn(err)
 	} else {
 		if err := yaml.Unmarshal(data, newCfg); err != nil {
@@ -506,7 +506,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if output, err := yaml.Marshal(newCfg); err != nil {
 		log.Warn(err)
 	} else {
-		if err := ioutil.WriteFile(newCfg.configPath(), output, 0644); err != nil {
+		if err := ioutil.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
 			log.Warn(err)
 		}
 	}

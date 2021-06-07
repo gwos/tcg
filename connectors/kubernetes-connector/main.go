@@ -9,6 +9,8 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"io/ioutil"
+	"strings"
 	"time"
 )
 
@@ -24,8 +26,6 @@ var (
 )
 
 func main() {
-	// services.GetController().RegisterEntrypoints(initializeEntrypoints())
-
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
@@ -66,8 +66,14 @@ func configHandler(data []byte) {
 		return
 	}
 
+	if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
+		if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
+			log.Error("[K8 Connector]: Error writing to file, reason: " + err.Error())
+		}
+	}
+
 	/* Update config with received values */
-	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
+	// TODO: fudge up some metrics - remove this once we hook in live metrics, appType
 	tExt.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
 	tExt.Views[ViewPods] = fudgeUpPodMetricDefinitions()
 	for _, metric := range tMetProf.Metrics {
@@ -236,4 +242,15 @@ func fudgeUpPodMetricDefinitions() map[string]transit.MetricDefinition {
 	}
 	// TODO: storage is not supported yet
 	return metrics
+}
+
+func writeDataToFile(data []byte) error {
+	strPath := config.GetConfig().ConfigPath()
+	strArray := strings.Split(strPath, "/")
+	finalPath := ""
+	for i := 0; i < len(strArray)-1; i++ {
+		finalPath += strArray[i] + "/"
+	}
+	finalPath += "kubernetes_config.yaml"
+	return ioutil.WriteFile(finalPath, data, 0644)
 }
