@@ -119,6 +119,10 @@ func configHandler(data []byte) {
 		chksum = chk
 	}
 
+	if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
+		log.Error(err)
+	}
+
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

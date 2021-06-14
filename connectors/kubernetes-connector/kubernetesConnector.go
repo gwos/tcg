@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
@@ -134,8 +133,10 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 	connector.kapi = connector.kClientSet.CoreV1()
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = context.TODO()
-	fmt.Printf("initialized Kubernetes connection to server version %s, for client version, %s, and endPoint %s",
+
+	log.Debug("[K8 Connector]: Initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
 		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint)
+
 	return nil
 }
 
@@ -391,7 +392,6 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 					Warning:  metricDefinition.WarningThreshold,
 					Critical: metricDefinition.CriticalThreshold,
 				}
-				// TODO: validate these times are correct
 				metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
 				metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
@@ -441,7 +441,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					// TODO: validate these times are correct
 					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilders = append(metricBuilders, metricBuilder)
@@ -499,7 +498,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					// TODO: validate these times are correct
 					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					var builders []connectors.MetricBuilder
