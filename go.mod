@@ -16,18 +16,15 @@ require (
 	github.com/go-openapi/spec v0.20.3 // indirect
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/gosnmp/gosnmp v1.32.0
-	github.com/hashicorp/go-hclog v0.16.1 // indirect
 	github.com/hashicorp/go-immutable-radix v1.3.0 // indirect
 	github.com/hashicorp/go-uuid v1.0.2
 	github.com/hashicorp/golang-lru v0.5.4 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/leodido/go-urn v1.2.1 // indirect
-	github.com/lib/pq v1.10.2 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/nats-io/jwt v1.2.2 // indirect
-	github.com/nats-io/nats-server/v2 v2.1.9
-	github.com/nats-io/nats-streaming-server v0.21.2
-	github.com/nats-io/stan.go v0.8.3
+	github.com/nats-io/nats-server/v2 v2.2.6
+	github.com/nats-io/nats-streaming-server v0.22.0
+	github.com/nats-io/stan.go v0.9.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
