@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
@@ -134,8 +135,8 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = context.TODO()
 
-	log.Debug("[K8 Connector]: Initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
-		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint)
+	log.Debug(fmt.Sprintf("[K8 Connector]: Initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
+		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint))
 
 	return nil
 }
