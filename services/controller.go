@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
@@ -35,7 +36,8 @@ type Entrypoint struct {
 	Handler func(c *gin.Context)
 }
 
-const startTimeout = time.Millisecond * 200
+const startRetryDelay = time.Millisecond * 200
+const startTimeout = time.Millisecond * 2000
 const shutdownTimeout = time.Millisecond * 200
 
 var onceController sync.Once
@@ -89,28 +91,39 @@ func (controller *Controller) startController() error {
 	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
-	controller.srv = &http.Server{
-		Addr:         addr,
-		Handler:      router,
-		ReadTimeout:  controller.Connector.ControllerReadTimeout,
-		WriteTimeout: controller.Connector.ControllerWriteTimeout,
-	}
-
 	go func() {
+		t0 := time.Now()
 		controller.agentStatus.Controller = Running
-		if certFile != "" && keyFile != "" {
-			log.Info("[Controller]: Start listen TLS: ", addr)
-			if err := controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+		for {
+			controller.srv = &http.Server{
+				Addr:         addr,
+				Handler:      router,
+				ReadTimeout:  controller.Connector.ControllerReadTimeout,
+				WriteTimeout: controller.Connector.ControllerWriteTimeout,
 			}
-		} else {
-			log.Info("[Controller]: Start listen: ", addr)
-			if err := controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+			var err error
+			if certFile != "" && keyFile != "" {
+				log.Info("[Controller]: Start listen TLS: ", addr)
+				if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+					log.Error("[Controller]: http.Server error: ", err)
+				}
+			} else {
+				log.Info("[Controller]: Start listen: ", addr)
+				if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Error("[Controller]: http.Server error: ", err)
+				}
 			}
+			/* getting here after http.Server exit */
+			controller.srv = nil
+			/* catch the "bind: address already in use" error */
+			if tcgerr.IsErrorAddressInUse(err) &&
+				time.Since(t0) < startTimeout-startRetryDelay {
+				log.Info("[Controller]: Retrying http.Server start")
+				time.Sleep(startRetryDelay)
+				continue
+			}
+			break
 		}
-		/* getting here after http.Server exit */
-		controller.srv = nil
 		controller.agentStatus.Controller = Stopped
 	}()
 	// TODO: ensure signal processing in case of linked library
