@@ -688,7 +688,7 @@ func (service AgentService) handleExit() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		s := <-c
-		fmt.Printf("\n- Signal %s received, exiting\n", s)
+		log.Info(fmt.Sprintf("Signal %s received, exiting", s))
 		/* wrap exitHandler with recover */
 		go func(fn func()) {
 			defer func() {
