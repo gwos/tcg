@@ -100,6 +100,8 @@ type Connector struct {
 	// Custom HTTP configuration
 	ControllerReadTimeout  time.Duration `yaml:"-"`
 	ControllerWriteTimeout time.Duration `yaml:"-"`
+	ControllerStartTimeout time.Duration `yaml:"-"`
+	ControllerStopTimeout  time.Duration `yaml:"-"`
 
 	Enabled            bool   `yaml:"enabled"`
 	InstallationMode   string `yaml:"installationMode,omitempty"`
@@ -336,6 +338,8 @@ func defaults() Config {
 			ControllerAddr:          ":8099",
 			ControllerReadTimeout:   time.Duration(time.Second * 10),
 			ControllerWriteTimeout:  time.Duration(time.Second * 20),
+			ControllerStartTimeout:  time.Duration(time.Second * 4),
+			ControllerStopTimeout:   time.Duration(time.Second * 4),
 			LogCondense:             0,
 			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
 			LogFileMaxSize:          1024 * 1024 * 10,                   // 10MB
