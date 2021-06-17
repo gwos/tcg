@@ -37,7 +37,7 @@ type Entrypoint struct {
 }
 
 const startRetryDelay = time.Millisecond * 200
-const startTimeout = time.Millisecond * 2000
+const startTimeout = time.Millisecond * 4000
 const shutdownTimeout = time.Millisecond * 200
 
 var onceController sync.Once
@@ -91,6 +91,8 @@ func (controller *Controller) startController() error {
 	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
+	/* set a short timer to wait for http.Server starting */
+	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
 		controller.agentStatus.Controller = Running
@@ -119,9 +121,11 @@ func (controller *Controller) startController() error {
 			if tcgerr.IsErrorAddressInUse(err) &&
 				time.Since(t0) < startTimeout-startRetryDelay {
 				log.Info("[Controller]: Retrying http.Server start")
+				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
 				continue
 			}
+			idleTimer.Stop()
 			break
 		}
 		controller.agentStatus.Controller = Stopped
@@ -136,8 +140,8 @@ func (controller *Controller) startController() error {
 	// <-quit
 	// StopServer()
 
-	// prevent misbehavior on immediate shutdown
-	time.Sleep(startTimeout)
+	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
+	<-idleTimer.C
 	return nil
 }
 
