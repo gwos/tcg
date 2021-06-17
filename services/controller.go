@@ -37,8 +37,6 @@ type Entrypoint struct {
 }
 
 const startRetryDelay = time.Millisecond * 200
-const startTimeout = time.Millisecond * 4000
-const shutdownTimeout = time.Millisecond * 4000
 
 var onceController sync.Once
 var controller *Controller
@@ -119,7 +117,7 @@ func (controller *Controller) startController() error {
 			controller.srv = nil
 			/* catch the "bind: address already in use" error */
 			if tcgerr.IsErrorAddressInUse(err) &&
-				time.Since(t0) < startTimeout-startRetryDelay {
+				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
 				log.Info("[Controller]: Retrying http.Server start")
 				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
@@ -142,7 +140,7 @@ func (controller *Controller) stopController() error {
 	if controller.srv == nil {
 		return nil
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), controller.Connector.ControllerStopTimeout)
 	go func() {
 		log.Info("[Controller]: Shutdown ...")
 		if err := controller.srv.Shutdown(ctx); err != nil {
