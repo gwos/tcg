@@ -9,12 +9,14 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	kv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
+	"math"
 	"strings"
 	"time"
 )
@@ -256,9 +258,11 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			var value int64 = 0
 			switch key {
 			case "cpu.cores":
-				value = node.Status.Capacity.Cpu().Value()
+				value = toPercentage(node.Status.Capacity.Cpu())
+				fmt.Printf("=========== cpu.cores: %d \n", value)
 			case "cpu.allocated":
-				value = node.Status.Allocatable.Cpu().Value()
+				value = toPercentage(node.Status.Allocatable.Cpu())
+				fmt.Printf("=========== cpu.allocated: %d \n", value)
 			case "memory.capacity":
 				value = node.Status.Capacity.Memory().Value()
 			case "memory.allocated":
@@ -376,10 +380,12 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				var value int64 = 0
 				switch key {
 				case "cpu":
-					value = node.Usage.Cpu().Value()
+					value = toPercentage(node.Usage.Cpu())
+					fmt.Printf("=========== cpu: %d \n", value)
 				case "memory":
 					value = node.Usage.Memory().Value()
 				default:
+					fmt.Println(key)
 					continue
 				}
 				metricBuilder := connectors.MetricBuilder{
@@ -425,7 +431,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					var value int64 = 0
 					switch key {
 					case "cpu":
-						value = pod.Containers[index].Usage.Cpu().Value()
+						value = toPercentage(pod.Containers[index].Usage.Cpu())
+						fmt.Printf("=========== cpu: %d \n", value)
 					case "memory":
 						value = pod.Containers[index].Usage.Memory().Value()
 					default:
@@ -477,7 +484,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					var value int64 = 0
 					switch key {
 					case "cpu":
-						value = container.Usage.Cpu().Value()
+						value = toPercentage(container.Usage.Cpu())
+						fmt.Printf("=========== cpu: %d \n", value)
+
 					case "memory":
 						value = container.Usage.Memory().Value()
 					default:
@@ -594,4 +603,47 @@ func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string
 		}
 	}
 	return ClusterHostGroup + "1"
+}
+
+// toPercentage - converts CPU from cores to percentage
+//
+// 1 core = 1000 Millicores = 100%
+// Value we get from Cpu in cores can be transformed
+// to percentage using mathematical formula:
+// percentage = cores * 1000 * 100 / 1000
+// let's simplify:
+// percentage = cores * 100
+//
+// Example:
+// You might want to assign a third of CPU each — or 33.33%.
+// If you wish to assign a third of a CPU, you should assign 333Mi (millicores) or 0.333(cores) to your container.
+func toPercentage(res *resource.Quantity) int64 {
+	fmt.Printf("String: %s\n", res.String())
+	fmt.Printf("Milli: %f\n", float64(res.MilliValue()))
+
+	if strings.HasSuffix(res.String(), "n") {
+		fmt.Printf("N Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100)
+		fmt.Println()
+		return int64(float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9)) * 100
+	}
+	if strings.HasSuffix(res.String(), "m") {
+		fmt.Printf("M Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100)
+		fmt.Println()
+		return int64(float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -6)) * 100
+	}
+
+	fmt.Println("RETURN 0")
+	fmt.Println()
+	return 0
+
+	//fmt.Printf("String: %s\n", res.String())
+	//fmt.Printf("Simple value: %d\n", res.MilliValue())
+	//if intValue, ok := res.AsInt64(); ok {
+	//	fmt.Printf("///////// IntValue: %d\n", intValue)
+	//	return intValue * 100 / 1000
+	//} else {
+	//	fmt.Printf("///////// DecValue: %d\n", res.AsDec().UnscaledBig().Int64())
+	//	return res.AsDec().UnscaledBig().Int64() * 100 / 1000
+	//}
+
 }
