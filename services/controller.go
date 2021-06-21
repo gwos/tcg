@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	"github.com/patrickmn/go-cache"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -41,8 +42,9 @@ type Entrypoint struct {
 	Handler func(c *gin.Context)
 }
 
-const startTimeout = time.Millisecond * 200
-const shutdownTimeout = time.Millisecond * 200
+const startRetryDelay = time.Millisecond * 200
+const startTimeout = time.Millisecond * 4000
+const shutdownTimeout = time.Millisecond * 4000
 
 var onceController sync.Once
 var controller *Controller
@@ -96,42 +98,47 @@ func (controller *Controller) startController() error {
 	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
-	controller.srv = &http.Server{
-		Addr:         addr,
-		Handler:      router,
-		ReadTimeout:  controller.Connector.ControllerReadTimeout,
-		WriteTimeout: controller.Connector.ControllerWriteTimeout,
-	}
-
+	/* set a short timer to wait for http.Server starting */
+	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
+		t0 := time.Now()
 		controller.agentStatus.Controller = StatusRunning
-		if certFile != "" && keyFile != "" {
-			log.Info("[Controller]: Start listen TLS: ", addr)
-			if err := controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+		for {
+			controller.srv = &http.Server{
+				Addr:         addr,
+				Handler:      router,
+				ReadTimeout:  controller.Connector.ControllerReadTimeout,
+				WriteTimeout: controller.Connector.ControllerWriteTimeout,
 			}
-		} else {
-			log.Info("[Controller]: Start listen: ", addr)
-			if err := controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+			var err error
+			if certFile != "" && keyFile != "" {
+				log.Info("[Controller]: Start listen TLS: ", addr)
+				if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
+					log.Error("[Controller]: http.Server error: ", err)
+				}
+			} else {
+				log.Info("[Controller]: Start listen: ", addr)
+				if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Error("[Controller]: http.Server error: ", err)
+				}
 			}
+			/* getting here after http.Server exit */
+			controller.srv = nil
+			/* catch the "bind: address already in use" error */
+			if tcgerr.IsErrorAddressInUse(err) &&
+				time.Since(t0) < startTimeout-startRetryDelay {
+				log.Info("[Controller]: Retrying http.Server start")
+				idleTimer.Reset(startRetryDelay * 2)
+				time.Sleep(startRetryDelay)
+				continue
+			}
+			idleTimer.Stop()
+			break
 		}
-		/* getting here after http.Server exit */
-		controller.srv = nil
 		controller.agentStatus.Controller = StatusStopped
 	}()
-	// TODO: ensure signal processing in case of linked library
-	// // Wait for interrupt signal to gracefully shutdown the server
-	// quit := make(chan os.Signal)
-	// // kill (no param) default send syscall.SIGTERM
-	// // kill -2 is syscall.SIGINT
-	// // kill -9 is syscall.SIGKILL but can't be catch, so don't need add it
-	// signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	// <-quit
-	// StopServer()
-
-	// prevent misbehavior on immediate shutdown
-	time.Sleep(startTimeout)
+	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
+	<-idleTimer.C
 	return nil
 }
 
@@ -139,16 +146,18 @@ func (controller *Controller) startController() error {
 // overrides AgentService implementation
 func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
-	log.Info("[Controller]: Shutdown ...")
+	if controller.srv == nil {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
-
-	if controller.srv != nil {
+	go func() {
+		log.Info("[Controller]: Shutdown ...")
 		if err := controller.srv.Shutdown(ctx); err != nil {
 			log.Warn("[Controller]: Shutdown:", err)
 		}
-	}
-	log.Info("[Controller]: Exiting")
+		cancel()
+	}()
+	/* wait for http.Server stopping to prevent misbehavior on immediate start */
 	<-ctx.Done()
 	return nil
 }
