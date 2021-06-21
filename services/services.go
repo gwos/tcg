@@ -80,6 +80,7 @@ type ConnectorStatusDTO struct {
 // AgentServices defines TCG Agent services interface
 type AgentServices interface {
 	DemandConfig() error
+	Quit() <-chan struct{}
 	MakeTracerContext() *transit.TracerContext
 	RegisterConfigHandler(func([]byte))
 	RemoveConfigHandler()
@@ -87,6 +88,10 @@ type AgentServices interface {
 	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
+	Stats() AgentStats
+	Status() AgentStatus
+
+	ExitAsync(chan error) (*CtrlAction, error)
 	ResetNatsAsync(chan error) (*CtrlAction, error)
 	StartControllerAsync(chan error) (*CtrlAction, error)
 	StopControllerAsync(chan error) (*CtrlAction, error)
@@ -94,6 +99,8 @@ type AgentServices interface {
 	StopNatsAsync(chan error) (*CtrlAction, error)
 	StartTransportAsync(chan error) (*CtrlAction, error)
 	StopTransportAsync(chan error) (*CtrlAction, error)
+
+	Exit() error
 	ResetNats() error
 	StartController() error
 	StopController() error
@@ -101,8 +108,6 @@ type AgentServices interface {
 	StopNats() error
 	StartTransport() error
 	StopTransport() error
-	Stats() AgentStats
-	Status() AgentStatus
 }
 
 // TransitServices defines TCG Agent services interface

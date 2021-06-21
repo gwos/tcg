@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
@@ -37,8 +38,8 @@ func main() {
 
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func configHandler(data []byte) {

@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"time"
 )
 
 var (
@@ -45,8 +46,8 @@ func main() {
 	log.Info("[K8 Connector]: Starting metric connection ...")
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func configHandler(data []byte) {
