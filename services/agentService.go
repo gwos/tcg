@@ -37,6 +37,7 @@ type AgentService struct {
 	agentStatus *AgentStatus
 	dsClient    *clients.DSClient
 	gwClients   []*clients.GWClient
+	quitChan    chan struct{}
 	statsChan   chan statsCounter
 	taskQueue   *taskQueue.TaskQueue
 
@@ -60,6 +61,7 @@ type taskSubject string
 
 const (
 	taskConfig          taskSubject = "config"
+	taskExit            taskSubject = "exit"
 	taskResetNats       taskSubject = "resetNats"
 	taskStartController taskSubject = "startController"
 	taskStopController  taskSubject = "stopController"
@@ -96,6 +98,7 @@ func GetAgentService() *AgentService {
 				Transport:  StatusStopped,
 			},
 			dsClient:    &clients.DSClient{DSConnection: config.GetConfig().DSConnection},
+			quitChan:    make(chan struct{}, 1),
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
 
@@ -108,7 +111,7 @@ func GetAgentService() *AgentService {
 		agentService.initTracerToken()
 		agentService.initTracerProvider()
 		agentService.handleTasks()
-		agentService.handleExit()
+		agentService.hookInterrupt()
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
@@ -192,6 +195,12 @@ func defaultDemandConfigHandler() bool { return true }
 
 func defaultExitHandler() {}
 
+// Quit returns channel
+// usefull for main loop
+func (service *AgentService) Quit() <-chan struct{} {
+	return service.quitChan
+}
+
 // RegisterConfigHandler sets callback
 // usefull for process extensions
 func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
@@ -221,6 +230,11 @@ func (service *AgentService) RegisterExitHandler(fn func()) {
 // RemoveExitHandler removes callback
 func (service *AgentService) RemoveExitHandler() {
 	service.exitHandler = defaultExitHandler
+}
+
+// ExitAsync implements AgentServices.ExitAsync interface
+func (service *AgentService) ExitAsync() (*taskQueue.Task, error) {
+	return service.taskQueue.PushAsync(taskExit)
 }
 
 // ResetNatsAsync implements AgentServices.ResetNatsAsync interface
@@ -256,6 +270,11 @@ func (service *AgentService) StartTransportAsync() (*taskQueue.Task, error) {
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync() (*taskQueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStopTransport)
+}
+
+// Exit implements AgentServices.Exit interface
+func (service *AgentService) Exit() error {
+	return service.taskQueue.PushSync(taskExit)
 }
 
 // ResetNats implements AgentServices.ResetNats interface
@@ -326,6 +345,8 @@ func (service *AgentService) handleTasks() {
 		switch task.Subject {
 		case taskConfig:
 			err = service.config(task.Args[0].([]byte))
+		case taskExit:
+			err = service.exit()
 		case taskResetNats:
 			err = service.resetNats()
 		case taskStartController:
@@ -350,6 +371,7 @@ func (service *AgentService) handleTasks() {
 		taskQueue.WithCapacity(taskQueueCapacity),
 		taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
 			taskConfig:          hTask,
+			taskExit:            hTask,
 			taskResetNats:       hTask,
 			taskStartController: hTask,
 			taskStopController:  hTask,
@@ -529,6 +551,34 @@ func (service *AgentService) config(data []byte) error {
 	return nil
 }
 
+func (service *AgentService) exit() error {
+	/* wrap exitHandler with recover */
+	c := make(chan struct{}, 1)
+	go func(fn func()) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Error("[handleExit]", err)
+			}
+		}()
+		fn()
+		c <- struct{}{}
+	}(service.exitHandler)
+	/* wait for exitHandler done */
+	<-c
+	if err := service.stopController(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	if err := service.stopTransport(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	if err := service.stopNats(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	/* send quit signal */
+	service.quitChan <- struct{}{}
+	return nil
+}
+
 func (service *AgentService) resetNats() error {
 	st0 := *(service.agentStatus)
 	if err := service.stopNats(); err != nil {
@@ -686,33 +736,15 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 	)
 }
 
-// handleExit gracefully handles syscalls
-func (service AgentService) handleExit() {
+// hookInterrupt gracefully handles syscalls
+func (service AgentService) hookInterrupt() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		s := <-c
 		log.Info(fmt.Sprintf("Signal %s received, exiting", s))
-		/* wrap exitHandler with recover */
-		go func(fn func()) {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Error("[handleExit]", err)
-				}
-			}()
-			fn()
-		}(service.exitHandler)
-
-		if err := service.StopController(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		if err := service.StopTransport(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		if err := service.StopNats(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		os.Exit(0)
+		/* process exit with taskQueue to prevent feature tasks */
+		_, _ = service.ExitAsync()
 	}()
 }
 

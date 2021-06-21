@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"strings"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
@@ -10,7 +12,6 @@ import (
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"strings"
 )
 
 var (
@@ -48,8 +49,8 @@ func main() {
 
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func configHandler(data []byte) {
