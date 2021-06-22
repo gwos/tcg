@@ -111,24 +111,22 @@ func (controller *Controller) startController() error {
 			var err error
 			if certFile != "" && keyFile != "" {
 				log.Info("[Controller]: Start listen TLS: ", addr)
-				if err = controller.srv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-					log.Error("[Controller]: http.Server error: ", err)
-				}
+				err = controller.srv.ListenAndServeTLS(certFile, keyFile)
 			} else {
 				log.Info("[Controller]: Start listen: ", addr)
-				if err = controller.srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-					log.Error("[Controller]: http.Server error: ", err)
-				}
+				err = controller.srv.ListenAndServe()
 			}
 			/* getting here after http.Server exit */
 			controller.srv = nil
 			/* catch the "bind: address already in use" error */
-			if tcgerr.IsErrorAddressInUse(err) &&
+			if err != nil && tcgerr.IsErrorAddressInUse(err) &&
 				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
-				log.Info("[Controller]: Retrying http.Server start")
+				log.Warn("[Controller]: ", err, ": retrying http.Server start")
 				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
 				continue
+			} else if err != nil && err != http.ErrServerClosed {
+				log.Error("[Controller]: http.Server error: ", err)
 			}
 			idleTimer.Stop()
 			break
