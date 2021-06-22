@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 	"syscall"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
-	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
@@ -39,6 +39,7 @@ type AgentService struct {
 	gwClients             []*clients.GWClient
 	ctrlIdx               uint8
 	ctrlChan              chan *CtrlAction
+	quitChan              chan struct{}
 	statsChan             chan statsCounter
 	tracerToken           []byte
 	configHandler         func([]byte)
@@ -67,6 +68,8 @@ type ctrlSubj string
 
 const (
 	ctrlSubjConfig          ctrlSubj = "config"
+	ctrlSubjExit                     = "exit"
+	ctrlSubjResetNats                = "resetNats"
 	ctrlSubjStartController          = "startController"
 	ctrlSubjStopController           = "stopController"
 	ctrlSubjStartNats                = "startNats"
@@ -117,6 +120,7 @@ func GetAgentService() *AgentService {
 			nil,
 			0,
 			make(chan *CtrlAction, ctrlLimit),
+			make(chan struct{}, 1),
 			make(chan statsCounter),
 			tracerToken,
 			defaultConfigHandler,
@@ -128,7 +132,7 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-		agentService.handleExit()
+		agentService.hookInterrupt()
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
@@ -212,6 +216,12 @@ func defaultDemandConfigHandler() bool { return true }
 
 func defaultExitHandler() {}
 
+// Quit returns channel
+// usefull for main loop
+func (service *AgentService) Quit() <-chan struct{} {
+	return service.quitChan
+}
+
 // RegisterConfigHandler sets callback
 // usefull for process extensions
 func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
@@ -243,6 +253,16 @@ func (service *AgentService) RemoveExitHandler() {
 	service.exitHandler = defaultExitHandler
 }
 
+// ExitAsync implements AgentServices.ExitAsync interface
+func (service *AgentService) ExitAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(nil, ctrlSubjExit, syncChan)
+}
+
+// ResetNatsAsync implements AgentServices.ResetNatsAsync interface
+func (service *AgentService) ResetNatsAsync(syncChan chan error) (*CtrlAction, error) {
+	return service.ctrlPushAsync(nil, ctrlSubjResetNats, syncChan)
+}
+
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
 func (service *AgentService) StartControllerAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStartController, syncChan)
@@ -271,6 +291,16 @@ func (service *AgentService) StartTransportAsync(syncChan chan error) (*CtrlActi
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
 func (service *AgentService) StopTransportAsync(syncChan chan error) (*CtrlAction, error) {
 	return service.ctrlPushAsync(nil, ctrlSubjStopTransport, syncChan)
+}
+
+// Exit implements AgentServices.Exit interface
+func (service *AgentService) Exit() error {
+	return service.ctrlPushSync(nil, ctrlSubjExit)
+}
+
+// ResetNats implements AgentServices.ResetNats interface
+func (service *AgentService) ResetNats() error {
+	return service.ctrlPushSync(nil, ctrlSubjResetNats)
 }
 
 // StartController implements AgentServices.StartController interface
@@ -363,6 +393,10 @@ func (service *AgentService) listenCtrlChan() {
 		switch ctrl.Subj {
 		case ctrlSubjConfig:
 			err = service.config(ctrl.Data.([]byte))
+		case ctrlSubjExit:
+			err = service.exit()
+		case ctrlSubjResetNats:
+			err = service.resetNats()
 		case ctrlSubjStartController:
 			err = service.startController()
 		case ctrlSubjStopController:
@@ -465,10 +499,14 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					default:
 						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
 					}
-					if errors.Is(err, tcgerr.ErrPermanent) {
+					if errors.Is(err, clients.ErrUnauthorized) {
 						/* it looks like an issue with credentialed user
 						so, wait for configuration update */
+						log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
 						_ = service.StopTransport()
+					} else if errors.Is(err, clients.ErrUndecided) {
+						/* it looks like an issue with data */
+						log.Error("dispatcher got an issue with data: ", err)
 					}
 					return err
 				},
@@ -555,6 +593,68 @@ func (service *AgentService) config(data []byte) error {
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
+	}
+	return nil
+}
+
+func (service *AgentService) exit() error {
+	/* wrap exitHandler with recover */
+	c := make(chan struct{}, 1)
+	go func(fn func()) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Error("[handleExit]", err)
+			}
+		}()
+		fn()
+		c <- struct{}{}
+	}(service.exitHandler)
+	/* wait for exitHandler done */
+	<-c
+	if err := service.stopController(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	if err := service.stopTransport(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	if err := service.stopNats(); err != nil {
+		log.Error("[handleExit]", err.Error())
+	}
+	/* send quit signal */
+	service.quitChan <- struct{}{}
+	return nil
+}
+
+func (service *AgentService) resetNats() error {
+	st0 := *(service.agentStatus)
+	if err := service.stopNats(); err != nil {
+		log.Warn("could not stop nats: ", err)
+	}
+	globs := [...]string{
+		"*/msgs.*.dat",
+		"*/msgs.*.idx",
+		"*/subs.dat",
+		"clients.dat",
+		"server.dat",
+	}
+	for _, glob := range globs {
+		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
+		for _, f := range files {
+			log.Debug("removing: ", f)
+			if err := os.Remove(f); err != nil {
+				log.Warn("could not remove: ", f)
+			}
+		}
+	}
+	if st0.Nats == Running {
+		if err := service.startNats(); err != nil {
+			log.Warn("could not start nats: ", err)
+		}
+	}
+	if st0.Transport == Running {
+		if err := service.startTransport(); err != nil {
+			log.Warn("could not start nats dispatcher: ", err)
+		}
 	}
 	return nil
 }
@@ -682,33 +782,15 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 	)
 }
 
-// handleExit gracefully handles syscalls
-func (service AgentService) handleExit() {
+// hookInterrupt gracefully handles syscalls
+func (service AgentService) hookInterrupt() {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		s := <-c
 		log.Info(fmt.Sprintf("Signal %s received, exiting", s))
-		/* wrap exitHandler with recover */
-		go func(fn func()) {
-			defer func() {
-				if err := recover(); err != nil {
-					log.Error("[handleExit]", err)
-				}
-			}()
-			fn()
-		}(service.exitHandler)
-
-		if err := service.StopController(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		if err := service.StopTransport(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		if err := service.StopNats(); err != nil {
-			log.Error("[handleExit]", err.Error())
-		}
-		os.Exit(0)
+		/* process exit with taskQueue to prevent feature tasks */
+		_, _ = service.ExitAsync(nil)
 	}()
 }
 
