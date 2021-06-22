@@ -49,8 +49,8 @@ func main() {
 
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func handleCache() {
