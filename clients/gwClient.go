@@ -138,7 +138,7 @@ func (client *GWClient) connectLocal() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: connectLocal") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -183,7 +183,7 @@ func (client *GWClient) connectRemote() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: connectRemote") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -238,7 +238,7 @@ func (client *GWClient) Disconnect() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: disconnect") }()
 
 	if err != nil {
 		return err
@@ -280,7 +280,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: validate token") }()
 
 	if err == nil {
 		if statusCode == 200 {
@@ -518,7 +518,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		})
 	}
 
-	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: sendRequest") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel

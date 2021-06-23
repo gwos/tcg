@@ -58,12 +58,12 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"error":      err,
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
-		"response":   string(byteResponse),
-		"headers": headers,
-		"reqURL":  entrypoint.String(),
+		"response": string(byteResponse),
+		"headers":  headers,
+		"reqURL":   entrypoint.String(),
 	})
 	logEntryLevel := log.DebugLevel
-	defer logEntry.Log(logEntryLevel, "DSClient: ValidateToken")
+	defer func() { logEntry.Log(logEntryLevel, "DSClient: ValidateToken") }()
 
 	if err == nil {
 		if statusCode == 201 {
@@ -97,13 +97,13 @@ func (client *DSClient) Reload(agentID string) error {
 		"error":      err,
 		"statusCode": statusCode,
 	}).WithDebug(log.Fields{
-		"response":   string(byteResponse),
-		"headers": headers,
-		"reqURL":  reqURL,
+		"response": string(byteResponse),
+		"headers":  headers,
+		"reqURL":   reqURL,
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "DSClient: Reload")
+	defer func() { logEntry.Log(logEntryLevel, "DSClient: Reload") }()
 
 	if statusCode == 404 {
 		logEntry.WithField("Hint", "Check AgentAI")
@@ -123,7 +123,7 @@ func (client *DSClient) Reload(agentID string) error {
 func makeDalekServicesScheme(hostName string) string {
 	scheme := "https"
 	if strings.HasPrefix(hostName, "dalekservices") {
-		scheme =  "http"
+		scheme = "http"
 	}
 	return scheme
 }
