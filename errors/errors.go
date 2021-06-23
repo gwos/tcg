@@ -2,6 +2,7 @@ package errors
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"runtime"
 	"syscall"
@@ -11,6 +12,11 @@ import (
 var (
 	ErrPermanent = errors.New("permanent error")
 	ErrTransient = errors.New("transient error")
+
+	ErrGateway      = fmt.Errorf("%w: %v", ErrTransient, "gateway error")
+	ErrSynchronizer = fmt.Errorf("%w: %v", ErrTransient, "synchronizer error")
+	ErrUnauthorized = fmt.Errorf("%w: %v", ErrPermanent, "unauthorized")
+	ErrUndecided    = fmt.Errorf("%w: %v", ErrPermanent, "undecided error")
 )
 
 // IsErrorAddressInUse verifies error

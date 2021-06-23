@@ -17,6 +17,7 @@ import (
 
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
@@ -499,15 +500,6 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					default:
 						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
 					}
-					if errors.Is(err, clients.ErrUnauthorized) {
-						/* it looks like an issue with credentialed user
-						so, wait for configuration update */
-						log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
-						_ = service.StopTransport()
-					} else if errors.Is(err, clients.ErrUndecided) {
-						/* it looks like an issue with data */
-						log.Error("dispatcher got an issue with data: ", err)
-					}
 					return err
 				},
 			),
@@ -561,6 +553,15 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 
 			if err = subjFn(ctx, p); err == nil {
 				service.updateStats(len(p.Payload), err, p.Type, time.Now())
+			}
+			if errors.Is(err, tcgerr.ErrUnauthorized) {
+				/* it looks like an issue with credentialed user
+				so, wait for configuration update */
+				log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
+				_ = service.StopTransport()
+			} else if errors.Is(err, tcgerr.ErrUndecided) {
+				/* it looks like an issue with data */
+				log.Error("dispatcher got an issue with data: ", err)
 			}
 			return err
 		},
