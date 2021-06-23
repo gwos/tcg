@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
@@ -515,10 +515,14 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			if err = handler(ctx, p); err == nil {
 				service.updateStats(len(p.Payload), err, p.Type, time.Now())
 			}
-			if errors.Is(err, tcgerr.ErrPermanent) {
+			if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user
 				so, wait for configuration update */
+				log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
 				_ = service.StopTransport()
+			} else if errors.Is(err, tcgerr.ErrUndecided) {
+				/* it looks like an issue with data */
+				log.Error("dispatcher got an issue with data: ", err)
 			}
 			return err
 		},
