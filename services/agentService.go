@@ -17,8 +17,8 @@ import (
 
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
-	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/config"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
@@ -86,6 +86,11 @@ const defaultDeadlineTimer = 9 * time.Second
 const traceOnDemandAgentID = "#traceOnDemandAgentID#"
 const traceOnDemandAppType = "#traceOnDemandAppType#"
 
+// AllowSignalHandlers defines setting the signal handlers
+// true by default, handle signals: os.Interrupt, syscall.SIGTERM
+// false on init of C-shared library libtransit
+var AllowSignalHandlers = true
+
 var onceAgentService sync.Once
 var agentService *AgentService
 
@@ -133,7 +138,9 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-		agentService.hookInterrupt()
+		if AllowSignalHandlers {
+			agentService.hookInterrupt()
+		}
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
