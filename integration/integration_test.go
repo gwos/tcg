@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -61,6 +62,14 @@ func TestIntegration(t *testing.T) {
 	t.Log("Check for host availability in the database")
 	time.Sleep(1 * time.Second)
 	assert.NoError(t, existenceCheck(t, true, HostStatusUp))
+
+	t.Log("Send bad ResourcesWithMetrics payload to GroundWork Foundation")
+	/* expect foundation error, processing should not stop */
+	badPayload := new(bytes.Buffer)
+	fmt.Fprintf(badPayload, "[[%s]]", buildResourceWithMetricsRequest(t))
+	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload.Bytes()))
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats)
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport)
 }
 
 func buildInventoryRequest(t *testing.T) []byte {
