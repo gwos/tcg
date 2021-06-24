@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/gwos/tcg/config"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 )
 
@@ -138,7 +139,7 @@ func (client *GWClient) connectLocal() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: connectLocal") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -152,12 +153,12 @@ func (client *GWClient) connectLocal() error {
 		return nil
 	}
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(byteResponse))
 	}
 	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+	return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(byteResponse))
 }
 
 func (client *GWClient) connectRemote() error {
@@ -183,7 +184,7 @@ func (client *GWClient) connectRemote() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: connectRemote") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -206,12 +207,12 @@ func (client *GWClient) connectRemote() error {
 		"errorCode": error2,
 	})
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, error2)
+		return fmt.Errorf("%w: %v", tcgerr.ErrGateway, error2)
 	}
 	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, error2)
+	return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, error2)
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -238,7 +239,7 @@ func (client *GWClient) Disconnect() error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: disconnect") }()
 
 	if err != nil {
 		return err
@@ -248,12 +249,12 @@ func (client *GWClient) Disconnect() error {
 		return nil
 	}
 	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(byteResponse))
 	}
 	if statusCode == 401 {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(byteResponse))
 	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+	return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(byteResponse))
 }
 
 // ValidateToken implements GWOperations.ValidateToken.
@@ -280,7 +281,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	})
 	logEntryLevel := log.InfoLevel
 
-	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: validate token") }()
 
 	if err == nil {
 		if statusCode == 200 {
@@ -288,9 +289,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 			if b {
 				return nil
 			}
-			return fmt.Errorf("%w: %v", ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
+			return fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
 		}
-		return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+		return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(byteResponse))
 	}
 
 	return err
@@ -518,7 +519,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		})
 	}
 
-	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
+	defer func() { logEntry.Log(logEntryLevel, "GWClient: sendRequest") }()
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
@@ -526,19 +527,19 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	}
 	if statusCode == 401 {
 		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
+		return nil, fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(byteResponse))
 	}
 	if statusCode == 502 || statusCode == 504 {
 		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
+		return nil, fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(byteResponse))
 	}
 	if statusCode == 503 {
 		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrSynchronizer, string(byteResponse))
+		return nil, fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(byteResponse))
 	}
 	if statusCode != 200 {
 		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+		return nil, fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(byteResponse))
 	}
 	return byteResponse, nil
 }

@@ -18,6 +18,7 @@ import (
 	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
+	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
@@ -85,6 +86,11 @@ const defaultDeadlineTimer = 9 * time.Second
 const traceOnDemandAgentID = "#traceOnDemandAgentID#"
 const traceOnDemandAppType = "#traceOnDemandAppType#"
 
+// AllowSignalHandlers defines setting the signal handlers
+// true by default, handle signals: os.Interrupt, syscall.SIGTERM
+// false on init of C-shared library libtransit
+var AllowSignalHandlers = true
+
 var onceAgentService sync.Once
 var agentService *AgentService
 
@@ -132,7 +138,9 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenCtrlChan()
 		go agentService.listenStatsChan()
-		agentService.hookInterrupt()
+		if AllowSignalHandlers {
+			agentService.hookInterrupt()
+		}
 
 		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
 		log.With(log.Fields{
@@ -499,15 +507,6 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					default:
 						err = fmt.Errorf("dispatcher error on process payload type %s:%s", p.Type, subjInventoryMetrics)
 					}
-					if errors.Is(err, clients.ErrUnauthorized) {
-						/* it looks like an issue with credentialed user
-						so, wait for configuration update */
-						log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
-						_ = service.StopTransport()
-					} else if errors.Is(err, clients.ErrUndecided) {
-						/* it looks like an issue with data */
-						log.Error("dispatcher got an issue with data: ", err)
-					}
 					return err
 				},
 			),
@@ -561,6 +560,15 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, subj
 
 			if err = subjFn(ctx, p); err == nil {
 				service.updateStats(len(p.Payload), err, p.Type, time.Now())
+			}
+			if errors.Is(err, tcgerr.ErrUnauthorized) {
+				/* it looks like an issue with credentialed user
+				so, wait for configuration update */
+				log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
+				_ = service.StopTransport()
+			} else if errors.Is(err, tcgerr.ErrUndecided) {
+				/* it looks like an issue with data */
+				log.Error("dispatcher got an issue with data: ", err)
 			}
 			return err
 		},

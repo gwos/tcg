@@ -30,6 +30,10 @@ import (
 	"github.com/gwos/tcg/services"
 )
 
+func init() {
+	services.AllowSignalHandlers = false
+}
+
 func main() {
 }
 
