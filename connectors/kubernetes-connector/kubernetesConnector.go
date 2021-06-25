@@ -379,6 +379,16 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 			for key, metricDefinition := range cfg.Views[ViewNodes] {
 				var value int64 = 0
 				switch key {
+				case "cpu.cores":
+					value = toPercentage(node.Usage.Cpu())
+					fmt.Printf("=========== cpu.cores: %d \n", value)
+				case "cpu.allocated":
+					value = toPercentage(node.Usage.Cpu())
+					fmt.Printf("=========== cpu.allocated: %d \n", value)
+				case "memory.capacity":
+					value = node.Usage.Memory().Value()
+				case "memory.allocated":
+					value = node.Usage.Memory().Value()
 				case "cpu":
 					value = toPercentage(node.Usage.Cpu())
 					fmt.Printf("=========== cpu: %d \n", value)

@@ -73,26 +73,26 @@ func configHandler(data []byte) {
 	}
 
 	/* Update config with received values */
-	// TODO: fudge up some metrics - remove this once we hook in live metrics, appType
-	tExt.Views[ViewNodes] = fudgeUpNodeMetricDefinitions()
-	tExt.Views[ViewPods] = fudgeUpPodMetricDefinitions()
-	for _, metric := range tMetProf.Metrics {
-		// temporary solution, will be removed
-		// TODO: push down into connectors - metric.Monitored breaks synthetics
-		// if templateMetricName == metric.Name || !metric.Monitored {
-		//	continue
-		//}
-		if metrics, has := tExt.Views[KubernetesView(metric.ServiceType)]; has {
-			metrics[metric.Name] = metric
-			tExt.Views[KubernetesView(metric.ServiceType)] = metrics
-		} else {
-			metrics := make(map[string]transit.MetricDefinition)
-			metrics[metric.Name] = metric
-			if tExt.Views != nil {
-				tExt.Views[KubernetesView(metric.ServiceType)] = metrics
-			}
-		}
-	}
+	tExt.Views[ViewNodes] = buildNodeMetricsMap(tMetProf.Metrics)
+	tExt.Views[ViewPods] = buildPodMetricsMap(tMetProf.Metrics)
+
+	//for _, metric := range tMetProf.Metrics {
+	//	// temporary solution, will be removed
+	//	// TODO: push down into connectors - metric.Monitored breaks synthetics
+	//	// if templateMetricName == metric.Name || !metric.Monitored {
+	//	//	continue
+	//	//}
+	//	if metrics, has := tExt.Views[KubernetesView(metric.ServiceType)]; has {
+	//		metrics[metric.Name] = metric
+	//		tExt.Views[KubernetesView(metric.ServiceType)] = metrics
+	//	} else {
+	//		metrics := make(map[string]transit.MetricDefinition)
+	//		metrics[metric.Name] = metric
+	//		if tExt.Views != nil {
+	//			tExt.Views[KubernetesView(metric.ServiceType)] = metrics
+	//		}
+	//	}
+	//}
 
 	gwConnections := config.GetConfig().GWConnections
 	if len(gwConnections) > 0 {
@@ -153,97 +153,26 @@ func periodicHandler() {
 	}
 }
 
-// TODO: remove this
-func fudgeUpNodeMetricDefinitions() map[string]transit.MetricDefinition {
+func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	metrics["cpu"] = transit.MetricDefinition{
-		Name:              "cpu",
-		Monitored:         true,
-		Graphed:           true,
-		ComputeType:       transit.Query,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
-	metrics["cpu.cores"] = transit.MetricDefinition{
-		Name:              "cpu.cores",
-		Monitored:         false,
-		Graphed:           false,
-		ComputeType:       transit.Informational,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
-	metrics["cpu.allocated"] = transit.MetricDefinition{
-		Name:              "cpu.allocated",
-		Monitored:         false,
-		Graphed:           false,
-		ComputeType:       transit.Informational,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
-	metrics["memory"] = transit.MetricDefinition{
-		Name:              "memory",
-		Monitored:         true,
-		Graphed:           true,
-		ComputeType:       transit.Query,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
-	metrics["memory.capacity"] = transit.MetricDefinition{
-		Name:              "memory.capacity",
-		Monitored:         false,
-		Graphed:           false,
-		ComputeType:       transit.Informational,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
-	metrics["memory.allocated"] = transit.MetricDefinition{
-		Name:              "memory.allocated",
-		Monitored:         false,
-		Graphed:           false,
-		ComputeType:       transit.Informational,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
+	for _, metric := range metricsArray {
+		if metric.ServiceType == string(ViewNodes) {
+			metrics[metric.Name] = metric
+		}
 	}
 
-	metrics["pods"] = transit.MetricDefinition{
-		Name:              "pods",
-		Monitored:         true,
-		Graphed:           true,
-		ComputeType:       transit.Query,
-		ServiceType:       "Node",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
 	// TODO: storage is not supported yet
 	return metrics
 }
 
-func fudgeUpPodMetricDefinitions() map[string]transit.MetricDefinition {
+func buildPodMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	metrics["cpu"] = transit.MetricDefinition{
-		Name:              "cpu",
-		Monitored:         true,
-		Graphed:           true,
-		ComputeType:       transit.Query,
-		ServiceType:       "Pod",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
+	for _, metric := range metricsArray {
+		if metric.ServiceType == string(ViewPods) {
+			metrics[metric.Name] = metric
+		}
 	}
-	metrics["memory"] = transit.MetricDefinition{
-		Name:              "memory",
-		Monitored:         true,
-		Graphed:           true,
-		ComputeType:       transit.Query,
-		ServiceType:       "Pod",
-		WarningThreshold:  -1,
-		CriticalThreshold: -1,
-	}
+
 	// TODO: storage is not supported yet
 	return metrics
 }
