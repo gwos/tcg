@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	github.com/PaesslerAG/gval v1.1.1
+	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
 	github.com/armon/go-metrics v0.3.8 // indirect
@@ -50,4 +51,5 @@ require (
 	k8s.io/apimachinery v0.21.1
 	k8s.io/client-go v0.21.1
 	k8s.io/metrics v0.21.1
+	k8s.io/utils v0.0.0-20201110183641-67b214c5f920 // indirect
 )
