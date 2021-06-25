@@ -111,9 +111,8 @@ type Connector struct {
 	// if 0 turn off condensing
 	LogCondense time.Duration `yaml:"logCondense"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile        string        `yaml:"logFile"`
-	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
-	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
+	LogFile        string `yaml:"logFile"`
+	LogFileMaxSize int64  `yaml:"logFileMaxSize"`
 	// Log files are rotated count times before being removed.
 	// If count is 0, old versions are removed rather than rotated.
 	LogFileRotate int      `yaml:"logFileRotate"`
@@ -341,8 +340,7 @@ func defaults() Config {
 			ControllerStartTimeout:  time.Duration(time.Second * 4),
 			ControllerStopTimeout:   time.Duration(time.Second * 4),
 			LogCondense:             0,
-			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
-			LogFileMaxSize:          1024 * 1024 * 10,                   // 10MB
+			LogFileMaxSize:          1024 * 1024 * 10, // 10MB
 			LogFileRotate:           5,
 			LogLevel:                1,
 			NatsAckWait:             time.Duration(time.Second * 30),
@@ -385,7 +383,6 @@ func GetConfig() *Config {
 
 		log.Config(
 			cfg.Connector.LogFile,
-			cfg.Connector.LogFileMaxAge,
 			cfg.Connector.LogFileMaxSize,
 			cfg.Connector.LogFileRotate,
 			int(cfg.Connector.LogLevel),
@@ -531,7 +528,6 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* update logger */
 	log.Config(
 		cfg.Connector.LogFile,
-		cfg.Connector.LogFileMaxAge,
 		cfg.Connector.LogFileMaxSize,
 		cfg.Connector.LogFileRotate,
 		int(cfg.Connector.LogLevel),
