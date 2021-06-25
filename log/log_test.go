@@ -20,12 +20,12 @@ func TestConfig(t *testing.T) {
 
 	writerHook.cache = cache.New(10*time.Minute, 100*time.Millisecond)
 
-	Config(logFile1.Name(), 0, 0, 1, 3, 0)
+	Config(logFile1.Name(), 0, 1, 3, 0)
 	Debug("message debug1")
 	Info("message info1")
 	Warn("message warn1")
 
-	Config(logFile2.Name(), 0, 0, 1, 2, 200*time.Millisecond)
+	Config(logFile2.Name(), 0, 1, 2, 200*time.Millisecond)
 	Debug("message debug")
 	Info("message info")
 	Info("message info")
@@ -52,7 +52,7 @@ func TestLogrotate(t *testing.T) {
 	defer os.Remove(logFile.Name() + ".2")
 	defer os.Remove(logFile.Name() + ".3")
 
-	Config(logFile.Name(), 200*time.Millisecond, 140, 3, 3, 0)
+	Config(logFile.Name(), 140, 3, 3, 0)
 	Debug("message debug1")
 	Info("message info1")
 	Warn("message warn1") // expect rotation by maxSize
@@ -66,9 +66,10 @@ func TestLogrotate(t *testing.T) {
 	assert.Contains(t, string(log1), "debug1")
 
 	time.Sleep(200 * time.Millisecond)
-	Warn("message debug2") // expect rotation by maxAge
-	Warn("message info2")
-	Warn("message warn2") // expect rotation by maxSize
+	Debug("message debug2")
+	Info("message info2") // expect rotation by maxSize
+	Warn("message warn2")
+	Debug("message debug3") // expect rotation by maxSize
 
 	log0, elog0 = ioutil.ReadFile(logFile.Name())
 	log1, elog1 = ioutil.ReadFile(logFile.Name() + ".1")
@@ -78,18 +79,20 @@ func TestLogrotate(t *testing.T) {
 	assert.NoError(t, elog1)
 	assert.NoError(t, elog2)
 	assert.NoError(t, elog3)
+
 	assert.Contains(t, string(log3), "debug1")
 	assert.Contains(t, string(log3), "info1")
 	assert.Contains(t, string(log2), "warn1")
-	assert.Contains(t, string(log1), "debug2")
+	assert.Contains(t, string(log2), "debug2")
 	assert.Contains(t, string(log1), "info2")
-	assert.Contains(t, string(log0), "warn2")
+	assert.Contains(t, string(log1), "warn2")
+	assert.Contains(t, string(log0), "debug3")
 }
 
 func TestSanitizeEntries(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "log")
 	defer os.Remove(tmpFile.Name())
-	Config(tmpFile.Name(), 0, 0, 1, 3, 0)
+	Config(tmpFile.Name(), 0, 1, 3, 0)
 	payload1, _ := json.Marshal(struct{ Password, Token string }{
 		Password: `PASS
 		WORD`,
