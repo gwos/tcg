@@ -13,7 +13,6 @@ import (
 	"github.com/gwos/tcg/transit"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"time"
@@ -105,6 +104,7 @@ const (
 	currentStatusPath = "/ServiceComms/CurrentStatus"
 	microsoftGroup = "Microsoft Apps"
 	office365App = "Office365"
+	interacApp = "Interac_OS365"
 )
 
 func (connector *MicrosoftGraphConnector)  SetCredentials(tenant string, client string, secret string) {
@@ -190,6 +190,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 	}
 	connector.collectInventory(cfg, monitoredState, &msGroup)
 	connector.collectStatus(cfg, monitoredState[office365App].Services)
+	connector.collectInteracInventory(cfg, monitoredState, &msGroup)
 	groups[microsoftGroup] = msGroup
 
 	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
@@ -235,6 +236,62 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
  	return inventory, monitored, hostGroups
 }
 
+func (connector *MicrosoftGraphConnector) collectInteracInventory(
+	cfg *ExtConfig, monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
+	hostResource := MicrosoftGraphResource{
+		Name:     interacApp,
+		Type:     transit.Host,
+		Status:   transit.HostUp,
+		Message:  "UP - Healthy",
+		// Labels:   labels,
+		Services: make(map[string]transit.DynamicMonitoredService),
+	}
+	monitoredState[interacApp] = hostResource
+	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+		Name:  hostResource.Name,
+		Owner: group.GroupName,
+		Type:  transit.Host,
+	})
+	// create one Drive metrics
+	serviceName :=  "OneDrive for Business"
+	serviceProperties := make(map[string]interface{})
+	serviceProperties["isGraphed"] = true
+	monitoredService, _ :=connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+	MicrosoftDrive(monitoredService, connector, cfg, connector.graphToken)
+	monitoredService.Status = transit.ServiceOk
+	monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
+		monitoredService.Metrics[2].Value.DoubleValue)
+	if monitoredService != nil {
+		hostResource.Services[monitoredService.Name] = *monitoredService
+	}
+
+	// create License metrics
+	serviceName2 :=  "License Activities"
+	serviceProperties2 := make(map[string]interface{})
+	serviceProperties2["isGraphed"] = true
+	monitoredService2, _ :=connectors.CreateService(serviceName2, interacApp, []transit.TimeSeries{}, serviceProperties2)
+	AddonLicenseMetrics(monitoredService2, connector, cfg, connector.graphToken)
+	monitoredService2.Status = transit.ServiceOk
+	monitoredService2.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
+		 monitoredService2.Metrics[1].Value.DoubleValue, monitoredService2.Metrics[0].Value.DoubleValue);
+	if monitoredService2 != nil {
+		hostResource.Services[monitoredService2.Name] = *monitoredService2
+	}
+	// create SharePoint metrics
+	serviceName3 :=  "SharePoint Online"
+	serviceProperties3 := make(map[string]interface{})
+	serviceProperties3["isGraphed"] = true
+	monitoredService3, _ :=connectors.CreateService(serviceName3, interacApp, []transit.TimeSeries{}, serviceProperties3)
+	SharePoint(monitoredService3, connector, cfg, connector.graphToken)
+	monitoredService3.Status = transit.ServiceOk
+	monitoredService3.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%",
+		monitoredService3.Metrics[2].Value.DoubleValue)
+	if monitoredService3 != nil {
+		hostResource.Services[monitoredService3.Name] = *monitoredService3
+	}
+	return nil
+}
+
 func (connector *MicrosoftGraphConnector) collectInventory(
 	cfg *ExtConfig, monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
 
@@ -278,12 +335,12 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 		Type:  transit.Host,
 	})
 	odata := ODataServicePayload{}
-	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
+	//randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
 	json.Unmarshal(responseBody, &odata)
 	for _, ods := range odata.Services {
 		metricBuilder := connectors.MetricBuilder{
 			Name:       ods.DisplayName,
-			Value:      randomizer.Intn(2) + 1,
+			Value:      0,
 			UnitType:   transit.UnitCounter,
 			// TODO: add these after merge
 			//ComputeType: metricDefinition.ComputeType,
@@ -293,12 +350,12 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 			Graphed: true, // TODO: calculate this from configs
 		}
 		monitoredService, _ := connectors.BuildServiceForMetric(hostResource.Name, metricBuilder)
-		switch ods.DisplayName {
-		case "Microsoft 365 Apps":
-			AddonLicenseMetrics(monitoredService, connector, cfg, connector.graphToken)
-		case "OneDrive for Business":
-			MicrosoftDrive(monitoredService, connector, cfg, connector.graphToken)
-		}
+		//switch ods.DisplayName {
+		//case "Microsoft 365 Apps":
+		//	AddonLicenseMetrics(monitoredService, connector, cfg, connector.graphToken)
+		//case "OneDrive for Business":
+		//	MicrosoftDrive(monitoredService, connector, cfg, connector.graphToken)
+		//}
 		if monitoredService != nil {
 			hostResource.Services[metricBuilder.Name] = *monitoredService
 		}
@@ -365,7 +422,7 @@ func (connector *MicrosoftGraphConnector) translateServiceStatus(odStatus string
 		status = transit.ServiceWarning
 		message = "The cause of the issue has been identified, we know what corrective action to take and are in the process of bringing the service back to a healthy state."
 	case "ExtendedRecovery":
-		status = transit.ServicePending
+		status = transit.ServiceWarning
 		message = "A corrective action is in progress to restore service to most users but will take some time to reach all the affected systems"
 	}
 	return status, message
