@@ -398,7 +398,7 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 	return &threshold, nil
 }
 
-// Creates metric based on data provided in metric builder and if metric successfully created
+// BuildServiceForMetric - creates metric based on data provided in metric builder and if metric successfully created
 // creates service with same name as metric which contains only this one metric
 // returns the result of service creation
 func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.DynamicMonitoredService, error) {
@@ -411,7 +411,7 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
 
 	serviceProperties := make(map[string]interface{})
-	serviceProperties["isGraphed"] = metricBuilder.Graphed
+	// serviceProperties["isGraphed"] = metricBuilder.Graphed
 
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
 }
