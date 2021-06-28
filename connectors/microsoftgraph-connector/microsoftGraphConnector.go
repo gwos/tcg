@@ -283,17 +283,21 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	for _, ods := range odata.Services {
 		metricBuilder := connectors.MetricBuilder{
 			Name:       ods.DisplayName,
-			Value:      randomizer.Intn(2),
+			Value:      randomizer.Intn(2) + 1,
 			UnitType:   transit.UnitCounter,
 			// TODO: add these after merge
 			//ComputeType: metricDefinition.ComputeType,
 			//Expression:  metricDefinition.Expression,
 			Warning:  -1,
 			Critical: -1,
+			Graphed: true, // TODO: calculate this from configs
 		}
 		monitoredService, _ := connectors.BuildServiceForMetric(hostResource.Name, metricBuilder)
-		if ods.DisplayName == "Microsoft 365 Apps" {
+		switch ods.DisplayName {
+		case "Microsoft 365 Apps":
 			AddonLicenseMetrics(monitoredService, connector, cfg, connector.graphToken)
+		case "OneDrive for Business":
+			MicrosoftDrive(monitoredService, connector, cfg, connector.graphToken)
 		}
 		if monitoredService != nil {
 			hostResource.Services[metricBuilder.Name] = *monitoredService

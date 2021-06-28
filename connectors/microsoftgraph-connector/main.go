@@ -34,6 +34,9 @@ func main() {
 	tenantId := env.GetString("MICROSOFT_TENANT_ID", "NOT SET")
 	clientId := env.GetString("MICROSOFT_CLIENT_ID", "NOT SET")
 	clientSecret := env.GetString("MICROSOFT_CLIENT_SECRET", "NOT SET")
+	log.Error("tenant id = " + tenantId)
+	log.Error("client id = " + clientId)
+	log.Error("client secret = " + clientSecret)
 	connector.SetCredentials(tenantId, clientId, clientSecret)
 	log.Info("[MsGraph Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
@@ -51,6 +54,7 @@ func main() {
 
 	/* return on quit signal */
 	<-transitService.Quit()
+	log.Info("Exiting process")
 }
 
 func configHandler(data []byte) {
@@ -124,7 +128,7 @@ func periodicHandler() {
 	inventory, monitored, groups := connector.Collect(extConfig)
 	log.Debug("[MsGraph Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
 
-	if count < 2 {
+	if count > -1 {
 		if err := connectors.SendInventory(
 			context.Background(),
 			inventory,
@@ -139,6 +143,7 @@ func periodicHandler() {
 	if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
 		log.Error("[MsGraph Connector]: Error during sending metrics.", err)
 	}
+	log.Info("completed period handler")
 }
 
 // TODO: remove this
