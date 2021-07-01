@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/golang/snappy"
+	"github.com/prometheus/common/model"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -89,8 +93,50 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
+	//decc := &SampleDecoder{
+	//	Dec: &protoDecoder{r: strings.NewReader(body)},
+	//	Opts: &DecodeOptions{
+	//		Timestamp: testTime,
+	//	},
+	//}
+
+	//writer := bytes.NewBufferString("your string")
+	//w, err := expfmt.MetricFamilyToOpenMetrics(writer, body.(dto.MetricFamilys))
+	//log.Error(w)
 	var parser expfmt.TextParser
+	if isProtobuf {
+ 		// reader := bytes.NewReader(body)
+		dest := make([]byte, len(body))
+		dst, err := snappy.Decode(dest, body)
+		if err != nil {
+			return nil, nil, err
+		}
+		r := bytes.NewReader(dst)
+ 		// r := strings.NewReader(s)
+		dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
+		//  log.Error("body: [", s, "]")
+
+		//mf := dto.MetricFamily{}
+		//err := dec.Decode(&mf)
+		//log.Error(err)
+	 	decoder := expfmt.SampleDecoder{
+			Dec:  dec,
+			Opts: &expfmt.DecodeOptions{},
+		}
+		for {
+			var v model.Vector
+			if err := decoder.Decode(&v); err != nil {
+				if err == io.EOF {
+					// Expected loop termination condition.
+					break
+				}
+				log.Error("Invalid Decode. Skipping.")
+				continue
+				}
+		}
+ 		return nil, nil, errors.New("testing ...")
+	}
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
 	if err != nil {
 		return nil, nil, err
@@ -105,8 +151,8 @@ func parsePrometheusBody(body []byte, resourceIndex int) (*[]transit.DynamicMoni
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(body []byte, resourceIndex int, statusDown bool) error {
-	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex); err == nil {
+func  processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf bool) error {
+	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf); err == nil {
 		if statusDown {
 			for i := 0; i < len(*monitoredResources); i++ {
 				(*monitoredResources)[i].Status = transit.HostUnscheduledDown
@@ -370,13 +416,18 @@ func initializeEntrypoints() []services.Entrypoint {
 }
 
 func receiverHandler(c *gin.Context) {
+	log.Error("content type = ", c.GetHeader("Content-Type"))
 	body, err := c.GetRawData()
+	if len(body) < 2 {
+		log.Info("Received Prometheus Push heartbeat...")
+	}
 	if err != nil {
 		log.Error("|apmConnector.go| : [receiverHandler] : ", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	err = processMetrics(body, -1, false)
+	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
+	err = processMetrics(body, -1, false, isProtobuf)
 	if err != nil {
 		log.Error(fmt.Sprintf("[APM Connector]~[Push]: %s", err))
 	}
@@ -396,7 +447,7 @@ func pull(resources []Resource) {
 				resource.URL, string(byteResponse)))
 			continue
 		}
-		err = processMetrics(byteResponse, index, statusCode == 220)
+		err = processMetrics(byteResponse, index, statusCode == 220, false				)
 		if err != nil {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
