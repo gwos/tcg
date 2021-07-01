@@ -1,7 +1,7 @@
 connector:
   agentId: ""
-  appName: KUBERNETES
-  appType: KUBERNETES
+  appName: OFFICE365
+  appType: OFFICE365
   controllerAddr: 0.0.0.0:8099
   natsFilestoreDir: natsstore
   natsStoreType: FILE
