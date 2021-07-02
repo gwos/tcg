@@ -1,14 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/golang/snappy"
-	"github.com/prometheus/common/model"
-	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -112,29 +109,35 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 		if err != nil {
 			return nil, nil, err
 		}
-		r := bytes.NewReader(dst)
- 		// r := strings.NewReader(s)
-		dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
-		//  log.Error("body: [", s, "]")
 
-		//mf := dto.MetricFamily{}
-		//err := dec.Decode(&mf)
-		//log.Error(err)
-	 	decoder := expfmt.SampleDecoder{
-			Dec:  dec,
-			Opts: &expfmt.DecodeOptions{},
-		}
-		for {
-			var v model.Vector
-			if err := decoder.Decode(&v); err != nil {
-				if err == io.EOF {
-					// Expected loop termination condition.
-					break
-				}
-				log.Error("Invalid Decode. Skipping.")
-				continue
-				}
-		}
+		var pp PromParser
+		result, error := pp.Parse(dst)
+		log.Error(result)
+		log.Error(error)
+
+		//r := bytes.NewReader(dst)
+ 		//// r := strings.NewReader(s)
+		//dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
+		////  log.Error("body: [", s, "]")
+		//
+		////mf := dto.MetricFamily{}
+		////err := dec.Decode(&mf)
+		////log.Error(err)
+	 	//decoder := expfmt.SampleDecoder{
+		//	Dec:  dec,
+		//	Opts: &expfmt.DecodeOptions{},
+		//}
+		//for {
+		//	var v model.Vector
+		//	if err := decoder.Decode(&v); err != nil {
+		//		if err == io.EOF {
+		//			// Expected loop termination condition.
+		//			break
+		//		}
+		//		log.Error("Invalid Decode. Skipping.")
+		//		continue
+		//		}
+		//}
  		return nil, nil, errors.New("testing ...")
 	}
 	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
