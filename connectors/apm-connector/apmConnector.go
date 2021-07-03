@@ -91,17 +91,9 @@ const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
 func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
-	//decc := &SampleDecoder{
-	//	Dec: &protoDecoder{r: strings.NewReader(body)},
-	//	Opts: &DecodeOptions{
-	//		Timestamp: testTime,
-	//	},
-	//}
-
-	//writer := bytes.NewBufferString("your string")
-	//w, err := expfmt.MetricFamilyToOpenMetrics(writer, body.(dto.MetricFamilys))
-	//log.Error(w)
-	var parser expfmt.TextParser
+	var textParser expfmt.TextParser
+	var promParser PromParser
+	var prometheusServices map[string]*dto.MetricFamily
 	if isProtobuf {
  		// reader := bytes.NewReader(body)
 		dest := make([]byte, len(body))
@@ -109,43 +101,18 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 		if err != nil {
 			return nil, nil, err
 		}
-
-		var pp PromParser
-		result, error := pp.Parse(dst)
-		log.Error(result)
-		log.Error(error)
-
-		//r := bytes.NewReader(dst)
- 		//// r := strings.NewReader(s)
-		//dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
-		////  log.Error("body: [", s, "]")
-		//
-		////mf := dto.MetricFamily{}
-		////err := dec.Decode(&mf)
-		////log.Error(err)
-	 	//decoder := expfmt.SampleDecoder{
-		//	Dec:  dec,
-		//	Opts: &expfmt.DecodeOptions{},
-		//}
-		//for {
-		//	var v model.Vector
-		//	if err := decoder.Decode(&v); err != nil {
-		//		if err == io.EOF {
-		//			// Expected loop termination condition.
-		//			break
-		//		}
-		//		log.Error("Invalid Decode. Skipping.")
-		//		continue
-		//		}
-		//}
- 		return nil, nil, errors.New("testing ...")
-	}
-	prometheusServices, err := parser.TextToMetricFamilies(strings.NewReader(string(body)))
-	if err != nil {
-		return nil, nil, err
+		prometheusServices, err = promParser.Parse(dst)
+		if err != nil {
+			return nil, nil, err
+		}
+	} else {
+		var err error
+		prometheusServices, err = textParser.TextToMetricFamilies(strings.NewReader(string(body)))
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	groups := make(map[string][]transit.MonitoredResourceRef)
-
 	monitoredResources, err := parsePrometheusServices(prometheusServices, groups, resourceIndex)
 	if err != nil {
 		return nil, nil, err
@@ -153,6 +120,7 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 	resourceGroups := constructResourceGroups(groups)
 	return monitoredResources, &resourceGroups, nil
 }
+
 
 func  processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf bool) error {
 	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf); err == nil {
@@ -185,7 +153,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 		result[serviceName] = metric.GetCounter().GetValue()
 	case dto.MetricType_UNTYPED:
 		result[serviceName] = metric.GetUntyped().GetValue()
-	case dto.MetricType_GAUGE:
+		case dto.MetricType_GAUGE:
 		result[serviceName] = metric.GetGauge().GetValue()
 	case dto.MetricType_HISTOGRAM:
 		if metric.GetHistogram().SampleSum != nil {
@@ -419,7 +387,7 @@ func initializeEntrypoints() []services.Entrypoint {
 }
 
 func receiverHandler(c *gin.Context) {
-	log.Error("content type = ", c.GetHeader("Content-Type"))
+	log.Info("content type = ", c.GetHeader("Content-Type"))
 	body, err := c.GetRawData()
 	if len(body) < 2 {
 		log.Info("Received Prometheus Push heartbeat...")
@@ -456,3 +424,38 @@ func pull(resources []Resource) {
 		}
 	}
 }
+
+//decc := &SampleDecoder{
+//	Dec: &protoDecoder{r: strings.NewReader(body)},
+//	Opts: &DecodeOptions{
+//		Timestamp: testTime,
+//	},
+//}
+
+//writer := bytes.NewBufferString("your string")
+//w, err := expfmt.MetricFamilyToOpenMetrics(writer, body.(dto.MetricFamilys))
+//log.Error(w)
+
+//r := bytes.NewReader(dst)
+//// r := strings.NewReader(s)
+//dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
+////  log.Error("body: [", s, "]")
+//
+////mf := dto.MetricFamily{}
+////err := dec.Decode(&mf)
+////log.Error(err)
+//decoder := expfmt.SampleDecoder{
+//	Dec:  dec,
+//	Opts: &expfmt.DecodeOptions{},
+//}
+//for {
+//	var v model.Vector
+//	if err := decoder.Decode(&v); err != nil {
+//		if err == io.EOF {
+//			// Expected loop termination condition.
+//			break
+//		}
+//		log.Error("Invalid Decode. Skipping.")
+//		continue
+//		}
+//}
