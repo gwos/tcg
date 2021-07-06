@@ -24,24 +24,22 @@ const (
 	ViewServices MicrosoftGraphView = "ViewServices"
 )
 
-
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	AppType   string
-	AppName   string
-	AgentID   string
-	EndPoint  string
-	Ownership transit.HostOwnershipType
-	Views     map[MicrosoftGraphView]map[string]transit.MetricDefinition
-	Groups    []transit.ResourceGroup
+	TenantId     string                                                     `json:"officeTenantId"`
+	ClientId     string                                                     `json:"officeClientId"`
+	ClientSecret string                                                     `json:"officeClientSecret"`
+	Ownership    transit.HostOwnershipType                                  `json:"ownership,omitempty"`
+	Groups       []transit.ResourceGroup                                    `json:"groups"`
+	Views        map[MicrosoftGraphView]map[string]transit.MetricDefinition `json:"views"`
 }
 
 type MicrosoftGraphConnector struct {
-	config     ExtConfig
-	ctx        context.Context
-	officeToken	string
-	graphToken	string
+	config      ExtConfig
+	ctx         context.Context
+	officeToken string
+	graphToken  string
 }
 
 type MicrosoftGraphResource struct {
@@ -54,34 +52,34 @@ type MicrosoftGraphResource struct {
 }
 
 type ODataServicePayload struct {
-	Context string `json:"@odata.context"`
+	Context  string         `json:"@odata.context"`
 	Services []ODataService `json:"value"`
 }
 
 type ODataService struct {
 	DisplayName string
-	Id string
+	Id          string
 	// Features []Feature
 }
 
 type ODataStatus struct {
-	Context string `json:"@odata.context"`
+	Context  string          `json:"@odata.context"`
 	Services []ServiceStatus `json:"value"`
 }
 
 type ServiceStatus struct {
-	Id string
+	Id                  string
 	WorkloadDisplayName string
-	Status string
-	StatusDisplayName string
-	StatusTime string
+	Status              string
+	StatusDisplayName   string
+	StatusTime          string
 }
 
 type AuthRecord struct {
-	GrantType   	string `json:"grant_type"`
-	ClientID   		string `json:"client_id"`
-	ClientSecret	string `json:"client_secret"`
-	Resource		string `json:"resource"`
+	GrantType    string `json:"grant_type"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
+	Resource     string `json:"resource"`
 }
 
 var httpClient = &http.Client{
@@ -91,23 +89,23 @@ var httpClient = &http.Client{
 }
 
 var (
-	tenantID = ""  // The Directory ID from Azure AD
-	clientID = ""  // The Application ID of the registered app
-	clientSecret = ""  // The secret key of the registered app
+	tenantID     = "" // The Directory ID from Azure AD
+	clientID     = "" // The Application ID of the registered app
+	clientSecret = "" // The secret key of the registered app
 )
 
 const (
-	officeResource = "https://manage.office.com"
-	graphResource = "https://graph.microsoft.com"
-	officeEndPoint = "https://manage.office.com/api/v1.0/"
-	servicesPath = "/ServiceComms/Services"
+	officeResource    = "https://manage.office.com"
+	graphResource     = "https://graph.microsoft.com"
+	officeEndPoint    = "https://manage.office.com/api/v1.0/"
+	servicesPath      = "/ServiceComms/Services"
 	currentStatusPath = "/ServiceComms/CurrentStatus"
-	microsoftGroup = "Microsoft Apps"
-	office365App = "Office365"
-	interacApp = "Interac_OS365"
+	microsoftGroup    = "Microsoft Apps"
+	office365App      = "Office365"
+	interacApp        = "Interac_OS365"
 )
 
-func (connector *MicrosoftGraphConnector)  SetCredentials(tenant string, client string, secret string) {
+func (connector *MicrosoftGraphConnector) SetCredentials(tenant string, client string, secret string) {
 	tenantID = tenant
 	clientID = client
 	clientSecret = secret
@@ -117,12 +115,12 @@ func (connector *MicrosoftGraphConnector) Initialize(config ExtConfig) error {
 	if connector.officeToken != "" {
 		return nil
 	}
-	token, err := login(tenantID, clientID, clientSecret,  officeResource)
+	token, err := login(tenantID, clientID, clientSecret, officeResource)
 	if err != nil {
 		return nil
 	}
 	connector.officeToken = token
-	token, err = login(tenantID, clientID, clientSecret,  graphResource)
+	token, err = login(tenantID, clientID, clientSecret, graphResource)
 	if err != nil {
 		return nil
 	}
@@ -143,11 +141,11 @@ func login(tenantID string, clientID string, clientSecret string, resource strin
 	var response *http.Response
 
 	endPoint := "https://login.microsoftonline.com/" + tenantID + "/oauth2/token"
-	auth := AuthRecord {
-		GrantType: "client_credentials",
-		ClientID: clientID,
+	auth := AuthRecord{
+		GrantType:    "client_credentials",
+		ClientID:     clientID,
 		ClientSecret: clientSecret,
-		Resource: resource,
+		Resource:     resource,
 	}
 	form := url.Values{}
 	form.Add("grant_type", "client_credentials")
@@ -158,7 +156,7 @@ func login(tenantID string, clientID string, clientSecret string, resource strin
 	var body io.Reader
 	body = bytes.NewBuffer(byteBody)
 	request, err := http.NewRequest(http.MethodPost, endPoint, body)
-	request.Header.Set(	"Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response, err = httpClient.Do(request)
 	if err != nil {
 		return "", err
@@ -233,16 +231,16 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 		hostGroups[index] = group
 		index = index + 1
 	}
- 	return inventory, monitored, hostGroups
+	return inventory, monitored, hostGroups
 }
 
 func (connector *MicrosoftGraphConnector) collectInteracInventory(
 	cfg *ExtConfig, monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
 	hostResource := MicrosoftGraphResource{
-		Name:     interacApp,
-		Type:     transit.Host,
-		Status:   transit.HostUp,
-		Message:  "UP - Healthy",
+		Name:    interacApp,
+		Type:    transit.Host,
+		Status:  transit.HostUp,
+		Message: "UP - Healthy",
 		// Labels:   labels,
 		Services: make(map[string]transit.DynamicMonitoredService),
 	}
@@ -253,10 +251,10 @@ func (connector *MicrosoftGraphConnector) collectInteracInventory(
 		Type:  transit.Host,
 	})
 	// create one Drive metrics
-	serviceName :=  "OneDrive for Business"
+	serviceName := "OneDrive for Business"
 	serviceProperties := make(map[string]interface{})
 	serviceProperties["isGraphed"] = true
-	monitoredService, _ :=connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+	monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 	MicrosoftDrive(monitoredService, connector, cfg, connector.graphToken)
 	monitoredService.Status = transit.ServiceOk
 	monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
@@ -266,22 +264,22 @@ func (connector *MicrosoftGraphConnector) collectInteracInventory(
 	}
 
 	// create License metrics
-	serviceName2 :=  "License Activities"
+	serviceName2 := "License Activities"
 	serviceProperties2 := make(map[string]interface{})
 	serviceProperties2["isGraphed"] = true
-	monitoredService2, _ :=connectors.CreateService(serviceName2, interacApp, []transit.TimeSeries{}, serviceProperties2)
+	monitoredService2, _ := connectors.CreateService(serviceName2, interacApp, []transit.TimeSeries{}, serviceProperties2)
 	AddonLicenseMetrics(monitoredService2, connector, cfg, connector.graphToken)
 	monitoredService2.Status = transit.ServiceOk
 	monitoredService2.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
-		 monitoredService2.Metrics[1].Value.DoubleValue, monitoredService2.Metrics[0].Value.DoubleValue);
+		monitoredService2.Metrics[1].Value.DoubleValue, monitoredService2.Metrics[0].Value.DoubleValue)
 	if monitoredService2 != nil {
 		hostResource.Services[monitoredService2.Name] = *monitoredService2
 	}
 	// create SharePoint metrics
-	serviceName3 :=  "SharePoint Online"
+	serviceName3 := "SharePoint Online"
 	serviceProperties3 := make(map[string]interface{})
 	serviceProperties3["isGraphed"] = true
-	monitoredService3, _ :=connectors.CreateService(serviceName3, interacApp, []transit.TimeSeries{}, serviceProperties3)
+	monitoredService3, _ := connectors.CreateService(serviceName3, interacApp, []transit.TimeSeries{}, serviceProperties3)
 	SharePoint(monitoredService3, connector, cfg, connector.graphToken)
 	monitoredService3.Status = transit.ServiceOk
 	monitoredService3.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%",
@@ -295,9 +293,9 @@ func (connector *MicrosoftGraphConnector) collectInteracInventory(
 func (connector *MicrosoftGraphConnector) collectInventory(
 	cfg *ExtConfig, monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
 
-	request, _ := http.NewRequest(http.MethodGet, officeEndPoint + tenantID + servicesPath, nil)
-	request.Header.Set(	"accept", "application/json; odata.metadata=full")
-	request.Header.Set("Authorization", "Bearer " + connector.officeToken)
+	request, _ := http.NewRequest(http.MethodGet, officeEndPoint+tenantID+servicesPath, nil)
+	request.Header.Set("accept", "application/json; odata.metadata=full")
+	request.Header.Set("Authorization", "Bearer "+connector.officeToken)
 	response, err := httpClient.Do(request)
 	if err != nil {
 		return err
@@ -307,7 +305,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 		connector.officeToken = ""
 		connector.graphToken = ""
 		connector.Initialize(*cfg)
-		request.Header.Set("Authorization", "Bearer " + connector.officeToken)
+		request.Header.Set("Authorization", "Bearer "+connector.officeToken)
 
 		response, err = httpClient.Do(request)
 		if err != nil {
@@ -321,10 +319,10 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	defer response.Body.Close()
 
 	hostResource := MicrosoftGraphResource{
-		Name:     office365App,
-		Type:     transit.Host,
-		Status:   transit.HostUp,
-		Message:  "UP - Healthy",
+		Name:    office365App,
+		Type:    transit.Host,
+		Status:  transit.HostUp,
+		Message: "UP - Healthy",
 		// Labels:   labels,
 		Services: make(map[string]transit.DynamicMonitoredService),
 	}
@@ -339,15 +337,15 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	json.Unmarshal(responseBody, &odata)
 	for _, ods := range odata.Services {
 		metricBuilder := connectors.MetricBuilder{
-			Name:       ods.DisplayName,
-			Value:      0,
-			UnitType:   transit.UnitCounter,
+			Name:     ods.DisplayName,
+			Value:    0,
+			UnitType: transit.UnitCounter,
 			// TODO: add these after merge
 			//ComputeType: metricDefinition.ComputeType,
 			//Expression:  metricDefinition.Expression,
 			Warning:  -1,
 			Critical: -1,
-			Graphed: true, // TODO: calculate this from configs
+			Graphed:  true, // TODO: calculate this from configs
 		}
 		monitoredService, _ := connectors.BuildServiceForMetric(hostResource.Name, metricBuilder)
 		//switch ods.DisplayName {
@@ -364,9 +362,9 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 }
 
 func (connector *MicrosoftGraphConnector) collectStatus(cfg *ExtConfig, monitoredServices map[string]transit.DynamicMonitoredService) error {
-	request, _ := http.NewRequest(http.MethodGet, officeEndPoint + tenantID + currentStatusPath, nil)
-	request.Header.Set(	"accept", "application/json; odata.metadata=full")
-	request.Header.Set("Authorization", "Bearer " + connector.officeToken)
+	request, _ := http.NewRequest(http.MethodGet, officeEndPoint+tenantID+currentStatusPath, nil)
+	request.Header.Set("accept", "application/json; odata.metadata=full")
+	request.Header.Set("Authorization", "Bearer "+connector.officeToken)
 	response, err := httpClient.Do(request)
 	if err != nil {
 		return err
@@ -376,7 +374,7 @@ func (connector *MicrosoftGraphConnector) collectStatus(cfg *ExtConfig, monitore
 		connector.officeToken = ""
 		connector.graphToken = ""
 		connector.Initialize(*cfg)
-		request.Header.Set("Authorization", "Bearer " + connector.officeToken)
+		request.Header.Set("Authorization", "Bearer "+connector.officeToken)
 		response, err = httpClient.Do(request)
 		if err != nil {
 			return err

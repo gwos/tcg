@@ -34,9 +34,6 @@ func main() {
 	tenantId := env.GetString("MICROSOFT_TENANT_ID", "NOT SET")
 	clientId := env.GetString("MICROSOFT_CLIENT_ID", "NOT SET")
 	clientSecret := env.GetString("MICROSOFT_CLIENT_SECRET", "NOT SET")
-	log.Error("tenant id = " + tenantId)
-	log.Error("client id = " + clientId)
-	log.Error("client secret = " + clientSecret)
 	connector.SetCredentials(tenantId, clientId, clientSecret)
 	log.Info("[MsGraph Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
@@ -61,13 +58,9 @@ func configHandler(data []byte) {
 	log.Info("[K8 Connector]: Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
-		AppType:   config.GetConfig().Connector.AppType,
-		AppName:   config.GetConfig().Connector.AppName,
-		AgentID:   config.GetConfig().Connector.AgentID,
-		EndPoint:  "gwos.bluesunrise.com:8001", // TODO: hardcoded
 		Ownership: transit.Yield,
-		Views:     make(map[MicrosoftGraphView]map[string]transit.MetricDefinition),
 		Groups:    []transit.ResourceGroup{},
+		Views:     make(map[MicrosoftGraphView]map[string]transit.MetricDefinition),
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -117,6 +110,8 @@ func configHandler(data []byte) {
 	if err == nil {
 		chksum = chk
 	}
+
+	connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -151,5 +146,3 @@ func temporaryMetricsDefinitions() map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
 	return metrics
 }
-
-
