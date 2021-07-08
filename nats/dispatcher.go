@@ -7,10 +7,11 @@ import (
 	"time"
 
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/nats-io/stan.go"
 	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -66,12 +67,14 @@ func getDispatcher() *natsDispatcher {
 // in case of some transient error (like networking issue)
 // it closes current subscription (doesn't unsubscribe) and plans retry
 func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
-	logEntry := log.With(log.Fields{
-		"durableName": opt.DurableName,
-	}).WithDebug(log.Fields{
-		"error":   err,
-		"message": msg,
-	})
+	logEvent := log.Info().Err(err).Str("durableName", opt.DurableName).
+		Func(func(e *zerolog.Event) {
+			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+				e.RawJSON("stan.data", msg.Data).
+					Uint64("stan.sequence", msg.Sequence).
+					Int64("stan.timestamp", msg.Timestamp)
+			}
+		})
 
 	if errors.Is(err, tcgerr.ErrTransient) {
 		retry := dispatcherRetry{
@@ -85,7 +88,8 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 		retry.Retry++
 
 		if retry.Retry < len(retryDelays) {
-			logEntry.WithField("retry", retry).Log(log.InfoLevel, "[NATS]: Not delivered: Will retry")
+			logEvent.Int("retry", retry.Retry).
+				Msg("dispatcher could not deliver: will retry")
 			d.retryes.Set(opt.DurableName, retry, 0)
 			delay := retryDelays[retry.Retry]
 
@@ -99,11 +103,11 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 			}()
 		} else {
 			d.retryes.Delete(opt.DurableName)
-			logEntry.Log(log.InfoLevel, "[NATS]: Not delivered: Stop retrying")
+			logEvent.Msg("dispatcher could not deliver: stop retrying")
 		}
 
 	} else {
-		logEntry.Log(log.InfoLevel, "[NATS]: Not delivered: Will not retry")
+		logEvent.Msg("dispatcher could not deliver: will not retry")
 	}
 }
 
@@ -136,11 +140,15 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 			}
 			_ = msg.Ack()
 			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
-			log.With(log.Fields{
-				"durableName": opt.DurableName,
-			}).WithDebug(log.Fields{
-				"message": msg,
-			}).Log(log.InfoLevel, "[NATS]: Delivered")
+			log.Info().Str("durableName", opt.DurableName).
+				Func(func(e *zerolog.Event) {
+					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+						e.RawJSON("stan.data", msg.Data).
+							Uint64("stan.sequence", msg.Sequence).
+							Int64("stan.timestamp", msg.Timestamp)
+					}
+				}).
+				Msg("dispatcher delivered")
 		},
 		stan.SetManualAckMode(),
 		stan.AckWait(d.config.AckWait),
@@ -178,10 +186,9 @@ func (d *natsDispatcher) taskRetryHandler(task *taskQueue.Task) error {
 		err = fmt.Errorf("%w: is not connected", ErrDispatcher)
 	}
 	if err != nil {
-		log.With(log.Fields{
-			"error": err,
-			"opt":   opt,
-		}).Log(log.InfoLevel, "[NATS]: dispatcher failed")
+		log.Info().Err(err).
+			Str("durableName", opt.DurableName).
+			Msg("dispatcher failed")
 	}
 	return err
 }
