@@ -3,9 +3,10 @@ package transit
 import (
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
 	"strconv"
+
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/rs/zerolog/log"
 )
 
 // VersionString defines type of constant
@@ -575,7 +576,7 @@ func (monitoredService *DynamicMonitoredService) CreateProperties(properties map
 		var typedValue TypedValue
 		err := typedValue.toTypedValue(v)
 		if err != nil {
-			log.Error("Property ", k, " of service ", monitoredService.Name, ": ", err)
+			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
 		}
 		monitoredService.CreateProperty(k, typedValue)
 	}
