@@ -1,38 +1,19 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"github.com/gwos/tcg/log"
-	dto "github.com/prometheus/client_model/go"
-	"math"
-	"time"
-	//"github.com/influxdata/telegraf"
-	//"github.com/influxdata/telegraf/metric"
 	"github.com/gogo/protobuf/proto"
+	"github.com/gwos/tcg/log"
+	"github.com/pkg/errors"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
+	"math"
+	"time"
 )
 
 type PromParser struct {
 	DefaultTags map[string]string
-}
-
-func (p *PromParser) ParseDebug(buf []byte) (interface{}, error) {
-	var req prompb.WriteRequest
-	if err := proto.Unmarshal(buf, &req); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
-	}
-	for _, ts := range req.Timeseries {
-		println("----- time series ----")
-		for _, l := range ts.Labels {
-			fmt.Printf("\t%s = %s\n", l.GetName(), l.GetValue())
-		}
-		for _, s := range ts.Samples {
-			fmt.Printf("\t %f, %d\n", s.GetValue(), s.GetTimestamp())
-		}
-	}
-	return nil, errors.New("testing")
 }
 
 func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
@@ -96,23 +77,20 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 	return metrics, err
 }
 
-//func (p *Parser) ParseLine(line string) (telegraf.Metric, error) {
-//	metrics, err := p.Parse([]byte(line))
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	if len(metrics) < 1 {
-//		return nil, fmt.Errorf("No metrics in line")
-//	}
-//
-//	if len(metrics) > 1 {
-//		return nil, fmt.Errorf("More than one metric in line")
-//	}
-//
-//	return metrics[0], nil
-//}
-//
-//func (p *Parser) SetDefaultTags(tags map[string]string) {
-//	p.DefaultTags = tags
-//}
+func (p *PromParser) parseDebug(buf []byte) (interface{}, error) {
+	var req prompb.WriteRequest
+	if err := proto.Unmarshal(buf, &req); err != nil {
+		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
+	}
+	for _, ts := range req.Timeseries {
+		println("----- time series ----")
+		for _, l := range ts.Labels {
+			fmt.Printf("\t%s = %s\n", l.GetName(), l.GetValue())
+		}
+		for _, s := range ts.Samples {
+			fmt.Printf("\t %f, %d\n", s.GetValue(), s.GetTimestamp())
+		}
+	}
+	return nil, errors.New("testing")
+}
+

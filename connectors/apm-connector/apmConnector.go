@@ -424,38 +424,3 @@ func pull(resources []Resource) {
 		}
 	}
 }
-
-//decc := &SampleDecoder{
-//	Dec: &protoDecoder{r: strings.NewReader(body)},
-//	Opts: &DecodeOptions{
-//		Timestamp: testTime,
-//	},
-//}
-
-//writer := bytes.NewBufferString("your string")
-//w, err := expfmt.MetricFamilyToOpenMetrics(writer, body.(dto.MetricFamilys))
-//log.Error(w)
-
-//r := bytes.NewReader(dst)
-//// r := strings.NewReader(s)
-//dec := expfmt.NewDecoder(r, expfmt.FmtProtoDelim)
-////  log.Error("body: [", s, "]")
-//
-////mf := dto.MetricFamily{}
-////err := dec.Decode(&mf)
-////log.Error(err)
-//decoder := expfmt.SampleDecoder{
-//	Dec:  dec,
-//	Opts: &expfmt.DecodeOptions{},
-//}
-//for {
-//	var v model.Vector
-//	if err := decoder.Decode(&v); err != nil {
-//		if err == io.EOF {
-//			// Expected loop termination condition.
-//			break
-//		}
-//		log.Error("Invalid Decode. Skipping.")
-//		continue
-//		}
-//}
