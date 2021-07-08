@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -15,8 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"strings"
-	"time"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration

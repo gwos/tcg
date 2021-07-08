@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/ioutil"
+
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/gwos/tcg/log"
-	"io/ioutil"
+	"github.com/rs/zerolog/log"
 )
 
 type EsClient struct {

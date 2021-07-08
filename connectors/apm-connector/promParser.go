@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/gogo/protobuf/proto"
-	"github.com/gwos/tcg/log"
 	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
-	"math"
-	"time"
+	"github.com/rs/zerolog/log"
 )
 
 type PromParser struct {
@@ -61,7 +62,7 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 				stamp = s.Timestamp // time.Unix(0, s.Timestamp*1000000)
 			}
 			if math.IsNaN(s.Value) {
-				log.Error("Nan Value ignored for ", metricName)
+				log.Error().Msgf("NaN value ignored for %s", metricName)
 				continue
 			}
 			m := dto.Metric{
@@ -83,13 +84,18 @@ func (p *PromParser) parseDebug(buf []byte) (interface{}, error) {
 		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
 	}
 	for _, ts := range req.Timeseries {
-		log.Debug("----- time series ----")
-		for _, l := range ts.Labels {
-			log.Debug(fmt.Sprintf("\t%s = %s\n", l.GetName(), l.GetValue()))
+		ll := make([]string, len(ts.Labels))
+		ss := make([]string, len(ts.Samples))
+		for i, l := range ts.Labels {
+			ll[i] = fmt.Sprintf("\t%s = %s\n", l.GetName(), l.GetValue())
 		}
-		for _, s := range ts.Samples {
-			log.Debug(fmt.Sprintf("\t %f, %d\n", s.GetValue(), s.GetTimestamp()))
+		for i, s := range ts.Samples {
+			ss[i] = fmt.Sprintf("\t %f, %d\n", s.GetValue(), s.GetTimestamp())
 		}
+		log.Debug().
+			Strs("labels", ll).
+			Strs("samples", ss).
+			Msg("time series")
 	}
 	return nil, errors.New("testing")
 }

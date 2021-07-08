@@ -3,19 +3,20 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/connectors/snmp-connector/clients"
-	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/snmp-connector/clients"
+	"github.com/gwos/tcg/connectors/snmp-connector/utils"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 const (

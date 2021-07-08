@@ -2,12 +2,13 @@ package clients
 
 import (
 	"fmt"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 const (

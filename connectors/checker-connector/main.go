@@ -6,10 +6,10 @@ import (
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -44,13 +44,13 @@ func main() {
 		}
 	})
 
-	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
@@ -59,15 +59,15 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[Checker Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	tExt, tMetProf := &ExtConfig{}, &transit.MetricsProfile{}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	if err := tExt.Validate(); err != nil {
-		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not validate config")
 		return
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
@@ -129,17 +129,25 @@ func taskHandler(task ScheduleTask) func() {
 			services.TraceAttrArray("command", task.Command),
 		)
 
-		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
 		if err != nil {
-			logEntry.Warn("[Checker Connector]: Error running command:", err.Error())
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("task failed")
 			return
 		}
-		logEntry.Debug("[Checker Connector]: Success in command execution")
+		log.Debug().
+			Interface("task", task).
+			Bytes("res", res).
+			Msg("task done")
 
 		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
 
 		if _, err = processMetrics(ctxN, res, task.DataFormat); err != nil {
-			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("could not process metrics")
 		}
 
 		services.EndTraceSpan(spanN,

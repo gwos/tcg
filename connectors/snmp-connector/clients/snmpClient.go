@@ -2,11 +2,12 @@ package clients
 
 import (
 	"errors"
-	snmp "github.com/gosnmp/gosnmp"
-	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/log"
 	"strings"
 	"time"
+
+	snmp "github.com/gosnmp/gosnmp"
+	"github.com/gwos/tcg/connectors/snmp-connector/utils"
+	"github.com/rs/zerolog/log"
 )
 
 type SnmpClient struct {

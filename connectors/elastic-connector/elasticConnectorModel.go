@@ -1,15 +1,16 @@
 package main
 
 import (
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	ecClients "github.com/gwos/tcg/connectors/elastic-connector/clients"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/transit"
-	"strings"
-	"sync"
-	"time"
+	"github.com/rs/zerolog/log"
 )
 
 var doOnce sync.Once
