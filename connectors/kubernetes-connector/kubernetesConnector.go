@@ -260,12 +260,12 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			case "cpu.cores":
 				value = node.Status.Capacity.Cpu().Value()
 			case "cpu.allocated":
-				value = toPercentage(node.Status.Allocatable.Cpu())
-				fmt.Printf("=========== cpu.allocated: %d \n", value)
+				value = float64(node.Status.Allocatable.Cpu().MilliValue())/float64(node.Status.Capacity.Cpu().MilliValue()) * 100
+				fmt.Printf("=========== HERE ===== cpu.allocated: %f \n", value.(float64))
 			case "memory.capacity":
 				value = node.Status.Capacity.Memory().Value()
-			case "memory.allocated":
-				value = node.Status.Allocatable.Memory().Value()
+			case "memory.allocatqed":
+				value = float64(node.Status.Allocatable.Memory().MilliValue())/float64(node.Status.Capacity.Memory().MilliValue()) * 100
 			case "pods":
 				value = node.Status.Capacity.Pods().Value()
 			default:
@@ -373,6 +373,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 		log.Error("[K8 Connector]: " + err.Error())
 		return
 	}
+
 	for _, node := range nodes.Items {
 		if resource, ok := monitoredState[node.Name]; ok {
 			for key, metricDefinition := range cfg.Views[ViewNodes] {
@@ -434,7 +435,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 						fmt.Printf("=========== cpu.cores: %d \n", value)
 					case "cpu.allocated":
 						value = toPercentage(container.Usage.Cpu())
-						fmt.Printf("=========== cpu.allocated: %d \n", value)
+						fmt.Printf("=========== cpu.allocated: %f \n", value)
 					case "memory.capacity":
 						value = container.Usage.Memory().Value()
 					case "memory.allocated":
@@ -497,7 +498,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						fmt.Printf("=========== cpu.cores: %d \n", value)
 					case "cpu.allocated":
 						value = toPercentage(container.Usage.Cpu())
-						fmt.Printf("=========== cpu.allocated: %d \n", value)
+						fmt.Printf("=========== cpu.allocated: %f \n", value)
 					case "memory.capacity":
 						value = container.Usage.Memory().Value()
 					case "memory.allocated":
@@ -609,6 +610,7 @@ func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.M
 	if status == transit.HostUp {
 		message.WriteString(upMessage)
 	}
+	_ = connector.mapi
 	return status, message.String()
 }
 
@@ -640,12 +642,12 @@ func toPercentage(res *resource.Quantity) float64 {
 	fmt.Printf("Milli: %f\n", float64(res.MilliValue()))
 
 	if strings.HasSuffix(res.String(), "n") {
-		fmt.Printf("N Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100)
+		fmt.Printf("N Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64())*math.Pow(10, -9)*100)
 		fmt.Println()
 		return float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100
 	}
 	if strings.HasSuffix(res.String(), "m") {
-		fmt.Printf("M Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100)
+		fmt.Printf("M Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64())*math.Pow(10, -9)*100)
 		fmt.Println()
 		return float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -6) * 100
 	}
