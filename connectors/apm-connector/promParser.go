@@ -35,7 +35,7 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 		}
 
 		labels := make([]*dto.LabelPair, 0)
-	 	for _, l := range ts.Labels {
+		for _, l := range ts.Labels {
 			tags[l.Name] = l.Value
 			labels = append(labels, &dto.LabelPair{Name: &l.Name, Value: &l.Value})
 		}
@@ -83,14 +83,13 @@ func (p *PromParser) parseDebug(buf []byte) (interface{}, error) {
 		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
 	}
 	for _, ts := range req.Timeseries {
-		println("----- time series ----")
+		log.Debug("----- time series ----")
 		for _, l := range ts.Labels {
-			fmt.Printf("\t%s = %s\n", l.GetName(), l.GetValue())
+			log.Debug(fmt.Sprintf("\t%s = %s\n", l.GetName(), l.GetValue()))
 		}
 		for _, s := range ts.Samples {
-			fmt.Printf("\t %f, %d\n", s.GetValue(), s.GetTimestamp())
+			log.Debug(fmt.Sprintf("\t %f, %d\n", s.GetValue(), s.GetTimestamp()))
 		}
 	}
 	return nil, errors.New("testing")
 }
-

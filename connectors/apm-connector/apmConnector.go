@@ -95,7 +95,7 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 	var promParser PromParser
 	var prometheusServices map[string]*dto.MetricFamily
 	if isProtobuf {
- 		// reader := bytes.NewReader(body)
+		// reader := bytes.NewReader(body)
 		dest := make([]byte, len(body))
 		dst, err := snappy.Decode(dest, body)
 		if err != nil {
@@ -121,8 +121,7 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 	return monitoredResources, &resourceGroups, nil
 }
 
-
-func  processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf bool) error {
+func processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf bool) error {
 	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf); err == nil {
 		if statusDown {
 			for i := 0; i < len(*monitoredResources); i++ {
@@ -153,7 +152,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 		result[serviceName] = metric.GetCounter().GetValue()
 	case dto.MetricType_UNTYPED:
 		result[serviceName] = metric.GetUntyped().GetValue()
-		case dto.MetricType_GAUGE:
+	case dto.MetricType_GAUGE:
 		result[serviceName] = metric.GetGauge().GetValue()
 	case dto.MetricType_HISTOGRAM:
 		if metric.GetHistogram().SampleSum != nil {
@@ -418,7 +417,7 @@ func pull(resources []Resource) {
 				resource.URL, string(byteResponse)))
 			continue
 		}
-		err = processMetrics(byteResponse, index, statusCode == 220, false				)
+		err = processMetrics(byteResponse, index, statusCode == 220, false)
 		if err != nil {
 			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
 		}
