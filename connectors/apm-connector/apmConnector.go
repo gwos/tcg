@@ -388,12 +388,13 @@ func initializeEntrypoints() []services.Entrypoint {
 func receiverHandler(c *gin.Context) {
 	log.Info("content type = ", c.GetHeader("Content-Type"))
 	body, err := c.GetRawData()
-	if len(body) < 2 {
-		log.Info("Received Prometheus Push heartbeat...")
-	}
 	if err != nil {
 		log.Error("|apmConnector.go| : [receiverHandler] : ", err)
 		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(body) < 2 {
+		log.Info("Received Prometheus Push heartbeat...")
 		return
 	}
 	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
