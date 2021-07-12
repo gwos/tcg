@@ -76,24 +76,6 @@ func configHandler(data []byte) {
 	tExt.Views[ViewNodes] = buildNodeMetricsMap(tMetProf.Metrics)
 	tExt.Views[ViewPods] = buildPodMetricsMap(tMetProf.Metrics)
 
-	//for _, metric := range tMetProf.Metrics {
-	//	// temporary solution, will be removed
-	//	// TODO: push down into connectors - metric.Monitored breaks synthetics
-	//	// if templateMetricName == metric.Name || !metric.Monitored {
-	//	//	continue
-	//	//}
-	//	if metrics, has := tExt.Views[KubernetesView(metric.ServiceType)]; has {
-	//		metrics[metric.Name] = metric
-	//		tExt.Views[KubernetesView(metric.ServiceType)] = metrics
-	//	} else {
-	//		metrics := make(map[string]transit.MetricDefinition)
-	//		metrics[metric.Name] = metric
-	//		if tExt.Views != nil {
-	//			tExt.Views[KubernetesView(metric.ServiceType)] = metrics
-	//		}
-	//	}
-	//}
-
 	gwConnections := config.GetConfig().GWConnections
 	if len(gwConnections) > 0 {
 		for _, conn := range gwConnections {

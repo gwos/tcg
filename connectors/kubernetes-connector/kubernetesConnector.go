@@ -9,14 +9,12 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	kv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"math"
 	"strings"
 	"time"
 )
@@ -260,12 +258,11 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			case "cpu.cores":
 				value = node.Status.Capacity.Cpu().Value()
 			case "cpu.allocated":
-				value = float64(node.Status.Allocatable.Cpu().MilliValue())/float64(node.Status.Capacity.Cpu().MilliValue()) * 100
-				fmt.Printf("=========== HERE ===== cpu.allocated: %f \n", value.(float64))
+				value = toPercentage(node.Status.Capacity.Cpu().MilliValue(), node.Status.Allocatable.Cpu().MilliValue())
 			case "memory.capacity":
 				value = node.Status.Capacity.Memory().Value()
-			case "memory.allocatqed":
-				value = float64(node.Status.Allocatable.Memory().MilliValue())/float64(node.Status.Capacity.Memory().MilliValue()) * 100
+			case "memory.allocated":
+				value = toPercentage(node.Status.Capacity.Memory().MilliValue(), node.Status.Allocatable.Memory().MilliValue())
 			case "pods":
 				value = node.Status.Capacity.Pods().Value()
 			default:
@@ -380,12 +377,10 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				var value interface{} = 0
 				switch key {
 				case "cpu":
-					value = toPercentage(node.Usage.Cpu())
-					fmt.Printf("=========== cpu: %d \n", value)
+					value = node.Usage.Cpu().MilliValue()
 				case "memory":
-					value = node.Usage.Memory().Value()
+					value = node.Usage.Memory().MilliValue()
 				default:
-					fmt.Println(key)
 					continue
 				}
 				metricBuilder := connectors.MetricBuilder{
@@ -432,17 +427,14 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					switch key {
 					case "cpu.cores":
 						value = container.Usage.Cpu().Value()
-						fmt.Printf("=========== cpu.cores: %d \n", value)
 					case "cpu.allocated":
-						value = toPercentage(container.Usage.Cpu())
-						fmt.Printf("=========== cpu.allocated: %f \n", value)
+						value = container.Usage.Cpu().MilliValue()
 					case "memory.capacity":
 						value = container.Usage.Memory().Value()
 					case "memory.allocated":
 						value = container.Usage.Memory().Value()
 					case "cpu":
-						value = toPercentage(pod.Containers[index].Usage.Cpu())
-						fmt.Printf("=========== cpu: %d \n", value)
+						value = pod.Containers[index].Usage.Cpu().MilliValue()
 					case "memory":
 						value = pod.Containers[index].Usage.Memory().Value()
 					default:
@@ -495,17 +487,14 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					switch key {
 					case "cpu.cores":
 						value = container.Usage.Cpu().Value()
-						fmt.Printf("=========== cpu.cores: %d \n", value)
 					case "cpu.allocated":
-						value = toPercentage(container.Usage.Cpu())
-						fmt.Printf("=========== cpu.allocated: %f \n", value)
+						value = container.Usage.Cpu().MilliValue()
 					case "memory.capacity":
 						value = container.Usage.Memory().Value()
 					case "memory.allocated":
 						value = container.Usage.Memory().Value()
 					case "cpu":
-						value = toPercentage(container.Usage.Cpu())
-						fmt.Printf("=========== cpu: %d \n", value)
+						value = container.Usage.Cpu().MilliValue()
 					case "memory":
 						value = container.Usage.Memory().Value()
 					default:
@@ -637,22 +626,6 @@ func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string
 // Example:
 // You might want to assign a third of CPU each — or 33.33%.
 // If you wish to assign a third of a CPU, you should assign 333Mi (millicores) or 0.333(cores) to your container.
-func toPercentage(res *resource.Quantity) float64 {
-	fmt.Printf("String: %s\n", res.String())
-	fmt.Printf("Milli: %f\n", float64(res.MilliValue()))
-
-	if strings.HasSuffix(res.String(), "n") {
-		fmt.Printf("N Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64())*math.Pow(10, -9)*100)
-		fmt.Println()
-		return float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -9) * 100
-	}
-	if strings.HasSuffix(res.String(), "m") {
-		fmt.Printf("M Return: %f%%\n", float64(res.AsDec().UnscaledBig().Int64())*math.Pow(10, -9)*100)
-		fmt.Println()
-		return float64(res.AsDec().UnscaledBig().Int64()) * math.Pow(10, -6) * 100
-	}
-
-	fmt.Println("RETURN 0")
-	fmt.Println()
-	return 0
+func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
+	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
 }
