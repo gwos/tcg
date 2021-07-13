@@ -31,10 +31,27 @@ func main() {
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
+	// TODO: get these from configuration
 	tenantId := env.GetString("MICROSOFT_TENANT_ID", "NOT SET")
 	clientId := env.GetString("MICROSOFT_CLIENT_ID", "NOT SET")
 	clientSecret := env.GetString("MICROSOFT_CLIENT_SECRET", "NOT SET")
+	// TODO: get these options from configuration
+	enableOneDriveMetrics, _ := env.GetBool("ENABLE_ONEDRIVE_METRICS", false)
+	enableLicensingMetrics, _ := env.GetBool("ENABLE_LICENSING_METRICS", false)
+	enableSharePointMetrics, _ := env.GetBool("ENABLE_SHAREPOINT_METRICS", false)
+	enableEmailMetrics, _ := env.GetBool("ENABLE_EMAIL_METRICS", false)
+	sharePointSite := env.GetString("SHAREPOINT_SITE", "")
+	sharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "")
+	outlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "")
 	connector.SetCredentials(tenantId, clientId, clientSecret)
+	//enableLicensingMetrics = true
+	//enableSharePointMetrics = true
+	//sharePointSite = "gwosjoey.sharepoint.com"
+	//sharePointSubSite = "GWOS"
+	//enableEmailMetrics = true
+	//outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
+	connector.SetOptions(enableOneDriveMetrics, enableLicensingMetrics, enableSharePointMetrics, enableEmailMetrics,
+		sharePointSite, sharePointSubSite, outlookEmailAddress)
 	log.Info("[MsGraph Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[MsGraph Connector]: ", err)
