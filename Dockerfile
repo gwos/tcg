@@ -9,7 +9,7 @@ ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 
 WORKDIR /go/src/
 COPY . .
-# RUN go test -v $(go list ./... | grep -v tcg/integration)
+RUN go test -v $(go list ./... | grep -v tcg/integration)
 RUN sh -x \
     && build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
     && ldflags="-X 'github.com/gwos/tcg/config.buildTime=${build_time}'" \
