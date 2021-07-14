@@ -2,10 +2,11 @@ package clients
 
 import (
 	"encoding/json"
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/log"
 	"net/http"
 	"strconv"
+
+	"github.com/gwos/tcg/clients"
+	"github.com/rs/zerolog/log"
 )
 
 const (

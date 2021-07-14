@@ -11,8 +11,8 @@ import (
 
 	"github.com/PaesslerAG/gval"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/log"
 	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog/log"
 )
 
 // ProcessesCache
@@ -515,7 +515,9 @@ func EvaluateExpressionHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, result)
 		return
 	}
-	log.Error("[Connectors]: " + err.Error())
+	log.Err(err).
+		Interface("expression", expression).
+		Msg("could not evaluate expression")
 	c.IndentedJSON(http.StatusBadRequest, err.Error())
 }
 

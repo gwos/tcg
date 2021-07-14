@@ -35,8 +35,8 @@ require (
 	github.com/prometheus/common v0.29.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/robfig/cron/v3 v3.0.1
+	github.com/rs/zerolog v1.23.0
 	github.com/shirou/gopsutil v3.21.5+incompatible
-	github.com/sirupsen/logrus v1.8.1
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/gin-swagger v1.3.0
 	github.com/swaggo/swag v1.7.0

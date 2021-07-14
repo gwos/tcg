@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	"github.com/patrickmn/go-cache"
-	"strings"
-	"time"
+	"github.com/rs/zerolog/log"
 )
 
 // FiveMinutes NeDi interval in seconds

@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/log"
 	"math/big"
 	"net"
 	"net/http"
 	"net/url"
+
+	"github.com/gwos/tcg/clients"
+	"github.com/rs/zerolog/log"
 )
 
 const (

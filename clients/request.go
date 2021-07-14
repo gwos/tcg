@@ -10,6 +10,8 @@ import (
 	"net/http/httptrace"
 	"net/url"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 )
 
@@ -95,4 +97,95 @@ func appendSeparator(params string) string {
 		params = "?"
 	}
 	return params
+}
+
+// Req defines request context
+type Req struct {
+	Err      error
+	Form     map[string]string
+	Headers  map[string]string
+	Method   string
+	Payload  []byte
+	Response []byte
+	Status   int
+	URL      string
+}
+
+// LogDetailsWith adds data to log event
+// if argument is nil creates Info or Error depending on Err
+func (q Req) LogDetailsWith(e *zerolog.Event) *zerolog.Event {
+	switch {
+	case e == nil && q.Err != nil:
+		e = log.Error()
+	case e == nil && q.Status >= 400:
+		e = log.Warn()
+	case e == nil:
+		e = log.Info()
+	}
+	e.Err(q.Err).
+		Int("status", q.Status).
+		Str("method", q.Method).
+		Str("url", q.URL)
+	if len(q.Headers) > 0 {
+		e.Interface("headers", q.Headers)
+	}
+	if len(q.Form) > 0 {
+		e.Interface("form", q.Form)
+	}
+	if len(q.Payload) > 0 {
+		e.Bytes("payload", q.Payload)
+	}
+	return e.Bytes("response", q.Response)
+}
+
+// LogWith adds data to log event
+// if argument is nil creates Info or Error depending on Err
+// add details on Status >= 400 or Debug
+func (q Req) LogWith(e *zerolog.Event) *zerolog.Event {
+	switch {
+	case e == nil && q.Err != nil:
+		e = log.Error()
+	case e == nil && q.Status >= 400:
+		e = log.Warn()
+	case e == nil:
+		e = log.Info()
+	}
+	e.Err(q.Err).
+		Int("status", q.Status).
+		Str("method", q.Method).
+		Str("url", q.URL)
+	if q.Status >= 400 || log.Logger.GetLevel() <= zerolog.DebugLevel {
+		if len(q.Headers) > 0 {
+			e.Interface("headers", q.Headers)
+		}
+		if len(q.Form) > 0 {
+			e.Interface("form", q.Form)
+		}
+		if len(q.Payload) > 0 {
+			e.Bytes("payload", q.Payload)
+		}
+		e.Bytes("response", q.Response)
+	}
+	return e
+}
+
+// Send sends request
+func (q *Req) Send() (*Req, error) {
+	return q.SendWithContext(nil)
+}
+
+// SendWithContext sends request
+func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
+	status, response, err := SendRequestWithContext(
+		ctx,
+		q.Method,
+		q.URL,
+		q.Headers,
+		q.Form,
+		q.Payload,
+	)
+	q.Err = err
+	q.Response = response
+	q.Status = status
+	return q, err
 }
