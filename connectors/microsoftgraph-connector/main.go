@@ -31,27 +31,36 @@ func main() {
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
 	// TODO: get these from configuration
 	tenantId := env.GetString("MICROSOFT_TENANT_ID", "NOT SET")
 	clientId := env.GetString("MICROSOFT_CLIENT_ID", "NOT SET")
 	clientSecret := env.GetString("MICROSOFT_CLIENT_SECRET", "NOT SET")
-	// TODO: get these options from configuration
+	// TODO: get these options from configuration (Views)
 	enableOneDriveMetrics, _ := env.GetBool("ENABLE_ONEDRIVE_METRICS", false)
 	enableLicensingMetrics, _ := env.GetBool("ENABLE_LICENSING_METRICS", false)
 	enableSharePointMetrics, _ := env.GetBool("ENABLE_SHAREPOINT_METRICS", false)
 	enableEmailMetrics, _ := env.GetBool("ENABLE_EMAIL_METRICS", false)
+	enableSecurityMetrics, _ := env.GetBool("ENABLE_SECURITY_METRICS", false)
 	sharePointSite := env.GetString("SHAREPOINT_SITE", "")
 	sharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "")
 	outlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "")
 	connector.SetCredentials(tenantId, clientId, clientSecret)
-	//enableLicensingMetrics = true
-	//enableSharePointMetrics = true
-	//sharePointSite = "gwosjoey.sharepoint.com"
-	//sharePointSubSite = "GWOS"
-	//enableEmailMetrics = true
-	//outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
+
+	enableOneDriveMetrics = true
+	enableLicensingMetrics = true
+	enableSharePointMetrics = true
+	sharePointSite = "gwosjoey.sharepoint.com"
+	sharePointSubSite = "GWOS"
+	enableEmailMetrics = true
+	outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
+	//enableSecurityMetrics = true
+
 	connector.SetOptions(enableOneDriveMetrics, enableLicensingMetrics, enableSharePointMetrics, enableEmailMetrics,
-		sharePointSite, sharePointSubSite, outlookEmailAddress)
+		enableSecurityMetrics, sharePointSite, sharePointSubSite, outlookEmailAddress)
+	//////////////////////////////////////////////////////////////////////////////////////////////////
+
 	log.Info("[MsGraph Connector]: Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
 		log.Error("[MsGraph Connector]: ", err)
@@ -86,12 +95,11 @@ func configHandler(data []byte) {
 		return
 	}
 	/* Update config with received values */
-	// TODO: fudge up some metrics - remove this once we hook in live metrics, apptype
-	tExt.Views[ViewServices] = temporaryMetricsDefinitions()
+	// tExt.Views[ViewServices] = temporaryMetricsDefinitions()
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		// TODO: push down into connectors - metric.Monitored breaks synthetics
-		//if templateMetricName == metric.Name || !metric.Monitored {
+		//if tempslateMetricName == metric.Name || !metric.Monitored {
 		//	continue
 		//}
 		if metrics, has := tExt.Views[MicrosoftGraphView(metric.ServiceType)]; has {
@@ -118,7 +126,7 @@ func configHandler(data []byte) {
 		}
 	}
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
-	monitorConnection.Extensions = extConfig
+	// monitorConnection.Extensions = extConfig
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
 	if err != nil || !bytes.Equal(chksum, chk) {
@@ -128,7 +136,7 @@ func configHandler(data []byte) {
 		chksum = chk
 	}
 
-	connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
+	 connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -137,6 +145,7 @@ func configHandler(data []byte) {
 }
 
 func periodicHandler() {
+	temporaryMetricsDefinitions()  // TODO: remove this when you have provisioning ready
 	inventory, monitored, groups := connector.Collect(extConfig)
 	log.Debug("[MsGraph Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
 
@@ -158,8 +167,8 @@ func periodicHandler() {
 	log.Info("completed period handler")
 }
 
-// TODO: remove this
-func temporaryMetricsDefinitions() map[string]transit.MetricDefinition {
-	metrics := make(map[string]transit.MetricDefinition)
-	return metrics
+// TODO: remove this when you have provisioning ready
+func temporaryMetricsDefinitions()  {
+	//bytes, _ := ioutil.ReadFile("/Users/dtaylor/gw8/tcg/connectors/microsoftgraph-connector/microsoftgraph-default.json")
+	//configHandler(bytes)
 }

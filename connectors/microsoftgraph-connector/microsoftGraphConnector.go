@@ -1,32 +1,30 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
 	"time"
 )
 
 type MicrosoftGraphView string
 
 const (
-	ViewServices MicrosoftGraphView = "ViewServices"
+	ViewServices 	MicrosoftGraphView = "ViewServices"
+	ViewOneDrive 	MicrosoftGraphView = "ViewOneDrive"
+	ViewLicensing	MicrosoftGraphView = "ViewLicensing"
+	ViewSharePoint  MicrosoftGraphView = "ViewSharePoint"
+	ViewEmail		MicrosoftGraphView = "ViewEmail"
+	ViewSecurity	MicrosoftGraphView = "ViewSecurity"
+	ViewCustom		MicrosoftGraphView = "ViewCustom"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
-type ExtConfig struct {
+	type ExtConfig struct {
 	TenantId     string                                                     `json:"officeTenantId"`
 	ClientId     string                                                     `json:"officeClientId"`
 	ClientSecret string                                                     `json:"officeClientSecret"`
@@ -38,8 +36,6 @@ type ExtConfig struct {
 type MicrosoftGraphConnector struct {
 	config      ExtConfig
 	ctx         context.Context
-	officeToken string
-	graphToken  string
 }
 
 type MicrosoftGraphResource struct {
@@ -48,7 +44,7 @@ type MicrosoftGraphResource struct {
 	Status   transit.MonitorStatus
 	Message  string
 	Labels   map[string]string
-	Services map[string]transit.DynamicMonitoredService
+	Services map[string]*transit.DynamicMonitoredService
 }
 
 type ODataServicePayload struct {
@@ -67,12 +63,18 @@ type ODataStatus struct {
 	Services []ServiceStatus `json:"value"`
 }
 
+type ODataFeatureStatus struct {
+	FeatureServiceStatus string
+	FeatureDisplayName string
+}
+
 type ServiceStatus struct {
 	Id                  string
 	WorkloadDisplayName string
 	Status              string
 	StatusDisplayName   string
 	StatusTime          string
+	FeatureStatus       []ODataFeatureStatus
 }
 
 type AuthRecord struct {
@@ -82,13 +84,9 @@ type AuthRecord struct {
 	Resource     string `json:"resource"`
 }
 
-var httpClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	},
-}
-
 var (
+	officeToken string
+	graphToken  string
 	tenantID     = "" // The Directory ID from Azure AD
 	clientID     = "" // The Application ID of the registered app
 	clientSecret = "" // The secret key of the registered app
@@ -96,6 +94,7 @@ var (
 	enableLicensingMetrics = false
 	enableSharePointMetrics = false
 	enableEmailMetrics = false
+	enableSecurityMetrics = false
 	sharePointSite = ""
 	sharePointSubSite = ""
 	outlookEmailAddress = ""
@@ -108,8 +107,8 @@ const (
 	servicesPath      = "/ServiceComms/Services"
 	currentStatusPath = "/ServiceComms/CurrentStatus"
 	microsoftGroup    = "Microsoft Apps"
-	office365App      = "Office365"
-	interacApp        = "Interac_OS365"
+	office365App      = "Office365Services"
+	interacApp        = "Office365Graph"
 )
 
 func (connector *MicrosoftGraphConnector) SetCredentials(tenant string, client string, secret string) {
@@ -119,32 +118,15 @@ func (connector *MicrosoftGraphConnector) SetCredentials(tenant string, client s
 }
 
 func (connector *MicrosoftGraphConnector) SetOptions(oneDriveMetrics bool, licensingMetrics bool, sharePointMetrics bool, emailMetrics bool,
-		sharePointSiteParam string, sharePointSubSiteParam string, outlookEmailAddressParam string) {
+	securityMetrics bool, sharePointSiteParam string, sharePointSubSiteParam string, outlookEmailAddressParam string) {
 	enableOneDriveMetrics = oneDriveMetrics
 	enableLicensingMetrics = licensingMetrics
 	enableSharePointMetrics = sharePointMetrics
 	enableEmailMetrics = emailMetrics
+	enableSecurityMetrics = securityMetrics
 	sharePointSite = sharePointSiteParam
 	sharePointSubSite = sharePointSubSiteParam
 	outlookEmailAddress = outlookEmailAddressParam
-}
-
-func (connector *MicrosoftGraphConnector) Initialize() error {
-	if connector.officeToken != "" {
-		return nil
-	}
-	token, err := login(tenantID, clientID, clientSecret, officeResource)
-	if err != nil {
-		return nil
-	}
-	connector.officeToken = token
-	token, err = login(tenantID, clientID, clientSecret, graphResource)
-	if err != nil {
-		return nil
-	}
-	connector.graphToken = token
-	log.Info(fmt.Sprintf("initialized MS Graph connection with  %s and %s", officeResource, graphResource))
-	return nil
 }
 
 func (connector *MicrosoftGraphConnector) Ping() error {
@@ -154,48 +136,10 @@ func (connector *MicrosoftGraphConnector) Ping() error {
 func (connector *MicrosoftGraphConnector) Shutdown() {
 }
 
-func login(tenantID string, clientID string, clientSecret string, resource string) (string, error) {
-	var request *http.Request
-	var response *http.Response
 
-	endPoint := "https://login.microsoftonline.com/" + tenantID + "/oauth2/token"
-	auth := AuthRecord{
-		GrantType:    "client_credentials",
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		Resource:     resource,
-	}
-	form := url.Values{}
-	form.Add("grant_type", "client_credentials")
-	form.Add("client_secret", auth.ClientSecret)
-	form.Add("client_id", auth.ClientID)
-	form.Add("resource", auth.Resource)
-	byteBody := []byte(form.Encode())
-	var body io.Reader
-	body = bytes.NewBuffer(byteBody)
-	request, err := http.NewRequest(http.MethodPost, endPoint, body)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	response, err = httpClient.Do(request)
-	if err != nil {
-		return "", err
-	}
-	defer response.Body.Close()
-	responseBody, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return "", err
-	}
-	v := interface{}(nil)
-	json.Unmarshal(responseBody, &v)
-	token, err := jsonpath.Get("$.access_token", v)
-	if err != nil {
-		return "", err
-	}
-	return token.(string), nil
-}
-
-// Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
+// Collect inventory and metrics for all graph resources. Sort resources into groups and return inventory of host resources and inventory of groups
 func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
-	connector.Initialize()
+	Initialize()
 	// gather inventory and Metrics
 	monitoredState := make(map[string]MicrosoftGraphResource)
 	groups := make(map[string]transit.ResourceGroup)
@@ -226,7 +170,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
 		serviceIndex = 0
 		for _, service := range resource.Services {
-			mServices[serviceIndex] = service
+			mServices[serviceIndex] = *service
 			serviceIndex = serviceIndex + 1
 		}
 		monitored[index] = transit.DynamicMonitoredResource{
@@ -261,7 +205,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]transit.DynamicMonitoredService),
+		Services: make(map[string]*transit.DynamicMonitoredService),
 	}
 	monitoredState[interacApp] = hostResource
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
@@ -276,53 +220,87 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		OneDrive(monitoredService, connector.graphToken)
-		monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
-			monitoredService.Metrics[2].Value.DoubleValue)
+		OneDrive(monitoredService, graphToken)
+		if (len(monitoredService.Metrics) >= 2) {
+			monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
+				monitoredService.Metrics[2].Value.DoubleValue)
+		} else {
+			monitoredService.Status = transit.ServiceUnknown
+			monitoredService.LastPlugInOutput = "No OneDrive metrics available"
+		}
 		if monitoredService != nil {
-			hostResource.Services[monitoredService.Name] = *monitoredService
+			hostResource.Services[monitoredService.Name] = monitoredService
 		}
 	}
 
 	// create License metrics
 	if enableLicensingMetrics {
-		serviceName2 := "License Activities"
-		serviceProperties2 := make(map[string]interface{})
-		serviceProperties2["isGraphed"] = true
-		monitoredService2, _ := connectors.CreateService(serviceName2, interacApp, []transit.TimeSeries{}, serviceProperties2)
-		AddonLicenseMetrics(monitoredService2, connector.graphToken)
-		monitoredService2.Status = transit.ServiceOk
-		monitoredService2.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
-			monitoredService2.Metrics[1].Value.DoubleValue, monitoredService2.Metrics[0].Value.DoubleValue)
-		if monitoredService2 != nil {
-			hostResource.Services[monitoredService2.Name] = *monitoredService2
+		serviceName := "License Activities"
+		serviceProperties := make(map[string]interface{})
+		serviceProperties["isGraphed"] = true
+		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+		AddonLicenseMetrics(monitoredService, graphToken)
+		// TODO: calculate status by threshold
+		monitoredService.Status = transit.ServiceOk
+		if (len(monitoredService.Metrics) >= 2) {
+			monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
+				monitoredService.Metrics[1].Value.DoubleValue, monitoredService.Metrics[0].Value.DoubleValue)
+		} else {
+			monitoredService.Status = transit.ServiceUnknown
+			monitoredService.LastPlugInOutput = "No licensing metrics available"
+		}
+		if monitoredService != nil {
+			hostResource.Services[monitoredService.Name] = monitoredService
 		}
 	}
 
 	// create SharePoint metrics
 	if enableSharePointMetrics {
-		serviceName3 := "SharePoint Online"
-		serviceProperties3 := make(map[string]interface{})
-		serviceProperties3["isGraphed"] = true
-		monitoredService3, _ := connectors.CreateService(serviceName3, interacApp, []transit.TimeSeries{}, serviceProperties3)
-		SharePoint(monitoredService3, connector.graphToken)
-		monitoredService3.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%", monitoredService3.Metrics[2].Value.DoubleValue)
-		if monitoredService3 != nil {
-			hostResource.Services[monitoredService3.Name] = *monitoredService3
+		serviceName := "SharePoint Online"
+		serviceProperties := make(map[string]interface{})
+		serviceProperties["isGraphed"] = true
+		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+		SharePoint(monitoredService, graphToken, sharePointSite, sharePointSubSite) // TODO: params
+		if (len(monitoredService.Metrics) >= 2) {
+			monitoredService.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%", monitoredService.Metrics[2].Value.DoubleValue)
+		} else {
+			monitoredService.Status = transit.ServiceUnknown
+			monitoredService.LastPlugInOutput = "No SharePoint metrics available"
+		}
+		if monitoredService != nil {
+			hostResource.Services[monitoredService.Name] = monitoredService
 		}
 	}
 
 	// create email metrics
 	if enableEmailMetrics {
-		serviceName4 := "Emails"
-		serviceProperties4 := make(map[string]interface{})
-		serviceProperties4["isGraphed"] = true
-		monitoredService4, _ := connectors.CreateService(serviceName4, interacApp, []transit.TimeSeries{}, serviceProperties4)
-		Emails(monitoredService4, connector.graphToken)
-		monitoredService4.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
-			monitoredService4.Metrics[0].Value.DoubleValue)
-		if monitoredService4 != nil {
-			hostResource.Services[monitoredService4.Name] = *monitoredService4
+		serviceName := "Emails"
+		serviceProperties := make(map[string]interface{})
+		serviceProperties["isGraphed"] = true
+		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+		Emails(monitoredService, graphToken, outlookEmailAddress)
+		if (len(monitoredService.Metrics) >= 1) {
+			monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
+				monitoredService.Metrics[0].Value.DoubleValue)
+		} else {
+			monitoredService.Status = transit.ServiceUnknown
+			monitoredService.LastPlugInOutput = "No EMAIL metrics available"
+		}
+		if monitoredService != nil {
+			hostResource.Services[monitoredService.Name] = monitoredService
+		}
+	}
+
+	if enableSecurityMetrics {
+		serviceName := "SecurityIndicators"
+		serviceProperties := make(map[string]interface{})
+		serviceProperties["isGraphed"] = true
+		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
+		SecurityAccessments(monitoredService, 	graphToken)
+		monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
+			monitoredService.Metrics[0].Value.DoubleValue)
+		if monitoredService != nil {
+			hostResource.Services[monitoredService.Name] = monitoredService
 		}
 	}
 	return nil
@@ -331,7 +309,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 func (connector *MicrosoftGraphConnector) collectInventory(
 	monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
 
-	body, err := ExecuteRequest(officeEndPoint+tenantID+servicesPath, connector.officeToken)
+	body, err := ExecuteRequest(officeEndPoint+tenantID+servicesPath, officeToken)
 	if err != nil {
 		return err
 	}
@@ -341,7 +319,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]transit.DynamicMonitoredService),
+		Services: make(map[string]*transit.DynamicMonitoredService),
 	}
 	monitoredState[office365App] = hostResource
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
@@ -353,33 +331,16 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	//randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
 	json.Unmarshal(body, &odata)
 	for _, ods := range odata.Services {
-		metricBuilder := connectors.MetricBuilder{
-			Name:     ods.DisplayName,
-			Value:    0,
-			UnitType: transit.UnitCounter,
-			// TODO: add these after merge
-			//ComputeType: metricDefinition.ComputeType,
-			//Expression:  metricDefinition.Expression,
-			Warning:  -1,
-			Critical: -1,
-			Graphed:  true, // TODO: calculate this from configs
-		}
-		monitoredService, _ := connectors.BuildServiceForMetric(hostResource.Name, metricBuilder)
-		//switch ods.DisplayName {
-		//case "Microsoft 365 Apps":
-		//	AddonLicenseMetrics(monitoredService, connector, cfg, connector.graphToken)
-		//case "OneDrive for Business":
-		//	OneDrive(monitoredService, connector, cfg, connector.graphToken)
-		//}
+		monitoredService, _ := connectors.CreateService(ods.DisplayName, hostResource.Name)
 		if monitoredService != nil {
-			hostResource.Services[metricBuilder.Name] = *monitoredService
+			hostResource.Services[ods.DisplayName] = monitoredService
 		}
 	}
 	return nil
 }
 
-func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]transit.DynamicMonitoredService) error {
-	body, err := ExecuteRequest(officeEndPoint+tenantID+currentStatusPath, connector.officeToken)
+func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]*transit.DynamicMonitoredService) error {
+	body, err := ExecuteRequest(officeEndPoint+tenantID+currentStatusPath, officeToken)
 	if err != nil {
 		return err
 	}
@@ -389,8 +350,22 @@ func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[st
 		if monitoredService, ok := monitoredServices[ods.WorkloadDisplayName]; ok {
 			monitoredService.Status, monitoredService.LastPlugInOutput = connector.translateServiceStatus(ods.Status)
 			monitoredServices[ods.WorkloadDisplayName] = monitoredService
+			var upCount float64 = 0
+			var totalCount float64 = 0
+			for _, ofs := range ods.FeatureStatus {
+				switch ofs.FeatureServiceStatus {
+				case "ServiceRestored", "ServiceOperational":
+					upCount++
+				}
+				totalCount++
+			}
+			var upPercent float64 = 0
+			if totalCount > 0 {
+				upPercent = (upCount / totalCount) * 100.0
+			}
+			metric := createMetricWithThresholds("features.up.percent", "", upPercent, 80, 60)
+			monitoredService.Metrics = append(monitoredService.Metrics, *metric)
 		}
-		// TODO: get additional metrics
 	}
 	return nil
 }
@@ -423,29 +398,3 @@ func (connector *MicrosoftGraphConnector) translateServiceStatus(odStatus string
 	return status, message
 }
 
-func ExecuteRequest(graphUri string, token string) ([]byte, error) {
-	request, _ := http.NewRequest("GET", graphUri, nil)
-	request.Header.Set(	"accept", "application/json; odata.metadata=full")
-	request.Header.Set("Authorization", "Bearer " + token)
-	response, error := httpClient.Do(request)
-	if error != nil {
-		return nil, error
-	}
-	if response.StatusCode != 200 {
-		log.Info("[MSGraph Connector]:  Retrying Authentication...")
-		connector.officeToken = ""
-		connector.graphToken = ""
-		connector.Initialize()
-		request.Header.Set("Authorization", "Bearer " + connector.officeToken)
-		response, error = httpClient.Do(request)
-		if error != nil {
-			return nil, error
-		}
-	}
-	body, error:= ioutil.ReadAll(response.Body)
-	defer response.Body.Close()
-	if error != nil {
-		return nil, error
-	}
-	return body, nil
-}
