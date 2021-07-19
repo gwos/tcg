@@ -13,13 +13,13 @@ import (
 type MicrosoftGraphView string
 
 const (
-	ViewServices 	MicrosoftGraphView = "ViewServices"
-	ViewOneDrive 	MicrosoftGraphView = "ViewOneDrive"
-	ViewLicensing	MicrosoftGraphView = "ViewLicensing"
-	ViewSharePoint  MicrosoftGraphView = "ViewSharePoint"
-	ViewEmail		MicrosoftGraphView = "ViewEmail"
-	ViewSecurity	MicrosoftGraphView = "ViewSecurity"
-	ViewCustom		MicrosoftGraphView = "ViewCustom"
+	ViewServices 	MicrosoftGraphView = "Services"
+	ViewOneDrive 	MicrosoftGraphView = "OneDrive"
+	ViewLicensing	MicrosoftGraphView = "Licensing"
+	ViewSharePoint  MicrosoftGraphView = "SharePoint"
+	ViewEmail		MicrosoftGraphView = "Email"
+	ViewSecurity	MicrosoftGraphView = "Security"
+	ViewCustom		MicrosoftGraphView = "Custom"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
