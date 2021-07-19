@@ -26,7 +26,7 @@ RUN sh -x \
     done \
     && mkdir -p /tcg/snmp-connector/utils \
     && cp connectors/snmp-connector/utils/xorp.pl /tcg/snmp-connector/utils \
-    && apk update && apk add perl \
+    && apt-get update && apt-get install perl \
     && echo "[CONNECTORS DONE]"
 RUN cp ./docker_cmd.sh /app/
 
