@@ -24,9 +24,6 @@ RUN sh -x \
         && cp *connector *config.yaml "$dest" \
         && cd -; \
     done \
-    && mkdir -p /tcg/snmp-connector/utils \
-    && cp connectors/snmp-connector/utils/xorp.pl /tcg/snmp-connector/utils \
-    && apt-get update && apt-get install perl \
     && echo "[CONNECTORS DONE]"
 RUN cp ./docker_cmd.sh /app/
 
@@ -37,6 +34,8 @@ COPY --from=build /app .
 
 FROM alpine:3.11 as prod
 COPY --from=build /app /app
+
+RUN apk add perl
 
 # Land docker exec into var folder
 WORKDIR /tcg/

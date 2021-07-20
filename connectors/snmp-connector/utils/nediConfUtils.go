@@ -33,8 +33,6 @@ var commColIdxMap = map[int]string{
 
 const commLinePattern = "comm(sec)?\\s+%s(\\z|\\s+)"
 
-const scriptFilepath = "utils/xorp.pl"
-
 type SecurityData struct {
 	Name            string
 	AuthProtocol    string
@@ -129,18 +127,24 @@ func GetSecurityData(community string) (*SecurityData, error) {
 
 func decrypt(encrypted string) (string, error) {
 	// TODO: rewrite it without invoking perl
-	cmd := exec.Command("perl", scriptFilepath, encrypted)
+	// cmd := exec.Command("perl", scriptFilepath, encrypted)
+	cmd := exec.Command("perl", "-e",
+		`sub XORp{my $k="change for more security";my $r="";for my $ch(split //,$_[0]){my $i=chop $k;$r.=chr(ord($ch)^ord($i));$k=$i.$k;}return $r;}print XORp(pack "H*",$ARGV[0]);`,
+		encrypted)
+	if v, ok := os.LookupEnv("NEDI_DECRYPT_CMD"); ok {
+		cmd = exec.Command(v, encrypted)
+	}
 	var out, errOut bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errOut
 	err := cmd.Run()
 	if err != nil {
 		log.Error("|nediConfUtils.go| : [decrypt]: Failed to run command '", cmd, "': ", err)
-		return "", errors.New("failed to run script to decrypt")
+		return "", errors.New("failed to run command to decrypt")
 	}
 	if len(errOut.Bytes()) > 0 {
 		log.Error("|nediConfUtils.go| : [decrypt]: Error when running script to decrypt: ", string(errOut.Bytes()))
-		return "", errors.New("error when running script to decrypt")
+		return "", errors.New("error when running command to decrypt")
 	}
 	return out.String(), nil
 }
