@@ -35,8 +35,6 @@ COPY --from=build /app .
 FROM alpine:3.11 as prod
 COPY --from=build /app /app
 
-RUN apk add perl
-
 # Land docker exec into var folder
 WORKDIR /tcg/
 CMD ["/app/docker_cmd.sh", "apm-connector"]
