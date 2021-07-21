@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gwos/tcg/log"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -49,11 +49,11 @@ func GetSecurityData(community string) (*SecurityData, error) {
 	doOnce.Do(func() {
 		retrieveConfFilepath()
 	})
-	log.Debug("|nediConfUtils.go| : [GetSecurityData]: Reading config from file: ", confFilepath, "nedi.conf")
+	log.Debug().Msgf("reading config from file: %snedi.conf", confFilepath)
 
 	file, err := os.Open(confFilepath + "nedi.conf")
 	if err != nil {
-		log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to open nedi.conf: ", err)
+		log.Err(err).Msg("could not open nedi.conf")
 		return nil, errors.New("failed to open nedi.conf")
 	}
 	defer file.Close()
@@ -65,7 +65,7 @@ func GetSecurityData(community string) (*SecurityData, error) {
 		line := scanner.Text()
 		matches, err := regexp.MatchString(pattern, line)
 		if err != nil {
-			log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to match line '", line, "': ", err)
+			log.Err(err).Msgf("could not match line '%s'", line)
 			continue
 		}
 		if matches {
@@ -94,14 +94,14 @@ func GetSecurityData(community string) (*SecurityData, error) {
 				if aPass != "" {
 					aPass, err = Decrypt(aPass)
 					if err != nil {
-						log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to decrypt authentication password: ", err)
+						log.Err(err).Msg("could not decrypt authentication password")
 						return nil, errors.New("failed to decrypt authentication password")
 					}
 				}
 				if pPass != "" {
 					pPass, err = Decrypt(pPass)
 					if err != nil {
-						log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to decrypt privacy password: ", err)
+						log.Err(err).Msg("could not decrypt privacy password")
 						return nil, errors.New("failed to decrypt privacy password")
 					}
 				}
@@ -118,7 +118,7 @@ func GetSecurityData(community string) (*SecurityData, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to read nedi.conf: ", err)
+		log.Err(err).Msg("could not read nedi.conf")
 		return nil, errors.New("failed to read nedi.conf")
 	}
 
@@ -156,7 +156,7 @@ func XORpass(s []byte) []byte {
 func retrieveConfFilepath() {
 	nediConfFilepath := os.Getenv("NEDI_CONF_PATH")
 	if nediConfFilepath == "" {
-		log.Warn("|nediConfUtils.go| : [retrieveConfFilepath]: Env variable 'NEDI_CONF_PATH' is not set")
+		log.Warn().Msg("env variable 'NEDI_CONF_PATH' is not set")
 		return
 	}
 	if !strings.HasSuffix(nediConfFilepath, "/") {

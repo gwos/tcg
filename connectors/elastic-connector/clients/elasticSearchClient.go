@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io/ioutil"
+
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
-	"github.com/gwos/tcg/log"
-	"io/ioutil"
+	"github.com/rs/zerolog/log"
 )
 
 type EsClient struct {
@@ -21,7 +22,7 @@ func (esClient *EsClient) InitEsClient() error {
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
-		log.Error("|elasticSearchClient.go| : [InitEsClient] : ", err)
+		log.Err(err).Msg("could not create ES client")
 	} else {
 		esClient.Client = client
 	}
@@ -38,7 +39,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]
 	}
 	searchResponse := parseSearchResponse(response)
 	if searchResponse == nil {
-		log.Error("|elasticSearchClient.go| : [GetHosts] : response is nil")
+		log.Error().Msg("could not get hosts: response is nil")
 		return nil, nil
 	}
 
@@ -55,7 +56,7 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]
 		response, err = esClient.doSearchRequest(searchBody, nil)
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
-			log.Error("|elasticSearchClient.go| : [GetHosts] : response is nil")
+			log.Error().Msg("could not get hosts: response is nil")
 			afterKey = nil
 			break
 		}
@@ -82,7 +83,7 @@ func (esClient EsClient) CountHits(hostField string, indexes []string, query *Es
 	}
 	searchResponse := parseSearchResponse(response)
 	if searchResponse == nil {
-		log.Error("|elasticSearchClient.go| : [CountHits] : response is nil")
+		log.Error().Msg("could not count hits: response is nil")
 		return nil, nil
 	}
 
@@ -99,7 +100,7 @@ func (esClient EsClient) CountHits(hostField string, indexes []string, query *Es
 		response, err = esClient.doSearchRequest(searchBody, indexes)
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
-			log.Error("|elasticSearchClient.go| : [CountHits] : response is nil")
+			log.Error().Msg("could not count hits: response is nil")
 			afterKey = nil
 			break
 		}
@@ -126,7 +127,7 @@ func (esClient EsClient) CountHitsForHost(hostName string, hostNameField string,
 	}
 	searchResponse := parseSearchResponse(response)
 	if searchResponse == nil {
-		log.Error("|elasticSearchClient.go| : [CountHitsForHost] : response is nil")
+		log.Error().Msg("could not count hits: response is nil")
 		return 0, nil
 	}
 	return searchResponse.Hits.Total.Value, nil
@@ -150,18 +151,20 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
-			log.Error("|elasticSearchClient.go| : [doSearchRequest] : ES client was not initialized")
+			log.Err(err).Msg("ES client was not initialized")
 			return nil, err
 		}
 	}
 	client := esClient.Client
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
-		log.Error("|elasticSearchClient.go| : [doSearchRequest] : Error encoding ES Search Body: ", err)
+		log.Err(err).Msg("could not encode ES Search Body")
 		return nil, nil
 	}
 
-	log.Debug("Performing ES search request with body: ", body.String())
+	log.Debug().
+		Bytes("body", body.Bytes()).
+		Msg("performing ES search request with body")
 
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
@@ -172,7 +175,7 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 	)
 
 	if err != nil {
-		log.Error("|elasticSearchClient.go| : [doSearchRequest] : Error getting Search response: ", err)
+		log.Err(err).Msg("could not get Search response")
 		return nil, nil
 	}
 
@@ -181,19 +184,22 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 
 func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 	if response == nil {
-		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : ES Search response is nil")
+		log.Error().Msg("ES Search response is nil")
 		return nil
 	}
 
-	log.Debug("ES Search response: ", response)
+	log.Debug().
+		Str("response", response.String()).
+		Msg("ES Search response")
 
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error parsing Search response body: ", err)
+			log.Err(err).Msg("could not parse Search response")
 		} else {
 			// Print the response status and error information.
-			log.Error("|elasticSearchClient.go| : [parseSearchResponse] : ", response.Status(),
+			log.Error().Msgf("response is error: %s: %s: %s",
+				response.Status(),
 				e["error"].(map[string]interface{})["type"],
 				e["error"].(map[string]interface{})["reason"],
 			)
@@ -203,7 +209,7 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error reading ES Search response body: ", err)
+		log.Err(err).Msg("could not read ES Search response")
 		return nil
 	}
 
@@ -211,7 +217,7 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 
 	var searchResponse EsSearchResponse
 	if err := json.Unmarshal(responseBody, &searchResponse); err != nil {
-		log.Error("|elasticSearchClient.go| : [parseSearchResponse] : Error parsing ES Search response body: ", err)
+		log.Err(err).Msg("could not parse ES Search response")
 		return nil
 	}
 
@@ -227,36 +233,42 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 	if esClient.Client == nil {
 		err := esClient.InitEsClient()
 		if err != nil {
-			log.Error("|elasticSearchClient.go| : [doSearchRequest] : ES client was not initialized")
+			log.Err(err).Msg("ES client was not initialized")
 			return result, err
 		}
 	}
 	client := esClient.Client
 
-	log.Debug("Performing ES FieldCaps request for fields: ", fieldNames)
+	log.Debug().
+		Strs("fieldNames", fieldNames).
+		Msg("Performing ES FieldCaps request for fields")
 
 	response, err := client.FieldCaps(
 		client.FieldCaps.WithFields(fieldNames...),
 		client.FieldCaps.WithIndex(),
 	)
 	if err != nil {
-		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error getting ES FieldCaps response: ", err)
+		log.Err(err).Msg("could not get ES FieldCaps response")
 		return result, nil
 	}
 
 	if response == nil {
-		log.Error("|elasticSearchClient.go| : [isAggregatable] : ES FieldCaps response is nil")
+		log.Error().Msg("ES FieldCaps response is nil")
 		return result, nil
 	}
 
-	log.Debug("ES FieldCaps response: ", response)
+	log.Debug().
+		Str("response", response.String()).
+		Msg("ES FieldCaps response")
+
 	if response.IsError() {
 		var e map[string]interface{}
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
-			log.Error("|elasticSearchClient.go| : [isAggregatable] : Error parsing ES FieldCaps response body: ", err)
+			log.Err(err).Msg("could not parse ES FieldCaps response")
 		} else {
 			// Print the response status and error information.
-			log.Error("|elasticSearchClient.go| : [isAggregatable] : ", response.Status(),
+			log.Error().Msgf("response is error: %s: %s: %s",
+				response.Status(),
 				e["error"].(map[string]interface{})["type"],
 				e["error"].(map[string]interface{})["reason"],
 			)
@@ -266,7 +278,7 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 
 	responseBody, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error reading ES FieldCaps response body: ", err)
+		log.Err(err).Msg("could not read ES FieldCaps response")
 		return result, nil
 	}
 
@@ -274,7 +286,7 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 
 	var fieldCapsResponse EsFieldCapsResponse
 	if err := json.Unmarshal(responseBody, &fieldCapsResponse); err != nil {
-		log.Error("|elasticSearchClient.go| : [isAggregatable] : Error parsing ES FieldCaps response body: ", err)
+		log.Err(err).Msg("could not parse ES FieldCaps response")
 		return result, nil
 	}
 
