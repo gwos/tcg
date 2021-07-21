@@ -2,15 +2,15 @@ package utils
 
 import (
 	"bufio"
-	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/gwos/tcg/log"
 	"os"
-	"os/exec"
 	"regexp"
 	"strings"
 	"sync"
+
+	"github.com/gwos/tcg/log"
 )
 
 const (
@@ -32,8 +32,6 @@ var commColIdxMap = map[int]string{
 }
 
 const commLinePattern = "comm(sec)?\\s+%s(\\z|\\s+)"
-
-const scriptFilepath = "utils/xorp.pl"
 
 type SecurityData struct {
 	Name            string
@@ -94,14 +92,14 @@ func GetSecurityData(community string) (*SecurityData, error) {
 			pPass := commDataMap[colPrivacyPassword]
 			if commDataMap[colComm] == "commsec" {
 				if aPass != "" {
-					aPass, err = decrypt(aPass)
+					aPass, err = Decrypt(aPass)
 					if err != nil {
 						log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to decrypt authentication password: ", err)
 						return nil, errors.New("failed to decrypt authentication password")
 					}
 				}
 				if pPass != "" {
-					pPass, err = decrypt(pPass)
+					pPass, err = Decrypt(pPass)
 					if err != nil {
 						log.Error("|nediConfUtils.go| : [GetSecurityData]: Failed to decrypt privacy password: ", err)
 						return nil, errors.New("failed to decrypt privacy password")
@@ -127,22 +125,32 @@ func GetSecurityData(community string) (*SecurityData, error) {
 	return nil, errors.New("no info found for community")
 }
 
-func decrypt(encrypted string) (string, error) {
-	// TODO: rewrite it without invoking perl
-	cmd := exec.Command("perl", scriptFilepath, encrypted)
-	var out, errOut bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errOut
-	err := cmd.Run()
+// Decrypt wraps XORpass
+func Decrypt(s string) (string, error) {
+	enc, err := hex.DecodeString(s)
 	if err != nil {
-		log.Error("|nediConfUtils.go| : [decrypt]: Failed to run command '", cmd, "': ", err)
-		return "", errors.New("failed to run script to decrypt")
+		return "", err
 	}
-	if len(errOut.Bytes()) > 0 {
-		log.Error("|nediConfUtils.go| : [decrypt]: Error when running script to decrypt: ", string(errOut.Bytes()))
-		return "", errors.New("error when running script to decrypt")
+	return string(XORpass(enc)), nil
+}
+
+// Encrypt wraps XORpass
+func Encrypt(s string) string {
+	return hex.EncodeToString(XORpass([]byte(s)))
+}
+
+// XORpass implements N XORpass from NeDi
+func XORpass(s []byte) []byte {
+	k, r := []byte("change for more security"), []byte{}
+	if v, ok := os.LookupEnv("NEDI_ENCRYPT_KEY"); ok {
+		k = []byte(v)
 	}
-	return out.String(), nil
+	for _, ch := range s {
+		i := k[len(k)-1]
+		r = append(r, byte(int(ch)^int(i)))
+		k = append([]byte{i}, k[:len(k)-1]...)
+	}
+	return r
 }
 
 func retrieveConfFilepath() {
