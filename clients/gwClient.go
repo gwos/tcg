@@ -145,6 +145,9 @@ func (client *GWClient) connectLocal() error {
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return err
 	}
 	if statusCode == 200 {
@@ -190,6 +193,9 @@ func (client *GWClient) connectRemote() error {
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return err
 	}
 	user := UserResponse{AccessToken: ""}
@@ -244,6 +250,9 @@ func (client *GWClient) Disconnect() error {
 	defer func() { logEntry.Log(logEntryLevel, "GWClient: disconnect") }()
 
 	if err != nil {
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return err
 	}
 
@@ -296,6 +305,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(byteResponse))
 	}
 
+	if tcgerr.IsErrorConnection(err) {
+		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+	}
 	return err
 }
 
@@ -525,6 +537,9 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 
 	if err != nil {
 		logEntryLevel = log.ErrorLevel
+		if tcgerr.IsErrorConnection(err) {
+			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return nil, err
 	}
 	if statusCode == 401 {
