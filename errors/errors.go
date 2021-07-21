@@ -3,9 +3,16 @@ package errors
 import (
 	"errors"
 	"fmt"
-	"os"
 	"runtime"
 	"syscall"
+)
+
+// define codes for MSWindows errors
+const (
+	WSAEADDRINUSE   syscall.Errno = 10048
+	WSAECONNABORTED syscall.Errno = 10053
+	WSAECONNRESET   syscall.Errno = 10054
+	WSAECONNREFUSED syscall.Errno = 10061
 )
 
 // define error types for retry logic
@@ -19,22 +26,57 @@ var (
 	ErrUndecided    = fmt.Errorf("%w: %v", ErrPermanent, "undecided error")
 )
 
-// IsErrorAddressInUse verifies error
-func IsErrorAddressInUse(err error) bool {
-	var eOsSyscall *os.SyscallError
-	if !errors.As(err, &eOsSyscall) {
+/* for docs only
+func isSyscallErrno(err error, errno uint) bool {
+	var syscallErr *os.SyscallError
+	if !errors.As(err, &syscallErr) {
 		return false
 	}
 	var errErrno syscall.Errno
-	if !errors.As(eOsSyscall, &errErrno) {
+	if !errors.As(syscallErr, &errErrno) {
 		return false
 	}
-	if errErrno == syscall.EADDRINUSE {
-		return true
-	}
-	const WSAEADDRINUSE = 10048
-	if runtime.GOOS == "windows" && errErrno == WSAEADDRINUSE {
+	if errErrno == syscall.Errno(errno) {
 		return true
 	}
 	return false
+} */
+
+// IsErrorAddressInUse verifies error
+func IsErrorAddressInUse(err error) bool {
+	if runtime.GOOS == "windows" {
+		return errors.Is(err, WSAEADDRINUSE)
+	}
+	return errors.Is(err, syscall.EADDRINUSE)
+}
+
+// IsErrorConnection verifies error
+func IsErrorConnection(err error) bool {
+	return IsErrorConnectionAborted(err) ||
+		IsErrorConnectionRefused(err) ||
+		IsErrorConnectionReset(err)
+}
+
+// IsErrorConnectionAborted verifies error
+func IsErrorConnectionAborted(err error) bool {
+	if runtime.GOOS == "windows" {
+		return errors.Is(err, WSAECONNABORTED)
+	}
+	return errors.Is(err, syscall.ECONNABORTED)
+}
+
+// IsErrorConnectionRefused verifies error
+func IsErrorConnectionRefused(err error) bool {
+	if runtime.GOOS == "windows" {
+		return errors.Is(err, WSAECONNREFUSED)
+	}
+	return errors.Is(err, syscall.ECONNREFUSED)
+}
+
+// IsErrorConnectionReset verifies error
+func IsErrorConnectionReset(err error) bool {
+	if runtime.GOOS == "windows" {
+		return errors.Is(err, WSAECONNRESET)
+	}
+	return errors.Is(err, syscall.ECONNRESET)
 }
