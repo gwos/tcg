@@ -220,13 +220,17 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		OneDrive(monitoredService, graphToken)
-		if (len(monitoredService.Metrics) >= 2) {
+		err := OneDrive(monitoredService, graphToken)
+		if (err == nil && len(monitoredService.Metrics) >= 2) {
 			monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
 				monitoredService.Metrics[2].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
-			monitoredService.LastPlugInOutput = "No OneDrive metrics available"
+			if err != nil {
+				monitoredService.LastPlugInOutput = err.Error()
+			} else {
+				monitoredService.LastPlugInOutput = "No OneDrive metrics available"
+			}
 		}
 		if monitoredService != nil {
 			hostResource.Services[monitoredService.Name] = monitoredService
@@ -239,15 +243,19 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		AddonLicenseMetrics(monitoredService, graphToken)
+		err := AddonLicenseMetrics(monitoredService, graphToken)
 		// TODO: calculate status by threshold
 		monitoredService.Status = transit.ServiceOk
-		if (len(monitoredService.Metrics) >= 2) {
+		if (err == nil && len(monitoredService.Metrics) >= 2) {
 			monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
 				monitoredService.Metrics[1].Value.DoubleValue, monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
-			monitoredService.LastPlugInOutput = "No licensing metrics available"
+			if err != nil {
+				monitoredService.LastPlugInOutput = err.Error()
+			} else {
+				monitoredService.LastPlugInOutput = "No licensing metrics available"
+			}
 		}
 		if monitoredService != nil {
 			hostResource.Services[monitoredService.Name] = monitoredService
@@ -260,12 +268,16 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		SharePoint(monitoredService, graphToken, sharePointSite, sharePointSubSite) // TODO: params
-		if (len(monitoredService.Metrics) >= 2) {
+		err := SharePoint(monitoredService, graphToken, sharePointSite, sharePointSubSite) // TODO: params
+		if (err == nil && len(monitoredService.Metrics) >= 2) {
 			monitoredService.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%", monitoredService.Metrics[2].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
-			monitoredService.LastPlugInOutput = "No SharePoint metrics available"
+			if err != nil {
+				monitoredService.LastPlugInOutput = err.Error()
+			} else {
+				monitoredService.LastPlugInOutput = "No SharePoint metrics available"
+			}
 		}
 		if monitoredService != nil {
 			hostResource.Services[monitoredService.Name] = monitoredService
@@ -278,13 +290,17 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		Emails(monitoredService, graphToken, outlookEmailAddress)
-		if (len(monitoredService.Metrics) >= 1) {
+		err := Emails(monitoredService, graphToken, outlookEmailAddress)
+		if (err == nil && len(monitoredService.Metrics) >= 1) {
 			monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
 				monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
-			monitoredService.LastPlugInOutput = "No EMAIL metrics available"
+			if err != nil {
+				monitoredService.LastPlugInOutput = err.Error()
+			} else {
+				monitoredService.LastPlugInOutput = "No EMAIL metrics available"
+			}
 		}
 		if monitoredService != nil {
 			hostResource.Services[monitoredService.Name] = monitoredService
@@ -296,9 +312,17 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
-		SecurityAccessments(monitoredService, 	graphToken)
-		monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
-			monitoredService.Metrics[0].Value.DoubleValue)
+		err := SecurityAccessments(monitoredService, 	graphToken)
+		if (err == nil && len(monitoredService.Metrics) >= 1) {
+			monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
+				monitoredService.Metrics[0].Value.DoubleValue)
+		} else {
+			if err != nil {
+				monitoredService.LastPlugInOutput = err.Error()
+			} else {
+				monitoredService.LastPlugInOutput = "No Security metrics available"
+			}
+		}
 		if monitoredService != nil {
 			hostResource.Services[monitoredService.Name] = monitoredService
 		}
