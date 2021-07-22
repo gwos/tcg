@@ -717,19 +717,16 @@ func (service *AgentService) stopTransport() error {
 
 // mixTracerContext adds `context` field if absent
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
-	if !bytes.Contains(payloadJSON, []byte("\"context\":")) ||
-		!bytes.Contains(payloadJSON, []byte("\"traceToken\":")) {
+	if !bytes.Contains(payloadJSON, []byte(`"context":`)) ||
+		!bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
 		ctxJSON, err := json.Marshal(service.MakeTracerContext())
 		if err != nil {
 			return nil, err
 		}
 		l := bytes.LastIndexByte(payloadJSON, byte('}'))
-		var buf bytes.Buffer
-		buf.Write(payloadJSON[:l])
-		buf.Write([]byte(",\"context\":"))
-		buf.Write(ctxJSON)
-		buf.Write([]byte("}"))
-		return buf.Bytes(), nil
+		return bytes.Join([][]byte{
+			payloadJSON[:l], []byte(`,"context":`), ctxJSON, []byte(`}`),
+		}, []byte(``)), nil
 	}
 	return payloadJSON, nil
 }

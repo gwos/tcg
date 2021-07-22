@@ -236,11 +236,13 @@ type natsPayload struct {
 // Marshal implements Marshaler
 // internally it applyes the latest format version
 func (p natsPayload) Marshal() ([]byte, error) {
-	if b, err := p.marshalV2(); err == nil {
-		return append([]byte("v2:"), b...), nil
-	} else {
+	pp, err := p.marshalV2()
+	if err != nil {
 		return nil, err
 	}
+	return bytes.Join([][]byte{
+		[]byte(`{"v2":`), pp, []byte(`}`),
+	}, []byte(``)), nil
 }
 
 // Unmarshal implements Unmarshaler
@@ -252,10 +254,10 @@ func (p *natsPayload) Unmarshal(input []byte) error {
 	switch {
 	case input[0] < 8:
 		return p.unmarshalV1(input)
-	case bytes.HasPrefix(input, []byte("v1:")):
-		return p.unmarshalV1(input[3:])
-	case bytes.HasPrefix(input, []byte("v2:")):
-		return p.unmarshalV2(input[3:])
+	case bytes.HasPrefix(input, []byte(`{"v1":`)):
+		return p.unmarshalV1(input[6 : len(input)-1])
+	case bytes.HasPrefix(input, []byte(`{"v2":`)):
+		return p.unmarshalV2(input[6 : len(input)-1])
 	default:
 		return fmt.Errorf("unknown payload format")
 	}
@@ -265,23 +267,13 @@ func (p natsPayload) marshalV1() ([]byte, error) {
 	spanID := p.SpanContext.SpanID()
 	traceID := p.SpanContext.TraceID()
 	traceFlags := p.SpanContext.TraceFlags()
-	var buf bytes.Buffer
-	if err := buf.WriteByte(byte(p.Type)); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(spanID[:]); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(traceID[:]); err != nil {
-		return nil, err
-	}
-	if err := buf.WriteByte(byte(traceFlags)); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(p.Payload[:]); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return bytes.Join([][]byte{
+		{byte(p.Type)},
+		spanID[:],
+		traceID[:],
+		{byte(traceFlags)},
+		p.Payload,
+	}, []byte(``)), nil
 }
 
 func (p *natsPayload) unmarshalV1(input []byte) error {
@@ -331,14 +323,15 @@ type natsPayload2 struct {
 func (p natsPayload) marshalV2() ([]byte, error) {
 	spanID := p.SpanContext.SpanID()
 	traceID := p.SpanContext.TraceID()
-	p2 := natsPayload2{
-		Type:       p.Type.String(),
-		Payload:    p.Payload,
-		SpanID:     hex.EncodeToString(spanID[:]),
-		TraceID:    hex.EncodeToString(traceID[:]),
-		TraceFlags: uint8(p.SpanContext.TraceFlags()),
-	}
-	return json.Marshal(p2)
+	traceFlags := p.SpanContext.TraceFlags()
+	return bytes.Join([][]byte{
+		[]byte(`{"type":"`), []byte(p.Type.String()),
+		[]byte(`","payload":`), p.Payload,
+		[]byte(`,"spanID":"`), []byte(hex.EncodeToString(spanID[:])),
+		[]byte(`","traceID":"`), []byte(hex.EncodeToString(traceID[:])),
+		[]byte(`","traceFlags":`), []byte(fmt.Sprintf(`%d`, traceFlags)),
+		[]byte(`}`),
+	}, []byte(``)), nil
 }
 
 func (p *natsPayload) unmarshalV2(input []byte) error {

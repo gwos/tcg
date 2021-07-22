@@ -3,7 +3,9 @@ package services
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -54,15 +56,12 @@ func Test_natsPayloadMarshal(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, q.Unmarshal(encoded))
 		assert.Equal(t, p, q)
-
-		encoded = append([]byte("v1:"), encoded...)
-		assert.NoError(t, q.Unmarshal(encoded))
+		assert.NoError(t, q.Unmarshal([]byte(fmt.Sprintf(`{"v1":%s}`, encoded))))
 		assert.Equal(t, p, q)
 
 		encoded, err = p.marshalV2()
 		assert.NoError(t, err)
-		encoded = append([]byte("v2:"), encoded...)
-		assert.NoError(t, q.Unmarshal(encoded))
+		assert.NoError(t, q.Unmarshal([]byte(fmt.Sprintf(`{"v2":%s}`, encoded))))
 		assert.Equal(t, p, q)
 	})
 }
@@ -113,6 +112,32 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 		return nil
 	}
 
+	marshalV2join := func(p natsPayload) ([]byte, error) {
+		spanID := p.SpanContext.SpanID()
+		traceID := p.SpanContext.TraceID()
+		traceFlags := p.SpanContext.TraceFlags()
+		return bytes.Join([][]byte{
+			[]byte(`{"type":"`), []byte(p.Type.String()),
+			[]byte(`","payload":`), p.Payload,
+			[]byte(`,"spanID":"`), []byte(hex.EncodeToString(spanID[:])),
+			[]byte(`","traceID":"`), []byte(hex.EncodeToString(traceID[:])),
+			[]byte(`","traceFlags":`), []byte(fmt.Sprintf(`%d`, traceFlags)),
+			[]byte(`}`),
+		}, []byte(``)), nil
+	}
+	marshalV2json := func(p natsPayload) ([]byte, error) {
+		spanID := p.SpanContext.SpanID()
+		traceID := p.SpanContext.TraceID()
+		p2 := natsPayload2{
+			Type:       p.Type.String(),
+			Payload:    p.Payload,
+			SpanID:     hex.EncodeToString(spanID[:]),
+			TraceID:    hex.EncodeToString(traceID[:]),
+			TraceFlags: uint8(p.SpanContext.TraceFlags()),
+		}
+		return json.Marshal(p2)
+	}
+
 	p := natsPayload{
 		Type:    typeMetrics,
 		Payload: []byte(`{"key1":"val1"}`),
@@ -156,12 +181,116 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 		}
 	})
 
+	b.Run("marshalV2join", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			encoded, err := marshalV2join(p)
+			assert.NoError(b, err)
+			q := natsPayload{}
+			assert.NoError(b, q.unmarshalV2(encoded))
+			assert.Equal(b, p, q)
+		}
+	})
+
+	b.Run("marshalV2json", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			encoded, err := marshalV2json(p)
+			assert.NoError(b, err)
+			q := natsPayload{}
+			assert.NoError(b, q.unmarshalV2(encoded))
+			assert.Equal(b, p, q)
+		}
+	})
+
 	b.Run("marshalV2", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			encoded, err := p.marshalV2()
 			assert.NoError(b, err)
 			q := natsPayload{}
 			assert.NoError(b, q.unmarshalV2(encoded))
+			assert.Equal(b, p, q)
+		}
+	})
+}
+
+func Benchmark_natsPayloadFprintf(b *testing.B) {
+	p := natsPayload{
+		Type:    typeMetrics,
+		Payload: []byte(`{"key1":"val1"}`),
+		SpanContext: trace.NewSpanContext(trace.SpanContextConfig{
+			SpanID:     trace.SpanID{11},
+			TraceID:    trace.TraceID{42},
+			TraceFlags: trace.TraceFlags(3),
+		}),
+	}
+
+	b.Run("V2_1", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pp, err := p.marshalV2()
+			assert.NoError(b, err)
+			mm := []byte(fmt.Sprintf(`{"v2":%s}`, pp))
+
+			q := natsPayload{}
+			assert.NoError(b, q.Unmarshal(mm))
+			assert.Equal(b, p, q)
+		}
+	})
+
+	b.Run("V2_2", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pp, err := p.marshalV2()
+			assert.NoError(b, err)
+			buf := bytes.NewBuffer(make([]byte, 0, len(pp)+8))
+			_, err = fmt.Fprintf(buf, `{"v2":%s}`, pp)
+			mm := buf.Bytes()
+
+			q := natsPayload{}
+			assert.NoError(b, q.Unmarshal(mm))
+			assert.Equal(b, p, q)
+		}
+	})
+
+	b.Run("V2_3", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pp, err := p.marshalV2()
+			assert.NoError(b, err)
+			buf := bytes.NewBuffer(make([]byte, 0, len(pp)+8))
+			buf.Write([]byte(`{"v2":`))
+			buf.Write(pp)
+			buf.Write([]byte(`}`))
+			mm := buf.Bytes()
+
+			q := natsPayload{}
+			assert.NoError(b, q.Unmarshal(mm))
+			assert.Equal(b, p, q)
+		}
+	})
+
+	b.Run("V2_4", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pp, err := p.marshalV2()
+			assert.NoError(b, err)
+			mm := bytes.Join([][]byte{
+				[]byte(`{"v2":`), pp, []byte(`}`),
+			}, []byte(``))
+
+			q := natsPayload{}
+			assert.NoError(b, q.Unmarshal(mm))
+			assert.Equal(b, p, q)
+		}
+	})
+
+	type v2wrap struct {
+		V2 json.RawMessage `json:"v2"`
+	}
+
+	b.Run("V2_5", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pp, err := p.marshalV2()
+			assert.NoError(b, err)
+			mm, err := json.Marshal(v2wrap{pp})
+
+			q := natsPayload{}
+			assert.NoError(b, q.Unmarshal(mm))
 			assert.Equal(b, p, q)
 		}
 	})
