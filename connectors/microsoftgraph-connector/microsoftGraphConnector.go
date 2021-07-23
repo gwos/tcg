@@ -327,6 +327,16 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 			hostResource.Services[monitoredService.Name] = monitoredService
 		}
 	}
+	count := 0
+	for _, service := range hostResource.Services {
+		if service.Status == transit.ServiceUnknown	{
+			count = count + 1
+		}
+	}
+	if count == len(hostResource.Services) {
+		hostResource.Status = transit.HostUnreachable
+		hostResource.Message = "All services for this host are in unknown status"
+	}
 	return nil
 }
 
@@ -359,6 +369,10 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 		if monitoredService != nil {
 			hostResource.Services[ods.DisplayName] = monitoredService
 		}
+	}
+	if len(odata.Services) == 0 {
+		hostResource.Status = transit.HostUnreachable
+		hostResource.Message = "Zero services found. Services are"
 	}
 	return nil
 }

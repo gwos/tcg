@@ -164,7 +164,6 @@ func periodicHandler() {
 	if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
 		log.Error("[MsGraph Connector]: Error during sending metrics.", err)
 	}
-	log.Info("completed period handler")
 }
 
 // TODO: remove this when you have provisioning ready
