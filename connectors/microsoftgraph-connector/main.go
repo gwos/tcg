@@ -147,7 +147,7 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	temporaryMetricsDefinitions()  // TODO: remove this when you have provisioning ready
 	inventory, monitored, groups := connector.Collect(extConfig)
-	log.Debug("[MsGraph Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+	log.Info("[MsGraph Connector]: run start ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
 
 	if count > -1 {
 		if err := connectors.SendInventory(
@@ -164,6 +164,8 @@ func periodicHandler() {
 	if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
 		log.Error("[MsGraph Connector]: Error during sending metrics.", err)
 	}
+	log.Info("[MsGraph Connector]: run stop", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+
 }
 
 // TODO: remove this when you have provisioning ready
