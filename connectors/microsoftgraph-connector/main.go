@@ -48,13 +48,13 @@ func main() {
 	outlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "")
 	connector.SetCredentials(tenantId, clientId, clientSecret)
 
-	enableOneDriveMetrics = true
-	enableLicensingMetrics = true
-	enableSharePointMetrics = true
-	sharePointSite = "gwosjoey.sharepoint.com"
-	sharePointSubSite = "GWOS"
-	enableEmailMetrics = true
-	outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
+	//enableOneDriveMetrics = true
+	//enableLicensingMetrics = true
+	//enableSharePointMetrics = true
+	//sharePointSite = "gwosjoey.sharepoint.com"
+	//sharePointSubSite = "GWOS"
+	//enableEmailMetrics = true
+	//outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
 	//enableSecurityMetrics = true
 
 	connector.SetOptions(enableOneDriveMetrics, enableLicensingMetrics, enableSharePointMetrics, enableEmailMetrics,

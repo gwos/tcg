@@ -176,6 +176,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 			mServices[serviceIndex] = *service
 			serviceIndex = serviceIndex + 1
 		}
+		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		monitored[index] = transit.DynamicMonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
@@ -185,7 +186,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 			},
 			Status:           resource.Status,
 			LastCheckTime:    milliseconds.MillisecondTimestamp{time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{time.Now()}, // TODO: interval
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}
@@ -196,8 +197,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 		hostGroups[index] = group
 		index = index + 1
 	}
-	log.Info("Ending collection....")
-	return inventory, monitored, hostGroups
+ 	return inventory, monitored, hostGroups
 }
 
 func (connector *MicrosoftGraphConnector) collectBuiltins(
@@ -252,7 +252,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		monitoredService.Status = transit.ServiceOk
 		if (err == nil && len(monitoredService.Metrics) >= 2) {
 			monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
-				monitoredService.Metrics[1].Value.DoubleValue, monitoredService.Metrics[0].Value.DoubleValue)
+				monitoredService.Metrics[0].Value.DoubleValue, monitoredService.Metrics[1].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
