@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"strings"
@@ -19,6 +21,7 @@ import (
 	"github.com/rs/zerolog/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
+	"golang.org/x/crypto/blake2b"
 )
 
 // Controller implements AgentServices, Controllers interface
@@ -174,21 +177,14 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
+	/* validate payload */
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(payload, &dto); err != nil {
 		log.Err(err).Msg("could not unmarshal connector dto")
 		c.JSON(http.StatusBadRequest, "could not unmarshal connector dto")
 		return
 	}
-
-	credentials := Credentials{
-		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
-		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
-	}
-	if err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName); err != nil {
-		c.JSON(http.StatusBadRequest, fmt.Sprintf("could not validate config token request: %s", dto.DSConnection.HostName))
-	}
-
+	/* process payload */
 	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
@@ -456,38 +452,95 @@ func (controller *Controller) version(c *gin.Context) {
 	c.JSON(http.StatusOK, config.GetBuildInfo())
 }
 
-func (controller *Controller) validateToken(c *gin.Context) {
-	// check local pin
+func (controller *Controller) checkAccess(c *gin.Context) {
+	if len(controller.dsClient.HostName) == 0 && len(controller.gwClients) == 0 {
+		log.Info().Str("url", c.Request.URL.Redacted()).
+			Msg("omit access check on empty config")
+		return
+	}
+
+	/* check local pin */
 	pin := controller.Connector.ControllerPin
 	if len(pin) > 0 && pin == c.Request.Header.Get("X-PIN") {
+		log.Debug().Str("url", c.Request.URL.Redacted()).
+			Msg("access allowed with X-PIN")
 		return
 	}
 
-	credentials := Credentials{
-		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
-		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
-	}
-
-	if credentials.GwosAppName == "" || credentials.GwosAPIToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": `Invalid GWOS-APP-NAME or GWOS-API-TOKEN`})
-		c.Abort()
-		return
-	}
-
-	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosAPIToken)
-
-	_, isCached := controller.authCache.Get(key)
-	if !isCached {
-		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
+	hashFn := func(args ...string) (string, error) {
+		h, err := blake2b.New512(nil)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return "", err
+		}
+		for _, s := range args {
+			if _, err := io.WriteString(h, s); err != nil {
+				return "", err
+			}
+		}
+		sum := h.Sum(nil)
+		return hex.EncodeToString(sum[:]), nil
+	}
+
+	/* check basic auth */
+	if username, password, hasAuth := c.Request.BasicAuth(); hasAuth {
+		var err error
+		defer func() {
+			if err == nil {
+				log.Debug().Str("url", c.Request.URL.Redacted()).
+					Str("username", username).
+					Msg("access allowed with BASIC")
+				return
+			}
+			log.Warn().Err(err).Str("url", c.Request.URL.Redacted()).
+				Str("username", username).
+				Msg("access disallowed with BASIC")
+			c.AbortWithStatusJSON(http.StatusUnauthorized,
+				gin.H{"error": err.Error()})
+		}()
+
+		if !(len(username) > 0 && len(password) > 0 && len(controller.gwClients) > 0) {
+			err = fmt.Errorf("misconfigured basic auth")
 			return
 		}
+		ck, err := hashFn(username, password)
+		if err == nil {
+			if _, isCached := controller.authCache.Get(ck); !isCached {
+				if _, err = controller.gwClients[0].AuthenticatePassword(username, password); err == nil {
+					err = controller.authCache.Add(ck, true, time.Hour)
+				}
+			}
+		}
+		return
+	}
 
-		err = controller.authCache.Add(key, credentials, 8*time.Hour)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	/* check gwos auth */
+	gwosAppName := c.Request.Header.Get("GWOS-APP-NAME")
+	gwosAPIToken := c.Request.Header.Get("GWOS-API-TOKEN")
+	var err error
+	defer func() {
+		if err == nil {
+			log.Debug().Str("url", c.Request.URL.Redacted()).
+				Str("gwosAppName", gwosAppName).
+				Msg("access allowed with GWOS")
 			return
+		}
+		log.Warn().Err(err).Str("url", c.Request.URL.Redacted()).
+			Str("gwosAppName", gwosAppName).
+			Msg("access disallowed with GWOS")
+		c.AbortWithStatusJSON(http.StatusUnauthorized,
+			gin.H{"error": err.Error()})
+	}()
+
+	if !(len(gwosAppName) > 0 && len(gwosAPIToken) > 0 && len(controller.dsClient.HostName) > 0) {
+		err = fmt.Errorf("misconfigured gwos auth")
+		return
+	}
+	ck, err := hashFn(gwosAppName, gwosAPIToken)
+	if err == nil {
+		if _, isCached := controller.authCache.Get(ck); !isCached {
+			if err = controller.dsClient.ValidateToken(gwosAppName, gwosAPIToken); err == nil {
+				err = controller.authCache.Add(ck, true, time.Hour)
+			}
 		}
 	}
 }
@@ -496,13 +549,15 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
-	apiV1Group := router.Group("/api/v1")
-	apiV1Config := router.Group("/api/v1/config")
+	/* public entrypoints */
 	apiV1Identity := router.Group("/api/v1/identity")
-	apiV1Group.Use(controller.validateToken)
+	apiV1Identity.GET("", controller.agentIdentity)
 
-	apiV1Config.POST("", controller.config)
-	apiV1Group.GET("/version", controller.version)
+	/* private entrypoints */
+	apiV1Group := router.Group("/api/v1")
+	apiV1Group.Use(controller.checkAccess)
+
+	apiV1Group.POST("/config", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
@@ -512,7 +567,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
-	apiV1Identity.GET("", controller.agentIdentity)
+	apiV1Group.GET("/version", controller.version)
 
 	for _, entrypoint := range entrypoints {
 		switch entrypoint.Method {

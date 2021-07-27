@@ -17,25 +17,9 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// GWOperations defines Groundwork operations interface
-type GWOperations interface {
-	Connect() error
-	Disconnect() error
-	GetServicesByAgent(agentID string) ([]byte, error)
-	GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) ([]byte, error)
-	ValidateToken(appName, apiToken string) error
-	ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error)
-	SetInDowntime(ctx context.Context, payload []byte) ([]byte, error)
-	SendEvents(ctx context.Context, payload []byte) ([]byte, error)
-	SendEventsAck(ctx context.Context, payload []byte) ([]byte, error)
-	SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error)
-	SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error)
-	SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error)
-}
-
-// Define entrypoints for GWOperations
+// Define entrypoints
 const (
-	GWEntrypointConnectRemote                  = "/api/users/authenticatePassword"
+	GWEntrypointAuthenticatePassword           = "/api/users/authenticatePassword"
 	GWEntrypointConnect                        = "/api/auth/login"
 	GWEntrypointDisconnect                     = "/api/auth/logout"
 	GWEntrypointClearInDowntime                = "/api/biz/clearindowntime"
@@ -51,7 +35,7 @@ const (
 	GWEntrypointValidateToken                  = "/api/auth/validatetoken"
 )
 
-// GWClient implements GWOperations interface
+// GWClient implements GW API operations
 type GWClient struct {
 	AppName string
 	AppType string
@@ -61,6 +45,7 @@ type GWClient struct {
 	once sync.Once
 
 	token                             string
+	uriAuthenticatePassword           string
 	uriConnect                        string
 	uriDisconnect                     string
 	uriClearInDowntime                string
@@ -76,24 +61,14 @@ type GWClient struct {
 	uriValidateToken                  string
 }
 
-// AuthPayload defines Connect payload on nonLocalConnection
-type AuthPayload struct {
-	Name     string `json:"name"`
-	Password string `json:"password"`
-}
-
-// UserResponse defines Connect response on nonLocalConnection
-type UserResponse struct {
-	Name        string `json:"name"`
-	AccessToken string `json:"accessToken"`
-}
-
+// GwServices defines collection
 type GwServices struct {
 	Services []struct {
 		HostName string `json:"hostName"`
 	} `json:"services"`
 }
 
+// GwHostGroups defines collection
 type GwHostGroups struct {
 	HostGroups []struct {
 		Name  string `json:"name"`
@@ -103,7 +78,7 @@ type GwHostGroups struct {
 	} `json:"hostGroups"`
 }
 
-// Connect implements GWOperations.Connect.
+// Connect calls API
 func (client *GWClient) Connect() error {
 	client.buildURIs()
 	prevToken := client.token
@@ -115,12 +90,22 @@ func (client *GWClient) Connect() error {
 		return nil
 	}
 	if client.LocalConnection {
-		return client.connectLocal()
+		token, err := client.connectLocal()
+		if err == nil {
+			client.token = token
+		}
+		return err
 	}
-	return client.connectRemote()
+	token, err := client.AuthenticatePassword(
+		client.GWConnection.UserName,
+		client.GWConnection.Password)
+	if err == nil {
+		client.token = token
+	}
+	return err
 }
 
-func (client *GWClient) connectLocal() error {
+func (client *GWClient) connectLocal() (string, error) {
 	formValues := map[string]string{
 		"gwos-app-name": client.AppName,
 		"user":          client.GWConnection.UserName,
@@ -141,90 +126,94 @@ func (client *GWClient) connectLocal() error {
 	case err != nil:
 		req.LogWith(log.Error()).Msg("could not connect local groundwork")
 		if tcgerr.IsErrorConnection(err) {
-			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
-		return err
+		return "", err
 
 	case req.Status == 401 ||
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
-		return eee
+		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
-		return eee
+		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
-		return eee
+		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
-		return eee
+		return "", eee
 	}
 	req.LogWith(log.Info()).Msg("connect local groundwork")
-	client.token = string(req.Response)
-	return nil
+	return string(req.Response), nil
 }
 
-func (client *GWClient) connectRemote() error {
-	authPayload := AuthPayload{
-		Name:     client.GWConnection.UserName,
-		Password: client.GWConnection.Password,
-	}
-	authBytes, _ := json.Marshal(authPayload)
+// AuthenticatePassword calls API and returns token
+func (client *GWClient) AuthenticatePassword(username, password string) (string, error) {
+	client.buildURIs()
+	payload, _ := json.Marshal(map[string]string{
+		"name":     username,
+		"password": password,
+	})
 	headers := map[string]string{
 		"Accept":        "application/json",
 		"Content-Type":  "application/json",
 		"GWOS-APP-NAME": client.AppName,
 	}
 	req, err := (&Req{
-		URL:     client.uriConnect,
+		URL:     client.uriAuthenticatePassword,
 		Method:  http.MethodPut,
 		Headers: headers,
-		Payload: authBytes,
+		Payload: payload,
 	}).Send()
 
 	switch {
 	case err != nil:
-		req.LogWith(log.Error()).Msg("could not connect remote groundwork")
+		req.LogWith(log.Error()).Msg("could not authenticate password")
 		if tcgerr.IsErrorConnection(err) {
-			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
-		return err
+		return "", err
 
 	case req.Status == 401 ||
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
-		return eee
+		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
-		return eee
+		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
-		return eee
+		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
-		return eee
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		return "", eee
 	}
 
+	type UserResponse struct {
+		Name        string `json:"name"`
+		AccessToken string `json:"accessToken"`
+	}
 	user := UserResponse{AccessToken: ""}
 	if err := json.Unmarshal(req.Response, &user); err != nil {
 		req.LogDetailsWith(log.Warn()).
 			AnErr("parsingError", err).
-			Msg("could not connect remote groundwork")
-		return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
+			Msg("could not authenticate password")
+		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
 	req.LogWith(log.Info()).
 		Func(func(e *zerolog.Event) {
@@ -233,12 +222,11 @@ func (client *GWClient) connectRemote() error {
 					Str("userToken", user.AccessToken)
 			}
 		}).
-		Msg("connect remote groundwork")
-	client.token = user.AccessToken
-	return nil
+		Msg("authenticate password")
+	return user.AccessToken, nil
 }
 
-// Disconnect implements GWOperations.Disconnect.
+// Disconnect calls API
 func (client *GWClient) Disconnect() error {
 	client.buildURIs()
 	formValues := map[string]string{
@@ -288,7 +276,7 @@ func (client *GWClient) Disconnect() error {
 	return nil
 }
 
-// ValidateToken implements GWOperations.ValidateToken.
+// ValidateToken calls API
 func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	client.buildURIs()
 	headers := map[string]string{
@@ -328,7 +316,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	return err
 }
 
-// SynchronizeInventory implements GWOperations.SynchronizeInventory.
+// SynchronizeInventory calls API
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	mergeParam := make(map[string]string)
@@ -350,7 +338,7 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 	return response, err
 }
 
-// SendResourcesWithMetrics implements GWOperations.SendResourcesWithMetrics.
+// SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -369,7 +357,7 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 	return client.sendData(ctx, client.uriSendResourceWithMetrics, payload)
 }
 
-// ClearInDowntime implements GWOperations.ClearInDowntime.
+// ClearInDowntime calls API
 func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -383,7 +371,7 @@ func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]
 	return client.sendData(ctx, client.uriClearInDowntime, payload)
 }
 
-// SetInDowntime implements GWOperations.SetInDowntime.
+// SetInDowntime calls API
 func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -397,7 +385,7 @@ func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]by
 	return client.sendData(ctx, client.uriSetInDowntime, payload)
 }
 
-// SendEvents implements GWOperations.SendEvents.
+// SendEvents calls API
 func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -411,7 +399,7 @@ func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte,
 	return client.sendData(ctx, client.uriSendEvents, payload)
 }
 
-// SendEventsAck implements GWOperations.SendEventsAck.
+// SendEventsAck calls API
 func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -425,7 +413,7 @@ func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]by
 	return client.sendData(ctx, client.uriSendEventsAck, payload)
 }
 
-// SendEventsUnack implements GWOperations.SendEventsUnack.
+// SendEventsUnack calls API
 func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -439,7 +427,7 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 	return client.sendData(ctx, client.uriSendEventsUnack, payload)
 }
 
-// GetServicesByAgent implements GWOperations.GetServicesByAgent.
+// GetServicesByAgent calls API
 func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) {
 	params := make(map[string]string)
 	params["query"] = "agentid = '" + agentID + "'"
@@ -460,6 +448,7 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	return &gwServices, nil
 }
 
+// GetHostGroupsByHostNamesAndAppType calls API
 func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) (*GwHostGroups, error) {
 	if len(hostNames) == 0 {
 		return nil, errors.New("unable to get host groups of host: host names are not provided")
@@ -563,10 +552,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 
 func (client *GWClient) buildURIs() {
 	client.once.Do(func() {
+		client.uriAuthenticatePassword = buildURI(client.GWConnection.HostName, GWEntrypointAuthenticatePassword)
 		client.uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-		if !client.LocalConnection {
-			client.uriConnect = buildURI(client.GWConnection.HostName, GWEntrypointConnectRemote)
-		}
 		client.uriDisconnect = buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
 		client.uriClearInDowntime = buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
 		client.uriSetInDowntime = buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
