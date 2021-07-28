@@ -88,7 +88,7 @@ func (l LogLevel) String() string {
 // Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
-	transit.AgentIdentity
+	transit.AgentIdentity `yaml:",inline"`
 
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
