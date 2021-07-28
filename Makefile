@@ -25,6 +25,10 @@ TIME_BUILD_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/time.c	\
 	${BUILD_TARGET_DIRECTORY}/time.h
 
+LOGGER_BUILD_OBJECTS = \
+	${BUILD_TARGET_DIRECTORY}/logger.c	\
+	${BUILD_TARGET_DIRECTORY}/logger.h
+
 CONFIG_BUILD_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/config.c	\
 	${BUILD_TARGET_DIRECTORY}/config.h
@@ -40,6 +44,7 @@ TRANSIT_BUILD_OBJECTS =	\
 LIBTRANSITJSON_OBJECTS = \
 	${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	\
 	${BUILD_TARGET_DIRECTORY}/generic_datatypes.o	\
+	${BUILD_TARGET_DIRECTORY}/logger.o		\
 	${BUILD_TARGET_DIRECTORY}/config.o		\
 	${BUILD_TARGET_DIRECTORY}/milliseconds.o	\
 	${BUILD_TARGET_DIRECTORY}/transit.o
@@ -59,6 +64,7 @@ BUILD_HEADER_FILES = \
 	gotocjson/_c_code/convert_go_to_c.h		\
 	${BUILD_TARGET_DIRECTORY}/time.h		\
 	${BUILD_TARGET_DIRECTORY}/generic_datatypes.h	\
+	${BUILD_TARGET_DIRECTORY}/logger.h		\
 	${BUILD_TARGET_DIRECTORY}/config.h		\
 	${BUILD_TARGET_DIRECTORY}/milliseconds.h	\
 	${BUILD_TARGET_DIRECTORY}/transit.h
@@ -144,6 +150,9 @@ ${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datat
 ${TIME_BUILD_OBJECTS}	: gotocjson/gotocjson time/time.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} time/time.go
 
+${LOGGER_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} logger/logger.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} logger/logger.go
+
 ${CONFIG_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} config/config.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} config/config.go
 
@@ -158,6 +167,9 @@ ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} |
 
 ${BUILD_TARGET_DIRECTORY}/generic_datatypes.o	: ${GENERIC_DATATYPES_BUILD_OBJECTS}
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/generic_datatypes.c -o $@ -Igotocjson/_c_code
+
+${BUILD_TARGET_DIRECTORY}/logger.o	: ${TIME_BUILD_OBJECTS} ${LOGGER_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
+	${CC} -c ${BUILD_TARGET_DIRECTORY}/logger.c -o $@ -Igotocjson/_c_code
 
 ${BUILD_TARGET_DIRECTORY}/config.o	: ${TIME_BUILD_OBJECTS} ${CONFIG_BUILD_OBJECTS} ${BUILD_TARGET_DIRECTORY}/generic_datatypes.h
 	${CC} -c ${BUILD_TARGET_DIRECTORY}/config.c -o $@ -Igotocjson/_c_code
