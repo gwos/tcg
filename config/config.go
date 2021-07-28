@@ -14,9 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/go2cadapter"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/trace/jaeger"
@@ -372,12 +371,14 @@ func defaults() Config {
 func GetConfig() *Config {
 	once.Do(func() {
 		/* buffer the logging while configuring */
-		logBuf := &logger.LogBuffer{
-			Level: zerolog.TraceLevel,
-			Size:  16,
-		}
-		log.Logger = zerolog.New(logBuf).
-			With().Timestamp().Caller().Logger()
+		// logBuf := &logger.LogBuffer{
+		// 	Level: zerolog.TraceLevel,
+		// 	Size:  16,
+		// }
+		// log.Logger = zerolog.New(logBuf).
+		// 	With().Timestamp().Caller().Logger()
+
+		go2cadapter.SetLogBuffer()
 		log.Info().Msgf("Build info: %s / %s", buildTag, buildTime)
 
 		c := defaults()
@@ -399,7 +400,8 @@ func GetConfig() *Config {
 				Msg("could not process config environment")
 		}
 		cfg.initLogger()
-		logger.WriteLogBuffer(logBuf)
+		// logger.WriteLogBuffer(logBuf)
+		go2cadapter.UseLogBuffer()
 	})
 	return cfg
 }
@@ -636,21 +638,32 @@ func (cfg Config) initJaegertracing() (*sdktrace.TracerProvider, error) {
 }
 
 func (cfg Config) initLogger() {
-	opts := []logger.Option{
-		logger.WithCondense(cfg.Connector.LogCondense),
-		logger.WithLastErrors(10),
-		logger.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
-		logger.WithNoColor(cfg.Connector.LogNoColor),
-		logger.WithTimeFormat(cfg.Connector.LogTimeFormat),
-	}
-	if cfg.Connector.LogFile != "" {
-		opts = append(opts, logger.WithLogFile(&logger.LogFile{
-			FilePath: cfg.Connector.LogFile,
-			MaxSize:  cfg.Connector.LogFileMaxSize,
-			Rotate:   cfg.Connector.LogFileRotate,
-		}))
-	}
-	logger.SetLogger(opts...)
+	/*
+		opts := []logger.Option{
+			logger.WithCondense(cfg.Connector.LogCondense),
+			logger.WithLastErrors(10),
+			logger.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
+			logger.WithNoColor(cfg.Connector.LogNoColor),
+			logger.WithTimeFormat(cfg.Connector.LogTimeFormat),
+		}
+		if cfg.Connector.LogFile != "" {
+			opts = append(opts, logger.WithLogFile(&logger.LogFile{
+				FilePath: cfg.Connector.LogFile,
+				MaxSize:  cfg.Connector.LogFileMaxSize,
+				Rotate:   cfg.Connector.LogFileRotate,
+			}))
+		}
+		logger.SetLogger(opts...)
+	*/
+	go2cadapter.SetLoggerWithOptions(
+		cfg.Connector.LogCondense,
+		cfg.Connector.LogFile,
+		cfg.Connector.LogFileMaxSize,
+		cfg.Connector.LogFileRotate,
+		int(cfg.Connector.LogLevel),
+		cfg.Connector.LogNoColor,
+		cfg.Connector.LogTimeFormat,
+	)
 }
 
 // Decrypt decrypts small messages
