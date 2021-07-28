@@ -277,7 +277,7 @@ func RemoveDemandConfigHandler() {
 // GetConnectorConfig is a C API for getting services.GetTransitService().Connector
 //export GetConnectorConfig
 func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
-	res, err := json.Marshal(services.GetTransitService().Connector)
+	res, err := json.Marshal(services.GetTransitService().Connector.AgentIdentity)
 	if err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
