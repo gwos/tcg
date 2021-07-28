@@ -274,9 +274,9 @@ func RemoveDemandConfigHandler() {
 	services.GetTransitService().RemoveDemandConfigHandler()
 }
 
-// GetConnectorConfig is a C API for getting services.GetTransitService().Connector
-//export GetConnectorConfig
-func GetConnectorConfig(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
+// GetAgentIdentity is a C API for getting AgentIdentity
+//export GetAgentIdentity
+func GetAgentIdentity(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) bool {
 	res, err := json.Marshal(services.GetTransitService().Connector.AgentIdentity)
 	if err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
