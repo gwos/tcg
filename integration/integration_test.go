@@ -36,7 +36,7 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	setupIntegration(t, time.Duration(5*time.Second))
+	setupIntegration(t, 5*time.Second)
 	headers, err = connect(t)
 	defer cleanNats(t)
 	defer clean(t, headers)
@@ -65,9 +65,9 @@ func TestIntegration(t *testing.T) {
 
 	t.Log("Send bad ResourcesWithMetrics payload to GroundWork Foundation")
 	/* expect foundation error, processing should not stop */
-	badPayload := new(bytes.Buffer)
-	fmt.Fprintf(badPayload, "[[%s]]", buildResourceWithMetricsRequest(t))
-	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload.Bytes()))
+	badPayload := bytes.ReplaceAll(buildResourceWithMetricsRequest(t),
+		[]byte(`context`), []byte(`*ontex*`))
+	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload))
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats)
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport)
 }

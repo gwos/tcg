@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/log"
 	natsd "github.com/nats-io/nats-server/v2/server"
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
 	"github.com/nats-io/stan.go"
+	"github.com/rs/zerolog/log"
 )
 
 // Define NATS IDs
@@ -90,13 +90,13 @@ func StartServer(config Config) error {
 	if s.stanServer == nil {
 		if stanServer, err := stand.RunServerWithOpts(stanOpts, natsOpts); err == nil {
 			s.stanServer = stanServer
-			log.Info("[NATS]: Started at: ", s.stanServer.ClientURL())
+			log.Info().Msgf("nats started at: %s", s.stanServer.ClientURL())
 		} else {
-			log.With(log.Fields{
-				"error":    err,
-				"stanOpts": stanOpts,
-				"natsOpts": natsOpts,
-			}).Log(log.WarnLevel, "[NATS]: RunServerWithOpts failed")
+			log.Warn().
+				Err(err).
+				Interface("stanOpts", stanOpts).
+				Interface("natsOpts", natsOpts).
+				Msg("nats RunServerWithOpts failed")
 			return err
 		}
 	}
@@ -134,7 +134,7 @@ func StartDispatcher(options []DispatcherOption) error {
 	if d.connDispatcher == nil {
 		if d.stanServer == nil {
 			err := fmt.Errorf("%v: unavailable", ErrNATS)
-			log.Warn("[NATS]: Dispatcher failed: ", err)
+			log.Warn().Err(err).Msg("nats dispatcher failed")
 			return err
 		}
 		var err error
@@ -143,7 +143,7 @@ func StartDispatcher(options []DispatcherOption) error {
 			dispatcherID,
 			stan.NatsURL(d.stanServer.ClientURL()),
 			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
-				log.Warn("[NATS]: ConnectionLostHandler at Dispatcher: ", e.Error())
+				log.Warn().Err(e).Msg("nats dispatcher invoked ConnectionLostHandler")
 				d.Lock()
 				_ = c.Close()
 				d.connDispatcher = nil
@@ -151,9 +151,7 @@ func StartDispatcher(options []DispatcherOption) error {
 				StartDispatcher(options)
 			}),
 		); err != nil {
-			log.With(log.Fields{
-				"error": err,
-			}).Log(log.WarnLevel, "[NATS]: Dispatcher failed to connect")
+			log.Warn().Err(err).Msg("nats dispatcher failed to connect")
 			return err
 		}
 	}
@@ -192,7 +190,7 @@ func Publish(subject string, msg []byte) error {
 	if s.connPublisher == nil {
 		if s.stanServer == nil {
 			err := fmt.Errorf("%v: unavailable", ErrNATS)
-			log.Warn("[NATS]: Publisher failed: ", err)
+			log.Warn().Err(err).Msg("nats publisher failed")
 			return err
 		}
 		var err error
@@ -202,16 +200,14 @@ func Publish(subject string, msg []byte) error {
 			stan.NatsURL(s.stanServer.ClientURL()),
 			stan.MaxPubAcksInflight(s.config.MaxPubAcksInflight),
 			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
-				log.Warn("[NATS]: ConnectionLostHandler at connPublisher: ", e.Error())
+				log.Warn().Err(e).Msg("nats publisher invoked ConnectionLostHandler")
 				s.Lock()
 				_ = c.Close()
 				s.connPublisher = nil
 				s.Unlock()
 			}),
 		); err != nil {
-			log.With(log.Fields{
-				"error": err,
-			}).Log(log.WarnLevel, "[NATS]: Publisher failed to connect")
+			log.Warn().Err(err).Msg("nats publisher failed to connect")
 			return err
 		}
 	}

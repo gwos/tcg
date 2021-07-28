@@ -13,7 +13,7 @@ func TestEvents(t *testing.T) {
 	testMessage, err := parseJSON("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
-	setupIntegration(t, time.Duration(5*time.Second))
+	setupIntegration(t, 5*time.Second)
 	defer cleanNats(t)
 
 	l0 := len(services.GetTransitService().Stats().LastErrors)
@@ -28,8 +28,8 @@ func TestEvents(t *testing.T) {
 	}
 
 	if len(services.GetTransitService().Stats().LastErrors) != l0 {
-		t.Errorf("LastErrors should be empty. lastErrors = %s",
-			services.GetTransitService().Stats().LastErrors)
+		t.Errorf("LastErrors should be not changed")
+		t.Log("lastErrors:", services.GetTransitService().Stats().LastErrors)
 		return
 	}
 }

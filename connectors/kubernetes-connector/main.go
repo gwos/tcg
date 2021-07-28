@@ -3,14 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -32,18 +31,17 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	log.Info("[K8 Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[K8 Connector]: ", err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
-	log.Info("[K8 Connector]: Starting metric connection ...")
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
 	/* return on quit signal */
@@ -51,7 +49,7 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[K8 Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		AppType:   config.GetConfig().Connector.AppType,
@@ -65,7 +63,7 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[K8 Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	/* Update config with received values */
@@ -121,23 +119,21 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if connector.kapi != nil {
 		inventory, monitored, groups := connector.Collect(extConfig)
-		log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+		log.Debug().Msgf("collected %d:%d:%d", len(inventory), len(monitored), len(groups))
 
 		if count == 0 {
-			if err := connectors.SendInventory(
+			err := connectors.SendInventory(
 				context.Background(),
 				inventory,
 				groups,
 				extConfig.Ownership,
-			); err != nil {
-				log.Error("[K8 Connector]: Error during sending inventory.", err)
-			}
+			)
+			log.Err(err).Msg("sending inventory")
 			count = count + 1
 		}
 		time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
-		if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
-			log.Error("[K8 Connector]: Error during sending metrics.", err)
-		}
+		err := connectors.SendMetrics(context.Background(), monitored, &groups)
+		log.Err(err).Msg("sending metrics")
 	}
 }
 

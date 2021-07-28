@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
@@ -48,13 +49,6 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastErrors             []LastError                        `json:"lastErrors"`
-}
-
-// LastError defines
-type LastError struct {
-	Message string                             `json:"message"`
-	Time    *milliseconds.MillisecondTimestamp `json:"time"`
 }
 
 // AgentIdentity defines TCG Agent Identity
@@ -64,10 +58,11 @@ type AgentIdentity struct {
 	AppType string `json:"appType"`
 }
 
-// AgentIdentityStats defines complex type
-type AgentIdentityStats struct {
+// AgentStatsExt defines complex type
+type AgentStatsExt struct {
 	AgentIdentity
 	AgentStats
+	LastErrors []logger.LogRecord
 }
 
 // AgentStatus defines TCG Agent status

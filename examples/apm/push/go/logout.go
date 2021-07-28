@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/log"
 	"net/http"
+
+	"github.com/gwos/tcg/clients"
+	"github.com/rs/zerolog/log"
 )
 
 var logoutUrl = "/api/auth/logout"
@@ -18,8 +19,9 @@ func logout(host, gwosAppName, gwosApiToken string) {
 
 	statusCode, body, err := clients.SendRequest(http.MethodPost, host+logoutUrl, headers, formValues, nil)
 	if err != nil {
-		log.Error(err.Error())
+		log.Err(err).Msg("could not send request")
 	}
-
-	log.Warn(statusCode, string(body))
+	log.Warn().
+		Int("statusCode", statusCode).
+		Msg(string(body))
 }

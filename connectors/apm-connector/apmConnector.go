@@ -5,22 +5,23 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/golang/snappy"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang/snappy"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -184,7 +185,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 		}
 		values := makeValue(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
-			log.Error(fmt.Sprintf("[APM Connector]:  Value for metric '%s' can not be empty", *prometheusService.Name))
+			log.Error().Msgf("value for metric '%s' can not be empty", *prometheusService.Name)
 			continue
 		}
 
@@ -310,7 +311,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 			continue
 		}
 		if err := validatePrometheusService(prometheusService); err != nil {
-			log.Error(fmt.Sprintf("[APM Connector]: %s", err.Error()))
+			log.Err(err).Msg("could not validate prometheus service")
 			continue
 		}
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
@@ -386,41 +387,50 @@ func initializeEntrypoints() []services.Entrypoint {
 }
 
 func receiverHandler(c *gin.Context) {
-	log.Info("content type = ", c.GetHeader("Content-Type"))
 	body, err := c.GetRawData()
+	logEvt := log.Err(err).
+		Str("content-type", c.GetHeader("Content-Type"))
+
 	if err != nil {
-		log.Error("|apmConnector.go| : [receiverHandler] : ", err)
+		logEvt.Msg("could not process Prometheus Push")
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
 	if len(body) < 2 {
-		log.Info("Received Prometheus Push heartbeat...")
+		logEvt.Msg("received Prometheus Push heartbeat...")
 		return
 	}
 	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
 	err = processMetrics(body, -1, false, isProtobuf)
 	if err != nil {
-		log.Error(fmt.Sprintf("[APM Connector]~[Push]: %s", err))
+		logEvt.Discard() // recreate log event with error level
+		log.Err(err).
+			Str("content-type", c.GetHeader("Content-Type")).
+			Msg("could not process Prometheus Push")
+		c.JSON(http.StatusBadRequest, err.Error())
 	}
 }
 
 func pull(resources []Resource) {
 	for index, resource := range resources {
-		statusCode, byteResponse, err := clients.SendRequest(http.MethodGet, resource.URL, resource.Headers, nil, nil)
+		req, err := (&clients.Req{
+			URL:     resource.URL,
+			Method:  http.MethodGet,
+			Headers: resource.Headers,
+		}).Send()
 
 		if err != nil {
-			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.URL, err.Error()))
+			req.LogWith(log.Error()).Msg("could not pull data from resource")
 			continue
 		}
-		if !(statusCode == 200 || statusCode == 201 || statusCode == 220) {
-			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: Can not get data from resource [%s]. Reason: %s.",
-				resource.URL, string(byteResponse)))
+		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
+			req.LogDetailsWith(log.Error()).Msg("could not pull data from resource")
 			continue
 		}
-		err = processMetrics(byteResponse, index, statusCode == 220, false)
+		req.LogWith(log.Info()).Msg("pull data from resource")
+		err = processMetrics(req.Response, index, req.Status == 220, false)
 		if err != nil {
-			log.Error(fmt.Sprintf("[APM Connector]~[Pull]: %s", err))
+			log.Err(err).Msg("could not process metrics")
 		}
 	}
 }

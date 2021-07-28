@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -15,8 +18,6 @@ import (
 	"k8s.io/client-go/rest"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"strings"
-	"time"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -253,8 +254,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 			monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 			if err != nil {
-				log.Error("Error when creating service ", node.Name, ":", customServiceName)
-				log.Error(err)
+				log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
 			}
 			if monitoredService != nil {
 				resource.Services[metricBuilder.Name] = *monitoredService
@@ -365,15 +365,14 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 				monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 				if err != nil {
-					log.Error("Error when creating service ", node.Name, ":", customServiceName)
-					log.Error(err)
+					log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
 				}
 				if monitoredService != nil {
 					resource.Services[metricBuilder.Name] = *monitoredService
 				}
 			}
 		} else {
-			log.Error("Node not found in monitored state: " + node.Name)
+			log.Error().Msgf("node not found in monitored state: %s", node.Name)
 		}
 	}
 }
@@ -414,8 +413,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					metricBuilders = append(metricBuilders, metricBuilder)
 					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
 					if err != nil {
-						log.Error("Error when creating service ", pod.Name, ":", metricDefinition.Name)
-						log.Error(err)
+						log.Err(err).Msgf("could not create service %s:%s", pod.Name, metricDefinition.Name)
 					}
 					if monitoredService != nil {
 						resource.Services[metricBuilder.Name] = *monitoredService
@@ -423,7 +421,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 				}
 			}
 		} else {
-			log.Error("Pod not found in monitored state: " + pod.Name)
+			log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
 		}
 	}
 }
@@ -490,7 +488,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						resource.Services[metricDefinition.Name] = *monitoredService
 					}
 				} else {
-					log.Error("Pod not found in monitored state: " + pod.Name)
+					log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
 				}
 			}
 		}

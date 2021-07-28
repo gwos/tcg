@@ -9,9 +9,9 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	_ "github.com/gwos/tcg/docs"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -36,14 +36,14 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	services.GetTransitService().RegisterExitHandler(cancel)
 
-	log.Info("[Elastic Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[Elastic Connector]: ", err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error("[Elastic Connector]: ", err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
@@ -54,7 +54,7 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[Elastic Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		Kibana: Kibana{
@@ -81,7 +81,7 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[Elastic Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	/* Update config with received values */
@@ -136,13 +136,11 @@ func configHandler(data []byte) {
 	chk, err := connectors.Hashsum(extConfig)
 	if err != nil || !bytes.Equal(cfgChksum, chk) {
 		if err := connector.LoadConfig(*extConfig); err != nil {
-			log.Error("[Elastic Connector]: Cannot reload ElasticConnector config: ", err)
+			log.Err(err).Msg("could not reload config")
 		} else {
 			_, inventory, groups := connector.CollectMetrics()
-			log.Info("[Elastic Connector]: Sending inventory ...")
-			if err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership); err != nil {
-				log.Error("[Elastic Connector]: ", err.Error())
-			}
+			err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership)
+			log.Err(err).Msg("sending inventory")
 			if invChk, err := connector.getInventoryHashSum(); err == nil {
 				invChksum = invChk
 			}
@@ -164,20 +162,14 @@ func periodicHandler() {
 
 		chk, chkErr := connector.getInventoryHashSum()
 		if chkErr != nil || !bytes.Equal(invChksum, chk) {
-			log.Info("[Elastic Connector]: Inventory changed. Sending inventory ...")
 			err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership)
-			if err != nil {
-				log.Error("[Elastic Connector]: ", err.Error())
-			}
+			log.Err(err).Msg("inventory changed: sending inventory")
 		}
 		if chkErr == nil {
 			invChksum = chk
 		}
 
-		log.Info("[Elastic Connector]: Monitoring resources ...")
 		err := connectors.SendMetrics(context.Background(), metrics, nil)
-		if err != nil {
-			log.Error("[Elastic Connector]: ", err.Error())
-		}
+		log.Err(err).Msg("sending metrics")
 	}
 }
