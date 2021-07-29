@@ -90,6 +90,14 @@ func (l LogLevel) String() string {
 type Connector struct {
 	transit.AgentIdentity `yaml:",inline"`
 
+	// These fields were added to this structure by Glenn, to get this code to compile
+	// so I could move on and solve other problems.  Should the code elsewhere (see
+	// the usage of cfg.Connector) refer to these fields, or to the respective fields
+	// in the AgentIdentity structure just above?  Clean this up, either way.
+	AgentID       string        `json:"agentId"`
+	AppName       string        `json:"appName"`
+	AppType       string        `json:"appType"`
+
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
