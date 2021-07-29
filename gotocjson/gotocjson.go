@@ -6,7 +6,7 @@
 // revise the Go interface, and ensure that the conversion rouines are up-to-date
 // and accurate.
 
-// Copyright (c) 2020 GroundWork Open Source, Inc. ("GroundWork").
+// Copyright (c) 2020-2021 GroundWork Open Source, Inc. ("GroundWork").
 // All rights reserved.
 
 package main
@@ -40,6 +40,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -206,6 +207,24 @@ func parse_args() {
 	if print_diagnostics && diag_file == os.Stdout {
 		print_errors = false
 	}
+}
+
+// An attempt at a function which will spill to the diag_file, and if that is not directed to the terminal
+// and os.Stderr is directed to the terminal, also spill to os.Stderr so the user can see the message even
+// if we are not printing full diagnostics, but in no case printing a duplicate message to the same file.
+// So far this attempt fails, because we cannot find the file descriptor of the io.Writer argument.
+func emit_diagnostic(w io.Writer, format string, args... interface{}) {
+	fmt.Fprintf(w, format, args...)
+	//
+	// "terminal" package:
+	// func IsTerminal(fd int) bool
+	//
+	// diagInfo, _ := w.Stat();
+	// errInfo, _ := os.Stderr.Stat()
+	// if (diagInfo.Mode() & os.ModeCharDevice) == 0 && (errInfo.Mode() & os.ModeCharDevice) != 0 {
+		// // w is not directed to a terminal, but stderr is a terminal
+		// fmt.Fprintf(os.Stderr, format, args...)
+	// }
 }
 
 func main() {
@@ -441,9 +460,12 @@ func process_parse_nodes(
 			include_headers = append(include_headers, fmt.Sprintf(`#include "%s.h"`, "time"))
 		}
 		// In general, we need to handle cross-package references in the converted Go application code.
-		// That said, references to the "log" package we supply do not need any such special handling.
+		// That said, references to the "logger" package we supply do not need any such special handling,
+		// because we won't actually be creating conversion routines for any datatypes in that package.
+		// The special-case handling here of that package prevents a #include "logger.h" directive from
+		// being emitted, inasmuch as that header will never be available.
 		special_package := special_package_prefix.FindStringSubmatch(pkg)
-		if special_package != nil && special_package[1] != "log" {
+		if special_package != nil && special_package[1] != "logger" {
 			include_headers = append(include_headers, fmt.Sprintf(`#include "%s.h"`, special_package[1]))
 		}
 	}
@@ -830,6 +852,73 @@ node_loop:
 										if print_diagnostics {
 											// fmt.Fprintf(diag_file, "    --- map Key Ident %#v\n", key_type_ident)
 										}
+										if value_type_ident, ok = type_map.Value.(*ast.Ident); ok {
+											if print_diagnostics {
+												// fmt.Fprintf(diag_file, "    --- map Value Ident %#v\n", value_type_ident)
+											}
+											field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
+										} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
+											if print_diagnostics {
+												// Suppress Go's "unused variable" noisiness, when the following printed output is commented out.
+												value_type_interface = value_type_interface
+												// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
+											}
+											// Logically, we would want to declare the field type name to refer to some sort of
+											// generic interface object, and then generate code to handle all the various types of
+											// objects (floats, slices, deep maps, slices of deep maps, etc.) one might encounter as
+											// instances of such an interface.  But that is far too complex for present needs.  Those
+											// needs currently are just to handle a structure in the Go code that has an interface
+											// as the value of one of its declared map values, in a structure that currently has no
+											// business being transferred between Go code and C code in the first place.  So instead,
+											// we punt; we just abort this iteration of the loop, which suppresses recognition of the
+											// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
+											// CONTINUE #1" below), which we handle there in a similar manner, by simply skipping further
+											// processing of that loop iteration as well.  The net effect is that said field will not
+											// appear in the C structure at all, and it will be neither serialized nor deserialized.
+											// But that won't matter, because we don't expect to ever exchange that structure with
+											// any Go code anyway.  This is just a workaround to avoid having to make larger changes.
+											// field_type_name = "map[" + key_type_ident.Name + "]" + "interface{...}"
+											continue
+										} else {
+											if print_diagnostics {
+												fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
+												fmt.Fprintf(diag_file, "ERROR:  struct field Type Value field is not of a recognized type\n")
+											}
+											panic_message = "aborting due to previous errors"
+											break node_loop
+										}
+										// FIX QUICK:  This needs work to fully reflect the map structure; perhaps the new statements now do so.
+										// field_type_name = value_type_ident.Name
+										if print_diagnostics {
+											// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
+										}
+										if print_diagnostics {
+											fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
+										}
+									} else if key_type_starexpr, ok := type_map.Key.(*ast.StarExpr); ok {
+										//
+										// We land in this case when we have this kind of struct field as input:
+										//
+										//     Re map[*regexp.Regexp][]byte
+										//
+										// and we get this error message as a consequence:
+										//
+										//     found unexpected field.Type.Key type:  *ast.StarExpr
+										//
+										// For now, the conversion processing has been rejiggered so we are
+										// no longer processing a Go file containing such a struct definition.
+										// So for the time being, we are not extending the conversion tool to
+										// cover that case, because it looks like there could be significant
+										// extra complexity if and when we want to process a *regexp.Regexp
+										// element during such conversions.
+										//
+										key_type_starexpr = key_type_starexpr
+										if print_diagnostics {
+											fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Key type:  %T\n", file_line(), type_map.Key)
+											fmt.Fprintf(diag_file, "ERROR:  struct field Type Key field is not of a recognized type\n")
+										}
+										panic_message = "aborting due to previous errors"
+										break node_loop
 									} else {
 										if print_diagnostics {
 											fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Key type:  %T\n", file_line(), type_map.Key)
@@ -837,49 +926,6 @@ node_loop:
 										}
 										panic_message = "aborting due to previous errors"
 										break node_loop
-									}
-									if value_type_ident, ok = type_map.Value.(*ast.Ident); ok {
-										if print_diagnostics {
-											// fmt.Fprintf(diag_file, "    --- map Value Ident %#v\n", value_type_ident)
-										}
-										field_type_name = "map[" + key_type_ident.Name + "]" + value_type_ident.Name
-									} else if value_type_interface, ok = type_map.Value.(*ast.InterfaceType); ok {
-										if print_diagnostics {
-											// Suppress Go's "unused variable" noisiness, when the following printed output is commented out.
-											value_type_interface = value_type_interface
-											// fmt.Fprintf(diag_file, "    --- map Value InterfaceType %#v\n", value_type_interface)
-										}
-										// Logically, we would want to declare the field type name to refer to some sort of
-										// generic interface object, and then generate code to handle all the various types of
-										// objects (floats, slices, deep maps, slices of deep maps, etc.) one might encounter as
-										// instances of such an interface.  But that is far too complex for present needs.  Those
-										// needs currently are just to handle a structure in the Go code that has an interface
-										// as the value of one of its declared map values, in a structure that currently has no
-										// business being transferred between Go code and C code in the first place.  So instead,
-										// we punt; we just abort this iteration of the loop, which suppresses recognition of the
-										// affected structure field.  This will create a hiccup in later code (see "COMPENSATORY
-										// CONTINUE #1" below), which we handle there in a similar manner, by simply skipping further
-										// processing of that loop iteration as well.  The net effect is that said field will not
-										// appear in the C structure at all, and it will be neither serialized nor deserialized.
-										// But that won't matter, because we don't expect to ever exchange that structure with
-										// any Go code anyway.  This is just a workaround to avoid having to make larger changes.
-										// field_type_name = "map[" + key_type_ident.Name + "]" + "interface{...}"
-										continue
-									} else {
-										if print_diagnostics {
-											fmt.Fprintf(diag_file, "ERROR:  at %s, found unexpected field.Type.Value type:  %T\n", file_line(), type_map.Value)
-											fmt.Fprintf(diag_file, "ERROR:  struct field Type Value field is not of a recognized type\n")
-										}
-										panic_message = "aborting due to previous errors"
-										break node_loop
-									}
-									// FIX QUICK:  This needs work to fully reflect the map structure; perhaps the new statements now do so.
-									// field_type_name = value_type_ident.Name
-									if print_diagnostics {
-										// fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v map[%#v]%#v\n", name.Name, key_type_ident.Name, field_type_name)
-									}
-									if print_diagnostics {
-										fmt.Fprintf(diag_file, "    --- struct field name and type:  %#v %#v\n", name.Name, field_type_name)
 									}
 								} else if type_selectorexpr, ok := field.Type.(*ast.SelectorExpr); ok {
 									var x_type_ident *ast.Ident
@@ -4968,12 +5014,18 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 				case "string":
 					field_C_type = "string"
 				case "struct":
-					// Hail Mary.  We might get a "milliseconds_MillisecondTimestamp" here.  That's the
-					// only supported case we are currently aware of.  We can extend this later if need
-					// be, but at least we'll find out if anything else shows up here, to know that we
-					// need such an extension.
+					// Hail Mary.  We might get a "milliseconds_MillisecondTimestamp" here, or certain
+					// other limited cross-package type references.  "milliseconds_MillisecondTimestamp"
+					// and "transit_AgentIdentity" are the only supported cases we are currently aware of.
+					// We can extend this later if need be (we don't like the special-case handling here
+					// of matching specific datatypes).  Or perhaps we might just allow all instances of
+					// this situation, without marking any of them as "unsupported", under the belief that
+					// there will be foreign-package conversion routines supplied elsewhere, as part of
+					// the data transformations created for the foreign package.  But at least for the
+					// time being with this validation, we'll find out if anything else shows up here, to
+					// know that we need such an extension, by a fatal error message printed just below. 
 					field_C_type = struct_field_C_types[struct_name][field_name]
-					if field_C_type != "milliseconds_MillisecondTimestamp" {
+					if field_C_type != "milliseconds_MillisecondTimestamp" && field_C_type != "transit_AgentIdentity" {
 						// We might extend this case in the future, to do something sensible with it.
 						field_C_type = "unsupported"
 					}

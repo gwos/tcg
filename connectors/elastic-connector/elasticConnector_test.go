@@ -65,7 +65,7 @@ func TestInitFullConfig(t *testing.T) {
 		HostNameField:      "eccTestHostNameLabel",
 		HostGroupField:     "eccTestHostGroupLabel",
 		GroupNameByUser:    false,
-		CheckInterval:      time.Duration(5) * time.Minute,
+		CheckInterval:      time.Minute * 5,
 		Ownership:          transit.Yield,
 		AppType:            "testAppType",
 		AgentID:            "testAgentId",

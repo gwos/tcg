@@ -13,17 +13,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 // ExtKeyCheckInterval defines field name
 const ExtKeyCheckInterval = "checkIntervalMinutes"
 
 // DefaultCheckInterval defines interval
-const DefaultCheckInterval = time.Duration(2) * time.Minute
+const DefaultCheckInterval = time.Minute * 2
 
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
@@ -232,7 +232,7 @@ type MetricBuilder struct {
 	Tags           map[string]string
 }
 
-// Creates metric based on data provided with metricBuilder
+// BuildMetric creates metric based on data provided with metricBuilder
 func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	var args []interface{}
 	if metricBuilder.UnitType != nil {
@@ -245,8 +245,9 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		}
 		args = append(args, timeInterval)
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
-		log.Error("|connectors.go| : [BuildMetric] : Error creating time interval for metric ", metricBuilder.Name,
-			": either start time or end time is not provided")
+		log.Error().
+			Msgf("could not create time interval for metric %s: either start time or end time is not provided",
+				metricBuilder.Name)
 	}
 	if metricBuilder.Tags != nil && len(metricBuilder.Tags) != 0 {
 		args = append(args, metricBuilder.Tags)
@@ -266,8 +267,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		warningThreshold, err := CreateWarningThreshold(metricName+"_wn",
 			metricBuilder.Warning)
 		if err != nil {
-			log.Error("|connectors.go| : [BuildMetric]: Error creating warning threshold for metric ", metricBuilder.Name,
-				": ", err)
+			log.Err(err).Msgf("could not create warning threshold for metric %s", metricBuilder.Name)
 		}
 		thresholds = append(thresholds, *warningThreshold)
 	}
@@ -275,8 +275,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		criticalThreshold, err := CreateCriticalThreshold(metricName+"_cr",
 			metricBuilder.Critical)
 		if err != nil {
-			log.Error("|connectors.go| : [BuildMetric] : Error creating critical threshold for metric ", metricBuilder.Name,
-				": ", err)
+			log.Err(err).Msgf("could not create critical threshold for metric %s", metricBuilder.Name)
 		}
 		thresholds = append(thresholds, *criticalThreshold)
 	}
@@ -398,14 +397,13 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 	return &threshold, nil
 }
 
-// BuildServiceForMetric - creates metric based on data provided in metric builder and if metric successfully created
+// BuildServiceForMetric creates metric based on data provided in metric builder and if metric successfully created
 // creates service with same name as metric which contains only this one metric
 // returns the result of service creation
 func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.DynamicMonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
-		log.Error("|connectors.go| : [BuildServiceForMetric] : Error creating metric for process: ", metricBuilder.Name,
-			" Reason: ", err)
+		log.Err(err).Msgf("could not create metric for process: %s", metricBuilder.Name)
 		return nil, errors.New("cannot create service with metric due to metric creation failure")
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
@@ -420,8 +418,7 @@ func BuildServiceForMetricWithStatusText(hostName string, metricBuilder MetricBu
 	statusMessages map[transit.MonitorStatus]string) (*transit.DynamicMonitoredService, error) {
 	service, err := BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
-		log.Error("|connectors.go| : [BuildServiceForMetricWithStatusText] : Error when creating service ",
-			hostName, ":", metricBuilder.CustomName, " Reason: ", err)
+		log.Err(err).Msgf("could not create service %s:%s", hostName, metricBuilder.CustomName)
 		return service, err
 	}
 	// if no message for status provided in a map patternMessage is "", thresholds will be texted anyway if they exist
@@ -435,8 +432,7 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 	for index, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
-			log.Error("Error creating metric for process: ", metricBuilder.Name)
-			log.Error(err)
+			log.Err(err).Msgf("could not create metric for process: %s", metricBuilder.Name)
 			return nil, errors.New("cannot create service with metric due to metric creation failure")
 		}
 		metrics[index] = *metric
@@ -450,8 +446,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
-			log.Error("|connectors.go| : [BuildServiceForMetrics]: Error creating metric for process: ", serviceName,
-				". With metric: ", metricBuilder.Name, "\n\t", err.Error())
+			log.Err(err).Msgf("could not create metric for process %s with metric %s", serviceName, metricBuilder.Name)
 			return nil, errors.New("cannot create service with metric due to metric creation failure")
 		}
 		timeSeries = append(timeSeries, *metric)
@@ -694,7 +689,10 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 		for _, metric := range result[i].Metrics {
 			if metric.MetricComputeType == transit.Synthetic {
 				if value, _, err := EvaluateGroundworkExpression(metric.MetricExpression, vars, 0); err != nil {
-					log.Error("|connectors.go| : [EvaluateExpressions] : ", err)
+					log.Err(err).
+						Interface("expression", metric.MetricExpression).
+						Interface("arguments", vars).
+						Msg("could not evaluate expression")
 					continue
 				} else {
 					endTime := metric.Interval.EndTime.Time
@@ -728,7 +726,7 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 					status, err := CalculateServiceStatus(&result[i].Metrics)
 					result[i].Status = status
 					if err != nil {
-						log.Error(fmt.Sprintf("|connectors.go| : [EvaluateExpressions] : %s (default status - \"STATUS_OK\")", err))
+						log.Err(err).Msg("could not calculate service status")
 					}
 				}
 			}
@@ -790,7 +788,7 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 	handler := func() {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("[Recovered]: ", err)
+				log.Err(err.(error)).Msg("recovered error in periodic handler")
 			}
 		}()
 		fn()
@@ -847,7 +845,7 @@ func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) str
 
 func addServiceStatusText(patternMessage string, service *transit.DynamicMonitoredService) {
 	if service == nil {
-		log.Error("|connectors.go| : [addServiceStatusText] : service is nil")
+		log.Error().Msg("service is nil")
 		return
 	}
 	re := regexp2.MustCompile(statusTextPattern)
@@ -856,13 +854,15 @@ func addServiceStatusText(patternMessage string, service *transit.DynamicMonitor
 		if fn, has := statusTextValGetters[pattern]; has {
 			replacement, err := fn(service)
 			if err != nil {
-				log.Warn("|connectors.go| : [addServiceStatusText] : Failed to replace pattern: ",
-					pattern, " in message ", pattern, "for service ", service.Name, " : ", err)
+				log.Warn().
+					Err(err).
+					Msgf("could not replace pattern <%s> in message <%s> for service %s",
+						pattern, patternMessage, service.Name)
 			} else {
 				patternMessage = strings.ReplaceAll(patternMessage, pattern, replacement)
 			}
 		} else {
-			log.Warn("|connectors.go| : [addServiceStatusText] : No method to get service value for pattern: ", pattern)
+			log.Warn().Msgf("no method to get service value for pattern: %s", pattern)
 		}
 	}
 	statusText := addThresholdsToStatusText(patternMessage, service)
@@ -871,7 +871,7 @@ func addServiceStatusText(patternMessage string, service *transit.DynamicMonitor
 
 func addThresholdsToStatusText(statusText string, service *transit.DynamicMonitoredService) string {
 	if service == nil {
-		log.Error("|connectors.go| : [addThresholdsStatusText] : service is nil")
+		log.Error().Msg("service is nil")
 		return statusText
 	}
 	if len(service.Metrics) == 1 {
@@ -891,8 +891,9 @@ func addThresholdsToStatusText(statusText string, service *transit.DynamicMonito
 							crt = value
 						}
 					} else {
-						log.Warn("|connectors.go| : [addThresholdsToStatusText] :"+
-							" Failed to get ", thresholdType, " threshold for service ", service.Name, " : ", err)
+						log.Warn().
+							Err(err).
+							Msgf("could not get %s threshold for service %s", thresholdType, service.Name)
 					}
 				}
 			}
@@ -908,7 +909,7 @@ func addThresholdsToStatusText(statusText string, service *transit.DynamicMonito
 			statusText = statusText + thText
 		}
 	} else {
-		log.Warn("|connectors.go| : [addThresholdsToStatusText] : Not supported for service with more than one metric")
+		log.Warn().Msg("not supported for service with more than one metric")
 	}
 	return statusText
 }
@@ -917,13 +918,13 @@ func extractValueForStatusText(service *transit.DynamicMonitoredService) (string
 	if len(service.Metrics) == 1 {
 		return getValueText(service.Metrics[0].Value)
 	}
-	log.Warn("|connectors.go| : [extractValueForStatusText] : Not supported for service with more than one metric")
+	log.Warn().Msg("not supported for service with more than one metric")
 	return "", errors.New("not supported for service with more than one metric")
 }
 
 func getValueText(value *transit.TypedValue) (string, error) {
 	if value == nil {
-		log.Warn("|connectors.go| : [getValueText] : no value")
+		log.Warn().Msg("no value")
 		return "", errors.New("no value")
 	}
 	switch value.ValueType {
@@ -938,7 +939,7 @@ func getValueText(value *transit.TypedValue) (string, error) {
 	case transit.TimeType:
 		return FormatTimeForStatusMessage(time.Duration(value.TimeValue.UnixNano()), time.Second), nil
 	}
-	log.Warn("|connectors.go| : [getValueText] : Unknown value type")
+	log.Warn().Msg("unknown value type")
 	return "", errors.New("unknown value type")
 }
 

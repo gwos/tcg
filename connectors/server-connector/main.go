@@ -7,9 +7,9 @@ import (
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	_ "github.com/gwos/tcg/docs"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -36,21 +36,21 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	log.Info("[Server Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[Server Connector]: ", err)
+		log.Err(err).Msg("could not demand the configuration")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error("[Server Connector]: ", err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func handleCache() {
@@ -58,7 +58,7 @@ func handleCache() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[Server Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		Groups: []transit.ResourceGroup{{
@@ -72,7 +72,7 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[Server Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	/* Update config with received values */
@@ -90,7 +90,7 @@ func configHandler(data []byte) {
 		extConfig,
 	)
 	if err != nil || !bytes.Equal(chksum, chk) {
-		log.Info("[Server Connector]: Sending inventory ...")
+		log.Info().Msg("sending inventory ...")
 		resources := []transit.DynamicInventoryResource{*Synchronize(metricsProfile.Metrics)}
 		groups := extConfig.Groups
 		for i, group := range groups {
@@ -115,11 +115,11 @@ func configHandler(data []byte) {
 
 func periodicHandler() {
 	if len(metricsProfile.Metrics) > 0 {
-		log.Info("[Server Connector]: Monitoring resources ...")
+		log.Info().Msg("monitoring resources ...")
 		if err := connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{
 			*CollectMetrics(metricsProfile.Metrics),
 		}, nil); err != nil {
-			log.Error("[Server Connector]: ", err)
+			log.Err(err).Msg("could not send metrics")
 		}
 	}
 }

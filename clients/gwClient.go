@@ -12,7 +12,9 @@ import (
 	"sync"
 
 	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
+	tcgerr "github.com/gwos/tcg/errors"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 // GWOperations defines Groundwork operations interface
@@ -128,38 +130,45 @@ func (client *GWClient) connectLocal() error {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	reqURL := client.uriConnect
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
+	req, err := (&Req{
+		URL:     client.uriConnect,
+		Method:  http.MethodPost,
+		Headers: headers,
+		Form:    formValues,
+	}).Send()
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectLocal")
-
-	if err != nil {
-		logEntryLevel = log.ErrorLevel
+	switch {
+	case err != nil:
+		req.LogWith(log.Error()).Msg("could not connect local groundwork")
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return err
+
+	case req.Status == 401 ||
+		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		return eee
+
+	case req.Status == 502 || req.Status == 504:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		return eee
+
+	case req.Status == 503:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		return eee
+
+	case req.Status != 200:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		return eee
 	}
-	if statusCode == 200 {
-		client.token = string(byteResponse)
-		logEntry.WithDebug(log.Fields{
-			"token": client.token,
-		})
-		return nil
-	}
-	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
-	}
-	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
-	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+	req.LogWith(log.Info()).Msg("connect local groundwork")
+	client.token = string(req.Response)
+	return nil
 }
 
 func (client *GWClient) connectRemote() error {
@@ -173,47 +182,60 @@ func (client *GWClient) connectRemote() error {
 		"Content-Type":  "application/json",
 		"GWOS-APP-NAME": client.AppName,
 	}
-	reqURL := client.uriConnect
-	statusCode, byteResponse, err := SendRequest(http.MethodPut, reqURL, headers, nil, authBytes)
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
+	req, err := (&Req{
+		URL:     client.uriConnect,
+		Method:  http.MethodPut,
+		Headers: headers,
+		Payload: authBytes,
+	}).Send()
 
-	defer logEntry.Log(logEntryLevel, "GWClient: connectRemote")
-
-	if err != nil {
-		logEntryLevel = log.ErrorLevel
-		return err
-	}
-	user := UserResponse{AccessToken: ""}
-	error2 := "unknown error"
-	if statusCode == 200 {
-		// client.token = string(byteResponse)
-		error2 := json.Unmarshal(byteResponse, &user)
-		if error2 == nil {
-			client.token = user.AccessToken
-			logEntry.WithDebug(log.Fields{
-				"user": user,
-			})
-			return nil
+	switch {
+	case err != nil:
+		req.LogWith(log.Error()).Msg("could not connect remote groundwork")
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
+		return err
+
+	case req.Status == 401 ||
+		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
+		return eee
+
+	case req.Status == 502 || req.Status == 504:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
+		return eee
+
+	case req.Status == 503:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
+		return eee
+
+	case req.Status != 200:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not connect remote groundwork")
+		return eee
 	}
-	logEntry.WithInfo(log.Fields{
-		"errorCode": error2,
-	})
-	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, error2)
+
+	user := UserResponse{AccessToken: ""}
+	if err := json.Unmarshal(req.Response, &user); err != nil {
+		req.LogDetailsWith(log.Warn()).
+			AnErr("parsingError", err).
+			Msg("could not connect remote groundwork")
+		return fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	if statusCode == 401 || (statusCode == 404 && bytes.Contains(byteResponse, []byte("password"))) {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
-	}
-	return fmt.Errorf("%w: %v", ErrUndecided, error2)
+	req.LogWith(log.Info()).
+		Func(func(e *zerolog.Event) {
+			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+				e.Str("userName", user.Name).
+					Str("userToken", user.AccessToken)
+			}
+		}).
+		Msg("connect remote groundwork")
+	client.token = user.AccessToken
+	return nil
 }
 
 // Disconnect implements GWOperations.Disconnect.
@@ -227,35 +249,43 @@ func (client *GWClient) Disconnect() error {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	reqURL := client.uriDisconnect
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
+	req, err := (&Req{
+		URL:     client.uriDisconnect,
+		Method:  http.MethodPost,
+		Headers: headers,
+		Form:    formValues,
+	}).Send()
 
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
-
-	defer logEntry.Log(logEntryLevel, "GWClient: disconnect")
-
-	if err != nil {
+	switch {
+	case err != nil:
+		req.LogWith(log.Error()).Msg("could not disconnect groundwork")
+		if tcgerr.IsErrorConnection(err) {
+			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return err
-	}
 
-	if statusCode == 200 {
-		return nil
+	case req.Status == 401:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		return eee
+
+	case req.Status == 502 || req.Status == 504:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		return eee
+
+	case req.Status == 503:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		return eee
+
+	case req.Status != 200:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		return eee
 	}
-	if statusCode == 502 || statusCode == 504 {
-		return fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
-	}
-	if statusCode == 401 {
-		return fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
-	}
-	return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+	req.LogWith(log.Info()).Msg("disconnect groundwork")
+	return nil
 }
 
 // ValidateToken implements GWOperations.ValidateToken.
@@ -269,32 +299,32 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-	reqURL := client.uriValidateToken
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, formValues, nil)
-
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
-
-	defer logEntry.Log(logEntryLevel, "GWClient: validate token")
+	req, err := (&Req{
+		URL:     client.uriValidateToken,
+		Method:  http.MethodPost,
+		Headers: headers,
+		Form:    formValues,
+	}).Send()
 
 	if err == nil {
-		if statusCode == 200 {
-			b, _ := strconv.ParseBool(string(byteResponse))
-			if b {
+		if req.Status == 200 {
+			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
+				req.LogWith(log.Debug()).Msg("validate groundwork token")
 				return nil
 			}
-			return fmt.Errorf("%w: %v", ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
+			eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
+			req.LogWith(log.Warn()).Err(eee).Msg("could not validate groundwork token")
+			return eee
 		}
-		return fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not validate groundwork token")
+		return eee
 	}
 
+	req.LogWith(log.Error()).Msg("could not validate groundwork token")
+	if tcgerr.IsErrorConnection(err) {
+		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+	}
 	return err
 }
 
@@ -307,16 +337,16 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		mergeHosts = client.GWConnection.MergeHosts
 	}
 	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
-	syncUri := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
+	reqURL := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(ctx, syncUri, payload,
+		return client.sendData(ctx, reqURL, payload,
 			header{
 				"HostNamePrefix",
 				client.ResourceNamePrefix,
 			},
 		)
 	}
-	response, err := client.sendData(ctx, syncUri, payload)
+	response, err := client.sendData(ctx, reqURL, payload)
 	return response, err
 }
 
@@ -415,16 +445,16 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqUrl := client.uriServices + BuildQueryParams(params)
-	response, err := client.sendRequest(context.Background(), http.MethodGet, reqUrl, nil)
+	reqURL := client.uriServices + BuildQueryParams(params)
+	response, err := client.sendRequest(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		log.Warn("|gwClient.go| : [GetServicesByAgent] : Unable to get GW services: ", err)
+		log.Err(err).Msg("could not get GW services")
 		return nil, err
 	}
 	var gwServices GwServices
 	err = json.Unmarshal(response, &gwServices)
 	if err != nil {
-		log.Warn("|gwClient.go| : [GetServicesByAgent] : Unable to parse received GW services: ", err)
+		log.Err(err).Msg("could not parse received GW services")
 		return nil, err
 	}
 	return &gwServices, nil
@@ -448,16 +478,16 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	params["query"] = query
 	params["depth"] = "Shallow"
 	client.buildURIs()
-	reqUrl := client.uriHostGroups + BuildQueryParams(params)
-	response, err := client.sendRequest(context.Background(), http.MethodGet, reqUrl, nil)
+	reqURL := client.uriHostGroups + BuildQueryParams(params)
+	response, err := client.sendRequest(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to get GW host groups: ", err)
+		log.Err(err).Msg("could not get GW host groups")
 		return nil, err
 	}
 	var gwHostGroups GwHostGroups
 	err = json.Unmarshal(response, &gwHostGroups)
 	if err != nil {
-		log.Error("|gwClient.go| : [GetHostGroupsByHostNamesAndAppType] : Unable to parse received GW host groups: ", err)
+		log.Err(err).Msg("could not parse received GW host groups")
 		return nil, err
 	}
 	return &gwHostGroups, nil
@@ -479,70 +509,56 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-
 	for _, header := range additionalHeaders {
 		headers[header.key] = header.value
 	}
+	req, err := (&Req{
+		URL:     reqURL,
+		Method:  httpMethod,
+		Headers: headers,
+		Payload: payload,
+	}).SendWithContext(ctx)
 
-	statusCode, byteResponse, err := SendRequestWithContext(ctx, httpMethod, reqURL, headers, nil, payload)
-
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"payload":  string(payload),
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
-
-	if statusCode == 401 {
-		logEntry.Log(logEntryLevel, "GWClient: sendRequest: reconnect")
-
+	if err == nil && req.Status == 401 {
+		log.Info().Msg("could not send request: reconnecting")
 		if err := client.Connect(); err != nil {
-			log.With(log.Fields{"error": err}).
-				Log(log.ErrorLevel, "GWClient: reconnect error")
+			log.Err(err).Msg("could not send request: could not reconnect")
 			return nil, err
 		}
-
-		headers["GWOS-API-TOKEN"] = client.token
-		statusCode, byteResponse, err = SendRequestWithContext(ctx, httpMethod, reqURL, headers, nil, payload)
-
-		logEntry = log.With(log.Fields{
-			"error":      err,
-			"statusCode": statusCode,
-		}).WithDebug(log.Fields{
-			"response": string(byteResponse),
-			"headers":  headers,
-			"payload":  string(payload),
-			"reqURL":   reqURL,
-		})
+		req.Headers["GWOS-API-TOKEN"] = client.token
+		req, err = req.SendWithContext(ctx)
 	}
 
-	defer logEntry.Log(logEntryLevel, "GWClient: sendRequest")
-
-	if err != nil {
-		logEntryLevel = log.ErrorLevel
+	switch {
+	case err != nil:
+		req.LogWith(log.Error()).Msg("could not send request")
+		if tcgerr.IsErrorConnection(err) {
+			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
+		}
 		return nil, err
+
+	case req.Status == 401:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		return nil, eee
+
+	case req.Status == 502 || req.Status == 504:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		return nil, eee
+
+	case req.Status == 503:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
+		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		return nil, eee
+
+	case req.Status != 200:
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not send request")
+		return nil, eee
 	}
-	if statusCode == 401 {
-		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrUnauthorized, string(byteResponse))
-	}
-	if statusCode == 502 || statusCode == 504 {
-		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrGateway, string(byteResponse))
-	}
-	if statusCode == 503 {
-		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrSynchronizer, string(byteResponse))
-	}
-	if statusCode != 200 {
-		logEntryLevel = log.WarnLevel
-		return nil, fmt.Errorf("%w: %v", ErrUndecided, string(byteResponse))
-	}
-	return byteResponse, nil
+	req.LogWith(log.Info()).Msg("send request")
+	return req.Response, nil
 }
 
 func (client *GWClient) buildURIs() {

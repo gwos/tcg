@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -15,8 +17,6 @@ import (
 	"k8s.io/client-go/rest"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
-	"strings"
-	"time"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
@@ -104,17 +104,17 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 
 	switch config.AuthType {
 	case InCluster:
-		log.Info("[K8 Connector]: Using InCluster auth")
+		log.Info().Msg("using InCluster auth")
 	case Credentials:
 		kConfig.Username = extConfig.KubernetesUserName
 		kConfig.Password = extConfig.KubernetesUserPassword
-		log.Info("[K8 Connector]: Using Credentials auth")
+		log.Info().Msg("using Credentials auth")
 	case BearerToken:
 		kConfig.BearerToken = extConfig.KubernetesBearerToken
-		log.Info("[K8 Connector]: Using Bearer Token auth")
+		log.Info().Msg("using Bearer Token auth")
 	case ConfigFile:
 		// TODO:
-		log.Info("[K8 Connector]: Using YAML File auth")
+		log.Info().Msg("using YAML File auth")
 	}
 
 	x, err := kubernetes.NewForConfig(&kConfig)
@@ -135,8 +135,8 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = context.TODO()
 
-	log.Debug(fmt.Sprintf("[K8 Connector]: Initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
-		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint))
+	log.Debug().Msgf("initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
+		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint)
 
 	return nil
 }
@@ -285,8 +285,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 			monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 			if err != nil {
-				log.Error("Error when creating service ", node.Name, ":", customServiceName)
-				log.Error(err)
+				log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
 			}
 			if monitoredService != nil {
 				resource.Services[metricBuilder.Name] = *monitoredService
@@ -310,7 +309,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Error("[K8 Connector]: " + err.Error())
+		log.Err(err).Msg("could not collect pod inventory")
 		return
 	}
 	for _, pod := range pods.Items {
@@ -367,7 +366,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		log.Error("[K8 Connector]: " + err.Error())
+		log.Err(err).Msg("could not collect node metrics")
 		return
 	}
 
@@ -399,15 +398,14 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 				monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 				if err != nil {
-					log.Error("Error when creating service ", node.Name, ":", customServiceName)
-					log.Error(err)
+					log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
 				}
 				if monitoredService != nil {
 					resource.Services[metricBuilder.Name] = *monitoredService
 				}
 			}
 		} else {
-			log.Error("Node not found in monitored state: " + node.Name)
+			log.Error().Msgf("node not found in monitored state: %s", node.Name)
 		}
 	}
 }
@@ -415,7 +413,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		log.Error("[K8 Connector]: " + err.Error())
+		log.Err(err).Msg("could not collect pod metrics")
 		return
 	}
 	for _, pod := range pods.Items {
@@ -456,8 +454,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					metricBuilders = append(metricBuilders, metricBuilder)
 					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
 					if err != nil {
-						log.Error("Error when creating service ", pod.Name, ":", metricDefinition.Name)
-						log.Error(err)
+						log.Err(err).Msgf("could not create service %s:%s", pod.Name, metricDefinition.Name)
 					}
 					if monitoredService != nil {
 						resource.Services[metricBuilder.Name] = *monitoredService
@@ -465,7 +462,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 				}
 			}
 		} else {
-			log.Error("Pod not found in monitored state: " + pod.Name)
+			log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
 		}
 	}
 }
@@ -474,7 +471,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		log.Error("[K8 Connector]: " + err.Error())
+		log.Err(err).Msg("could not collect pod metrics")
 		return
 	}
 	builderMap := make(map[string][]connectors.MetricBuilder)
@@ -540,7 +537,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						resource.Services[metricDefinition.Name] = *monitoredService
 					}
 				} else {
-					log.Error("Pod not found in monitored state: " + pod.Name)
+					log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
 				}
 			}
 		}

@@ -3,15 +3,15 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -30,27 +30,25 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	log.Info("[K8 Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[K8 Connector]: ", err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
-	log.Info("[K8 Connector]: Starting metric connection ...")
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
-	/* prevent return */
-	<-make(chan bool, 1)
+	/* return on quit signal */
+	<-transitService.Quit()
 }
 
 func configHandler(data []byte) {
-	log.Info("[K8 Connector]: Configuration received")
-
+	log.Info().Msg("configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		EndPoint:  defaultKubernetesClusterEndpoint,
@@ -62,13 +60,13 @@ func configHandler(data []byte) {
 	tMetProf := &transit.MetricsProfile{}
 
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[K8 Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 
 	if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
 		if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
-			log.Error("[K8 Connector]: Error writing to file, reason: " + err.Error())
+			log.Err(err).Msg("could not write to file")
 		}
 	}
 
@@ -102,7 +100,7 @@ func configHandler(data []byte) {
 	}
 
 	if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not initialize connector")
 	}
 
 	/* Restart periodic loop */
@@ -115,23 +113,21 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if connector.kapi != nil {
 		inventory, monitored, groups := connector.Collect(extConfig)
-		log.Debug("[K8 Connector]: ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+		log.Debug().Msgf("collected %d:%d:%d", len(inventory), len(monitored), len(groups))
 
 		if count == 0 {
-			if err := connectors.SendInventory(
+			err := connectors.SendInventory(
 				context.Background(),
 				inventory,
 				groups,
 				extConfig.Ownership,
-			); err != nil {
-				log.Error("[K8 Connector]: Error during sending inventory.", err)
-			}
+			)
+			log.Err(err).Msg("sending inventory")
 			count = count + 1
 		}
 		time.Sleep(3 * time.Second) // TODO: better way to assure sync completion?
-		if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
-			log.Error("[K8 Connector]: Error during sending metrics.", err)
-		}
+		err := connectors.SendMetrics(context.Background(), monitored, &groups)
+		log.Err(err).Msg("sending metrics")
 	}
 }
 
