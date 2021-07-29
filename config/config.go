@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/transit"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -87,9 +88,7 @@ func (l LogLevel) String() string {
 // Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
-	AgentID string `yaml:"agentId"`
-	AppName string `yaml:"appName"`
-	AppType string `yaml:"appType"`
+	transit.AgentIdentity `yaml:",inline"`
 
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`

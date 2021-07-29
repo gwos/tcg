@@ -51,16 +51,9 @@ type AgentStats struct {
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
 }
 
-// AgentIdentity defines TCG Agent Identity
-type AgentIdentity struct {
-	AgentID string `json:"agentID"`
-	AppName string `json:"appName"`
-	AppType string `json:"appType"`
-}
-
 // AgentStatsExt defines complex type
 type AgentStatsExt struct {
-	AgentIdentity
+	transit.AgentIdentity
 	AgentStats
 	LastErrors []logger.LogRecord
 }

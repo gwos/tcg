@@ -1009,3 +1009,10 @@ func (ms *DynamicMonitoredService) ToInventoryService() DynamicInventoryService 
 		BaseTransitData: ms.BaseTransitData,
 	}
 }
+
+// AgentIdentity defines TCG Agent Identity
+type AgentIdentity struct {
+	AgentID string `json:"agentId" yaml:"agentId"`
+	AppName string `json:"appName" yaml:"appName"`
+	AppType string `json:"appType" yaml:"appType"`
+}

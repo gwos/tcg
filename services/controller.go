@@ -420,12 +420,7 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Success 200 {object} services.AgentIdentity
 // @Router  /agent [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
-	agentIdentity := AgentIdentity{
-		AgentID: controller.Connector.AgentID,
-		AppName: controller.Connector.AppName,
-		AppType: controller.Connector.AppType,
-	}
-	c.JSON(http.StatusOK, agentIdentity)
+	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
 }
 
 //
