@@ -61,10 +61,8 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	request.Header.Set("Connection", "close")
-	if headers != nil {
-		for key, value := range headers {
-			request.Header.Add(key, value)
-		}
+	for key, value := range headers {
+		request.Header.Add(key, value)
 	}
 
 	response, err = httpClient.Do(request)

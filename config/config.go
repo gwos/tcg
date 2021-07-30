@@ -50,24 +50,21 @@ func GetBuildInfo() BuildInfo {
 	return BuildInfo{buildTag, buildTime}
 }
 
-// ConfigStringConstant defines string constant type
-type ConfigStringConstant string
-
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
 //   for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv           ConfigStringConstant = "TCG_CONFIG"
-	ConfigName                               = "tcg_config.yaml"
-	EnvConfigPrefix                          = "TCG"
-	SecKeyEnv                                = "TCG_SECKEY"
-	SecVerPrefix                             = "_v1_"
-	InstallationModeEnv                      = "INSTALLATION_MODE"
-	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
-	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
-	InstallationModeP                        = "PARENT"
-	InstallationModeS                        = "STANDALONE"
+	ConfigEnv           = "TCG_CONFIG"
+	ConfigName          = "tcg_config.yaml"
+	EnvConfigPrefix     = "TCG"
+	SecKeyEnv           = "TCG_SECKEY"
+	SecVerPrefix        = "_v1_"
+	InstallationModeEnv = "INSTALLATION_MODE"
+	InstallationModeCMC = "CHILD_MANAGED_CHILD"
+	InstallationModePMC = "PARENT_MANAGED_CHILD"
+	InstallationModeP   = "PARENT"
+	InstallationModeS   = "STANDALONE"
 )
 
 // LogLevel defines levels in logrus-style
@@ -405,7 +402,7 @@ func GetConfig() *Config {
 
 // ConfigPath returns config file path
 func (cfg Config) ConfigPath() string {
-	configPath := os.Getenv(string(ConfigEnv))
+	configPath := os.Getenv(ConfigEnv)
 	if configPath == "" {
 		configPath = ConfigName
 		if wd, err := os.Getwd(); err == nil {

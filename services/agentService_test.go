@@ -51,8 +51,8 @@ func TestAgentService_DemandConfig(t *testing.T) {
 	err = tmpfile.Close()
 	assert.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
-	_ = os.Setenv(string(config.ConfigEnv), tmpfile.Name())
-	defer os.Unsetenv(string(config.ConfigEnv))
+	_ = os.Setenv(config.ConfigEnv, tmpfile.Name())
+	defer os.Unsetenv(config.ConfigEnv)
 
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
 	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")

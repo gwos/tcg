@@ -38,9 +38,9 @@ type MetricKind string
 // Cumulative - A value accumulated over a time interval. Cumulative
 const (
 	MetricKindUnspecified MetricKind = "METRIC_KIND_UNSPECIFIED"
-	Gauge                            = "GAUGE"
-	Delta                            = "DELTA"
-	Cumulative                       = "CUMULATIVE"
+	Gauge                 MetricKind = "GAUGE"
+	Delta                 MetricKind = "DELTA"
+	Cumulative            MetricKind = "CUMULATIVE"
 )
 
 // ValueType defines the data type of the value of a metric
@@ -49,11 +49,11 @@ type ValueType string
 // Data type of the value of a metric
 const (
 	IntegerType     ValueType = "IntegerType"
-	DoubleType                = "DoubleType"
-	StringType                = "StringType"
-	BooleanType               = "BooleanType"
-	TimeType                  = "TimeType"
-	UnspecifiedType           = "UnspecifiedType"
+	DoubleType      ValueType = "DoubleType"
+	StringType      ValueType = "StringType"
+	BooleanType     ValueType = "BooleanType"
+	TimeType        ValueType = "TimeType"
+	UnspecifiedType ValueType = "UnspecifiedType"
 )
 
 // UnitType - Supported units are a subset of The Unified Code for Units of Measure
@@ -64,10 +64,10 @@ type UnitType string
 // Supported units
 const (
 	UnitCounter UnitType = "1"
-	PercentCPU           = "%{cpu}"
-	KB                   = "KB"
-	MB                   = "MB"
-	GB                   = "GB"
+	PercentCPU  UnitType = "%{cpu}"
+	KB          UnitType = "KB"
+	MB          UnitType = "MB"
+	GB          UnitType = "GB"
 )
 
 // ComputeType defines CloudHub Compute Types
@@ -76,11 +76,11 @@ type ComputeType string
 // CloudHub Compute Types
 const (
 	Query         ComputeType = "Query"
-	Regex                     = "Regex"
-	Synthetic                 = "Synthetic"
-	Informational             = "Informational"
-	Performance               = "Performance"
-	Health                    = "Health"
+	Regex         ComputeType = "Regex"
+	Synthetic     ComputeType = "Synthetic"
+	Informational ComputeType = "Informational"
+	Performance   ComputeType = "Performance"
+	Health        ComputeType = "Health"
 )
 
 // MonitorStatus represents Groundwork service monitor status
@@ -89,17 +89,17 @@ type MonitorStatus string
 // Groundwork Standard Monitored Resource Statuses
 const (
 	ServiceOk                  MonitorStatus = "SERVICE_OK"
-	ServiceWarning                           = "SERVICE_WARNING"
-	ServiceUnscheduledCritical               = "SERVICE_UNSCHEDULED_CRITICAL"
-	ServicePending                           = "SERVICE_PENDING"
-	ServiceScheduledCritical                 = "SERVICE_SCHEDULED_CRITICAL"
-	ServiceUnknown                           = "SERVICE_UNKNOWN"
-	HostUp                                   = "HOST_UP"
-	HostUnscheduledDown                      = "HOST_UNSCHEDULED_DOWN"
-	HostPending                              = "HOST_PENDING"
-	HostScheduledDown                        = "HOST_SCHEDULED_DOWN"
-	HostUnreachable                          = "HOST_UNREACHABLE"
-	HostUnchanged                            = "HOST_UNCHANGED"
+	ServiceWarning             MonitorStatus = "SERVICE_WARNING"
+	ServiceUnscheduledCritical MonitorStatus = "SERVICE_UNSCHEDULED_CRITICAL"
+	ServicePending             MonitorStatus = "SERVICE_PENDING"
+	ServiceScheduledCritical   MonitorStatus = "SERVICE_SCHEDULED_CRITICAL"
+	ServiceUnknown             MonitorStatus = "SERVICE_UNKNOWN"
+	HostUp                     MonitorStatus = "HOST_UP"
+	HostUnscheduledDown        MonitorStatus = "HOST_UNSCHEDULED_DOWN"
+	HostPending                MonitorStatus = "HOST_PENDING"
+	HostScheduledDown          MonitorStatus = "HOST_SCHEDULED_DOWN"
+	HostUnreachable            MonitorStatus = "HOST_UNREACHABLE"
+	HostUnchanged              MonitorStatus = "HOST_UNCHANGED"
 )
 
 // ResourceType defines the resource type
@@ -109,17 +109,17 @@ type ResourceType string
 // General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
 	Host           ResourceType = "host"
-	Hypervisor                  = "hypervisor"
-	Instance                    = "instance"
-	VirtualMachine              = "virtual-machine"
-	CloudApp                    = "cloud-app"
-	CloudFunction               = "cloud-function"
-	LoadBalancer                = "load-balancer"
-	Container                   = "container"
-	Storage                     = "storage"
-	Network                     = "network"
-	NetworkSwitch               = "network-switch"
-	NetworkDevice               = "network-device"
+	Hypervisor     ResourceType = "hypervisor"
+	Instance       ResourceType = "instance"
+	VirtualMachine ResourceType = "virtual-machine"
+	CloudApp       ResourceType = "cloud-app"
+	CloudFunction  ResourceType = "cloud-function"
+	LoadBalancer   ResourceType = "load-balancer"
+	Container      ResourceType = "container"
+	Storage        ResourceType = "storage"
+	Network        ResourceType = "network"
+	NetworkSwitch  ResourceType = "network-switch"
+	NetworkDevice  ResourceType = "network-device"
 )
 
 // ServiceType defines the service type
@@ -137,8 +137,8 @@ type GroupType string
 // The group type uniquely defining corresponding foundation group type
 const (
 	HostGroup    GroupType = "HostGroup"
-	ServiceGroup           = "ServiceGroup"
-	CustomGroup            = "CustomGroup"
+	ServiceGroup GroupType = "ServiceGroup"
+	CustomGroup  GroupType = "CustomGroup"
 )
 
 // MetricSampleType defines TimeSeries Metric Sample Possible Types
@@ -240,7 +240,7 @@ func (thresholdValue ThresholdValue) String() string {
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
 type TimeSeries struct {
 	MetricName string           `json:"metricName"`
-	SampleType MetricSampleType `json:"sampleType,omitEmpty"`
+	SampleType MetricSampleType `json:"sampleType,omitempty"`
 	// Interval: The time interval to which the data sample applies. For
 	// GAUGE metrics, only the end time of the interval is used. For DELTA
 	// metrics, the start and end time should specify a non-zero interval,
