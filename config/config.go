@@ -381,14 +381,14 @@ func GetConfig() *Config {
 
 		c := defaults()
 		cfg = &c
-		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
+		if data, err := ioutil.ReadFile(cfg.ConfigPath()); err != nil {
 			log.Warn().Err(err).
-				Str("configPath", cfg.configPath()).
+				Str("configPath", cfg.ConfigPath()).
 				Msg("could not read config")
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
 				log.Err(err).
-					Str("configPath", cfg.configPath()).
+					Str("configPath", cfg.ConfigPath()).
 					Msg("could not parse config")
 			}
 		}
@@ -403,7 +403,8 @@ func GetConfig() *Config {
 	return cfg
 }
 
-func (cfg Config) configPath() string {
+// ConfigPath returns config file path
+func (cfg Config) ConfigPath() string {
 	configPath := os.Getenv(string(ConfigEnv))
 	if configPath == "" {
 		configPath = ConfigName
@@ -488,14 +489,14 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
 	newCfg := &c
 	/* load config file */
-	if data, err := ioutil.ReadFile(newCfg.configPath()); err != nil {
+	if data, err := ioutil.ReadFile(newCfg.ConfigPath()); err != nil {
 		log.Warn().Err(err).
-			Str("configPath", cfg.configPath()).
+			Str("configPath", cfg.ConfigPath()).
 			Msg("could not read config")
 	} else {
 		if err := yaml.Unmarshal(data, newCfg); err != nil {
 			log.Warn().Err(err).
-				Str("configPath", newCfg.configPath()).
+				Str("configPath", newCfg.ConfigPath()).
 				Msg("could not parse config")
 		}
 	}
@@ -517,9 +518,9 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		log.Err(err).
 			Msg("could not prepare config for writing")
 	} else {
-		if err := ioutil.WriteFile(newCfg.configPath(), output, 0644); err != nil {
+		if err := ioutil.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
 			log.Err(err).
-				Str("configPath", newCfg.configPath()).
+				Str("configPath", newCfg.ConfigPath()).
 				Msg("could not write config")
 		}
 	}

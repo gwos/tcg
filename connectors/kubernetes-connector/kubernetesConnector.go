@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -23,13 +22,17 @@ import (
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	AppType   string
-	AppName   string
-	AgentID   string
-	EndPoint  string
-	Ownership transit.HostOwnershipType
-	Views     map[KubernetesView]map[string]transit.MetricDefinition
-	Groups    []transit.ResourceGroup
+	EndPoint      string                                                 `json:"kubernetesClusterEndpoint"`
+	Views         map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
+	Groups        []transit.ResourceGroup                                `json:"groups"`
+	CheckInterval time.Duration                                          `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType                              `json:"ownership,omitempty"`
+	AuthType      AuthType                                               `json:"authType"`
+
+	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
+	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
+	KubernetesBearerToken  string `json:"kubernetesBearerToken,omitempty"`
+	KubernetesConfigFile   string `json:"kubernetesConfigFile,omitempty"`
 }
 
 type KubernetesView string
@@ -39,11 +42,21 @@ const (
 	ViewPods  KubernetesView = "Pods"
 )
 
+type AuthType string
+
 const (
-	ClusterHostGroup = "cluster-"
-	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
-	PodsHostGroup    = "pods-"
-	NamespaceDefault = "default"
+	InCluster   AuthType = "InCluster"
+	Credentials AuthType = "UsernamePassword"
+	BearerToken AuthType = "BearerToken"
+	ConfigFile  AuthType = "ConfigFile"
+)
+
+const (
+	ClusterHostGroup                 = "cluster-"
+	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
+	PodsHostGroup                    = "pods-"
+	NamespaceDefault                 = "default"
+	defaultKubernetesClusterEndpoint = "gwos.bluesunrise.com:8001"
 )
 
 type KubernetesConnector struct {
@@ -88,6 +101,22 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		Timeout:             0,
 		Dial:                nil,
 	}
+
+	switch config.AuthType {
+	case InCluster:
+		log.Info().Msg("using InCluster auth")
+	case Credentials:
+		kConfig.Username = extConfig.KubernetesUserName
+		kConfig.Password = extConfig.KubernetesUserPassword
+		log.Info().Msg("using Credentials auth")
+	case BearerToken:
+		kConfig.BearerToken = extConfig.KubernetesBearerToken
+		log.Info().Msg("using Bearer Token auth")
+	case ConfigFile:
+		// TODO:
+		log.Info().Msg("using YAML File auth")
+	}
+
 	x, err := kubernetes.NewForConfig(&kConfig)
 	if err != nil {
 		return err
@@ -105,8 +134,10 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 	connector.kapi = connector.kClientSet.CoreV1()
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = context.TODO()
-	fmt.Printf("initialized Kubernetes connection to server version %s, for client version, %s, and endPoint %s",
+
+	log.Debug().Msgf("initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
 		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint)
+
 	return nil
 }
 
@@ -132,7 +163,7 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 	monitoredState := make(map[string]KubernetesResource)
 	groups := make(map[string]transit.ResourceGroup)
 	connector.collectNodeInventory(monitoredState, groups, cfg)
-	connector.collectPodInventory(monitoredState, groups, cfg, metricsPerContainer)
+	connector.collectPodInventory(monitoredState, groups, cfg, &metricsPerContainer)
 	connector.collectNodeMetrics(monitoredState, cfg)
 	if metricsPerContainer {
 		connector.collectPodMetricsPerContainer(monitoredState, cfg)
@@ -169,8 +200,8 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{time.Now()}, // TODO: interval
+			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}
@@ -222,24 +253,24 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		monitoredState[resource.Name] = resource
 		// process services
 		for key, metricDefinition := range cfg.Views[ViewNodes] {
-			var value int64 = 0
+			var value interface{} = 0
 			switch key {
 			case "cpu.cores":
 				value = node.Status.Capacity.Cpu().Value()
 			case "cpu.allocated":
-				value = node.Status.Allocatable.Cpu().Value()
+				value = toPercentage(node.Status.Capacity.Cpu().MilliValue(), node.Status.Allocatable.Cpu().MilliValue())
 			case "memory.capacity":
 				value = node.Status.Capacity.Memory().Value()
 			case "memory.allocated":
-				value = node.Status.Allocatable.Memory().Value()
+				value = toPercentage(node.Status.Capacity.Memory().MilliValue(), node.Status.Allocatable.Memory().MilliValue())
 			case "pods":
 				value = node.Status.Capacity.Pods().Value()
 			default:
 				continue
 			}
-			if value > 4000000 { // TODO: how do we handle longs
-				value = value / 1000
-			}
+			//if value > 4000000 { // TODO: how do we handle longs
+			//	value = value / 1000
+			//}
 			metricBuilder := connectors.MetricBuilder{
 				Name:       key,
 				CustomName: metricDefinition.CustomName,
@@ -273,12 +304,13 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 // Pod Inventory also retrieves status
 // inventory also contains status, pod counts, capacity and allocation metrics
-func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig, metricsPerContainer bool) {
+func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig, metricsPerContainer *bool) {
 	// TODO: filter pods by namespace(s)
 	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		// TODO:
+		log.Err(err).Msg("could not collect pod inventory")
+		return
 	}
 	for _, pod := range pods.Items {
 		labels := make(map[string]string)
@@ -286,7 +318,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			labels[key] = element
 		}
 		podName := pod.Name
-		if metricsPerContainer {
+		if *metricsPerContainer {
 			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
 		}
 		monitorStatus, message := connector.calculatePodStatus(&pod)
@@ -334,17 +366,19 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Err(err).Msg("could not collect node metrics")
+		return
 	}
+
 	for _, node := range nodes.Items {
 		if resource, ok := monitoredState[node.Name]; ok {
 			for key, metricDefinition := range cfg.Views[ViewNodes] {
-				var value int64 = 0
+				var value interface{} = 0
 				switch key {
 				case "cpu":
-					value = node.Usage.Cpu().Value()
+					value = node.Usage.Cpu().MilliValue()
 				case "memory":
-					value = node.Usage.Memory().Value()
+					value = node.Usage.Memory().MilliValue()
 				default:
 					continue
 				}
@@ -359,7 +393,6 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 					Warning:  metricDefinition.WarningThreshold,
 					Critical: metricDefinition.CriticalThreshold,
 				}
-				// TODO: validate these times are correct
 				metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
 				metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
@@ -380,17 +413,26 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Err(err).Msg("could not collect pod metrics")
+		return
 	}
 	for _, pod := range pods.Items {
 		if resource, ok := monitoredState[pod.Name]; ok {
 			for index, container := range pod.Containers {
 				metricBuilders := make([]connectors.MetricBuilder, 0)
 				for key, metricDefinition := range cfg.Views[ViewPods] {
-					var value int64 = 0
+					var value interface{} = 0
 					switch key {
+					case "cpu.cores":
+						value = container.Usage.Cpu().Value()
+					case "cpu.allocated":
+						value = container.Usage.Cpu().MilliValue()
+					case "memory.capacity":
+						value = container.Usage.Memory().Value()
+					case "memory.allocated":
+						value = container.Usage.Memory().Value()
 					case "cpu":
-						value = pod.Containers[index].Usage.Cpu().Value()
+						value = pod.Containers[index].Usage.Cpu().MilliValue()
 					case "memory":
 						value = pod.Containers[index].Usage.Memory().Value()
 					default:
@@ -407,7 +449,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					// TODO: validate these times are correct
 					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilders = append(metricBuilders, metricBuilder)
@@ -430,7 +471,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
-		// TODO:
+		log.Err(err).Msg("could not collect pod metrics")
+		return
 	}
 	builderMap := make(map[string][]connectors.MetricBuilder)
 	serviceMap := make(map[string]transit.DynamicMonitoredService)
@@ -438,10 +480,18 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
 				if resource, ok := monitoredState[container.Name]; ok {
-					var value int64 = 0
+					var value interface{} = 0
 					switch key {
-					case "cpu":
+					case "cpu.cores":
 						value = container.Usage.Cpu().Value()
+					case "cpu.allocated":
+						value = container.Usage.Cpu().MilliValue()
+					case "memory.capacity":
+						value = container.Usage.Memory().Value()
+					case "memory.allocated":
+						value = container.Usage.Memory().Value()
+					case "cpu":
+						value = container.Usage.Cpu().MilliValue()
 					case "memory":
 						value = container.Usage.Memory().Value()
 					default:
@@ -463,7 +513,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					// TODO: validate these times are correct
 					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
 					var builders []connectors.MetricBuilder
@@ -533,7 +582,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 
 func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.MonitorStatus, string) {
 	var message strings.Builder
-	var upMessage string = "Pod is healthy"
+	var upMessage = "Pod is healthy"
 	var status transit.MonitorStatus = transit.HostUp
 	for _, condition := range pod.Status.Conditions {
 		if condition.Status != v1.ConditionTrue {
@@ -547,6 +596,7 @@ func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.M
 	if status == transit.HostUp {
 		message.WriteString(upMessage)
 	}
+	_ = connector.mapi
 	return status, message.String()
 }
 
@@ -559,4 +609,20 @@ func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string
 		}
 	}
 	return ClusterHostGroup + "1"
+}
+
+// toPercentage - converts CPU from cores to percentage
+//
+// 1 core = 1000 Millicores = 100%
+// Value we get from Cpu in cores can be transformed
+// to percentage using mathematical formula:
+// percentage = cores * 1000 * 100 / 1000
+// let's simplify:
+// percentage = cores * 100
+//
+// Example:
+// You might want to assign a third of CPU each — or 33.33%.
+// If you wish to assign a third of a CPU, you should assign 333Mi (millicores) or 0.333(cores) to your container.
+func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
+	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
 }

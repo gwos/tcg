@@ -409,7 +409,7 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
 
 	serviceProperties := make(map[string]interface{})
-	serviceProperties["isGraphed"] = metricBuilder.Graphed
+	// serviceProperties["isGraphed"] = metricBuilder.Graphed
 
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
 }
