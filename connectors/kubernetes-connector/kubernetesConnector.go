@@ -46,9 +46,9 @@ type AuthType string
 
 const (
 	InCluster   AuthType = "InCluster"
-	Credentials          = "UsernamePassword"
-	BearerToken          = "BearerToken"
-	ConfigFile           = "ConfigFile"
+	Credentials AuthType = "UsernamePassword"
+	BearerToken AuthType = "BearerToken"
+	ConfigFile  AuthType = "ConfigFile"
 )
 
 const (
