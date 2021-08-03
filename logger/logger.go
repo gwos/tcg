@@ -28,7 +28,7 @@ var (
 	filter = &FilterWriter{
 		LevelWriter: zerolog.MultiLevelWriter(formatter, errBuffer),
 		Re: map[*regexp.Regexp][]byte{
-			regexp.MustCompile(`((?i:password|token)"[^:]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`): []byte(`${1}"***"`),
+			regexp.MustCompile(`((?i:password|token)"[^":]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`): []byte(`${1}"***"`),
 		},
 	}
 	condenser = &CondenseWriter{

@@ -519,6 +519,15 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	log.Debug().
+		Str("AgentID", agentService.AgentID).
+		Str("AppType", agentService.AppType).
+		Str("AppName", agentService.AppName).
+		Str("ControllerAddr", agentService.ControllerAddr).
+		Str("DSClient", agentService.dsClient.HostName).
+		Msg("loaded config")
+
+	controller.authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	// notify C-API config change

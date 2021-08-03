@@ -11,27 +11,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// DSOperations defines DalekServices operations interface
-type DSOperations interface {
-	Reload(agentID string) error
-	ValidateToken(appName, apiToken string) error
-}
-
 // Define entrypoints for DSOperations
 const (
 	DSEntrypointReload        = "/dalekservices/connectors/reload/:agentID"
 	DSEntrypointValidateToken = "/dalekservices/validate-token"
 )
 
-// DSClient implements DSOperations interface
+// DSClient implements DS API operations
 type DSClient struct {
 	*config.DSConnection
 }
 
-// ValidateToken implements DSOperations.ValidateToken.
-func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL string) error {
+// ValidateToken calls API
+func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		log.Info().Msg("omit ValidateToken on demand config")
+		log.Info().Msg("DSClient is not configured")
 		return nil
 	}
 
@@ -43,12 +37,9 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-	if dalekServicesURL == "" {
-		dalekServicesURL = client.DSConnection.HostName
-	}
 	entrypoint := url.URL{
-		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
-		Host:   dalekServicesURL,
+		Scheme: makeDalekServicesScheme(client.HostName),
+		Host:   client.HostName,
 		Path:   DSEntrypointValidateToken,
 	}
 	req, err := (&Req{
@@ -76,15 +67,19 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 	return err
 }
 
-// Reload implements DSOperations.Reload.
+// Reload calls API
 func (client *DSClient) Reload(agentID string) error {
+	if len(client.HostName) == 0 {
+		log.Info().Msg("DSClient is not configured")
+		return nil
+	}
 	headers := map[string]string{
 		"Accept":       "application/json",
 		"Content-Type": "application/json",
 	}
 	entrypoint := url.URL{
-		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
-		Host:   client.DSConnection.HostName,
+		Scheme: makeDalekServicesScheme(client.HostName),
+		Host:   client.HostName,
 		Path:   strings.ReplaceAll(DSEntrypointReload, ":agentID", agentID),
 	}
 	req, err := (&Req{
