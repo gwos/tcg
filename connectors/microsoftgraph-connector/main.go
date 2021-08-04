@@ -3,14 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
+	"time"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 	"k8s.io/utils/env"
-	"time"
 )
 
 var (
@@ -61,27 +61,25 @@ func main() {
 		enableSecurityMetrics, sharePointSite, sharePointSubSite, outlookEmailAddress)
 	//////////////////////////////////////////////////////////////////////////////////////////////////
 
-	log.Info("[MsGraph Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error("[MsGraph Connector]: ", err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
-	log.Info("[MsGraph Connector]: Starting metric connection ...")
 	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 
 	/* return on quit signal */
 	<-transitService.Quit()
-	log.Info("Exiting process")
 }
 
 func configHandler(data []byte) {
-	log.Info("[K8 Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		Ownership: transit.Yield,
@@ -91,7 +89,7 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[K8 Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	/* Update config with received values */
@@ -136,7 +134,7 @@ func configHandler(data []byte) {
 		chksum = chk
 	}
 
-	 connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
+	connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -145,30 +143,27 @@ func configHandler(data []byte) {
 }
 
 func periodicHandler() {
-	temporaryMetricsDefinitions()  // TODO: remove this when you have provisioning ready
+	temporaryMetricsDefinitions() // TODO: remove this when you have provisioning ready
 	inventory, monitored, groups := connector.Collect(extConfig)
-	log.Info("[MsGraph Connector]: run start ", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+	log.Debug().Msgf("collected %d:%d:%d", len(inventory), len(monitored), len(groups))
 
 	if count > -1 {
-		if err := connectors.SendInventory(
+		err := connectors.SendInventory(
 			context.Background(),
 			inventory,
 			groups,
 			extConfig.Ownership,
-		); err != nil {
-			log.Error("[K8 Connector]: Error during sending inventory.", err)
-		}
+		)
+		log.Err(err).Msg("sending inventory")
 		count = count + 1
 	}
 	time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
-	if err := connectors.SendMetrics(context.Background(), monitored, &groups); err != nil {
-		log.Error("[MsGraph Connector]: Error during sending metrics.", err)
-	}
-	log.Info("[MsGraph Connector]: run stop", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
+	err := connectors.SendMetrics(context.Background(), monitored, &groups)
+	log.Err(err).Msg("sending metrics")
 }
 
 // TODO: remove this when you have provisioning ready
-func temporaryMetricsDefinitions()  {
+func temporaryMetricsDefinitions() {
 	//bytes, _ := ioutil.ReadFile("/Users/dtaylor/gw8/tcg/connectors/microsoftgraph-connector/microsoftgraph-default.json")
 	//configHandler(bytes)
 }

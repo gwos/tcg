@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	"github.com/patrickmn/go-cache"
-	"strings"
-	"time"
+	"github.com/rs/zerolog/log"
 )
 
 // FiveMinutes NeDi interval in seconds
@@ -54,8 +55,7 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 		mServices := device.retrieveMonitoredServices(metricDefinitions)
 		mResource, err := connectors.CreateResource(device.Name, mServices)
 		if err != nil {
-			log.Error("|snmpConnectorModel.go| : [retrieveMonitoredResources] : Error when create monitored resource '", device.Name,
-				"'. Reason: ", err)
+			log.Err(err).Msgf("could not create monitored resource '%s'", device.Name)
 		}
 		mResource.Status = calculateHostStatus(device.LastOK)
 		if mResource != nil {
@@ -93,9 +93,8 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					value = float64(metric.Value) / 8000000
 					break
 				default:
-					log.Warn("|snmpConnectorModel.go| : [retrieveMonitoredServices] : Unable to process metric '",
-						metricName, "' for interface '", iFace.Name, "' of device '", device.Name,
-						"': unsupported unit type '", metric.UnitType, "'. Skipping.")
+					log.Warn().Msgf("could not process metric '%s' for interface '%s' of device '%s': unsupported unit type '%s': skipping",
+						metricName, iFace.Name, device.Name, metric.UnitType)
 					continue
 				}
 
@@ -126,8 +125,7 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 
 		mService, err := connectors.BuildServiceForMetrics(iFace.Name, device.Name, metricsBuilder)
 		if err != nil {
-			log.Error("|snmpConnectorModel.go| : [retrieveMonitoredServices] : Error when create monitored service '",
-				device.Name, ":", iFace.Name, "'. Reason: ", err)
+			log.Err(err).Msgf("could not create monitored service '%s:%s'", device.Name, iFace.Name)
 		}
 		if mService != nil {
 			mServices[i] = *mService
@@ -149,7 +147,7 @@ func calculateHostStatus(lastOk float64) transit.MonitorStatus {
 
 func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 	metricName string, currentValue interface{}) (bool, bool, interface{}) {
-	if strings.EqualFold(string(metricKind), transit.Delta) {
+	if strings.EqualFold(string(metricKind), string(transit.Delta)) {
 		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
 			case transit.UnitCounter:

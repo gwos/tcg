@@ -3,19 +3,20 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/connectors/snmp-connector/clients"
-	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/snmp-connector/clients"
+	"github.com/gwos/tcg/connectors/snmp-connector/utils"
+	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -67,8 +68,8 @@ func (connector *SnmpConnector) LoadConfig(config ExtConfig) error {
 	connector.config = config
 	err := connector.nediClient.Init(config.NediServer)
 	if err != nil {
-		log.Error("|snmpConnector.go| : [LoadConfig]: Failed to init NeDi client: ", err)
-		return errors.New("failed to init NeDi client")
+		log.Err(err).Msg("could not init NeDi client")
+		return errors.New("could not init NeDi client")
 	}
 	connector.mState.Init()
 	return nil
@@ -79,15 +80,14 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredReso
 	if connector.config.Views != nil && len(connector.config.Views) > 0 {
 		devices, err := connector.nediClient.GetDevices()
 		if err != nil {
-			log.Error("|snmpConnector.go| : [CollectMetrics]: Failed to get devices: ", err)
-			return nil, nil, nil, errors.New("failed to get devices")
+			log.Err(err).Msg("could not get devices")
+			return nil, nil, nil, errors.New("could not get devices")
 		}
 		for _, device := range devices {
 			deviceExt := DeviceExt{Device: device}
 			secData, err := utils.GetSecurityData(device.Community)
 			if err != nil {
-				log.Error("|snmpConnector.go| : [CollectMetrics]: Failed to get security data of device '",
-					device.Name, "': ", err)
+				log.Err(err).Msgf("could not get security data of device '%s'", device.Name)
 			}
 			if secData != nil {
 				deviceExt.SecData = secData
@@ -109,7 +109,7 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredReso
 			connector.collectInterfacesMetrics(mibs)
 			break
 		default:
-			log.Warn("|snmpConnector.go| : [CollectMetrics]: Not supported view: ", view)
+			log.Warn().Msgf("not supported view: %s", view)
 			continue
 		}
 		for k, v := range metrics {
@@ -130,17 +130,16 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredReso
 }
 
 func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
-	log.Info("========= starting collection of interface metrics...")
+	log.Info().Msg("========= starting collection of interface metrics...")
 	for deviceName, device := range connector.mState.devices {
 		interfaces, err := connector.nediClient.GetDeviceInterfaces(deviceName)
 		if err != nil {
-			log.Error("|snmpConnector.go| : [collectInterfaceMetrics]: Failed to get interfaces of device '",
-				deviceName, "': ", err)
+			log.Err(err).Msgf("could not get interfaces of device '%s'", deviceName)
 			continue
 		}
 
 		if len(interfaces) == 0 {
-			log.Info("|snmpConnector.go| : [collectInterfaceMetrics]: No interfaces of device '", deviceName, "' found")
+			log.Info().Msgf("no interfaces of device '%s' found", deviceName)
 			continue
 		}
 
@@ -154,15 +153,13 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 		connector.mState.devices[deviceName] = device
 
 		if device.SecData == nil {
-			log.Error("|snmpConnector.go| : [collectInterfaceMetrics]: Security data for device '",
-				deviceName, "' not found. Skipping")
+			log.Error().Msgf("security data for device '%s' not found: skipping", deviceName)
 			continue
 		}
 
 		snmpData, err := connector.snmpClient.GetSnmpData(mibs, device.Ip, device.SecData)
 		if err != nil {
-			log.Error("|snmpConnector.go| : [collectInterfaceMetrics]: Failed to get SNMP data for device '",
-				deviceName, "': ", err)
+			log.Err(err).Msgf("could not get SNMP data for device '%s'", deviceName)
 			continue
 		}
 
@@ -172,9 +169,8 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 				idxMix := mixes[len(mixes)-1]
 				idx, err := strconv.Atoi(idxMix)
 				if err != nil {
-					log.Error("|snmpConnector.go| : [collectInterfaceMetrics]:"+
-						" Failed to retrieve interface index from '", snmpValue.Name,
-						"'. Cannot convert '", idxMix, " to integer: ", err)
+					log.Err(err).Msgf("could not retrieve interface index from '%s', cannot convert '%s' to integer",
+						snmpValue.Name, idxMix)
 					continue
 				}
 				if iFace, has := device.Interfaces[idx]; has {
@@ -186,13 +182,12 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 					iFace.Metrics[metric.Mib] = metric
 					device.Interfaces[idx] = iFace
 				} else {
-					log.Warn("|snmpConnector.go| : [collectInterfaceMetrics]: Interface of index '", idx,
-						"' for device '", deviceName, "' not found")
+					log.Warn().Msgf("interface of index '%d' for device '%s' not found", idx, deviceName)
 				}
 			}
 		}
 	}
-	log.Info("========= ending collection of interface metrics...")
+	log.Info().Msg("========= ending collection of interface metrics...")
 }
 
 func (connector *SnmpConnector) listSuggestions(view string, name string) []string {
@@ -206,7 +201,7 @@ func (connector *SnmpConnector) listSuggestions(view string, name string) []stri
 		}
 		break
 	default:
-		log.Warn("|snmpConnector.go| : [listSuggestions]: Not supported view: ", view)
+		log.Warn().Msgf("not supported view: %s", view)
 		break
 	}
 	return suggestions

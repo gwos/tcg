@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
-	"net/url"
 )
 
 const baseGraphUri = "https://graph.microsoft.com/v1.0/users/%s/messages?"

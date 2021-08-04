@@ -9,7 +9,13 @@ ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 
 WORKDIR /go/src/
 COPY . .
-RUN go test -v $(go list ./... | grep -v tcg/integration)
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
+        libjansson-dev \
+    && make clean && make \
+    && echo "[GOTOCJSON TEST DONE]"
+RUN go test -v $(go list ./... | grep -v tcg/integration) \
+    && echo "[Go TESTS DONE]"
 RUN sh -x \
     && build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
     && ldflags="-X 'github.com/gwos/tcg/config.buildTime=${build_time}'" \

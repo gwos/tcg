@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
@@ -47,26 +49,13 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastErrors             []LastError                        `json:"lastErrors"`
 }
 
-// LastError defines
-type LastError struct {
-	Message string                             `json:"message"`
-	Time    *milliseconds.MillisecondTimestamp `json:"time"`
-}
-
-// AgentIdentity defines TCG Agent Identity
-type AgentIdentity struct {
-	AgentID string `json:"agentID"`
-	AppName string `json:"appName"`
-	AppType string `json:"appType"`
-}
-
-// AgentIdentityStats defines complex type
-type AgentIdentityStats struct {
-	AgentIdentity
+// AgentStatsExt defines complex type
+type AgentStatsExt struct {
+	transit.AgentIdentity
 	AgentStats
+	LastErrors []logger.LogRecord
 }
 
 // AgentStatus defines TCG Agent status
@@ -236,11 +225,7 @@ type natsPayload struct {
 // Marshal implements Marshaler
 // internally it applyes the latest format version
 func (p natsPayload) Marshal() ([]byte, error) {
-	if b, err := p.marshalV2(); err == nil {
-		return append([]byte("v2:"), b...), nil
-	} else {
-		return nil, err
-	}
+	return p.marshalV2()
 }
 
 // Unmarshal implements Unmarshaler
@@ -252,10 +237,8 @@ func (p *natsPayload) Unmarshal(input []byte) error {
 	switch {
 	case input[0] < 8:
 		return p.unmarshalV1(input)
-	case bytes.HasPrefix(input, []byte("v1:")):
-		return p.unmarshalV1(input[3:])
-	case bytes.HasPrefix(input, []byte("v2:")):
-		return p.unmarshalV2(input[3:])
+	case bytes.HasPrefix(input, []byte(`{"v2":`)):
+		return p.unmarshalV2(input)
 	default:
 		return fmt.Errorf("unknown payload format")
 	}
@@ -265,23 +248,13 @@ func (p natsPayload) marshalV1() ([]byte, error) {
 	spanID := p.SpanContext.SpanID()
 	traceID := p.SpanContext.TraceID()
 	traceFlags := p.SpanContext.TraceFlags()
-	var buf bytes.Buffer
-	if err := buf.WriteByte(byte(p.Type)); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(spanID[:]); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(traceID[:]); err != nil {
-		return nil, err
-	}
-	if err := buf.WriteByte(byte(traceFlags)); err != nil {
-		return nil, err
-	}
-	if _, err := buf.Write(p.Payload[:]); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	buf := make([]byte, 0, len(p.Payload)+26)
+	buf = append(buf, byte(p.Type))
+	buf = append(buf, spanID[:]...)
+	buf = append(buf, traceID[:]...)
+	buf = append(buf, byte(traceFlags))
+	buf = append(buf, p.Payload...)
+	return buf, nil
 }
 
 func (p *natsPayload) unmarshalV1(input []byte) error {
@@ -331,19 +304,25 @@ type natsPayload2 struct {
 func (p natsPayload) marshalV2() ([]byte, error) {
 	spanID := p.SpanContext.SpanID()
 	traceID := p.SpanContext.TraceID()
-	p2 := natsPayload2{
-		Type:       p.Type.String(),
-		Payload:    p.Payload,
-		SpanID:     hex.EncodeToString(spanID[:]),
-		TraceID:    hex.EncodeToString(traceID[:]),
-		TraceFlags: uint8(p.SpanContext.TraceFlags()),
-	}
-	return json.Marshal(p2)
+	traceFlags := p.SpanContext.TraceFlags()
+	buf := make([]byte, 0, len(p.Payload)+132)
+	buf = append(buf, `{"v2":{"type":"`...)
+	buf = append(buf, p.Type.String()...)
+	buf = append(buf, `","payload":`...)
+	buf = append(buf, p.Payload...)
+	buf = append(buf, `,"spanID":"`...)
+	buf = append(buf, hex.EncodeToString(spanID[:])...)
+	buf = append(buf, `","traceID":"`...)
+	buf = append(buf, hex.EncodeToString(traceID[:])...)
+	buf = append(buf, `","traceFlags":`...)
+	buf = strconv.AppendUint(buf, uint64(traceFlags), 10)
+	buf = append(buf, `}}`...)
+	return buf, nil
 }
 
 func (p *natsPayload) unmarshalV2(input []byte) error {
 	var p2 natsPayload2
-	if err := json.Unmarshal(input, &p2); err != nil {
+	if err := json.Unmarshal(input[6:len(input)-1], &p2); err != nil {
 		return err
 	}
 	spanCtxCfg := trace.SpanContextConfig{

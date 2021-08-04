@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
-	"time"
+	"github.com/rs/zerolog/log"
 )
 
 type MicrosoftGraphView string
@@ -139,9 +140,9 @@ func (connector *MicrosoftGraphConnector) Shutdown() {
 
 // Collect inventory and metrics for all graph resources. Sort resources into groups and return inventory of host resources and inventory of groups
 func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
-	log.Info("Starting collection...")
+	log.Info().Msg("Starting collection...")
 	_ = Initialize()
-	log.Info("After init...")
+	log.Info().Msg("After init...")
 	// gather inventory and Metrics
 	monitoredState := make(map[string]MicrosoftGraphResource)
 	groups := make(map[string]transit.ResourceGroup)
@@ -154,7 +155,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 	_ = connector.collectStatus(monitoredState[office365App].Services)
 	_ = connector.collectBuiltins(monitoredState, &msGroup)
 	groups[microsoftGroup] = msGroup
-	log.Info("inventory and metrics gathered....")
+	log.Info().Msg("inventory and metrics gathered....")
 	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
 	monitored := make([]transit.DynamicMonitoredResource, len(monitoredState))
 	hostGroups := make([]transit.ResourceGroup, len(groups))

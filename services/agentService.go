@@ -17,13 +17,14 @@ import (
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
@@ -52,7 +53,6 @@ type AgentService struct {
 
 type statsCounter struct {
 	bytesSent   int
-	lastError   error
 	payloadType payloadType
 	timestamp   time.Time
 }
@@ -120,14 +120,13 @@ func GetAgentService() *AgentService {
 			agentService.hookInterrupt()
 		}
 
-		log.SetHook(agentService.hookLogErrors, log.ErrorLevel)
-		log.With(log.Fields{
-			"AgentID":        agentService.AgentID,
-			"AppType":        agentService.AppType,
-			"AppName":        agentService.AppName,
-			"ControllerAddr": agentService.ControllerAddr,
-			"DSClient":       agentService.dsClient.HostName,
-		}).Log(log.DebugLevel, "#AgentService Config")
+		log.Debug().
+			Str("AgentID", agentService.AgentID).
+			Str("AppType", agentService.AppType).
+			Str("AppName", agentService.AppName).
+			Str("ControllerAddr", agentService.ControllerAddr).
+			Str("DSClient", agentService.dsClient.HostName).
+			Msg("starting with config")
 	})
 
 	return agentService
@@ -139,27 +138,26 @@ func (service *AgentService) DemandConfig() error {
 		return err
 	}
 	if config.GetConfig().IsConfiguringPMC() {
-		log.Info("[Demand Config]: Configuring PARENT_MANAGED_CHILD")
-		// expect the config api call
+		log.Info().Msg("configuring PARENT_MANAGED_CHILD")
+		/* expect the config api call */
 		return nil
 	}
 	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
-		log.Info("[Demand Config]: Config Server is not configured")
-		// expect the config api call
+		log.Info().Msg("config server is not configured")
+		/* expect the config api call */
 		return nil
 	}
 
 	go func() {
 		for i := 0; ; i++ {
 			if err := service.dsClient.Reload(service.AgentID); err != nil {
-				log.With(log.Fields{"error": err}).
-					Log(log.ErrorLevel, "[Demand Config]: Config Server is not available")
+				log.Err(err).Msg("config server is not available")
 				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
 				continue
 			}
 			break
 		}
-		log.Info("[Demand Config]: Config Server found and connected")
+		log.Info().Msg("config server found and connected")
 	}()
 	return nil
 }
@@ -320,13 +318,11 @@ func (service *AgentService) StopTransport() error {
 }
 
 // Stats implements AgentServices.Stats interface
-func (service *AgentService) Stats() AgentIdentityStats {
-	return AgentIdentityStats{AgentIdentity{
-		AgentID: service.Connector.AgentID,
-		AppName: service.Connector.AppName,
-		AppType: service.Connector.AppType,
-	},
-		*service.agentStats,
+func (service *AgentService) Stats() AgentStatsExt {
+	return AgentStatsExt{
+		AgentIdentity: service.Connector.AgentIdentity,
+		AgentStats:    *service.agentStats,
+		LastErrors:    logger.LastErrors(),
 	}
 }
 
@@ -338,15 +334,14 @@ func (service *AgentService) Status() AgentStatus {
 // handleTasks handles task queue
 func (service *AgentService) handleTasks() {
 	hAlarm := func(task *taskQueue.Task) error {
-		log.Error("#AgentService.taskQueue timed over:", task.Subject)
+		log.Error().Msgf("taskQueue timed over: %s", task.Subject)
 		return nil
 	}
 	hTask := func(task *taskQueue.Task) error {
-		logEntry := log.With(log.Fields{
-			"Idx":     task.Idx,
-			"Subject": task.Subject,
-		})
-		logEntry.Log(log.DebugLevel, "#AgentService.taskQueue")
+		log.Debug().
+			Interface("Subject", task.Subject).
+			Uint8("Idx", task.Idx).
+			Msg("taskQueue")
 		service.agentStatus.task = task
 		var err error
 		switch task.Subject {
@@ -393,42 +388,24 @@ func (service *AgentService) handleTasks() {
 func (service *AgentService) listenStatsChan() {
 	for {
 		res := <-service.statsChan
-
 		ts := milliseconds.MillisecondTimestamp{Time: res.timestamp}
-		if res.lastError != nil {
-			service.agentStats.LastErrors = append(service.agentStats.LastErrors, LastError{
-				res.lastError.Error(),
-				&ts,
-			})
-			statsLastErrorsLen := len(service.agentStats.LastErrors)
-			if statsLastErrorsLen > statsLastErrorsLim {
-				service.agentStats.LastErrors = service.agentStats.LastErrors[(statsLastErrorsLen - statsLastErrorsLim):]
-			}
-		} else {
-			service.agentStats.BytesSent += res.bytesSent
-			service.agentStats.MessagesSent++
-			switch res.payloadType {
-			case typeInventory:
-				service.agentStats.LastInventoryRun = &ts
-			case typeMetrics:
-				service.agentStats.LastMetricsRun = &ts
-				service.agentStats.MetricsSent++
-			case typeEvents:
-				// TODO: handle events acks, unacks
-				service.agentStats.LastAlertRun = &ts
-			}
-
+		service.agentStats.BytesSent += res.bytesSent
+		service.agentStats.MessagesSent++
+		switch res.payloadType {
+		case typeInventory:
+			service.agentStats.LastInventoryRun = &ts
+		case typeMetrics:
+			service.agentStats.LastMetricsRun = &ts
+			service.agentStats.MetricsSent++
+		case typeEvents:
+			// TODO: handle events acks, unacks
+			service.agentStats.LastAlertRun = &ts
 		}
 	}
 }
 
-func (service *AgentService) updateStats(bytesSent int, lastError error, payloadType payloadType, timestamp time.Time) {
-	service.statsChan <- statsCounter{
-		bytesSent:   bytesSent,
-		lastError:   lastError,
-		payloadType: payloadType,
-		timestamp:   timestamp,
-	}
+func (service *AgentService) updateStats(c statsCounter) {
+	service.statsChan <- c
 }
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
@@ -508,7 +485,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 
 			p := natsPayload{}
 			if err = p.Unmarshal(b); err != nil {
-				log.Warn("dispatcher error on unmarshal payload: ", err)
+				log.Warn().Err(err).Msg("could not unmarshal payload")
 			}
 			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
 			defer func() {
@@ -520,16 +497,17 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.updateStats(len(p.Payload), err, p.Type, time.Now())
+				service.updateStats(
+					statsCounter{bytesSent: len(p.Payload), payloadType: p.Type, timestamp: time.Now()})
 			}
 			if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user
 				so, wait for configuration update */
-				log.Error("dispatcher got an issue with credentialed user, wait for configuration update")
+				log.Err(err).Msg("dispatcher got an issue with credentialed user, wait for configuration update")
 				_ = service.StopTransport()
 			} else if errors.Is(err, tcgerr.ErrUndecided) {
 				/* it looks like an issue with data */
-				log.Error("dispatcher got an issue with data: ", err)
+				log.Err(err).Msg("dispatcher got an issue with data")
 			}
 			return err
 		},
@@ -541,11 +519,20 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	log.Debug().
+		Str("AgentID", agentService.AgentID).
+		Str("AppType", agentService.AppType).
+		Str("AppName", agentService.AppName).
+		Str("ControllerAddr", agentService.ControllerAddr).
+		Str("DSClient", agentService.dsClient.HostName).
+		Msg("loaded config")
+
+	controller.authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	// notify C-API config change
 	if success := service.demandConfigHandler(); !success {
-		log.Warn("[Config]: DemandConfigCallback returned 'false'. Continue with previous inventory.")
+		log.Warn().Msg("demandConfigHandler returned 'false'. Continue with previous inventory.")
 	}
 	// TODO: add logic to avoid processing previous inventory in case of callback fails
 	// stop nats processing
@@ -568,7 +555,7 @@ func (service *AgentService) exit() error {
 	go func(fn func()) {
 		defer func() {
 			if err := recover(); err != nil {
-				log.Error("[handleExit]", err)
+				log.Err(err.(error)).Msg("handleExit")
 			}
 		}()
 		fn()
@@ -577,13 +564,13 @@ func (service *AgentService) exit() error {
 	/* wait for exitHandler done */
 	<-c
 	if err := service.stopController(); err != nil {
-		log.Error("[handleExit]", err.Error())
+		log.Err(err).Msg("handleExit")
 	}
 	if err := service.stopTransport(); err != nil {
-		log.Error("[handleExit]", err.Error())
+		log.Err(err).Msg("handleExit")
 	}
 	if err := service.stopNats(); err != nil {
-		log.Error("[handleExit]", err.Error())
+		log.Err(err).Msg("handleExit")
 	}
 	/* send quit signal */
 	service.quitChan <- struct{}{}
@@ -593,7 +580,7 @@ func (service *AgentService) exit() error {
 func (service *AgentService) resetNats() error {
 	st0 := *(service.agentStatus)
 	if err := service.stopNats(); err != nil {
-		log.Warn("could not stop nats: ", err)
+		log.Warn().Err(err).Msg("could not stop nats")
 	}
 	globs := [...]string{
 		"*/msgs.*.dat",
@@ -605,20 +592,20 @@ func (service *AgentService) resetNats() error {
 	for _, glob := range globs {
 		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
 		for _, f := range files {
-			log.Debug("removing: ", f)
+			log.Debug().Msgf("removing: %s", f)
 			if err := os.Remove(f); err != nil {
-				log.Warn("could not remove: ", f)
+				log.Warn().Msgf("could not remove: %s", f)
 			}
 		}
 	}
 	if st0.Nats == StatusRunning {
 		if err := service.startNats(); err != nil {
-			log.Warn("could not start nats: ", err)
+			log.Warn().Err(err).Msg("could not start nats")
 		}
 	}
 	if st0.Transport == StatusRunning {
 		if err := service.startTransport(); err != nil {
-			log.Warn("could not start nats dispatcher: ", err)
+			log.Warn().Err(err).Msg("could not start nats dispatcher")
 		}
 	}
 	return nil
@@ -680,7 +667,7 @@ func (service *AgentService) startTransport() error {
 		}
 	}
 	if len(cons) == 0 {
-		log.Warn("[StartTransport]: Empty GWConnections")
+		log.Warn().Msg("empty GWConnections")
 		return nil
 	}
 	/* Process clients */
@@ -699,7 +686,7 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
-	log.Info("[StartTransport]: Started")
+	log.Info().Msg("dispatcher started")
 	return nil
 }
 
@@ -711,25 +698,22 @@ func (service *AgentService) stopTransport() error {
 		return err
 	}
 	service.agentStatus.Transport = StatusStopped
-	log.Info("[StopTransport]: Stopped")
+	log.Info().Msg("dispatcher stopped")
 	return nil
 }
 
 // mixTracerContext adds `context` field if absent
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
-	if !bytes.Contains(payloadJSON, []byte("\"context\":")) ||
-		!bytes.Contains(payloadJSON, []byte("\"traceToken\":")) {
+	if !bytes.Contains(payloadJSON, []byte(`"context":`)) ||
+		!bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
 		ctxJSON, err := json.Marshal(service.MakeTracerContext())
 		if err != nil {
 			return nil, err
 		}
 		l := bytes.LastIndexByte(payloadJSON, byte('}'))
-		var buf bytes.Buffer
-		buf.Write(payloadJSON[:l])
-		buf.Write([]byte(",\"context\":"))
-		buf.Write(ctxJSON)
-		buf.Write([]byte("}"))
-		return buf.Bytes(), nil
+		return bytes.Join([][]byte{
+			payloadJSON[:l], []byte(`,"context":`), ctxJSON, []byte(`}`),
+		}, []byte(``)), nil
 	}
 	return payloadJSON, nil
 }
@@ -753,16 +737,10 @@ func (service AgentService) hookInterrupt() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		s := <-c
-		log.Info(fmt.Sprintf("Signal %s received, exiting", s))
+		log.Info().Msgf("signal %s received, exiting", s)
 		/* process exit with taskQueue to prevent feature tasks */
 		_, _ = service.ExitAsync()
 	}()
-}
-
-// hookLogErrors collects error entries for stats
-func (service AgentService) hookLogErrors(entry log.Entry) error {
-	service.updateStats(0, fmt.Errorf("%s%s", entry.Context.Value(entry.Entry), entry.Message), typeUndefined, entry.Time)
-	return nil
 }
 
 func (service *AgentService) initTracerToken() {

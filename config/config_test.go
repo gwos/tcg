@@ -38,12 +38,12 @@ gwConnections:
 	err = tmpFile.Close()
 	assert.NoError(t, err)
 
-	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(ConfigEnv, tmpFile.Name())
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTOREMAXAGE", "1h")
 	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
 	_ = os.Setenv("TCG_DSCONNECTION", "{\"hostName\":\"localhost:3001\"}")
 	_ = os.Setenv("TCG_GWCONNECTIONS", "[{\"password\":\"SEC RET\"},{\"hostName\":\"localhost:3001\"}]")
-	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv(ConfigEnv)
 	defer os.Unsetenv("TCG_CONNECTOR_NATSSTOREMAXAGE")
 	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
 	defer os.Unsetenv("TCG_DSCONNECTION")
@@ -87,9 +87,9 @@ dsConnection:
 	_, err = tmpFile.Write(configYAML)
 	assert.NoError(t, err)
 
-	_ = os.Setenv(string(ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(ConfigEnv, tmpFile.Name())
 	_ = os.Setenv("TCG_CONNECTOR_CONTROLLERADDR", ":8022")
-	defer os.Unsetenv(string(ConfigEnv))
+	defer os.Unsetenv(ConfigEnv)
 	defer os.Unsetenv("TCG_CONNECTOR_CONTROLLERADDR")
 
 	expected := defaults()

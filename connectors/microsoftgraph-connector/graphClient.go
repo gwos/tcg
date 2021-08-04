@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/transit"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/PaesslerAG/jsonpath"
+	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var httpClient = &http.Client{
@@ -86,7 +87,7 @@ func Initialize() error {
 		return nil
 	}
 	graphToken = token
-	log.Info(fmt.Sprintf("initialized MS Graph connection with  %s and %s", officeResource, graphResource))
+	log.Info().Msgf("initialized MS Graph connection with  %s and %s", officeResource, graphResource)
 	return nil
 }
 
@@ -99,7 +100,7 @@ func ExecuteRequest(graphUri string, token string) ([]byte, error) {
 		return nil, err
 	}
 	if response.StatusCode != 200 {
-		log.Info("[MSGraph Connector]:  Retrying Authentication...")
+		log.Info().Msg("Retrying Authentication...")
 		_ = response.Body.Close()
 		isOfficeToken := false
 		if token == officeToken {
@@ -132,11 +133,12 @@ func Do(request *http.Request) (*http.Response, error) {
 func parseError(v interface{}) error {
 	msg, err := jsonpath.Get("$.error.message", v)
 	if err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not parse")
 		return err
 	}
 	if msg != nil {
-		log.Error(msg)
+		log.Error().Interface("error", msg).
+			Msg("could not parse")
 		return errors.New(msg.(string))
 	}
 	return nil
@@ -157,7 +159,9 @@ func createMetricWithThresholds(name string, suffix string, value interface{}, w
 	}
 	metric, err := connectors.BuildMetric(metricBuilder)
 	if err != nil {
-		log.Error("failed to build metric " + metricBuilder.Name)
+		log.Error().
+			Str("metric", metricBuilder.Name).
+			Msg("failed to build metric")
 		return nil
 	}
 	return metric

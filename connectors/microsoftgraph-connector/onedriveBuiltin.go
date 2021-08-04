@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"

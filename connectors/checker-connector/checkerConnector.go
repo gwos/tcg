@@ -13,10 +13,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -33,8 +33,8 @@ type DataFormat string
 // Data formats of the received body
 const (
 	Bronx   DataFormat = "bronx"
-	NSCA               = "nsca"
-	NSCAAlt            = "nsca-alt"
+	NSCA    DataFormat = "nsca"
+	NSCAAlt DataFormat = "nsca-alt"
 )
 
 // ScheduleTask defines command
@@ -100,12 +100,18 @@ func makeEntrypointHandler(dataFormat DataFormat) func(*gin.Context) {
 
 		payload, err = c.GetRawData()
 		if err != nil {
-			log.With(log.Fields{"entrypoint": c.FullPath()}).
-				Warn("[Checker Connector]: ", err.Error())
+			log.Warn().Err(err).
+				Str("entrypoint", c.FullPath()).
+				Msg("could not process incoming request")
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		if _, err = processMetrics(ctx, payload, dataFormat); err != nil {
+			log.Warn().Err(err).
+				Str("entrypoint", c.FullPath()).
+				Str("dataFormat", string(dataFormat)).
+				Bytes("payload", payload).
+				Msg("could not process metrics")
 			c.JSON(http.StatusBadRequest, err.Error())
 			return
 		}

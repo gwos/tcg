@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
