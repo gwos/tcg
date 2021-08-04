@@ -165,7 +165,6 @@ func periodicHandler() {
 		log.Error("[MsGraph Connector]: Error during sending metrics.", err)
 	}
 	log.Info("[MsGraph Connector]: run stop", fmt.Sprintf("%d:%d:%d", len(inventory), len(monitored), len(groups)))
-
 }
 
 // TODO: remove this when you have provisioning ready

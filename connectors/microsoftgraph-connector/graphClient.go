@@ -22,43 +22,54 @@ var httpClient = &http.Client{
 	},
 }
 
-func login(tenantID string, clientID string, clientSecret string, resource string) (string, error) {
-	var request *http.Request
-	var response *http.Response
+func login(tenantID string, clientID string, clientSecret string, resource string) (str string, err error) {
+	var (
+		responseBody []byte
+		body         io.Reader
+		token        interface{}
+		v            interface{}
+		request      *http.Request
+		response     *http.Response
+	)
 
-	endPoint := "https://login.microsoftonline.com/" + tenantID + "/oauth2/token"
+	endPoint := fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/token", tenantID)
+
 	auth := AuthRecord{
 		GrantType:    "client_credentials",
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Resource:     resource,
 	}
-	form := url.Values{}
-	form.Add("grant_type", "client_credentials")
-	form.Add("client_secret", auth.ClientSecret)
-	form.Add("client_id", auth.ClientID)
-	form.Add("resource", auth.Resource)
-	byteBody := []byte(form.Encode())
-	var body io.Reader
-	body = bytes.NewBuffer(byteBody)
-	request, err := http.NewRequest(http.MethodPost, endPoint, body)
-	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	response, err = Do(request)
-	if err != nil {
-		return "", err
+
+	form := url.Values{
+		"grant_type":    []string{"client_credentials"},
+		"client_secret": []string{auth.ClientSecret},
+		"client_id":     []string{auth.ClientID},
+		"resource":      []string{auth.Resource},
 	}
-	defer response.Body.Close()
-	responseBody, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return "", err
+
+	body = bytes.NewBuffer([]byte(form.Encode()))
+	if request, err = http.NewRequest(http.MethodPost, endPoint, body); err == nil {
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if response, err = Do(request); err != nil {
+			return
+		}
+	} else {
+		return
 	}
-	v := interface{}(nil)
-	json.Unmarshal(responseBody, &v)
-	token, err := jsonpath.Get("$.access_token", v)
-	if err != nil {
-		return "", err
+
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	if responseBody, err = ioutil.ReadAll(response.Body); err == nil {
+		_ = json.Unmarshal(responseBody, &v)
+		if token, err = jsonpath.Get("$.access_token", v); err == nil {
+			str = token.(string)
+		}
 	}
-	return token.(string), nil
+
+	return
 }
 
 func Initialize() error {
@@ -81,38 +92,36 @@ func Initialize() error {
 
 func ExecuteRequest(graphUri string, token string) ([]byte, error) {
 	request, _ := http.NewRequest("GET", graphUri, nil)
-	request.Header.Set(	"accept", "application/json; odata.metadata=full")
-	request.Header.Set("Authorization", "Bearer " + token)
-	response, error := httpClient.Do(request)
-	if error != nil {
-		return nil, error
+	request.Header.Set("accept", "application/json; odata.metadata=full")
+	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	response, err := httpClient.Do(request)
+	if err != nil {
+		return nil, err
 	}
 	if response.StatusCode != 200 {
 		log.Info("[MSGraph Connector]:  Retrying Authentication...")
-		response.Body.Close()
+		_ = response.Body.Close()
 		isOfficeToken := false
 		if token == officeToken {
 			isOfficeToken = true
 		}
 		officeToken = ""
 		graphToken = ""
-		Initialize()
+		_ = Initialize()
 		newToken := graphToken
 		if isOfficeToken {
 			newToken = officeToken
 		}
-		request.Header.Set("Authorization", "Bearer " + newToken)
-		response, error = httpClient.Do(request)
-		if error != nil {
-			return nil, error
+		request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", newToken))
+		response, err = httpClient.Do(request)
+		if err != nil {
+			return nil, err
 		}
 	}
-	body, error:= ioutil.ReadAll(response.Body)
-	defer response.Body.Close()
-	if error != nil {
-		return nil, error
-	}
-	return body, nil
+	defer func() {
+		_ = response.Body.Close()
+	}()
+	return ioutil.ReadAll(response.Body)
 }
 
 func Do(request *http.Request) (*http.Response, error) {
@@ -133,19 +142,18 @@ func parseError(v interface{}) error {
 	return nil
 }
 
-
 func createMetric(name string, suffix string, value interface{}) *transit.TimeSeries {
 	return createMetricWithThresholds(name, suffix, value, -1, -1)
 }
 
 func createMetricWithThresholds(name string, suffix string, value interface{}, warning float64, critical float64) *transit.TimeSeries {
 	metricBuilder := connectors.MetricBuilder{
-		Name:       name + suffix,
-		Value:      value,
-		UnitType:   transit.UnitCounter,
+		Name:     fmt.Sprintf("%s%s", name, suffix),
+		Value:    value,
+		UnitType: transit.UnitCounter,
 		Warning:  warning,
 		Critical: critical,
-		Graphed: true, // TODO: get this value from configs
+		Graphed:  true, // TODO: get this value from configs
 	}
 	metric, err := connectors.BuildMetric(metricBuilder)
 	if err != nil {
@@ -155,22 +163,19 @@ func createMetricWithThresholds(name string, suffix string, value interface{}, w
 	return metric
 }
 
-func getCount(v interface{}) (int, error) {
-	var count int = 0
+func getCount(v interface{}) (c int, err error) {
+	var (
+		value interface{}
+	)
 	if v != nil {
-		value, err := jsonpath.Get("$.value[*]", v)
-		if err != nil {
-			return count, err
-		}
-		if value != nil {
-			count = len(value.([]interface{}))
-			if count == 0 {
-				err := parseError(v)
-				if err != nil {
-					return 0, err
+		if value, err = jsonpath.Get("$.value[*]", v); err == nil {
+			if value != nil {
+				c = len(value.([]interface{}))
+				if c == 0 && parseError(v) != nil {
+					return
 				}
 			}
 		}
 	}
-	return count, nil
+	return
 }

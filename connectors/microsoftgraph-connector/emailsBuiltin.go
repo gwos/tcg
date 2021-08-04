@@ -8,31 +8,35 @@ import (
 	"net/url"
 )
 
-// Emails built in
-func Emails(
-	service *transit.DynamicMonitoredService,
-	token string,
-	outlookEmailAddress string,
-) error {
-	baseGraphUri := "https://graph.microsoft.com/v1.0/users/%s/messages?"
-	params := url.Values{}
-	params.Add("$filter", "isRead ne true")
-	params.Add("$select", "receivedDateTime")
-	graphUri := fmt.Sprintf(baseGraphUri, outlookEmailAddress) + params.Encode()
-	body, err := ExecuteRequest(graphUri, token)
-	if err != nil {
-		return err
-	}
-	v := interface{}(nil)
-	json.Unmarshal(body, &v)
-	count, err := getCount(v)
-	if err != nil {
-		return err
-	}
-	// TODO: wire in thresholds
-	metric := createMetricWithThresholds("unread-emails", "", float64(count), 2, 4)
-	service.Metrics = append(service.Metrics, *metric)
-	service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
-	return nil
-}
+const baseGraphUri = "https://graph.microsoft.com/v1.0/users/%s/messages?"
 
+// Emails built in
+func Emails(service *transit.DynamicMonitoredService, token string, outlookEmailAddress string) (err error) {
+	var (
+		c    int
+		body []byte
+		v    interface{}
+	)
+
+	params := url.Values{
+		"$filter": []string{"isRead ne true"},
+		"$select": []string{"receivedDateTime"},
+	}
+
+	graphUri := fmt.Sprintf(baseGraphUri, outlookEmailAddress) + params.Encode()
+
+	if body, err = ExecuteRequest(graphUri, token); err == nil {
+		_ = json.Unmarshal(body, &v)
+	} else {
+		return
+	}
+
+	if c, err = getCount(v); err == nil {
+		// TODO: wire in thresholds
+		metric := createMetricWithThresholds("unread-emails", "", float64(c), 2, 4)
+		service.Metrics = append(service.Metrics, *metric)
+		service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+	}
+
+	return
+}
