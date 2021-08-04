@@ -275,7 +275,7 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 			}
 		}
 
-		if hostNames != nil && len(hostNames) > 0 {
+		if len(hostNames) > 0 {
 			gwHostGroups, err := gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
 			if err != nil || gwHostGroups == nil {
 				log.Error().Err(err).

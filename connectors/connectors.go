@@ -174,9 +174,7 @@ func CreateInventoryResource(name string, services []transit.DynamicInventorySer
 			},
 		},
 	}
-	for _, s := range services {
-		resource.Services = append(resource.Services, s)
-	}
+	resource.Services = append(resource.Services, services...)
 	return resource
 }
 
@@ -195,9 +193,7 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 		Type:        groupType,
 		Description: description,
 	}
-	for _, r := range resources {
-		group.Resources = append(group.Resources, r)
-	}
+	group.Resources = append(group.Resources, resources...)
 	return group
 }
 

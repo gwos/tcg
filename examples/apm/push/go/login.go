@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"github.com/gwos/tcg/clients"
 	"net/http"
+
+	"github.com/gwos/tcg/clients"
 )
 
 var loginUrl = "/api/auth/login"
@@ -29,8 +29,8 @@ func login(host, user, password, gwosAppName string) (*credentials, error) {
 		return nil, err
 	}
 	if statusCode != 200 {
-		return nil, errors.New(fmt.Sprintf("[ERROR]: Http request failed. [Status code]: %d, [Response]: %s",
-			statusCode, string(body)))
+		return nil, fmt.Errorf("[ERROR]: Http request failed. [Status code]: %d, [Response]: %s",
+			statusCode, string(body))
 	}
 
 	return &credentials{

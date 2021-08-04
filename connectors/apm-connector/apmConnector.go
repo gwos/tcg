@@ -141,7 +141,7 @@ func processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf 
 
 func validatePrometheusService(service *dto.MetricFamily) error {
 	if service.Name == nil {
-		return errors.New("Prometheus service name can not be empty ")
+		return errors.New("prometheus service name can not be empty")
 	}
 	return nil
 }

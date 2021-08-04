@@ -33,8 +33,8 @@ type DataFormat string
 // Data formats of the received body
 const (
 	Bronx   DataFormat = "bronx"
-	NSCA               = "nsca"
-	NSCAAlt            = "nsca-alt"
+	NSCA    DataFormat = "nsca"
+	NSCAAlt DataFormat = "nsca-alt"
 )
 
 // ScheduleTask defines command

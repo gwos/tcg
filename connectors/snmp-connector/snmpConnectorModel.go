@@ -147,7 +147,7 @@ func calculateHostStatus(lastOk float64) transit.MonitorStatus {
 
 func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 	metricName string, currentValue interface{}) (bool, bool, interface{}) {
-	if strings.EqualFold(string(metricKind), transit.Delta) {
+	if strings.EqualFold(string(metricKind), string(transit.Delta)) {
 		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
 			case transit.UnitCounter:
