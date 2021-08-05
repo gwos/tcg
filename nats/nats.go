@@ -9,6 +9,7 @@ import (
 	stand "github.com/nats-io/nats-streaming-server/server"
 	"github.com/nats-io/nats-streaming-server/stores"
 	"github.com/nats-io/stan.go"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -64,6 +65,7 @@ type DispatcherOption struct {
 func StartServer(config Config) error {
 	natsOpts := stand.DefaultNatsServerOptions.Clone()
 	natsOpts.MaxPayload = config.MaxPayload
+	natsOpts.HTTPHost = "127.0.0.1"
 	natsOpts.HTTPPort = config.MonitorPort
 	natsOpts.Port = natsd.RANDOM_PORT
 
@@ -90,7 +92,14 @@ func StartServer(config Config) error {
 	if s.stanServer == nil {
 		if stanServer, err := stand.RunServerWithOpts(stanOpts, natsOpts); err == nil {
 			s.stanServer = stanServer
-			log.Info().Msgf("nats started at: %s", s.stanServer.ClientURL())
+			log.Info().
+				Func(func(e *zerolog.Event) {
+					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+						e.Interface("stanOpts", stanOpts).
+							Interface("natsOpts", natsOpts)
+					}
+				}).
+				Msgf("nats started at: %s", s.stanServer.ClientURL())
 		} else {
 			log.Warn().
 				Err(err).
