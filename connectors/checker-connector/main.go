@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/checker-connector/parser"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
@@ -143,7 +144,7 @@ func taskHandler(task ScheduleTask) func() {
 
 		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
 
-		if _, err = processMetrics(ctxN, res, task.DataFormat); err != nil {
+		if _, err = parser.ProcessMetrics(ctxN, res, task.DataFormat); err != nil {
 			log.Warn().Err(err).
 				Interface("task", task).
 				Bytes("res", res).
