@@ -9,21 +9,30 @@ ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 
 WORKDIR /go/src/
 COPY . .
+
 RUN apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
         libjansson-dev \
     && make clean && make \
     && echo "[GOTOCJSON TEST DONE]"
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
+        libmcrypt4 libmcrypt-dev \
+    && echo "[CHECKER NSCA DEPS DONE]"
 RUN go test -v $(go list ./... | grep -v tcg/integration) \
     && echo "[Go TESTS DONE]"
+
+# use bash for run to support '[[' command
+SHELL ["/bin/bash", "-c"]
 RUN sh -x \
     && build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
     && ldflags="-X 'github.com/gwos/tcg/config.buildTime=${build_time}'" \
     && ldflags="${ldflags} -X 'github.com/gwos/tcg/config.buildTag=${TRAVIS_TAG}'" \
     && for d in ./connectors/*connector/; \
-    do \
-        cd "$d"; pwd; \
-        CGO_ENABLED=0 go build -ldflags "$ldflags" . \
+    do  cd "$d"; pwd; \
+        CGO_ENABLED=0; \
+        if [[ "$d" == *checker* ]] ; then CGO_ENABLED=1; fi; \
+        echo "CGO_ENABLED:$CGO_ENABLED"; \
+        CGO_ENABLED=$CGO_ENABLED go build -ldflags "$ldflags" . \
         && name=$(ls *connector) \
         && dest="/app/${name}" \
         && mkdir -p "$dest" \

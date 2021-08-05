@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/checker-connector/nsca"
 	"github.com/gwos/tcg/connectors/checker-connector/parser"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
@@ -27,6 +28,8 @@ var (
 			cron.SkipIfStillRunning(cron.DefaultLogger),
 		),
 	)
+
+	nscaCancel context.CancelFunc
 )
 
 // @title TCG API Documentation
@@ -40,6 +43,9 @@ func main() {
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
+		if nscaCancel != nil {
+			nscaCancel()
+		}
 		if sch != nil {
 			sch.Stop()
 		}
@@ -54,6 +60,10 @@ func main() {
 		log.Err(err).Msg("could not start connector")
 		return
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	nscaCancel = cancel
+	nsca.Start(ctx)
 
 	/* return on quit signal */
 	<-transitService.Quit()
