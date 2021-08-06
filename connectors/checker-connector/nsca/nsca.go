@@ -3,7 +3,6 @@ package nsca
 import (
 	"context"
 	"fmt"
-	stdlog "log"
 	"net"
 	"os"
 	"strconv"
@@ -94,10 +93,36 @@ func StartServerWithContext(ctx context.Context, conf *nscatools.Config) error {
 			}
 			defer conn.Close()
 
-			stdlog.SetOutput(log.Logger)
-			logErr := stdlog.New(log.Logger, "", 0)
 			// run as a goroutine
-			go nscatools.HandleClient(conf, conn, logErr)
+			go HandleClient(conf, conn)
 		}
 	}
+}
+
+func HandleClient(conf *nscatools.Config, conn net.Conn) error {
+	// close connection on exit
+	defer conn.Close()
+
+	// sends the initialization packet
+	ipacket, err := nscatools.NewInitPacket()
+	if err != nil {
+		log.Err(err).Msg("unable to create the init packet")
+		return err
+	}
+	if err = ipacket.Write(conn); err != nil {
+		log.Err(err).Msg("unable to send the init packet")
+		return err
+	}
+
+	// Retrieves the data from the client
+	data := nscatools.NewDataPacket(conf.EncryptionMethod, []byte(conf.Password), ipacket)
+
+	if err = data.Read(conn); err != nil {
+		log.Err(err).Msg("unable to read the data packet")
+		return err
+	}
+	if err = conf.PacketHandler(data); err != nil {
+		log.Err(err).Msg("unable to process the data packet in the custom handler")
+	}
+	return err
 }
