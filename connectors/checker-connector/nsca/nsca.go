@@ -56,7 +56,7 @@ func Handler(p *nscatools.DataPacket) error {
 }
 
 func Start(ctx context.Context) {
-	nscaHost := "localhost"
+	nscaHost := "0.0.0.0"
 	nscaPort := uint16(5667)
 	nscaEncrypt := nscatools.EncryptNone
 	nscaPassword := ""
