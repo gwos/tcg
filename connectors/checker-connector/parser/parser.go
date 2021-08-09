@@ -17,9 +17,8 @@ import (
 )
 
 var (
-	bronxRegexp = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
+	bronxRegexp = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
 	nscaRegexp  = regexp.MustCompile(`^(?:(.*?);)?(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
-	// perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);$`)
 	// skipping unittype postfix
 	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
 	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
@@ -170,7 +169,7 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 			case 6:
 				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)[1:]
 			}
-			if values == nil || len(values) < 4 {
+			if len(values) < 4 {
 				return nil, errors.New("invalid metric format")
 			}
 			var value, warning, critical float64
@@ -260,25 +259,8 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 	for _, metric := range metricsLines {
 		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
 
-		if len(arr) != 10 {
+		if len(arr) != 7 {
 			return nil, errors.New("invalid metric format")
-		}
-
-		var value, warning, critical float64
-		if v, err := strconv.ParseFloat(arr[7], 64); err == nil {
-			value = v
-		} else {
-			return nil, err
-		}
-		if w, err := strconv.ParseFloat(arr[8], 64); err == nil {
-			warning = w
-		} else {
-			return nil, err
-		}
-		if c, err := strconv.ParseFloat(arr[9], 64); err == nil {
-			critical = c
-		} else {
-			return nil, err
 		}
 
 		timestamp, err := getTime(arr[1])
@@ -286,22 +268,61 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 			return nil, err
 		}
 
-		timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
-			Name:           arr[6],
-			ComputeType:    transit.Query,
-			Value:          value,
-			UnitType:       transit.MB,
-			Warning:        warning,
-			Critical:       critical,
-			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: timestamp.Time},
-			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: timestamp.Time},
-		})
-		if err != nil {
-			return nil, err
-		}
-		metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])] = append(metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])], *timeSeries)
-	}
+		perfData := arr[6]
+		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
+		for _, metric := range pdArr {
+			var values []string
+			switch len(strings.Split(metric, ";")) {
+			case 4:
+				values = perfDataRegexp.FindStringSubmatch(metric)[1:]
+			case 5:
+				values = perfDataWithMinRegexp.FindStringSubmatch(metric)[1:]
+			case 6:
+				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)[1:]
+			}
+			if len(values) < 4 {
+				return nil, errors.New("invalid metric format")
+			}
+			var value, warning, critical float64
+			if len(values[1]) > 0 {
+				if v, err := strconv.ParseFloat(values[1], 64); err == nil {
+					value = v
+				} else {
+					return nil, err
+				}
+			}
+			if len(values[2]) > 0 {
+				if w, err := strconv.ParseFloat(values[2], 64); err == nil {
+					warning = w
+				} else {
+					return nil, err
+				}
+			}
+			if len(values[3]) > 0 {
+				if c, err := strconv.ParseFloat(values[3], 64); err == nil {
+					critical = c
+				} else {
+					return nil, err
+				}
+			}
 
+			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
+				Name:           values[0],
+				ComputeType:    transit.Query,
+				Value:          value,
+				UnitType:       transit.MB,
+				Warning:        warning,
+				Critical:       critical,
+				StartTimestamp: timestamp,
+				EndTimestamp:   timestamp,
+			})
+			if err != nil {
+				return nil, err
+			}
+			metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])] =
+				append(metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])], *timeSeries)
+		}
+	}
 	return metricsMap, nil
 }
 
@@ -310,7 +331,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 	for _, metric := range metricsLines {
 		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
 
-		if len(arr) != 10 {
+		if len(arr) != 7 {
 			return nil, errors.New("invalid metric format")
 		}
 

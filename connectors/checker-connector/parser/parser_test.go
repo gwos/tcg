@@ -17,9 +17,7 @@ awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :
 	monitoredResources, err := parse(data, NSCA)
 	assert.NoError(t, err)
 
-	if len(*monitoredResources) != 4 {
-		assert.Fail(t, "invalid count of monitored resources")
-	}
+	assert.Equal(t, 4, len(*monitoredResources), "invalid count of monitored resources")
 
 	for _, res := range *monitoredResources {
 		switch res.Name {
@@ -47,17 +45,21 @@ awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :
 
 func TestBronxParser(t *testing.T) {
 	data := []byte(
-		`S;1596719076;Server1;Disk1;0;OK| test-metric=44;85;95
-S;1596719076;Server2;Disk2;1;WARNING| test-metric=44;85;95
-S;1596719076;Server3;Disk3;2;CRITICAL| test-metric=44;85;95`,
+		`S;1596719076;Server1;Disk1;0;OK| test-metric=44;85;95;
+S;1596719076;Server2;Disk2;1;WARNING| test-metric=44;85;95;
+S;1596719076;Server3;Disk3;2;CRITICAL| test-metric=44;85;95;
+S;1628530909;awips-demo-2;example-service-2;0;OK - example-service-2 (2021-08-09 17:41:49 :: 1628530909) | result=63ms;;;0;
+S;1628530909;awips-demo-2;example-service-3;0;OK - example-service-3 (2021-08-09 17:41:49 :: 1628530909) | result=210ms;;;0;
+S;1628530909;awips-demo-2;example-service-4;0;OK - example-service-4 (2021-08-09 17:41:49 :: 1628530909) | result=126ms;;;0;
+S;1628530909;awips-demo-2;example-service-5;0;OK - example-service-5 (2021-08-09 17:41:49 :: 1628530909) | result=42ms;;;0;
+S;1628530909;awips-demo-2;example-service-6;0;OK - example-service-6 (2021-08-09 17:41:49 :: 1628530909) | result=42ms;;;0;
+S;1628530909;awips-demo-2;example-service-7;0;OK - example-service-7 (2021-08-09 17:41:49 :: 1628530909) | result=63ms;;;0;`,
 	)
 
 	monitoredResources, err := parse(data, Bronx)
 	assert.NoError(t, err)
 
-	if len(*monitoredResources) != 3 {
-		assert.Fail(t, "invalid count of monitored resources")
-	}
+	assert.Equal(t, 4, len(*monitoredResources), "invalid count of monitored resources")
 
 	for _, res := range *monitoredResources {
 		switch res.Name {
@@ -71,6 +73,10 @@ S;1596719076;Server3;Disk3;2;CRITICAL| test-metric=44;85;95`,
 		case "Server3":
 			assert.Equal(t, 1, len(res.Services), "invalid count of services for monitored resource")
 			assert.Equal(t, "Disk3", res.Services[0].Name, "invalid service in monitored resources")
+		case "awips-demo-2":
+			assert.Equal(t, 6, len(res.Services), "invalid count of services for monitored resource")
+			assert.Equal(t, "example-service-2", res.Services[0].Name, "invalid service in monitored resources")
+			assert.Equal(t, 1, len(res.Services[0].Metrics), "invalid count of metrics for service")
 		default:
 			assert.Fail(t, "invalid service in monitored resources")
 		}
