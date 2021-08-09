@@ -143,7 +143,11 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
 	metricsMap := make(map[string][]transit.TimeSeries)
 	for _, metric := range metricsLines {
-		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
+		arr := nscaRegexp.FindStringSubmatch(metric)
+		if len(arr) < 5 {
+			return nil, errors.New("invalid metric format")
+		}
+		arr = arr[1:]
 
 		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		var err error
@@ -220,7 +224,12 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 	servicesMap := make(map[string][]transit.DynamicMonitoredService)
 
 	for _, metric := range metricsLines {
-		arr := nscaRegexp.FindStringSubmatch(metric)[1:]
+		arr := nscaRegexp.FindStringSubmatch(metric)
+		if len(arr) < 5 {
+			return nil, errors.New("invalid metric format")
+		}
+		arr = arr[1:]
+
 		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		var err error
 		if len(arr) > 5 && arr[0] == "" {
@@ -257,11 +266,11 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
 	metricsMap := make(map[string][]transit.TimeSeries)
 	for _, metric := range metricsLines {
-		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
-
-		if len(arr) != 7 {
+		arr := bronxRegexp.FindStringSubmatch(metric)
+		if len(arr) != 8 {
 			return nil, errors.New("invalid metric format")
 		}
+		arr = arr[1:]
 
 		timestamp, err := getTime(arr[1])
 		if err != nil {
@@ -329,11 +338,11 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
 	servicesMap := make(map[string][]transit.DynamicMonitoredService)
 	for _, metric := range metricsLines {
-		arr := bronxRegexp.FindStringSubmatch(metric)[1:]
-
-		if len(arr) != 7 {
+		arr := bronxRegexp.FindStringSubmatch(metric)
+		if len(arr) != 8 {
 			return nil, errors.New("invalid metric format")
 		}
+		arr = arr[1:]
 
 		timestamp, err := getTime(arr[1])
 		if err != nil {
