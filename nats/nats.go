@@ -65,7 +65,7 @@ type DispatcherOption struct {
 func StartServer(config Config) error {
 	natsOpts := stand.DefaultNatsServerOptions.Clone()
 	natsOpts.MaxPayload = config.MaxPayload
-	natsOpts.HTTPHost = "127.0.0.1"
+	natsOpts.HTTPHost = "0.0.0.0"
 	natsOpts.HTTPPort = config.MonitorPort
 	natsOpts.Port = natsd.RANDOM_PORT
 
