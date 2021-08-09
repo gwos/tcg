@@ -47,14 +47,8 @@ RUN cp ./docker_cmd.sh /app/
 FROM scratch as export
 COPY --from=build /app .
 
-# FROM alpine:3.11 as prod
-FROM ubuntu:bionic as prod
+FROM alpine:3.11 as prod
 COPY --from=build /app /app
-RUN apt-get update -qq \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
-        libmcrypt4 \
-    && echo '### cleanup packages lists ###' \
-    && rm -rf /var/lib/apt/lists/*
 
 # Land docker exec into var folder
 WORKDIR /tcg/
