@@ -2,10 +2,7 @@
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
 #
-FROM golang:latest as build
-
-ARG TRAVIS_TAG=
-ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
+FROM golang:latest as test-deb
 
 WORKDIR /go/src/
 COPY . .
@@ -15,9 +12,18 @@ RUN apt-get update -qq \
         libjansson-dev \
     && make clean && make \
     && echo "[GOTOCJSON TEST DONE]"
-RUN DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
-        libmcrypt4 libmcrypt-dev \
+
+FROM golang:alpine as build
+ARG TRAVIS_TAG=
+ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
+WORKDIR /go/src/
+COPY . .
+
+RUN apk add --no-cache \
+        bash build-base \
+        libmcrypt libmcrypt-dev \
     && echo "[CHECKER NSCA DEPS DONE]"
+
 RUN go test -v $(go list ./... | grep -v tcg/integration) \
     && echo "[Go TESTS DONE]"
 
@@ -48,6 +54,7 @@ FROM scratch as export
 COPY --from=build /app .
 
 FROM alpine:3.11 as prod
+RUN apk add --no-cache libmcrypt
 COPY --from=build /app /app
 
 # Land docker exec into var folder
