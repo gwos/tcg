@@ -10,13 +10,14 @@ func TestNscaParser(t *testing.T) {
 	data := []byte(
 		`Server1;Disks1;0;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0;
 Server2;Disks2;1;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0; load15=2.220;0.000;0.000;0;
-Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0;`,
+Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0;
+awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :: 1628524058) | result=147ms;;;0;`,
 	)
 
 	monitoredResources, err := parse(data, NSCA)
 	assert.NoError(t, err)
 
-	if len(*monitoredResources) != 3 {
+	if len(*monitoredResources) != 4 {
 		assert.Fail(t, "invalid count of monitored resources")
 	}
 
@@ -34,6 +35,10 @@ Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.0
 			assert.Equal(t, 1, len(res.Services), "invalid count of services for monitored resource")
 			assert.Equal(t, "Disks3", res.Services[0].Name, "invalid service in monitored resources")
 			assert.Equal(t, 2, len(res.Services[0].Metrics), "invalid count of metrics for service")
+		case "awips-demo-4":
+			assert.Equal(t, 1, len(res.Services), "invalid count of services for monitored resource")
+			assert.Equal(t, "example-service-10", res.Services[0].Name, "invalid service in monitored resources")
+			assert.Equal(t, 1, len(res.Services[0].Metrics), "invalid count of metrics for service")
 		default:
 			assert.Fail(t, "invalid service in monitored resources")
 		}

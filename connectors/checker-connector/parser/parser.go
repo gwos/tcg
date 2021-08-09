@@ -17,11 +17,13 @@ import (
 )
 
 var (
-	bronxRegexp              = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
-	nscaRegexp               = regexp.MustCompile(`^(?:(.*?);)?(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
-	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);$`)
-	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);$`)
-	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);(.*?);(.*?);$`)
+	bronxRegexp = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|\s(.*?)=(.*?);(.*?);(.*?)$`)
+	nscaRegexp  = regexp.MustCompile(`^(?:(.*?);)?(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
+	// perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?);(.*?);(.*?);$`)
+	// skipping unittype postfix
+	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
+	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
+	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
 )
 
 // DataFormat describes incoming payload
@@ -172,20 +174,26 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 				return nil, errors.New("invalid metric format")
 			}
 			var value, warning, critical float64
-			if v, err := strconv.ParseFloat(values[1], 64); err == nil {
-				value = v
-			} else {
-				return nil, err
+			if len(values[1]) > 0 {
+				if v, err := strconv.ParseFloat(values[1], 64); err == nil {
+					value = v
+				} else {
+					return nil, err
+				}
 			}
-			if w, err := strconv.ParseFloat(values[2], 64); err == nil {
-				warning = w
-			} else {
-				return nil, err
+			if len(values[2]) > 0 {
+				if w, err := strconv.ParseFloat(values[2], 64); err == nil {
+					warning = w
+				} else {
+					return nil, err
+				}
 			}
-			if c, err := strconv.ParseFloat(values[3], 64); err == nil {
-				critical = c
-			} else {
-				return nil, err
+			if len(values[3]) > 0 {
+				if c, err := strconv.ParseFloat(values[3], 64); err == nil {
+					critical = c
+				} else {
+					return nil, err
+				}
 			}
 
 			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
