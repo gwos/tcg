@@ -4,20 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/PaesslerAG/gval"
+	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
-
-	"github.com/PaesslerAG/gval"
-	"github.com/gin-gonic/gin"
-	"github.com/patrickmn/go-cache"
-	"github.com/rs/zerolog/log"
 )
-
-// ProcessesCache
-// TODO: move into Server Connector
-var ProcessesCache = cache.New(5*time.Minute, 5*time.Minute)
 
 const (
 	Kb                 = "GW:KB"
@@ -472,16 +465,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	vars := make(map[string]interface{})
 
 	if !override {
-		if processesInterface, exist := ProcessesCache.Get("processes"); exist {
-			processes := processesInterface.(map[string]float64)
-			for _, param := range expression.Params {
-				if val, exist := processes[strings.ReplaceAll(param.Name, ".", "_")]; exist {
-					vars[strings.ReplaceAll(param.Name, ".", "_")] = val
-				}
-			}
-		} else {
-			return -1, errors.New("processes cache not initialized ")
-		}
+		return -1, errors.New("processes cache not initialized ")
 	} else {
 		for _, param := range expression.Params {
 			vars[strings.ReplaceAll(param.Name, ".", "_")] = param.Value
