@@ -22,11 +22,11 @@ var (
 	nscaRegexp = regexp.MustCompile(
 		`^((?P<ts>.*?);)?(?P<resName>.*?);(?P<svcName>.*?);(?P<status>.*?);(?P<msg>.*?)\s*\|\s*(?P<perf>.*?)$`)
 	perfDataRegexp = regexp.MustCompile(
-		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);$`)
-	perfDataWithMinRegexp = regexp.MustCompile(
-		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);(?P<min>.*?)(\D*?);$`)
-	perfDataWithMinMaxRegexp = regexp.MustCompile(
-		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);(?P<min>.*?)(\D*?);(?P<max>.*?)(\D*?);$`)
+		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);` +
+			`((?P<min>.*?)(\D*?);)?((?P<max>.*?)(\D*?);)?$`)
+
+	ErrInvalidMetricFormat = errors.New("invalid metric format")
+	ErrUnknownMetricFormat = errors.New("unknown metric format")
 )
 
 // DataFormat describes incoming payload
@@ -61,11 +61,9 @@ func ProcessMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) 
 	if err != nil {
 		return nil, err
 	}
-
 	if err := connectors.SendMetrics(ctxN, *monitoredResources, nil); err != nil {
 		return nil, err
 	}
-
 	return monitoredResources, nil
 }
 
@@ -85,7 +83,7 @@ func parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 	case NSCA, NSCAAlt:
 		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
 	default:
-		return nil, errors.New("unknown data format provided")
+		return nil, ErrUnknownMetricFormat
 	}
 	if err != nil {
 		return nil, err
@@ -97,7 +95,7 @@ func parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 	case NSCA, NSCAAlt:
 		resourceNameToServicesMap, err = getNscaServices(serviceNameToMetricsMap, metricsLines)
 	default:
-		return nil, errors.New("unknown data format provided")
+		return nil, ErrUnknownMetricFormat
 	}
 	if err != nil {
 		return nil, err
@@ -157,7 +155,6 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 		return transit.ServiceUnscheduledCritical, nil
 	case "3":
 		return transit.ServiceUnknown, nil
-
 	default:
 		return "nil", errors.New("unknown status provided")
 	}
@@ -168,8 +165,8 @@ func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
 	re := nscaRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) < 5 {
-			return nil, errors.New("invalid metric format")
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
 		}
 		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
@@ -180,34 +177,21 @@ func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		perfData := match[re.SubexpIndex("perf")]
-		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
-		for _, metric := range pdArr {
-			var values []string
-			var label, val, warn, crit string
-			switch len(strings.Split(metric, ";")) {
-			case 0, 1, 2, 3:
-				return nil, errors.New("invalid metric format")
-			case 4:
-				values = perfDataRegexp.FindStringSubmatch(metric)
-				label = values[perfDataRegexp.SubexpIndex("label")]
-				val = values[perfDataRegexp.SubexpIndex("val")]
-				warn = values[perfDataRegexp.SubexpIndex("warn")]
-				crit = values[perfDataRegexp.SubexpIndex("crit")]
-			case 5:
-				values = perfDataWithMinRegexp.FindStringSubmatch(metric)
-				label = values[perfDataWithMinRegexp.SubexpIndex("label")]
-				val = values[perfDataWithMinRegexp.SubexpIndex("val")]
-				warn = values[perfDataWithMinRegexp.SubexpIndex("warn")]
-				crit = values[perfDataWithMinRegexp.SubexpIndex("crit")]
-			case 6:
-				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)
-				label = values[perfDataWithMinMaxRegexp.SubexpIndex("label")]
-				val = values[perfDataWithMinMaxRegexp.SubexpIndex("val")]
-				warn = values[perfDataWithMinMaxRegexp.SubexpIndex("warn")]
-				crit = values[perfDataWithMinMaxRegexp.SubexpIndex("crit")]
+		for _, metric := range strings.Split(strings.TrimSpace(perfData), " ") {
+			var (
+				match                    []string
+				label, val, warn, crit   string
+				value, warning, critical float64
+			)
+			match = perfDataRegexp.FindStringSubmatch(metric)
+			if match == nil {
+				return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "perf data")
 			}
+			label = match[perfDataRegexp.SubexpIndex("label")]
+			val = match[perfDataRegexp.SubexpIndex("val")]
+			warn = match[perfDataRegexp.SubexpIndex("warn")]
+			crit = match[perfDataRegexp.SubexpIndex("crit")]
 
-			var value, warning, critical float64
 			if len(val) > 0 {
 				if v, err := strconv.ParseFloat(val, 64); err == nil {
 					value = v
@@ -255,8 +239,8 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 	re := nscaRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) < 5 {
-			return nil, errors.New("invalid metric format")
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
 		}
 		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
@@ -292,8 +276,8 @@ func getBronxMetrics(metricsLines []string) (MetricsMap, error) {
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) != 9 {
-			return nil, errors.New("invalid metric format")
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
 		}
 		timestamp, err := getTime(match[re.SubexpIndex("ts")])
 		if err != nil {
@@ -302,34 +286,21 @@ func getBronxMetrics(metricsLines []string) (MetricsMap, error) {
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		perfData := match[re.SubexpIndex("perf")]
-		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
-		for _, metric := range pdArr {
-			var values []string
-			var label, val, warn, crit string
-			switch len(strings.Split(metric, ";")) {
-			case 0, 1, 2, 3:
-				return nil, errors.New("invalid metric format")
-			case 4:
-				values = perfDataRegexp.FindStringSubmatch(metric)
-				label = values[perfDataRegexp.SubexpIndex("label")]
-				val = values[perfDataRegexp.SubexpIndex("val")]
-				warn = values[perfDataRegexp.SubexpIndex("warn")]
-				crit = values[perfDataRegexp.SubexpIndex("crit")]
-			case 5:
-				values = perfDataWithMinRegexp.FindStringSubmatch(metric)
-				label = values[perfDataWithMinRegexp.SubexpIndex("label")]
-				val = values[perfDataWithMinRegexp.SubexpIndex("val")]
-				warn = values[perfDataWithMinRegexp.SubexpIndex("warn")]
-				crit = values[perfDataWithMinRegexp.SubexpIndex("crit")]
-			case 6:
-				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)
-				label = values[perfDataWithMinMaxRegexp.SubexpIndex("label")]
-				val = values[perfDataWithMinMaxRegexp.SubexpIndex("val")]
-				warn = values[perfDataWithMinMaxRegexp.SubexpIndex("warn")]
-				crit = values[perfDataWithMinMaxRegexp.SubexpIndex("crit")]
+		for _, metric := range strings.Split(strings.TrimSpace(perfData), " ") {
+			var (
+				match                    []string
+				label, val, warn, crit   string
+				value, warning, critical float64
+			)
+			match = perfDataRegexp.FindStringSubmatch(metric)
+			if match == nil {
+				return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "perf data")
 			}
+			label = match[perfDataRegexp.SubexpIndex("label")]
+			val = match[perfDataRegexp.SubexpIndex("val")]
+			warn = match[perfDataRegexp.SubexpIndex("warn")]
+			crit = match[perfDataRegexp.SubexpIndex("crit")]
 
-			var value, warning, critical float64
 			if len(val) > 0 {
 				if v, err := strconv.ParseFloat(val, 64); err == nil {
 					value = v
@@ -377,8 +348,8 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) != 9 {
-			return nil, errors.New("invalid metric format")
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
 		}
 		timestamp, err := getTime(match[re.SubexpIndex("ts")])
 		if err != nil {
