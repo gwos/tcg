@@ -17,12 +17,16 @@ import (
 )
 
 var (
-	bronxRegexp = regexp.MustCompile(`^(.*?);(.*?);(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
-	nscaRegexp  = regexp.MustCompile(`^(?:(.*?);)?(.*?);(.*?);(.*?);(.*?)\|(.*?)$`)
-	// skipping unittype postfix
-	perfDataRegexp           = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
-	perfDataWithMinRegexp    = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
-	perfDataWithMinMaxRegexp = regexp.MustCompile(`^(.*?)=(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);(.*?)(?:\D*?);$`)
+	bronxRegexp = regexp.MustCompile(
+		`^(?P<type>H|S);(?P<ts>.*?);(?P<resName>.*?);((?P<svcName>.*?);)?(?P<status>.*?);(?P<msg>.*?)\s*\|\s*(?P<perf>.*?)$`)
+	nscaRegexp = regexp.MustCompile(
+		`^((?P<ts>.*?);)?(?P<resName>.*?);(?P<svcName>.*?);(?P<status>.*?);(?P<msg>.*?)\s*\|\s*(?P<perf>.*?)$`)
+	perfDataRegexp = regexp.MustCompile(
+		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);$`)
+	perfDataWithMinRegexp = regexp.MustCompile(
+		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);(?P<min>.*?)(\D*?);$`)
+	perfDataWithMinMaxRegexp = regexp.MustCompile(
+		`^(?P<label>.*?)=(?P<val>.*?)(?P<unitType>\D*?);(?P<warn>.*?)(\D*?);(?P<crit>.*?)(\D*?);(?P<min>.*?)(\D*?);(?P<max>.*?)(\D*?);$`)
 )
 
 // DataFormat describes incoming payload
@@ -142,57 +146,65 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 
 func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
 	metricsMap := make(map[string][]transit.TimeSeries)
+	re := nscaRegexp
 	for _, metric := range metricsLines {
-		arr := nscaRegexp.FindStringSubmatch(metric)
-		if len(arr) < 5 {
+		match := re.FindStringSubmatch(metric)
+		if len(match) < 5 {
 			return nil, errors.New("invalid metric format")
 		}
-		arr = arr[1:]
-
-		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-		var err error
-		if len(arr) > 5 && arr[0] == "" {
-			arr = arr[1:]
-		} else {
-			timestamp, err = getTime(arr[0])
-			if err != nil {
-				return nil, err
+		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		if ts := match[re.SubexpIndex("ts")]; ts != "" {
+			if t, err := getTime(ts); err == nil {
+				timestamp = t
 			}
 		}
-
-		perfData := arr[len(arr)-1]
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		perfData := match[re.SubexpIndex("perf")]
 		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
-
 		for _, metric := range pdArr {
 			var values []string
+			var label, val, warn, crit string
 			switch len(strings.Split(metric, ";")) {
-			case 4:
-				values = perfDataRegexp.FindStringSubmatch(metric)[1:]
-			case 5:
-				values = perfDataWithMinRegexp.FindStringSubmatch(metric)[1:]
-			case 6:
-				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)[1:]
-			}
-			if len(values) < 4 {
+			case 0, 1, 2, 3:
 				return nil, errors.New("invalid metric format")
+			case 4:
+				values = perfDataRegexp.FindStringSubmatch(metric)
+				label = values[perfDataRegexp.SubexpIndex("label")]
+				val = values[perfDataRegexp.SubexpIndex("val")]
+				warn = values[perfDataRegexp.SubexpIndex("warn")]
+				crit = values[perfDataRegexp.SubexpIndex("crit")]
+			case 5:
+				values = perfDataWithMinRegexp.FindStringSubmatch(metric)
+				label = values[perfDataWithMinRegexp.SubexpIndex("label")]
+				val = values[perfDataWithMinRegexp.SubexpIndex("val")]
+				warn = values[perfDataWithMinRegexp.SubexpIndex("warn")]
+				crit = values[perfDataWithMinRegexp.SubexpIndex("crit")]
+			case 6:
+				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)
+				label = values[perfDataWithMinMaxRegexp.SubexpIndex("label")]
+				val = values[perfDataWithMinMaxRegexp.SubexpIndex("val")]
+				warn = values[perfDataWithMinMaxRegexp.SubexpIndex("warn")]
+				crit = values[perfDataWithMinMaxRegexp.SubexpIndex("crit")]
 			}
+
 			var value, warning, critical float64
-			if len(values[1]) > 0 {
-				if v, err := strconv.ParseFloat(values[1], 64); err == nil {
+			if len(val) > 0 {
+				if v, err := strconv.ParseFloat(val, 64); err == nil {
 					value = v
 				} else {
 					return nil, err
 				}
 			}
-			if len(values[2]) > 0 {
-				if w, err := strconv.ParseFloat(values[2], 64); err == nil {
+			if len(warn) > 0 {
+				if w, err := strconv.ParseFloat(warn, 64); err == nil {
 					warning = w
 				} else {
 					return nil, err
 				}
 			}
-			if len(values[3]) > 0 {
-				if c, err := strconv.ParseFloat(values[3], 64); err == nil {
+			if len(crit) > 0 {
+				if c, err := strconv.ParseFloat(crit, 64); err == nil {
 					critical = c
 				} else {
 					return nil, err
@@ -200,7 +212,7 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 			}
 
 			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
-				Name:           values[0],
+				Name:           label,
 				ComputeType:    transit.Query,
 				Value:          value,
 				UnitType:       transit.MB,
@@ -212,103 +224,109 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 			if err != nil {
 				return nil, err
 			}
-			metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])] =
-				append(metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])], *timeSeries)
+			metricsMap[fmt.Sprintf("%s:%s", resName, svcName)] =
+				append(metricsMap[fmt.Sprintf("%s:%s", resName, svcName)], *timeSeries)
 		}
 	}
-
 	return metricsMap, nil
 }
 
 func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
 	servicesMap := make(map[string][]transit.DynamicMonitoredService)
-
+	re := nscaRegexp
 	for _, metric := range metricsLines {
-		arr := nscaRegexp.FindStringSubmatch(metric)
-		if len(arr) < 5 {
+		match := re.FindStringSubmatch(metric)
+		if len(match) < 5 {
 			return nil, errors.New("invalid metric format")
 		}
-		arr = arr[1:]
-
-		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-		var err error
-		if len(arr) > 5 && arr[0] == "" {
-			arr = arr[1:]
-		} else {
-			timestamp, err = getTime(arr[0])
-			if err != nil {
-				return nil, err
+		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		if ts := match[re.SubexpIndex("ts")]; ts != "" {
+			if t, err := getTime(ts); err == nil {
+				timestamp = t
 			}
 		}
-
-		status, err := getStatus(arr[len(arr)-3])
+		status, err := getStatus(match[re.SubexpIndex("status")])
 		if err != nil {
 			return nil, err
 		}
-
-		servicesMap[arr[len(arr)-5]] = append(servicesMap[arr[len(arr)-5]], transit.DynamicMonitoredService{
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		msg := match[re.SubexpIndex("msg")]
+		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
-				Name:  arr[len(arr)-4],
+				Name:  svcName,
 				Type:  transit.Service,
-				Owner: arr[len(arr)-5],
+				Owner: resName,
 			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
-			LastPlugInOutput: arr[len(arr)-2],
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[len(arr)-5], arr[len(arr)-4])],
+			LastPlugInOutput: msg,
+			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
-
 	return removeDuplicateServices(servicesMap), nil
 }
 
 func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
 	metricsMap := make(map[string][]transit.TimeSeries)
+	re := bronxRegexp
 	for _, metric := range metricsLines {
-		arr := bronxRegexp.FindStringSubmatch(metric)
-		if len(arr) != 8 {
+		match := re.FindStringSubmatch(metric)
+		if len(match) != 8 {
 			return nil, errors.New("invalid metric format")
 		}
-		arr = arr[1:]
-
-		timestamp, err := getTime(arr[1])
+		timestamp, err := getTime(match[re.SubexpIndex("ts")])
 		if err != nil {
 			return nil, err
 		}
-
-		perfData := arr[6]
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		perfData := match[re.SubexpIndex("perf")]
 		pdArr := strings.Split(strings.TrimSpace(perfData), " ")
 		for _, metric := range pdArr {
 			var values []string
+			var label, val, warn, crit string
 			switch len(strings.Split(metric, ";")) {
-			case 4:
-				values = perfDataRegexp.FindStringSubmatch(metric)[1:]
-			case 5:
-				values = perfDataWithMinRegexp.FindStringSubmatch(metric)[1:]
-			case 6:
-				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)[1:]
-			}
-			if len(values) < 4 {
+			case 0, 1, 2, 3:
 				return nil, errors.New("invalid metric format")
+			case 4:
+				values = perfDataRegexp.FindStringSubmatch(metric)
+				label = values[perfDataRegexp.SubexpIndex("label")]
+				val = values[perfDataRegexp.SubexpIndex("val")]
+				warn = values[perfDataRegexp.SubexpIndex("warn")]
+				crit = values[perfDataRegexp.SubexpIndex("crit")]
+			case 5:
+				values = perfDataWithMinRegexp.FindStringSubmatch(metric)
+				label = values[perfDataWithMinRegexp.SubexpIndex("label")]
+				val = values[perfDataWithMinRegexp.SubexpIndex("val")]
+				warn = values[perfDataWithMinRegexp.SubexpIndex("warn")]
+				crit = values[perfDataWithMinRegexp.SubexpIndex("crit")]
+			case 6:
+				values = perfDataWithMinMaxRegexp.FindStringSubmatch(metric)
+				label = values[perfDataWithMinMaxRegexp.SubexpIndex("label")]
+				val = values[perfDataWithMinMaxRegexp.SubexpIndex("val")]
+				warn = values[perfDataWithMinMaxRegexp.SubexpIndex("warn")]
+				crit = values[perfDataWithMinMaxRegexp.SubexpIndex("crit")]
 			}
+
 			var value, warning, critical float64
-			if len(values[1]) > 0 {
-				if v, err := strconv.ParseFloat(values[1], 64); err == nil {
+			if len(val) > 0 {
+				if v, err := strconv.ParseFloat(val, 64); err == nil {
 					value = v
 				} else {
 					return nil, err
 				}
 			}
-			if len(values[2]) > 0 {
-				if w, err := strconv.ParseFloat(values[2], 64); err == nil {
+			if len(warn) > 0 {
+				if w, err := strconv.ParseFloat(warn, 64); err == nil {
 					warning = w
 				} else {
 					return nil, err
 				}
 			}
-			if len(values[3]) > 0 {
-				if c, err := strconv.ParseFloat(values[3], 64); err == nil {
+			if len(crit) > 0 {
+				if c, err := strconv.ParseFloat(crit, 64); err == nil {
 					critical = c
 				} else {
 					return nil, err
@@ -316,7 +334,7 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 			}
 
 			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
-				Name:           values[0],
+				Name:           label,
 				ComputeType:    transit.Query,
 				Value:          value,
 				UnitType:       transit.MB,
@@ -328,8 +346,8 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 			if err != nil {
 				return nil, err
 			}
-			metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])] =
-				append(metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])], *timeSeries)
+			metricsMap[fmt.Sprintf("%s:%s", resName, svcName)] =
+				append(metricsMap[fmt.Sprintf("%s:%s", resName, svcName)], *timeSeries)
 		}
 	}
 	return metricsMap, nil
@@ -337,37 +355,36 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 
 func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
 	servicesMap := make(map[string][]transit.DynamicMonitoredService)
+	re := bronxRegexp
 	for _, metric := range metricsLines {
-		arr := bronxRegexp.FindStringSubmatch(metric)
-		if len(arr) != 8 {
+		match := re.FindStringSubmatch(metric)
+		if len(match) != 8 {
 			return nil, errors.New("invalid metric format")
 		}
-		arr = arr[1:]
-
-		timestamp, err := getTime(arr[1])
+		timestamp, err := getTime(match[re.SubexpIndex("ts")])
 		if err != nil {
 			return nil, err
 		}
-
-		status, err := getStatus(arr[4])
+		status, err := getStatus(match[re.SubexpIndex("status")])
 		if err != nil {
 			return nil, err
 		}
-
-		servicesMap[arr[2]] = append(servicesMap[arr[2]], transit.DynamicMonitoredService{
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		msg := match[re.SubexpIndex("msg")]
+		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
-				Name:  arr[3],
+				Name:  svcName,
 				Type:  transit.Service,
-				Owner: arr[2],
+				Owner: resName,
 			},
 			Status:           status,
 			LastCheckTime:    *timestamp,
 			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
-			LastPlugInOutput: arr[5],
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", arr[2], arr[3])],
+			LastPlugInOutput: msg,
+			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
-
 	return removeDuplicateServices(servicesMap), nil
 }
 
