@@ -39,6 +39,9 @@ const (
 	NSCAAlt DataFormat = "nsca-alt"
 )
 
+type MetricsMap map[string][]transit.TimeSeries
+type ServicesMap map[string][]transit.DynamicMonitoredService
+
 func ProcessMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
 	var (
 		ctxN               context.Context
@@ -71,8 +74,8 @@ func parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 
 	var (
 		monitoredResources        []transit.DynamicMonitoredResource
-		serviceNameToMetricsMap   map[string][]transit.TimeSeries
-		resourceNameToServicesMap map[string][]transit.DynamicMonitoredService
+		serviceNameToMetricsMap   MetricsMap
+		resourceNameToServicesMap ServicesMap
 		err                       error
 	)
 
@@ -144,8 +147,8 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 	}
 }
 
-func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
-	metricsMap := make(map[string][]transit.TimeSeries)
+func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
+	metricsMap := make(MetricsMap)
 	re := nscaRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
@@ -231,8 +234,8 @@ func getNscaMetrics(metricsLines []string) (map[string][]transit.TimeSeries, err
 	return metricsMap, nil
 }
 
-func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
-	servicesMap := make(map[string][]transit.DynamicMonitoredService)
+func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap, error) {
+	servicesMap := make(ServicesMap)
 	re := nscaRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
@@ -268,8 +271,8 @@ func getNscaServices(metricsMap map[string][]transit.TimeSeries, metricsLines []
 	return removeDuplicateServices(servicesMap), nil
 }
 
-func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, error) {
-	metricsMap := make(map[string][]transit.TimeSeries)
+func getBronxMetrics(metricsLines []string) (MetricsMap, error) {
+	metricsMap := make(MetricsMap)
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
@@ -353,8 +356,8 @@ func getBronxMetrics(metricsLines []string) (map[string][]transit.TimeSeries, er
 	return metricsMap, nil
 }
 
-func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines []string) (map[string][]transit.DynamicMonitoredService, error) {
-	servicesMap := make(map[string][]transit.DynamicMonitoredService)
+func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap, error) {
+	servicesMap := make(ServicesMap)
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
@@ -388,7 +391,7 @@ func getBronxServices(metricsMap map[string][]transit.TimeSeries, metricsLines [
 	return removeDuplicateServices(servicesMap), nil
 }
 
-func removeDuplicateServices(servicesMap map[string][]transit.DynamicMonitoredService) map[string][]transit.DynamicMonitoredService {
+func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
 	for key, value := range servicesMap {
 		keys := make(map[string]bool)
 		var list []transit.DynamicMonitoredService
