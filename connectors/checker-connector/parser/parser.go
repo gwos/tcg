@@ -103,19 +103,35 @@ func parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 		return nil, err
 	}
 
-	for key, value := range resourceNameToServicesMap {
-		monitoredResources = append(monitoredResources, transit.DynamicMonitoredResource{
+	for resName, services := range resourceNameToServicesMap {
+		res := transit.DynamicMonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
-					Name: key,
+					Name: resName,
 					Type: transit.Host,
 				},
 			},
-			Status:        connectors.CalculateResourceStatus(value),
-			LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)},
-			Services:      value,
-		})
+			Services: make([]transit.DynamicMonitoredService, 0, len(services)),
+		}
+		/* filter and apply host-check results */
+		resFlag := false
+		for _, svc := range services {
+			if svc.Name == "" {
+				resFlag = true
+				res.LastPlugInOutput = svc.LastPlugInOutput
+				res.LastCheckTime = svc.LastCheckTime
+				res.NextCheckTime = svc.NextCheckTime
+				res.Status = svc.Status
+				continue
+			}
+			res.Services = append(res.Services, svc)
+		}
+		if !resFlag {
+			res.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
+			res.NextCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
+			res.Status = connectors.CalculateResourceStatus(res.Services)
+		}
+		monitoredResources = append(monitoredResources, res)
 	}
 
 	return &monitoredResources, nil
@@ -276,7 +292,7 @@ func getBronxMetrics(metricsLines []string) (MetricsMap, error) {
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) != 8 {
+		if len(match) != 9 {
 			return nil, errors.New("invalid metric format")
 		}
 		timestamp, err := getTime(match[re.SubexpIndex("ts")])
@@ -361,7 +377,7 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
-		if len(match) != 8 {
+		if len(match) != 9 {
 			return nil, errors.New("invalid metric format")
 		}
 		timestamp, err := getTime(match[re.SubexpIndex("ts")])

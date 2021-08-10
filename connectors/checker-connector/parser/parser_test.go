@@ -82,3 +82,30 @@ S;1628530909;awips-demo-2;example-service-7;0;OK - example-service-7 (2021-08-09
 		}
 	}
 }
+
+func TestBronxParser2(t *testing.T) {
+	data := []byte(
+`H;1628546296;awips-demo-2;0;UP - awips-demo-2 (2021-08-09 21:58:16 :: 1628546296) | result=21ms;;;0;
+S;1628546296;awips-demo-2;example-service;0;OK - example-service (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
+S;1628546296;awips-demo-2;example-service-1;0;OK - example-service-1 (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
+S;1628546296;awips-demo-2;example-service-2;0;OK - example-service-2 (2021-08-09 21:58:16 :: 1628546296) | result=84ms;;;0;
+S;1628546296;awips-demo-2;example-service-3;0;OK - example-service-3 (2021-08-09 21:58:16 :: 1628546296) | result=42ms;;;0;
+S;1628546296;awips-demo-2;example-service-4;0;OK - example-service-4 (2021-08-09 21:58:16 :: 1628546296) | result=147ms;;;0;
+S;1628546296;awips-demo-2;example-service-5;0;OK - example-service-5 (2021-08-09 21:58:16 :: 1628546296) | result=63ms;;;0;`,
+	)
+
+	monitoredResources, err := parse(data, Bronx)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(*monitoredResources), "invalid count of monitored resources")
+
+	for _, res := range *monitoredResources {
+		switch res.Name {
+		case "awips-demo-2":
+			assert.Equal(t, 6, len(res.Services), "invalid count of services for monitored resource")
+			assert.Equal(t, 1, len(res.Services[0].Metrics), "invalid count of metrics for service")
+		default:
+			assert.Fail(t, "invalid service in monitored resources")
+		}
+	}
+}
