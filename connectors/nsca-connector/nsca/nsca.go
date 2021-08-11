@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/connectors/checker-connector/parser"
+	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tubemogul/nscatools"

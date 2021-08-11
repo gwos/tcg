@@ -36,7 +36,7 @@ RUN sh -x \
     && for d in ./connectors/*connector/; \
     do  cd "$d"; pwd; \
         CGO_ENABLED=0; \
-        if [[ "$d" == *checker* ]] ; then CGO_ENABLED=1; fi; \
+        if [[ "$d" == *nsca* ]] ; then CGO_ENABLED=1; fi; \
         echo "CGO_ENABLED:$CGO_ENABLED"; \
         CGO_ENABLED=$CGO_ENABLED go build -ldflags "$ldflags" . \
         && name=$(ls *connector) \

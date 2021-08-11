@@ -6,8 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/connectors/checker-connector/nsca"
-	"github.com/gwos/tcg/connectors/checker-connector/parser"
+	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
@@ -28,8 +27,6 @@ var (
 			cron.SkipIfStillRunning(cron.DefaultLogger),
 		),
 	)
-
-	nscaCancel context.CancelFunc
 )
 
 // @title TCG API Documentation
@@ -38,14 +35,9 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	services.GetController().RegisterEntrypoints(initializeEntrypoints())
-
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
-		if nscaCancel != nil {
-			nscaCancel()
-		}
 		if sch != nil {
 			sch.Stop()
 		}
@@ -60,10 +52,6 @@ func main() {
 		log.Err(err).Msg("could not start connector")
 		return
 	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	nscaCancel = cancel
-	nsca.Start(ctx)
 
 	/* return on quit signal */
 	<-transitService.Quit()
