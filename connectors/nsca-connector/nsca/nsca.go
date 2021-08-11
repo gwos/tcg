@@ -85,11 +85,7 @@ func Start(ctx context.Context) {
 		nscaPassword = nscaEnvPassword
 	}
 
-	// stdlog.SetOutput(log.Logger)
-	// nscatools.StartServer(
-	// 	nscatools.NewConfig(nscaHost, nscaPort, nscaEncrypt, nscaPassword, Handler),
-	// 	true)
-	StartServerWithContext(ctx,
+	go StartServerWithContext(ctx,
 		NewConfigExt(nscaHost, nscaPort, nscaEncrypt, nscaPassword, Handler))
 }
 
