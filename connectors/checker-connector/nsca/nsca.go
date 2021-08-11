@@ -149,7 +149,7 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 
 	// Retrieves the data from the client
 	data := nscatools.NewDataPacket(conf.EncryptionMethod, []byte(conf.Password), ipacket)
-	dp := &DataPacketExt{*data, []byte{}}
+	dp := &DataPacketExt{*data}
 	if err = dp.Read(conn); err != nil {
 		log.Err(err).Msg("unable to read the data packet")
 		return err
@@ -175,7 +175,6 @@ func NewConfigExt(host string, port uint16, encryption int, password string, han
 
 type DataPacketExt struct {
 	nscatools.DataPacket
-	fullPacket []byte
 }
 
 func (p *DataPacketExt) Read(conn io.Reader) error {
@@ -196,12 +195,11 @@ func (p *DataPacketExt) Read(conn io.Reader) error {
 	log.Debug().
 		Bytes("fullPacket", fullPacket).
 		Msg("reading nscatools.DataPacket")
-	p.fullPacket = append(p.fullPacket, fullPacket...)
 
 	p.Crc = binary.BigEndian.Uint32(fullPacket[4:8])
-	// if crc32 := p.CalculateCrc(fullPacket); p.Crc != crc32 {
-	// 	return fmt.Errorf("Dropping packet with invalid CRC32 - possibly due to client using wrong password or crypto algorithm?")
-	// }
+	if crc32 := p.CalculateCrc(fullPacket); p.Crc != crc32 {
+		return fmt.Errorf("invalid CRC32: possibly due to mismatch password or crypto algorithm")
+	}
 
 	p.Timestamp = binary.BigEndian.Uint32(fullPacket[8:12])
 	// MaxPacketAge <= 0 means that we don't check it
