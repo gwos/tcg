@@ -140,9 +140,7 @@ func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	i *= int64(time.Millisecond)
-	return &milliseconds.MillisecondTimestamp{Time: time.Unix(0, i)}, nil
+	return &milliseconds.MillisecondTimestamp{Time: time.Unix(i, 0)}, nil
 }
 
 func getStatus(str string) (transit.MonitorStatus, error) {
