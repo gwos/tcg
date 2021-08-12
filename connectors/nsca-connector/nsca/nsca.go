@@ -45,7 +45,7 @@ func Handler(p *DataPacketExt) error {
 		Str("pluginOutput", p.PluginOutput).
 		Bytes("buf", buf).
 		Func(func(e *zerolog.Event) {
-			println("##plain")
+			println("# NSCA plain packet #")
 			println(string(buf))
 		}).
 		Msg("processing DataPacket")
@@ -188,9 +188,10 @@ func (p *DataPacketExt) Read(conn io.Reader) error {
 		return err
 	}
 
-	log.Debug().
-		Bytes("fullPacket", fullPacket).
-		Msg("reading nscatools.DataPacket")
+	log.Debug().Func(func(e *zerolog.Event) {
+		println("# NSCA fullPacket #")
+		println(string(fullPacket))
+	}).Send()
 
 	p.Crc = binary.BigEndian.Uint32(fullPacket[4:8])
 	if crc32 := p.CalculateCrc(fullPacket); p.Crc != crc32 {
