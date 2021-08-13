@@ -14,7 +14,7 @@ Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.0
 awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :: 1628524058) | result=147ms;;;0;`,
 	)
 
-	monitoredResources, err := parse(data, NSCA)
+	monitoredResources, err := Parse(data, NSCA)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 4, len(*monitoredResources), "invalid count of monitored resources")
@@ -56,7 +56,7 @@ S;1628530909;awips-demo-2;example-service-6;0;OK - example-service-6 (2021-08-09
 S;1628530909;awips-demo-2;example-service-7;0;OK - example-service-7 (2021-08-09 17:41:49 :: 1628530909) | result=63ms;;;0;`,
 	)
 
-	monitoredResources, err := parse(data, Bronx)
+	monitoredResources, err := Parse(data, Bronx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 4, len(*monitoredResources), "invalid count of monitored resources")
@@ -94,7 +94,7 @@ S;1628546296;awips-demo-2;example-service-4;0;OK - example-service-4 (2021-08-09
 S;1628546296;awips-demo-2;example-service-5;0;OK - example-service-5 (2021-08-09 21:58:16 :: 1628546296) | result=63ms;;;0;`,
 	)
 
-	monitoredResources, err := parse(data, Bronx)
+	monitoredResources, err := Parse(data, Bronx)
 	assert.NoError(t, err)
 
 	assert.Equal(t, 1, len(*monitoredResources), "invalid count of monitored resources")

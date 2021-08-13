@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"regexp"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 )
 
@@ -42,32 +40,7 @@ const (
 type MetricsMap map[string][]transit.TimeSeries
 type ServicesMap map[string][]transit.DynamicMonitoredService
 
-func ProcessMetrics(ctx context.Context, payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
-	var (
-		ctxN               context.Context
-		err                error
-		monitoredResources *[]transit.DynamicMonitoredResource
-		span               services.TraceSpan
-	)
-
-	ctxN, span = services.StartTraceSpan(ctx, "connectors", "parseBody")
-	monitoredResources, err = parse(payload, dataFormat)
-
-	services.EndTraceSpan(span,
-		services.TraceAttrError(err),
-		services.TraceAttrPayloadLen(payload),
-	)
-
-	if err != nil {
-		return nil, err
-	}
-	if err := connectors.SendMetrics(ctxN, *monitoredResources, nil); err != nil {
-		return nil, err
-	}
-	return monitoredResources, nil
-}
-
-func parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
+func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (

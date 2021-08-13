@@ -40,7 +40,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	nscaCancel = cancel
-	nsca.Start(ctx)
+	nsca.Start(ctx, makeNSCAHandler())
 
 	/* return on quit signal */
 	<-transitService.Quit()

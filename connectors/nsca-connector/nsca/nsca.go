@@ -13,53 +13,54 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/tubemogul/nscatools"
 )
 
-func Handler(p *DataPacketExt) error {
+func AdaptHandler(h func([]byte) error) DataHandler {
 	// It's unclear for now how to process multi-line metrics in the right way.
 	// The nscatools.DataPacket provides host, service, and state info for the 1st line only.
 	// And PluginOutput contains the rest.
 	// The `fullPacket` payload that processed in the HandleClient() by nscatools.DataPacket.Read()
 	// contains a lot of noise and looks like protocol defined structure.
 	// So, here we try to reconstruct plain metrics payload and process it with own parser.
-	s := strings.Replace(p.PluginOutput, `\n`, "\n", -1)
-	buf := make([]byte, 0, 4+len(p.HostName)+len(p.Service)+len(s))
-	buf = append(buf, p.HostName...)
-	buf = append(buf, ';')
-	buf = append(buf, p.Service...)
-	buf = append(buf, ';')
-	buf = strconv.AppendInt(buf, int64(p.State), 10)
-	buf = append(buf, ';')
-	buf = append(buf, s...)
-	log.Debug().
-		Int16("version", p.Version).
-		Uint32("crc", p.Crc).
-		Uint32("timestamp", p.Timestamp).
-		Int16("state", p.State).
-		Str("hostname", p.HostName).
-		Str("service", p.Service).
-		Str("pluginOutput", p.PluginOutput).
-		Bytes("buf", buf).
-		Func(func(e *zerolog.Event) {
-			println("# NSCA plain packet #")
-			println(string(buf))
-		}).
-		Msg("processing DataPacket")
-
-	_, err := parser.ProcessMetrics(context.Background(), buf, parser.NSCA)
-	if err != nil {
-		log.Warn().Err(err).
+	return func(p *DataPacketExt) error {
+		s := strings.Replace(p.PluginOutput, `\n`, "\n", -1)
+		buf := make([]byte, 0, 4+len(p.HostName)+len(p.Service)+len(s))
+		buf = append(buf, p.HostName...)
+		buf = append(buf, ';')
+		buf = append(buf, p.Service...)
+		buf = append(buf, ';')
+		buf = strconv.AppendInt(buf, int64(p.State), 10)
+		buf = append(buf, ';')
+		buf = append(buf, s...)
+		log.Debug().
+			Int16("version", p.Version).
+			Uint32("crc", p.Crc).
+			Uint32("timestamp", p.Timestamp).
+			Int16("state", p.State).
+			Str("hostname", p.HostName).
+			Str("service", p.Service).
+			Str("pluginOutput", p.PluginOutput).
 			Bytes("buf", buf).
-			Msg("could not process metrics")
+			Func(func(e *zerolog.Event) {
+				println("# NSCA plain packet #")
+				println(string(buf))
+			}).
+			Msg("processing DataPacket")
+
+		err := h(buf)
+		if err != nil {
+			log.Warn().Err(err).
+				Bytes("payload", buf).
+				Msg("could not process incoming data")
+		}
+		return nil
 	}
-	return err
 }
 
-func Start(ctx context.Context) {
+func Start(ctx context.Context, handler DataHandler) {
 	nscaHost := "0.0.0.0"
 	nscaPort := uint16(5667)
 	nscaEncrypt := nscatools.EncryptNone
@@ -86,7 +87,7 @@ func Start(ctx context.Context) {
 	}
 
 	go StartServerWithContext(ctx,
-		NewConfigExt(nscaHost, nscaPort, nscaEncrypt, nscaPassword, Handler))
+		NewConfigExt(nscaHost, nscaPort, nscaEncrypt, nscaPassword, handler))
 }
 
 func StartServerWithContext(ctx context.Context, conf *ConfigExt) error {
@@ -156,14 +157,14 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 	return err
 }
 
-type dataHandler func(*DataPacketExt) error
+type DataHandler func(*DataPacketExt) error
 
 type ConfigExt struct {
 	nscatools.Config
-	PacketHandler dataHandler
+	PacketHandler DataHandler
 }
 
-func NewConfigExt(host string, port uint16, encryption int, password string, handler dataHandler) *ConfigExt {
+func NewConfigExt(host string, port uint16, encryption int, password string, handler DataHandler) *ConfigExt {
 	c := nscatools.NewConfig(host, port, encryption, password, nil)
 	cfg := ConfigExt{*c, handler}
 	return &cfg
