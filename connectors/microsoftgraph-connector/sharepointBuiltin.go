@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/zerolog/log"
+	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
@@ -18,7 +20,7 @@ const (
 // Site
 // Subsite
 // Challenge: where to store parameters
-func SharePoint(service *transit.DynamicMonitoredService, token string, sharePointSite string, sharePointSubSite string) (err error) {
+func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite, sharePointSubSite string) (err error) {
 	var (
 		c       int
 		body    []byte
@@ -35,24 +37,49 @@ func SharePoint(service *transit.DynamicMonitoredService, token string, sharePoi
 	if body, err = ExecuteRequest(graphUri, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
+		log.Error().Msgf("%v", err)
 		return
 	}
 
 	if c, err = getCount(v); err == nil {
 		for i := 0; i < c; i++ {
 			sku1, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].name", i), v)
-			total1, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].quota.total", i), v)
-			remaining1, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].quota.remaining", i), v)
+			totalValue, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].quota.total", i), v)
+			remainingValue, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].quota.remaining", i), v)
+			freeValue := 100 - (totalValue.(float64) / remainingValue.(float64))
 
-			total := createMetric(sku1.(string), "-total", total1.(float64))
-			remaining := createMetric(sku1.(string), "-remaining", remaining1.(float64))
+			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.total"); ok {
+				total := createMetricWithThresholds(
+					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
+					".total",
+					totalValue.(float64),
+					float64(definition.WarningThreshold),
+					float64(definition.CriticalThreshold),
+				)
+				service.Metrics = append(service.Metrics, *total)
+			}
 
-			free := 100 - (total1.(float64) / remaining1.(float64))
-			free1 := createMetricWithThresholds(sku1.(string), "-free", free, 15, 5)
+			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.remaining"); ok {
+				remaining := createMetricWithThresholds(
+					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
+					".remaining",
+					remainingValue.(float64),
+					float64(definition.WarningThreshold),
+					float64(definition.CriticalThreshold),
+				)
+				service.Metrics = append(service.Metrics, *remaining)
+			}
 
-			service.Metrics = append(service.Metrics, *total)
-			service.Metrics = append(service.Metrics, *remaining)
-			service.Metrics = append(service.Metrics, *free1)
+			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.free"); ok {
+				free := createMetricWithThresholds(
+					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
+					".free",
+					freeValue,
+					float64(definition.WarningThreshold),
+					float64(definition.CriticalThreshold),
+				)
+				service.Metrics = append(service.Metrics, *free)
+			}
 
 			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
 		}

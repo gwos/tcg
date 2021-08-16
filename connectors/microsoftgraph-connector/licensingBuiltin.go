@@ -29,14 +29,29 @@ func AddonLicenseMetrics(service *transit.DynamicMonitoredService, token string)
 	if c, err = getCount(v); err == nil {
 		for i := 0; i < c; i++ {
 			sku, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].skuPartNumber", i), v)
-			consumed, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].consumedUnits", i), v)
-			prepaid, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].prepaidUnits.enabled", i), v)
 
-			metric1 := createMetric(sku.(string), "-licences-prepaid", prepaid.(float64))
-			service.Metrics = append(service.Metrics, *metric1)
+			if definition, ok := contains(metricsProfile.Metrics, "licences.prepaid"); ok {
+				prepaid, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].prepaidUnits.enabled", i), v)
+				metric := createMetricWithThresholds(
+					sku.(string), ".licences.prepaid",
+					prepaid.(float64),
+					float64(definition.WarningThreshold),
+					float64(definition.CriticalThreshold),
+				)
+				service.Metrics = append(service.Metrics, *metric)
+			}
 
-			metric2 := createMetric(sku.(string), "-licences-consumed", consumed.(float64))
-			service.Metrics = append(service.Metrics, *metric2)
+			if definition, ok := contains(metricsProfile.Metrics, "licences.consumed"); ok {
+				consumed, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].consumedUnits", i), v)
+				metric := createMetricWithThresholds(
+					sku.(string),
+					".licences.consumed",
+					consumed.(float64),
+					float64(definition.WarningThreshold),
+					float64(definition.CriticalThreshold),
+				)
+				service.Metrics = append(service.Metrics, *metric)
+			}
 		}
 	}
 

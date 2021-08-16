@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
+	"github.com/gwos/tcg/services"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gwos/tcg/connectors"
@@ -94,11 +98,11 @@ var (
 	clientSecret            = "" // The secret key of the registered app
 	enableOneDriveMetrics   = false
 	enableLicensingMetrics  = false
-	enableSharePointMetrics = false
-	enableEmailMetrics      = false
+	enableSharePointMetrics = true
+	enableEmailMetrics      = true
 	enableSecurityMetrics   = false
-	sharePointSite          = ""
-	sharePointSubSite       = ""
+	sharePointSite          = "gwosjoey.sharepoint.com"
+	sharePointSubSite       = "GWOS"
 	outlookEmailAddress     = ""
 )
 
@@ -113,21 +117,22 @@ const (
 	interacApp        = "Office365Graph"
 )
 
-func (connector *MicrosoftGraphConnector) SetCredentials(tenant string, client string, secret string) {
+func (connector *MicrosoftGraphConnector) SetCredentials(tenant, client, secret string) {
 	tenantID = tenant
 	clientID = client
 	clientSecret = secret
 }
 
-func (connector *MicrosoftGraphConnector) SetOptions(oneDriveMetrics bool, licensingMetrics bool, sharePointMetrics bool, emailMetrics bool,
-	securityMetrics bool, sharePointSiteParam string, sharePointSubSiteParam string, outlookEmailAddressParam string) {
+func (connector *MicrosoftGraphConnector) SetOptions(oneDriveMetrics, licensingMetrics, sharePointMetrics, emailMetrics, securityMetrics bool,
+	sharePointSiteParam, sharePointSubSiteParam, outlookEmailAddressParam string) {
+
 	enableOneDriveMetrics = oneDriveMetrics
 	enableLicensingMetrics = licensingMetrics
 	enableSharePointMetrics = sharePointMetrics
 	enableEmailMetrics = emailMetrics
 	enableSecurityMetrics = securityMetrics
-	sharePointSite = sharePointSiteParam
-	sharePointSubSite = sharePointSubSiteParam
+	// sharePointSite = sharePointSiteParam
+	// sharePointSubSite = sharePointSubSiteParam
 	outlookEmailAddress = outlookEmailAddressParam
 }
 
@@ -438,4 +443,65 @@ func (connector *MicrosoftGraphConnector) translateServiceStatus(odStatus string
 		message = "A corrective action is in progress to restore service to most users but will take some time to reach all the affected systems"
 	}
 	return status, message
+}
+
+func contains(metricDefinitions []transit.MetricDefinition, name string) (*transit.MetricDefinition, bool) {
+	for _, v := range metricDefinitions {
+		if v.Name == name {
+			return &v, true
+		}
+	}
+	return nil, false
+}
+
+// initializeEntrypoints - function for setting entrypoints,
+// that will be available through the Server Connector API
+func initializeEntrypoints() []services.Entrypoint {
+	return []services.Entrypoint{
+		{
+			URL:    "/suggest/:viewName",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, availableMetrics()[c.Param("viewName")])
+			},
+		},
+		{
+			URL:    "/suggest/:viewName/:name",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, listSuggestions(c.Param("viewName"), c.Param("name")))
+			},
+		},
+	}
+}
+
+func listSuggestions(viewName, name string) (result []string) {
+	for _, metricName := range availableMetrics()[viewName] {
+		if strings.Contains(metricName, name) {
+			result = append(result, metricName)
+		}
+	}
+
+	return result
+}
+
+var availableMetrics = func() map[string][]string {
+	return map[string][]string{
+		"OneDrive": {
+			"onedrive.total",
+			"onedrive.remaining",
+			"onedrive.free",
+		},
+		"SharePoint": {
+			"sharepoint.total",
+			"sharepoint.remaining",
+		},
+		"Licensing": {
+			"subscriptions.prepaid",
+			"subscriptions.consumed",
+		},
+		"Email": {
+			"unread.emails",
+		},
+	}
 }

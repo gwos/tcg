@@ -10,11 +10,16 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
+)
+
+const (
+	masRetries = 5
 )
 
 var httpClient = &http.Client{
@@ -23,7 +28,7 @@ var httpClient = &http.Client{
 	},
 }
 
-func login(tenantID string, clientID string, clientSecret string, resource string) (str string, err error) {
+func login(tenantID, clientID, clientSecret, resource string) (str string, err error) {
 	var (
 		responseBody []byte
 		body         io.Reader
@@ -91,7 +96,7 @@ func Initialize() error {
 	return nil
 }
 
-func ExecuteRequest(graphUri string, token string) ([]byte, error) {
+func ExecuteRequest(graphUri, token string) ([]byte, error) {
 	request, _ := http.NewRequest("GET", graphUri, nil)
 	request.Header.Set("accept", "application/json; odata.metadata=full")
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -126,8 +131,17 @@ func ExecuteRequest(graphUri string, token string) ([]byte, error) {
 }
 
 func Do(request *http.Request) (*http.Response, error) {
-	// TODO: retry logics
-	return httpClient.Do(request)
+	response, err := httpClient.Do(request)
+	var counter = 1
+	for response.StatusCode != 200 && response.StatusCode != 401 {
+		time.Sleep(time.Duration(counter) * time.Second)
+		response, err = httpClient.Do(request)
+		counter++
+		if counter == masRetries+1 {
+			return response, err
+		}
+	}
+	return response, err
 }
 
 func parseError(v interface{}) error {
@@ -144,7 +158,7 @@ func parseError(v interface{}) error {
 	return nil
 }
 
-func createMetric(name string, suffix string, value interface{}) *transit.TimeSeries {
+func createMetric(name, suffix string, value interface{}) *transit.TimeSeries {
 	return createMetricWithThresholds(name, suffix, value, -1, -1)
 }
 

@@ -23,24 +23,6 @@
         "extensions": {}
       },
       {
-        "name": "onedrive.total",
-        "customName": "",
-        "description": "One Drive Total Disk Space",
-        "monitored": true,
-        "graphed": true,
-        "metricType": "Gauge",
-        "computeType": "Query",
-        "serviceType": "OneDrive",
-        "sourceType": "built-in",
-        "aggregateType": "",
-        "warningThreshold": -1,
-        "criticalThreshold": -1,
-        "expression": "$.quota.total",
-        "format": "",
-        "filters": [],
-        "extensions": {}
-      },
-      {
         "name": "onedrive.remaining",
         "customName": "",
         "description": "",
@@ -108,8 +90,8 @@
         "serviceType": "SharePoint",
         "sourceType": "built-in",
         "aggregateType": "",
-        "warningThreshold": -1,
-        "criticalThreshold": -1,
+        "warningThreshold": 10,
+        "criticalThreshold": 100,
         "expression": "$.value[%d].total",
         "format": "",
         "filters": [],
@@ -134,7 +116,7 @@
         "extensions": {}
       },
       {
-        "name": "sharepoint.free",
+        "name": "sharepoint.remaining",
         "customName": "",
         "description": "Percentage of free space per Share Point drive",
         "monitored": true,

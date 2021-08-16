@@ -26,49 +26,35 @@ var (
 )
 
 func main() {
-	// services.GetController().RegisterEntrypoints(initializeEntrypoints())
+	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	/////////////////////////////////////////////////////////////////////////////////////////////
-	// TODO: get these from configuration
-	tenantId := env.GetString("MICROSOFT_TENANT_ID", "NOT SET")
-	clientId := env.GetString("MICROSOFT_CLIENT_ID", "NOT SET")
-	clientSecret := env.GetString("MICROSOFT_CLIENT_SECRET", "NOT SET")
 	// TODO: get these options from configuration (Views)
-	enableOneDriveMetrics, _ := env.GetBool("ENABLE_ONEDRIVE_METRICS", false)
-	enableLicensingMetrics, _ := env.GetBool("ENABLE_LICENSING_METRICS", false)
-	enableSharePointMetrics, _ := env.GetBool("ENABLE_SHAREPOINT_METRICS", false)
-	enableEmailMetrics, _ := env.GetBool("ENABLE_EMAIL_METRICS", false)
-	enableSecurityMetrics, _ := env.GetBool("ENABLE_SECURITY_METRICS", false)
-	sharePointSite := env.GetString("SHAREPOINT_SITE", "")
-	sharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "")
-	outlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "")
-	connector.SetCredentials(tenantId, clientId, clientSecret)
+	//////////////////////////////////////////////////////////////////////////////////////////////////
+	tmpEnableOneDriveMetrics, _ := env.GetBool("ENABLE_ONEDRIVE_METRICS", true)
+	tmpEnableLicensingMetrics, _ := env.GetBool("ENABLE_LICENSING_METRICS", true)
+	tmpEnableSharePointMetrics, _ := env.GetBool("ENABLE_SHAREPOINT_METRICS", true)
+	tmpEnableEmailMetrics, _ := env.GetBool("ENABLE_EMAIL_METRICS", true)
+	tmpEnableSecurityMetrics, _ := env.GetBool("ENABLE_SECURITY_METRICS", true)
+	tmpSharePointSite := env.GetString("SHAREPOINT_SITE", "gwosjoey.sharepoint.com")
+	tmpSharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "GWOS")
+	tmpOutlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "davidt@gwosjoey.onmicrosoft.com")
 
-	//enableOneDriveMetrics = true
-	//enableLicensingMetrics = true
-	//enableSharePointMetrics = true
-	//sharePointSite = "gwosjoey.sharepoint.com"
-	//sharePointSubSite = "GWOS"
-	//enableEmailMetrics = true
-	//outlookEmailAddress = "davidt@gwosjoey.onmicrosoft.com"
-	//enableSecurityMetrics = true
-
-	connector.SetOptions(enableOneDriveMetrics, enableLicensingMetrics, enableSharePointMetrics, enableEmailMetrics,
-		enableSecurityMetrics, sharePointSite, sharePointSubSite, outlookEmailAddress)
+	connector.SetOptions(tmpEnableOneDriveMetrics, tmpEnableLicensingMetrics, tmpEnableSharePointMetrics, tmpEnableEmailMetrics,
+		tmpEnableSecurityMetrics, tmpSharePointSite, tmpSharePointSubSite, tmpOutlookEmailAddress)
 	//////////////////////////////////////////////////////////////////////////////////////////////////
 
-	log.Info().Msg("waiting for configuration to be delivered ...")
+	log.Info().Msg("Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Err(err).Msg("could not demand config")
+		log.Err(err).Msg("Could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Err(err).Msg("could not start connector")
+		log.Err(err).Msg("Could not start connector")
 		return
 	}
 
@@ -97,7 +83,7 @@ func configHandler(data []byte) {
 	for _, metric := range tMetProf.Metrics {
 		// temporary solution, will be removed
 		// TODO: push down into connectors - metric.Monitored breaks synthetics
-		//if tempslateMetricName == metric.Name || !metric.Monitored {
+		//if templateMetricName == metric.Name || !metric.Monitored {
 		//	continue
 		//}
 		if metrics, has := tExt.Views[MicrosoftGraphView(metric.ServiceType)]; has {
@@ -124,6 +110,7 @@ func configHandler(data []byte) {
 		}
 	}
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+
 	// monitorConnection.Extensions = extConfig
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)
@@ -143,7 +130,6 @@ func configHandler(data []byte) {
 }
 
 func periodicHandler() {
-	temporaryMetricsDefinitions() // TODO: remove this when you have provisioning ready
 	inventory, monitored, groups := connector.Collect(extConfig)
 	log.Debug().Msgf("collected %d:%d:%d", len(inventory), len(monitored), len(groups))
 
@@ -157,13 +143,7 @@ func periodicHandler() {
 		log.Err(err).Msg("sending inventory")
 		count = count + 1
 	}
-	time.Sleep(3 * time.Second) // TODO: better way to assure synch completion?
+	time.Sleep(3 * time.Second) // TODO: better way to assure sync completion?
 	err := connectors.SendMetrics(context.Background(), monitored, &groups)
 	log.Err(err).Msg("sending metrics")
-}
-
-// TODO: remove this when you have provisioning ready
-func temporaryMetricsDefinitions() {
-	//bytes, _ := ioutil.ReadFile("/Users/dtaylor/gw8/tcg/connectors/microsoftgraph-connector/microsoftgraph-default.json")
-	//configHandler(bytes)
 }

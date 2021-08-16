@@ -25,9 +25,16 @@ func SecurityAssessments(service *transit.DynamicMonitoredService, token string)
 	}
 
 	if c, err = getCount(v); err == nil {
-		metric := createMetricWithThresholds("security-indicators", "", float64(c), 2, 4)
-		service.Metrics = append(service.Metrics, *metric)
-		service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+		if definition, ok := contains(metricsProfile.Metrics, "security.indicators"); ok {
+			metric := createMetricWithThresholds("security",
+				".indicators",
+				float64(c),
+				float64(definition.WarningThreshold),
+				float64(definition.CriticalThreshold),
+			)
+			service.Metrics = append(service.Metrics, *metric)
+			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+		}
 	}
 
 	return
