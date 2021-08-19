@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/services"
 	"net/http"
@@ -91,19 +90,21 @@ type AuthRecord struct {
 }
 
 var (
-	officeToken             string
-	graphToken              string
-	tenantID                = "" // The Directory ID from Azure AD
-	clientID                = "" // The Application ID of the registered app
-	clientSecret            = "" // The secret key of the registered app
-	enableOneDriveMetrics   = false
-	enableLicensingMetrics  = false
-	enableSharePointMetrics = true
-	enableEmailMetrics      = true
-	enableSecurityMetrics   = false
-	sharePointSite          = "gwosjoey.sharepoint.com"
-	sharePointSubSite       = "GWOS"
-	outlookEmailAddress     = ""
+	officeToken  string
+	graphToken   string
+	tenantID     = "" // The Directory ID from Azure AD
+	clientID     = "" // The Application ID of the registered app
+	clientSecret = "" // The secret key of the registered app
+	viewStateMap = map[string]bool{
+		string(ViewOneDrive):   false,
+		string(ViewLicensing):  false,
+		string(ViewSharePoint): false,
+		string(ViewEmail):      false,
+		string(ViewSecurity):   false,
+	}
+	sharePointSite      = "gwosjoey.sharepoint.com"
+	sharePointSubSite   = "GWOS"
+	outlookEmailAddress = ""
 )
 
 const (
@@ -123,16 +124,9 @@ func (connector *MicrosoftGraphConnector) SetCredentials(tenant, client, secret 
 	clientSecret = secret
 }
 
-func (connector *MicrosoftGraphConnector) SetOptions(oneDriveMetrics, licensingMetrics, sharePointMetrics, emailMetrics, securityMetrics bool,
-	sharePointSiteParam, sharePointSubSiteParam, outlookEmailAddressParam string) {
-
-	enableOneDriveMetrics = oneDriveMetrics
-	enableLicensingMetrics = licensingMetrics
-	enableSharePointMetrics = sharePointMetrics
-	enableEmailMetrics = emailMetrics
-	enableSecurityMetrics = securityMetrics
-	// sharePointSite = sharePointSiteParam
-	// sharePointSubSite = sharePointSubSiteParam
+func (connector *MicrosoftGraphConnector) SetOptions(sharePointSiteParam, sharePointSubSiteParam, outlookEmailAddressParam string) {
+	sharePointSite = sharePointSiteParam
+	sharePointSubSite = sharePointSubSiteParam
 	outlookEmailAddress = outlookEmailAddressParam
 }
 
@@ -167,13 +161,13 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 	index := 0
 	for _, resource := range monitoredState {
 		// convert inventory
-		services := make([]transit.DynamicInventoryService, len(resource.Services))
+		srvs := make([]transit.DynamicInventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
-			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
+			srvs[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
 			serviceIndex = serviceIndex + 1
 		}
-		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
+		inventory[index] = connectors.CreateInventoryResource(resource.Name, srvs)
 		// convert monitored state
 		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
 		serviceIndex = 0
@@ -224,15 +218,14 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	})
 
 	// create one Drive metrics
-	if enableOneDriveMetrics {
+	if viewStateMap[string(ViewOneDrive)] {
 		serviceName := "OneDrive for Business"
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := OneDrive(monitoredService, graphToken)
-		if err == nil && len(monitoredService.Metrics) >= 2 {
-			monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%",
-				monitoredService.Metrics[2].Value.DoubleValue)
+		if err == nil {
+			// monitoredService.LastPlugInOutput = fmt.Sprintf("One Drive free space is %f%%", monitoredService.Metrics[2].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
@@ -247,19 +240,16 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	}
 
 	// create License metrics
-	if enableLicensingMetrics {
+	if viewStateMap[string(ViewLicensing)] {
 		serviceName := "License Activities"
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := AddonLicenseMetrics(monitoredService, graphToken)
 		// TODO: calculate status by threshold
-		monitoredService.Status = transit.ServiceOk
-		if err == nil && len(monitoredService.Metrics) >= 2 {
-			monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f",
-				monitoredService.Metrics[0].Value.DoubleValue, monitoredService.Metrics[1].Value.DoubleValue)
+		if err == nil {
+			// monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f", monitoredService.Metrics[0].Value.DoubleValue, monitoredService.Metrics[1].Value.DoubleValue)
 		} else {
-			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
 				monitoredService.LastPlugInOutput = err.Error()
 			} else {
@@ -272,14 +262,14 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	}
 
 	// create SharePoint metrics
-	if enableSharePointMetrics {
+	if viewStateMap[string(ViewSharePoint)] {
 		serviceName := "SharePoint Online"
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := SharePoint(monitoredService, graphToken, sharePointSite, sharePointSubSite) // TODO: params
-		if err == nil && len(monitoredService.Metrics) >= 2 {
-			monitoredService.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%", monitoredService.Metrics[2].Value.DoubleValue)
+		if err == nil {
+			// monitoredService.LastPlugInOutput = fmt.Sprintf("SharePoint free space is %f%%", monitoredService.Metrics[2].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
@@ -293,16 +283,15 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		}
 	}
 
-	// create email metrics
-	if enableEmailMetrics {
+	// Create Email metrics
+	if viewStateMap[string(ViewEmail)] {
 		serviceName := "Emails"
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := Emails(monitoredService, graphToken, outlookEmailAddress)
-		if err == nil && len(monitoredService.Metrics) >= 1 {
-			monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
-				monitoredService.Metrics[0].Value.DoubleValue)
+		if err == nil {
+			// monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread", monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
@@ -316,15 +305,15 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		}
 	}
 
-	if enableSecurityMetrics {
+	// Create Security metrics
+	if viewStateMap[string(ViewSecurity)] {
 		serviceName := "SecurityIndicators"
 		serviceProperties := make(map[string]interface{})
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := SecurityAssessments(monitoredService, graphToken)
-		if err == nil && len(monitoredService.Metrics) >= 1 {
-			monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread",
-				monitoredService.Metrics[0].Value.DoubleValue)
+		if err == nil {
+			// monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread", monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			if err != nil {
 				monitoredService.LastPlugInOutput = err.Error()
@@ -445,13 +434,22 @@ func (connector *MicrosoftGraphConnector) translateServiceStatus(odStatus string
 	return status, message
 }
 
-func contains(metricDefinitions []transit.MetricDefinition, name string) (*transit.MetricDefinition, bool) {
+func containsMetric(metricDefinitions []transit.MetricDefinition, metricName string) (*transit.MetricDefinition, bool) {
 	for _, v := range metricDefinitions {
-		if v.Name == name {
+		if v.Name == metricName {
 			return &v, true
 		}
 	}
 	return nil, false
+}
+
+func containsView(metricDefinitions []transit.MetricDefinition, viewName string) bool {
+	for _, v := range metricDefinitions {
+		if v.ServiceType == viewName && v.Name != "$view_Template#" {
+			return true
+		}
+	}
+	return false
 }
 
 // initializeEntrypoints - function for setting entrypoints,

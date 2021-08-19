@@ -48,7 +48,7 @@ func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite,
 			remainingValue, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].quota.remaining", i), v)
 			freeValue := 100 - (totalValue.(float64) / remainingValue.(float64))
 
-			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.total"); ok {
+			if definition, ok := containsMetric(metricsProfile.Metrics, "sharepoint.total"); ok {
 				total := createMetricWithThresholds(
 					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
 					".total",
@@ -59,7 +59,7 @@ func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite,
 				service.Metrics = append(service.Metrics, *total)
 			}
 
-			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.remaining"); ok {
+			if definition, ok := containsMetric(metricsProfile.Metrics, "sharepoint.remaining"); ok {
 				remaining := createMetricWithThresholds(
 					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
 					".remaining",
@@ -70,7 +70,7 @@ func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite,
 				service.Metrics = append(service.Metrics, *remaining)
 			}
 
-			if definition, ok := contains(metricsProfile.Metrics, "sharepoint.free"); ok {
+			if definition, ok := containsMetric(metricsProfile.Metrics, "sharepoint.free"); ok {
 				free := createMetricWithThresholds(
 					strings.ToLower(strings.ReplaceAll(sku1.(string), " ", ".")),
 					".free",

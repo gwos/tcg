@@ -33,7 +33,7 @@ func Emails(service *transit.DynamicMonitoredService, token, outlookEmailAddress
 	}
 
 	if c, err = getCount(v); err == nil {
-		if definition, ok := contains(metricsProfile.Metrics, "unread.emails"); ok {
+		if definition, ok := containsMetric(metricsProfile.Metrics, "unread.emails"); ok {
 			metric := createMetricWithThresholds(
 				"unread",
 				".emails",

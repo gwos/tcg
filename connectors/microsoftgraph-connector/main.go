@@ -34,17 +34,11 @@ func main() {
 
 	// TODO: get these options from configuration (Views)
 	//////////////////////////////////////////////////////////////////////////////////////////////////
-	tmpEnableOneDriveMetrics, _ := env.GetBool("ENABLE_ONEDRIVE_METRICS", true)
-	tmpEnableLicensingMetrics, _ := env.GetBool("ENABLE_LICENSING_METRICS", true)
-	tmpEnableSharePointMetrics, _ := env.GetBool("ENABLE_SHAREPOINT_METRICS", true)
-	tmpEnableEmailMetrics, _ := env.GetBool("ENABLE_EMAIL_METRICS", true)
-	tmpEnableSecurityMetrics, _ := env.GetBool("ENABLE_SECURITY_METRICS", true)
 	tmpSharePointSite := env.GetString("SHAREPOINT_SITE", "gwosjoey.sharepoint.com")
 	tmpSharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "GWOS")
 	tmpOutlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "davidt@gwosjoey.onmicrosoft.com")
 
-	connector.SetOptions(tmpEnableOneDriveMetrics, tmpEnableLicensingMetrics, tmpEnableSharePointMetrics, tmpEnableEmailMetrics,
-		tmpEnableSecurityMetrics, tmpSharePointSite, tmpSharePointSubSite, tmpOutlookEmailAddress)
+	connector.SetOptions(tmpSharePointSite, tmpSharePointSubSite, tmpOutlookEmailAddress)
 	//////////////////////////////////////////////////////////////////////////////////////////////////
 
 	log.Info().Msg("Waiting for configuration to be delivered ...")
@@ -110,6 +104,10 @@ func configHandler(data []byte) {
 		}
 	}
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+
+	for k, _ := range viewStateMap {
+		viewStateMap[k] = containsView(metricsProfile.Metrics, k)
+	}
 
 	// monitorConnection.Extensions = extConfig
 	/* Process checksums */

@@ -24,9 +24,9 @@ func OneDrive(service *transit.DynamicMonitoredService, token string) (err error
 
 	total, _ := jsonpath.Get("$.quota.total", v)
 
-	if definition, ok := contains(metricsProfile.Metrics, "onedrive.total"); ok {
+	if definition, ok := containsMetric(metricsProfile.Metrics, "onedrive.total"); ok {
 		metric1 := createMetricWithThresholds(
-			"onedrive.total",
+			"onedrive",
 			".total",
 			total.(float64),
 			float64(definition.WarningThreshold),
@@ -36,8 +36,9 @@ func OneDrive(service *transit.DynamicMonitoredService, token string) (err error
 	}
 
 	remaining, _ := jsonpath.Get("$.quota.remaining", v)
-	if definition, ok := contains(metricsProfile.Metrics, "onedrive.remaining"); ok {
-		metric2 := createMetricWithThresholds("onedrive",
+	if definition, ok := containsMetric(metricsProfile.Metrics, "onedrive.remaining"); ok {
+		metric2 := createMetricWithThresholds(
+			"onedrive",
 			".remaining",
 			remaining.(float64),
 			float64(definition.WarningThreshold),
@@ -46,9 +47,10 @@ func OneDrive(service *transit.DynamicMonitoredService, token string) (err error
 		service.Metrics = append(service.Metrics, *metric2)
 	}
 
-	if definition, ok := contains(metricsProfile.Metrics, "onedrive"); ok {
+	if definition, ok := containsMetric(metricsProfile.Metrics, "onedrive"); ok {
 		free := 100 - (total.(float64) / remaining.(float64))
-		metric3 := createMetricWithThresholds("onedrive.free",
+		metric3 := createMetricWithThresholds(
+			"onedrive",
 			".free",
 			free,
 			float64(definition.WarningThreshold),
