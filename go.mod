@@ -41,6 +41,7 @@ require (
 	github.com/swaggo/gin-swagger v1.3.0
 	github.com/swaggo/swag v1.7.0
 	github.com/tklauser/go-sysconf v0.3.7 // indirect
+	github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e
 	github.com/ugorji/go v1.2.6 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.20.0
 	go.opentelemetry.io/otel v0.20.0

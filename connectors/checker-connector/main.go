@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
@@ -34,8 +35,6 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	services.GetController().RegisterEntrypoints(initializeEntrypoints())
-
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -99,11 +98,11 @@ func taskHandler(task ScheduleTask) func() {
 		cmd := exec.Command(task.Command[0], task.Command[1:]...)
 		cmd.Env = task.Environment
 		var (
-			handler     func() ([]byte, error)
-			err         error
-			res         []byte
-			span, spanN services.TraceSpan
-			ctx, ctxN   context.Context
+			handler func() ([]byte, error)
+			err     error
+			res     []byte
+
+			monitoredResources *[]transit.DynamicMonitoredResource
 		)
 		if task.CombinedOutput {
 			handler = cmd.CombinedOutput
@@ -111,7 +110,7 @@ func taskHandler(task ScheduleTask) func() {
 			handler = cmd.Output
 		}
 
-		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
+		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
 			services.EndTraceSpan(span,
 				services.TraceAttrError(err),
@@ -119,11 +118,11 @@ func taskHandler(task ScheduleTask) func() {
 				services.TraceAttrString("task", task.String()),
 			)
 		}()
-		_, spanN = services.StartTraceSpan(ctx, "connectors", "command")
 
+		_, span2 := services.StartTraceSpan(ctx, "connectors", "command")
 		res, err = handler()
 
-		services.EndTraceSpan(spanN,
+		services.EndTraceSpan(span2,
 			services.TraceAttrError(err),
 			services.TraceAttrPayloadLen(res),
 			services.TraceAttrArray("command", task.Command),
@@ -141,18 +140,26 @@ func taskHandler(task ScheduleTask) func() {
 			Bytes("res", res).
 			Msg("task done")
 
-		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
+		_, span3 := services.StartTraceSpan(ctx, "connectors", "parse")
+		monitoredResources, err = parser.Parse(res, task.DataFormat)
 
-		if _, err = processMetrics(ctxN, res, task.DataFormat); err != nil {
-			log.Warn().Err(err).
-				Interface("task", task).
-				Bytes("res", res).
-				Msg("could not process metrics")
-		}
-
-		services.EndTraceSpan(spanN,
+		services.EndTraceSpan(span3,
 			services.TraceAttrError(err),
 			services.TraceAttrPayloadLen(res),
 		)
+
+		if err != nil {
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("could not parse metrics")
+			return
+		}
+		if err = connectors.SendMetrics(ctx, *monitoredResources, nil); err != nil {
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("could not send metrics")
+		}
 	}
 }
