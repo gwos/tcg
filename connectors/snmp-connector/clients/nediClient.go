@@ -26,6 +26,7 @@ const (
 	colIfName   = "ifname"
 	colIfIndex  = "ifidx"
 	colLastOK   = "lastok"
+	colIfStat   = "ifstat"
 )
 
 type NediClient struct {
@@ -50,6 +51,7 @@ type Interface struct {
 	Name   string
 	Device string
 	Index  int
+	Status int
 }
 
 func (client *NediClient) Init(server string) error {
@@ -200,6 +202,7 @@ func parseInterfaces(response []interface{}) []Interface {
 		name := i[colIfName]
 		device := i[colDevice]
 		index := i[colIfIndex]
+		status := i[colIfStat]
 
 		switch nameVal := name.(type) {
 		case string:
@@ -217,6 +220,14 @@ func parseInterfaces(response []interface{}) []Interface {
 			log.Warn().Msgf("skipping interface '%s:%s:%s' of unsupported type",
 				iFace.Name, colDevice, devVal)
 			continue
+		}
+
+		iFace.Status = -1
+		if statVal, err := getInt(status); err == nil {
+			iFace.Status = statVal
+		} else {
+			log.Warn().Msgf("skipping interface '%s:%s:%d' of unsupported type",
+				iFace.Name, colIfStat, status)
 		}
 
 		idxVal, err := getInt(index)

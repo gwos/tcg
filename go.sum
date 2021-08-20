@@ -440,6 +440,8 @@ github.com/tklauser/go-sysconf v0.3.7 h1:HT7h4+536gjqeq1ZIJPgOl1rg1XFatQGVZWp7Py
 github.com/tklauser/go-sysconf v0.3.7/go.mod h1:JZIdXh4RmBvZDBZ41ld2bGxRV3n4daiiqA3skYhAoQ4=
 github.com/tklauser/numcpus v0.2.3 h1:nQ0QYpiritP6ViFhrKYsiv6VVxOpum2Gks5GhnJbS/8=
 github.com/tklauser/numcpus v0.2.3/go.mod h1:vpEPS/JC+oZGGQ/My/vJnNsvMDQL6PwOqt8dsCw5j+E=
+github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e h1:RAHYkOTkG4FXWMqO0qzy6h6zo7cE6OhQG1UnuF7UqAE=
+github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e/go.mod h1:tKLDtZWJrnN+XY4lz0ZccdCnGDiNRzMcPBkwgliZ1LQ=
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/ugorji/go v1.1.4/go.mod h1:uQMGLiO92mf5W77hV/PUCpI3pbzQx3CRekS0kk+RGrc=
 github.com/ugorji/go v1.1.7/go.mod h1:kZn38zHttfInRq0xu/PH0az30d+z6vm202qpg1oXVMw=

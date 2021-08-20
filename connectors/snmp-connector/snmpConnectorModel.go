@@ -128,6 +128,21 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 			log.Err(err).Msgf("could not create monitored service '%s:%s'", device.Name, iFace.Name)
 		}
 		if mService != nil {
+			switch iFace.Status {
+			case 0:
+				mService.Status = transit.ServiceWarning
+				mService.LastPlugInOutput = "Interface Operational State is DOWN, Administrative state is DOWN"
+			case 1:
+				mService.Status = transit.ServiceUnscheduledCritical
+				mService.LastPlugInOutput = "Interface Operational State is DOWN, Administrative state is UP"
+			case 2:
+				mService.Status = transit.ServiceWarning
+				mService.LastPlugInOutput = "Interface Operational State is UP, Administrative state is DOWN"
+			case 3:
+				mService.Status = transit.ServiceOk
+				mService.LastPlugInOutput = "Interface Operational State is UP, Administrative state is UP"
+			case -1:
+			}
 			mServices[i] = *mService
 		}
 		i++
