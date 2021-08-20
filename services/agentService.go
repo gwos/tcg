@@ -147,9 +147,12 @@ func GetAgentService() *AgentService {
 			"AgentID":        agentService.AgentID,
 			"AppType":        agentService.AppType,
 			"AppName":        agentService.AppName,
+			"BatchEvents":    agentService.BatchEvents.String(),
+			"BatchMetrics":   agentService.BatchMetrics.String(),
+			"BatchMaxBytes":  agentService.BatchMaxBytes,
 			"ControllerAddr": agentService.ControllerAddr,
 			"DSClient":       agentService.dsClient.HostName,
-		}).Log(log.DebugLevel, "#AgentService Config")
+		}).Log(log.DebugLevel, "starting with config")
 	})
 
 	return agentService
@@ -580,6 +583,21 @@ func (service *AgentService) config(data []byte) error {
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
 		return err
 	}
+	log.With(log.Fields{
+		"AgentID":        service.AgentID,
+		"AppType":        service.AppType,
+		"AppName":        service.AppName,
+		"BatchEvents":    service.BatchEvents.String(),
+		"BatchMetrics":   service.BatchMetrics.String(),
+		"BatchMaxBytes":  service.BatchMaxBytes,
+		"ControllerAddr": service.ControllerAddr,
+		"DSClient":       service.dsClient.HostName,
+	}).Log(log.DebugLevel, "loaded config")
+
+	// ensure nested services properly initialized
+	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)
+	GetTransitService().metricsBatcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
+	cache.AuthCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	// notify C-API config change
@@ -606,6 +624,13 @@ func (service *AgentService) config(data []byte) error {
 }
 
 func (service *AgentService) exit() error {
+	GetTransitService().eventsBatcher.Exit()
+	GetTransitService().metricsBatcher.Exit()
+
+	if service.telemetryFlushHandler != nil {
+		service.telemetryFlushHandler()
+	}
+
 	/* wrap exitHandler with recover */
 	c := make(chan struct{}, 1)
 	go func(fn func()) {

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gwos/tcg/batcher"
+	"github.com/gwos/tcg/batcher/events"
+	"github.com/gwos/tcg/batcher/metrics"
 	"github.com/gwos/tcg/nats"
 	"go.opentelemetry.io/otel/label"
 )
@@ -13,6 +16,9 @@ import (
 type TransitService struct {
 	*AgentService
 	listMetricsHandler func() ([]byte, error)
+
+	eventsBatcher  *batcher.Batcher
+	metricsBatcher *batcher.Batcher
 }
 
 var onceTransitService sync.Once
@@ -22,9 +28,21 @@ var transitService *TransitService
 func GetTransitService() *TransitService {
 	onceTransitService.Do(func() {
 		transitService = &TransitService{
-			GetAgentService(),
-			defaultListMetricsHandler,
+			AgentService:       GetAgentService(),
+			listMetricsHandler: defaultListMetricsHandler,
 		}
+		transitService.eventsBatcher = batcher.NewBatcher(
+			new(events.EventsBatchBuilder),
+			transitService.sendEvents,
+			transitService.Connector.BatchEvents,
+			transitService.Connector.BatchMaxBytes,
+		)
+		transitService.metricsBatcher = batcher.NewBatcher(
+			new(metrics.MetricsBatchBuilder),
+			transitService.sendMetrics,
+			transitService.Connector.BatchMetrics,
+			transitService.Connector.BatchMaxBytes,
+		)
 	})
 	return transitService
 }
@@ -90,6 +108,14 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
+	if service.Connector.BatchEvents == 0 {
+		return service.sendEvents(ctx, payload)
+	}
+	service.eventsBatcher.Add(payload)
+	return nil
+}
+
+func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
 	var (
 		b   []byte
 		err error
@@ -150,6 +176,14 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
+	if service.Connector.BatchMetrics == 0 {
+		return service.sendMetrics(ctx, payload)
+	}
+	service.metricsBatcher.Add(payload)
+	return nil
+}
+
+func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
 	var (
 		b   []byte
 		err error
