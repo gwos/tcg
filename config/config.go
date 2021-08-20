@@ -87,6 +87,8 @@ func (l LogLevel) String() string {
 type Connector struct {
 	transit.AgentIdentity `yaml:",inline"`
 
+	BatchMetrics time.Duration `yaml:"batchMetrics"`
+
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
 	ControllerAddr     string `yaml:"controllerAddr"`
@@ -334,6 +336,7 @@ type Config struct {
 func defaults() Config {
 	return Config{
 		Connector: &Connector{
+			BatchMetrics:            0,
 			ControllerAddr:          ":8099",
 			ControllerReadTimeout:   time.Second * 10,
 			ControllerWriteTimeout:  time.Second * 20,
