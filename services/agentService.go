@@ -531,12 +531,12 @@ func (service *AgentService) config(data []byte) error {
 		Msg("loaded config")
 
 	// ensure nested services properly initialized
-	GetTransitService().batchCachedMetrics()
+	GetTransitService().batchBufferedMetrics()
 	batchMetrics := transitService.Connector.BatchMetrics
 	if batchMetrics == 0 {
 		batchMetrics = math.MaxInt64
 	}
-	GetTransitService().batcher.ticker.Reset(batchMetrics)
+	GetTransitService().batchBuffer.ticker.Reset(batchMetrics)
 	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
@@ -560,8 +560,8 @@ func (service *AgentService) config(data []byte) error {
 }
 
 func (service *AgentService) exit() error {
-	GetTransitService().batchCachedMetrics()
-	GetTransitService().batcher.done <- true
+	GetTransitService().batchBufferedMetrics()
+	GetTransitService().batchBuffer.exit <- true
 
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())

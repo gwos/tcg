@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -20,11 +21,120 @@ type TransitService struct {
 	*AgentService
 	listMetricsHandler func() ([]byte, error)
 
-	batcher struct {
+	batchBuffer struct {
+		exit   chan bool
 		cache  *cache.Cache
 		ticker *time.Ticker
-		done   chan bool
 	}
+	batchRequest BatchRequest
+}
+
+type BatchRequest struct {
+	groupsMap map[string]transit.ResourceGroup
+	resMap    map[string]transit.DynamicMonitoredResource
+	resSvcMap map[string][]transit.DynamicMonitoredService
+	svcMap    map[string]svcMapItem
+
+	r    transit.DynamicResourcesWithServicesRequest
+	size int
+}
+
+// Fill takes transit.DynamicResourcesWithServicesRequest as RawJSON
+func (br *BatchRequest) Fill(b []byte) {
+	if br.groupsMap == nil {
+		br.groupsMap = make(map[string]transit.ResourceGroup)
+	}
+	if br.resMap == nil {
+		br.resMap = make(map[string]transit.DynamicMonitoredResource)
+	}
+	if br.resSvcMap == nil {
+		br.resSvcMap = make(map[string][]transit.DynamicMonitoredService)
+	}
+	if br.svcMap == nil {
+		br.svcMap = make(map[string]svcMapItem)
+	}
+
+	var p transit.DynamicResourcesWithServicesRequest
+	if err := json.Unmarshal(b, &p); err != nil {
+		log.Err(err).
+			RawJSON("payload", b).
+			Msg("could not unmarshal metrics payload for batch")
+	} else {
+		if br.r.Context == nil {
+			br.r.Context = p.Context
+		}
+		for _, g := range p.Groups {
+			br.groupsMap[string(g.Type)+":"+g.GroupName] = g
+		}
+		for _, res := range p.Resources {
+			resK := string(res.Type) + ":" + res.Name
+			for _, svc := range res.Services {
+				svcK := string(res.Type) + ":" + res.Name + "::" + string(svc.Type) + ":" + svc.Name
+				br.svcMap[svcK] = svcMapItem{
+					resK: resK,
+					svcK: svcK,
+					svc:  svc,
+				}
+			}
+			res.Services = []transit.DynamicMonitoredService{}
+			br.resMap[resK] = res
+		}
+		br.size += len(b)
+		lim := GetTransitService().BatchMaxBytes
+		if br.size > lim {
+			log.Debug().Msgf("batch payload exceeded the soft limit %d KB", lim/1024)
+			br.Flush()
+		}
+	}
+}
+
+// Flush sends the request if not empty
+func (br *BatchRequest) Flush() error {
+	defer func() {
+		br.groupsMap = make(map[string]transit.ResourceGroup)
+		br.resMap = make(map[string]transit.DynamicMonitoredResource)
+		br.resSvcMap = make(map[string][]transit.DynamicMonitoredService)
+		br.svcMap = make(map[string]svcMapItem)
+		br.size = 0
+	}()
+
+	for _, g := range br.groupsMap {
+		br.r.Groups = append(br.r.Groups, g)
+	}
+	for _, svcItem := range br.svcMap {
+		br.resSvcMap[svcItem.resK] = append(br.resSvcMap[svcItem.resK], svcItem.svc)
+	}
+	for _, res := range br.resMap {
+		resK := string(res.Type) + ":" + res.Name
+		res.Services = br.resSvcMap[resK]
+		br.r.Resources = append(br.r.Resources, res)
+	}
+
+	if len(br.r.Resources) > 0 {
+		log.Debug().Msgf("batched %d resources with %d services in %d groups",
+			len(br.r.Resources), len(br.svcMap), len(br.groupsMap))
+		b, err := json.Marshal(br.r)
+		if err != nil {
+			return err
+		}
+
+		if bytes.Contains(b, []byte(`:"-6`)) {
+			log.Warn().
+				Interface("resMap", br.resMap).
+				Interface("batch.Resources", br.r.Resources).
+				RawJSON("payload", b).
+				Msg("zero time in batch payload")
+		}
+
+		GetTransitService().sendMetrics(context.Background(), b)
+	}
+	return nil
+}
+
+type svcMapItem struct {
+	resK string
+	svcK string
+	svc  transit.DynamicMonitoredService
 }
 
 var onceTransitService sync.Once
@@ -37,22 +147,22 @@ func GetTransitService() *TransitService {
 			AgentService:       GetAgentService(),
 			listMetricsHandler: defaultListMetricsHandler,
 		}
-		/* init the batcher to reduce config logic */
-		transitService.batcher.cache = cache.New(-1, -1)
-		transitService.batcher.cache.SetDefault("nextCK", uint64(0))
-		transitService.batcher.done = make(chan bool, 1)
+		/* init the batcher buffer to reduce config logic */
+		transitService.batchBuffer.cache = cache.New(-1, -1)
+		transitService.batchBuffer.cache.SetDefault("nextCK", uint64(0))
+		transitService.batchBuffer.exit = make(chan bool, 1)
 		batchMetrics := transitService.Connector.BatchMetrics
 		if batchMetrics == 0 {
 			batchMetrics = math.MaxInt64
 		}
-		transitService.batcher.ticker = time.NewTicker(batchMetrics)
+		transitService.batchBuffer.ticker = time.NewTicker(batchMetrics)
 		go func() {
 			for {
 				select {
-				case <-transitService.batcher.done:
+				case <-transitService.batchBuffer.exit:
 					return
-				case <-transitService.batcher.ticker.C:
-					transitService.batchCachedMetrics()
+				case <-transitService.batchBuffer.ticker.C:
+					transitService.batchBufferedMetrics()
 				}
 			}
 		}()
@@ -194,7 +304,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	if service.Connector.BatchMetrics == 0 {
 		return service.sendMetrics(ctx, payload)
 	}
-	return service.cacheMetrics(payload)
+	return service.bufferMetrics(payload)
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
@@ -222,88 +332,28 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 	return err
 }
 
-func (service *TransitService) cacheMetrics(payload []byte) error {
-	nextCK, err := service.batcher.cache.IncrementUint64("nextCK", 1)
+func (service *TransitService) bufferMetrics(payload []byte) error {
+	nextCK, err := service.batchBuffer.cache.IncrementUint64("nextCK", 1)
 	if err != nil {
 		return err
 	}
 	if nextCK == math.MaxUint64 {
 		nextCK = 0
-		service.batcher.cache.SetDefault("nextCK", 0)
+		service.batchBuffer.cache.SetDefault("nextCK", 0)
 	}
-	service.batcher.cache.SetDefault(strconv.FormatUint(nextCK, 10), payload)
+	service.batchBuffer.cache.SetDefault(strconv.FormatUint(nextCK, 10), payload)
 	return err
 }
 
-func (service *TransitService) batchCachedMetrics() error {
-	type svcMapItem struct {
-		resK string
-		svcK string
-		svc  transit.DynamicMonitoredService
-	}
-	batch := transit.DynamicResourcesWithServicesRequest{}
-	groupsMap := map[string]transit.ResourceGroup{}
-	resMap := map[string]transit.DynamicMonitoredResource{}
-	svcMap := map[string]svcMapItem{}
-	resSvcMap := map[string][]transit.DynamicMonitoredService{}
-	for ck, c := range service.batcher.cache.Items() {
+func (service *TransitService) batchBufferedMetrics() error {
+	for ck, c := range service.batchBuffer.cache.Items() {
 		if ck == "nextCK" {
 			continue
 		}
-		var p transit.DynamicResourcesWithServicesRequest
-		if err := json.Unmarshal(c.Object.([]byte), &p); err != nil {
-			log.Err(err).
-				RawJSON("payload", c.Object.([]byte)).
-				Msg("could not unmarshal metrics payload for batch")
-		} else {
-			log.Debug().
-				Interface("p", p).
-				RawJSON("payload", c.Object.([]byte)).
-				Msg("unmarshal metrics payload for batch")
-
-			if batch.Context == nil {
-				batch.Context = p.Context
-			}
-			for _, g := range p.Groups {
-				groupsMap[string(g.Type)+":"+g.GroupName] = g
-			}
-			for _, res := range p.Resources {
-				resK := string(res.Type) + ":" + res.Name
-				for _, svc := range res.Services {
-					svcK := string(res.Type) + ":" + res.Name + "::" + string(svc.Type) + ":" + svc.Name
-					svcMap[svcK] = svcMapItem{
-						resK: resK,
-						svcK: svcK,
-						svc:  svc,
-					}
-				}
-				res.Services = []transit.DynamicMonitoredService{}
-				resMap[resK] = res
-			}
-		}
-		service.batcher.cache.Delete(ck)
+		service.batchRequest.Fill(c.Object.([]byte))
+		service.batchBuffer.cache.Delete(ck)
 	}
-	for _, g := range groupsMap {
-		batch.Groups = append(batch.Groups, g)
-	}
-	for _, svcItem := range svcMap {
-		resSvcMap[svcItem.resK] = append(resSvcMap[svcItem.resK], svcItem.svc)
-	}
-	for _, res := range resMap {
-		resK := string(res.Type) + ":" + res.Name
-		res.Services = resSvcMap[resK]
-		batch.Resources = append(batch.Resources, res)
-	}
-	if len(batch.Resources) > 0 {
-		log.Debug().Msgf("batched %d resources with %d services in %d groups",
-			len(batch.Resources), len(svcMap), len(groupsMap))
-		b, err := json.Marshal(batch)
-		if err != nil {
-			return err
-		}
-		service.sendMetrics(context.Background(), b)
-	}
-	return nil
+	return service.batchRequest.Flush()
 }
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
