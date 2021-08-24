@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -126,6 +125,7 @@ func GetAgentService() *AgentService {
 			Str("AppType", agentService.AppType).
 			Str("AppName", agentService.AppName).
 			Str("BatchMetrics", agentService.BatchMetrics.String()).
+			Int("BatchMaxBytes", agentService.BatchMaxBytes).
 			Str("ControllerAddr", agentService.ControllerAddr).
 			Str("DSClient", agentService.dsClient.HostName).
 			Msg("starting with config")
@@ -526,17 +526,13 @@ func (service *AgentService) config(data []byte) error {
 		Str("AppType", service.AppType).
 		Str("AppName", service.AppName).
 		Str("BatchMetrics", service.BatchMetrics.String()).
+		Int("BatchMaxBytes", agentService.BatchMaxBytes).
 		Str("ControllerAddr", service.ControllerAddr).
 		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
 
 	// ensure nested services properly initialized
-	GetTransitService().batchBufferedMetrics()
-	batchMetrics := transitService.Connector.BatchMetrics
-	if batchMetrics == 0 {
-		batchMetrics = math.MaxInt64
-	}
-	GetTransitService().batchBuffer.ticker.Reset(batchMetrics)
+	GetTransitService().Batcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
 	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
@@ -560,8 +556,7 @@ func (service *AgentService) config(data []byte) error {
 }
 
 func (service *AgentService) exit() error {
-	GetTransitService().batchBufferedMetrics()
-	GetTransitService().batchBuffer.exit <- true
+	GetTransitService().Batcher.Exit()
 
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
