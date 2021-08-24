@@ -1,13 +1,13 @@
 package batcher
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"math"
 	"strconv"
 	"time"
 
+	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
@@ -113,7 +113,7 @@ type sendRequestHandler func(context.Context, []byte) error
 
 // BatchBuilder implements builder
 type BatchBuilder struct {
-	r         transit.DynamicResourcesWithServicesRequest
+	tContexts []transit.TracerContext
 	groupsMap map[string]transit.ResourceGroup
 	resMap    map[string]transit.DynamicMonitoredResource
 	resSvcMap map[string][]transit.DynamicMonitoredService
@@ -123,7 +123,7 @@ type BatchBuilder struct {
 // NewBuilder returns new instance
 func NewBuilder() *BatchBuilder {
 	return &BatchBuilder{
-		r:         transit.DynamicResourcesWithServicesRequest{},
+		tContexts: make([]transit.TracerContext, 0),
 		groupsMap: make(map[string]transit.ResourceGroup),
 		resMap:    make(map[string]transit.DynamicMonitoredResource),
 		resSvcMap: make(map[string][]transit.DynamicMonitoredService),
@@ -139,15 +139,14 @@ func (bld *BatchBuilder) Add(p []byte) {
 			RawJSON("payload", p).
 			Msg("could not unmarshal metrics payload for batch")
 	} else {
-		if bld.r.Context == nil {
-			bld.r.Context = r2.Context
-		}
+		bld.tContexts = append(bld.tContexts, *r2.Context)
 		for _, g := range r2.Groups {
 			bld.groupsMap[string(g.Type)+":"+g.GroupName] = g
 		}
 		for _, res := range r2.Resources {
 			resK := string(res.Type) + ":" + res.Name
 			for _, svc := range res.Services {
+				applyTime(&res, &svc, r2.Context.TimeStamp) // ensure time fields
 				svcK := string(res.Type) + ":" + res.Name + "::" + string(svc.Type) + ":" + svc.Name
 				bld.svcMap[svcK] = svcMapItem{
 					resK: resK,
@@ -163,8 +162,12 @@ func (bld *BatchBuilder) Add(p []byte) {
 
 // Build builds the batch payload if not empty
 func (bld *BatchBuilder) Build() ([]byte, error) {
+	r := transit.DynamicResourcesWithServicesRequest{}
+	if len(bld.tContexts) > 0 {
+		r.Context = &bld.tContexts[0]
+	}
 	for _, g := range bld.groupsMap {
-		bld.r.Groups = append(bld.r.Groups, g)
+		r.Groups = append(r.Groups, g)
 	}
 	for _, svcItem := range bld.svcMap {
 		bld.resSvcMap[svcItem.resK] = append(bld.resSvcMap[svcItem.resK], svcItem.svc)
@@ -172,23 +175,13 @@ func (bld *BatchBuilder) Build() ([]byte, error) {
 	for _, res := range bld.resMap {
 		resK := string(res.Type) + ":" + res.Name
 		res.Services = bld.resSvcMap[resK]
-		bld.r.Resources = append(bld.r.Resources, res)
+		r.Resources = append(r.Resources, res)
 	}
 
-	if len(bld.r.Resources) > 0 {
+	if len(r.Resources) > 0 {
 		log.Debug().Msgf("batched %d resources with %d services in %d groups",
-			len(bld.r.Resources), len(bld.svcMap), len(bld.groupsMap))
-		p, err := json.Marshal(bld.r)
-
-		if err == nil && bytes.Contains(p, []byte(`:"-6`)) {
-			log.Warn().
-				Interface("resMap", bld.resMap).
-				Interface("batch.Resources", bld.r.Resources).
-				RawJSON("payload", p).
-				Msg("zero time in batch payload")
-		}
-
-		return p, err
+			len(r.Resources), len(bld.svcMap), len(bld.groupsMap))
+		return json.Marshal(r)
 	}
 	return nil, nil
 }
@@ -197,4 +190,31 @@ type svcMapItem struct {
 	resK string
 	svcK string
 	svc  transit.DynamicMonitoredService
+}
+
+func applyTime(res *transit.DynamicMonitoredResource,
+	svc *transit.DynamicMonitoredService,
+	ts milliseconds.MillisecondTimestamp) {
+
+	if ts.IsZero() {
+		ts = milliseconds.MillisecondTimestamp{Time: time.Now()}
+	}
+	switch {
+	case res.LastCheckTime.IsZero() && !svc.LastCheckTime.IsZero():
+		res.LastCheckTime = svc.LastCheckTime
+	case !res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+		svc.LastCheckTime = res.LastCheckTime
+	case res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+		res.LastCheckTime = ts
+		svc.LastCheckTime = ts
+	}
+	switch {
+	case res.NextCheckTime.IsZero() && !svc.NextCheckTime.IsZero():
+		res.NextCheckTime = svc.NextCheckTime
+	case !res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+		svc.NextCheckTime = res.NextCheckTime
+	case res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+		res.NextCheckTime = ts
+		svc.NextCheckTime = ts
+	}
 }
