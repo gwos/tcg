@@ -152,6 +152,7 @@ func (bld *BatchBuilder) Add(p []byte) {
 					svc:  svc,
 				}
 			}
+			applyTime(&res, &transit.DynamicMonitoredService{}, r.Context.TimeStamp) // ensure resource time fields in case of empty services
 			res.Services = []transit.DynamicMonitoredService{}
 			bld.resMap[resK] = res
 		}
