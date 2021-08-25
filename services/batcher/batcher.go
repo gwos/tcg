@@ -103,7 +103,7 @@ func (bt *Batcher) batchBufferedMetrics() error {
 		bt.cache.Delete(ck)
 	}
 	payload, err := bld.Build()
-	if payload != nil && err == nil {
+	if err == nil && len(payload) > 0 {
 		return bt.rh(context.Background(), payload)
 	}
 	return err
@@ -116,7 +116,6 @@ type BatchBuilder struct {
 	tContexts []transit.TracerContext
 	groupsMap map[string]transit.ResourceGroup
 	resMap    map[string]transit.DynamicMonitoredResource
-	resSvcMap map[string][]transit.DynamicMonitoredService
 	svcMap    map[string]svcMapItem
 }
 
@@ -126,27 +125,26 @@ func NewBuilder() *BatchBuilder {
 		tContexts: make([]transit.TracerContext, 0),
 		groupsMap: make(map[string]transit.ResourceGroup),
 		resMap:    make(map[string]transit.DynamicMonitoredResource),
-		resSvcMap: make(map[string][]transit.DynamicMonitoredService),
 		svcMap:    make(map[string]svcMapItem),
 	}
 }
 
 // Add adds single transit.DynamicResourcesWithServicesRequest to batch
 func (bld *BatchBuilder) Add(p []byte) {
-	var r2 transit.DynamicResourcesWithServicesRequest
-	if err := json.Unmarshal(p, &r2); err != nil {
+	r := transit.DynamicResourcesWithServicesRequest{}
+	if err := json.Unmarshal(p, &r); err != nil {
 		log.Err(err).
 			RawJSON("payload", p).
 			Msg("could not unmarshal metrics payload for batch")
 	} else {
-		bld.tContexts = append(bld.tContexts, *r2.Context)
-		for _, g := range r2.Groups {
+		bld.tContexts = append(bld.tContexts, *r.Context)
+		for _, g := range r.Groups {
 			bld.groupsMap[string(g.Type)+":"+g.GroupName] = g
 		}
-		for _, res := range r2.Resources {
+		for _, res := range r.Resources {
 			resK := string(res.Type) + ":" + res.Name
 			for _, svc := range res.Services {
-				applyTime(&res, &svc, r2.Context.TimeStamp) // ensure time fields
+				applyTime(&res, &svc, r.Context.TimeStamp) // ensure time fields
 				svcK := string(res.Type) + ":" + res.Name + "::" + string(svc.Type) + ":" + svc.Name
 				bld.svcMap[svcK] = svcMapItem{
 					resK: resK,
@@ -170,11 +168,11 @@ func (bld *BatchBuilder) Build() ([]byte, error) {
 		r.Groups = append(r.Groups, g)
 	}
 	for _, svcItem := range bld.svcMap {
-		bld.resSvcMap[svcItem.resK] = append(bld.resSvcMap[svcItem.resK], svcItem.svc)
+		res := bld.resMap[svcItem.resK]
+		res.Services = append(res.Services, svcItem.svc)
+		bld.resMap[svcItem.resK] = res
 	}
 	for _, res := range bld.resMap {
-		resK := string(res.Type) + ":" + res.Name
-		res.Services = bld.resSvcMap[resK]
 		r.Resources = append(r.Resources, res)
 	}
 
