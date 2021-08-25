@@ -7,13 +7,15 @@ import (
 
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/services/batcher"
+	"github.com/gwos/tcg/services/batcher/metrics"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces
 type TransitService struct {
 	*AgentService
-	Batcher            *batcher.Batcher
 	listMetricsHandler func() ([]byte, error)
+
+	metricsBatcher *batcher.Batcher
 }
 
 var onceTransitService sync.Once
@@ -26,7 +28,8 @@ func GetTransitService() *TransitService {
 			AgentService:       GetAgentService(),
 			listMetricsHandler: defaultListMetricsHandler,
 		}
-		transitService.Batcher = batcher.NewBatcher(
+		transitService.metricsBatcher = batcher.NewBatcher(
+			func() batcher.BatchBuilder { return metrics.NewMetricsBatchBuilder() },
 			transitService.sendMetrics,
 			transitService.Connector.BatchMetrics,
 			transitService.Connector.BatchMaxBytes,
@@ -169,7 +172,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	if service.Connector.BatchMetrics == 0 {
 		return service.sendMetrics(ctx, payload)
 	}
-	return service.Batcher.Add(payload)
+	return service.metricsBatcher.Add(payload)
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
