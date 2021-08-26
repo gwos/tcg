@@ -11,26 +11,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// MetricsBatchBuilder implements builder
-type MetricsBatchBuilder struct {
-	byGroups map[string]mapItem
-}
-
 type mapItem struct {
 	contexts []transit.TracerContext
 	groups   []transit.ResourceGroup
 	res      []transit.DynamicMonitoredResource
 }
 
-// NewMetricsBatchBuilder returns new instance
-func NewMetricsBatchBuilder() *MetricsBatchBuilder {
-	return &MetricsBatchBuilder{
-		byGroups: make(map[string]mapItem),
-	}
-}
-
 // Add adds single transit.DynamicResourcesWithServicesRequest to batch
-func (bld *MetricsBatchBuilder) Add(p []byte) {
+func add(byGroups map[string]mapItem, p []byte) {
 	r := transit.DynamicResourcesWithServicesRequest{}
 	if err := json.Unmarshal(p, &r); err != nil {
 		log.Err(err).
@@ -47,12 +35,12 @@ func (bld *MetricsBatchBuilder) Add(p []byte) {
 	}
 
 	k := makeGKey(r.Groups)
-	if item, ok := bld.byGroups[k]; ok {
+	if item, ok := byGroups[k]; ok {
 		item.contexts = append(item.contexts, *r.Context)
 		item.res = append(item.res, r.Resources...)
-		bld.byGroups[k] = item
+		byGroups[k] = item
 	} else {
-		bld.byGroups[k] = mapItem{
+		byGroups[k] = mapItem{
 			contexts: []transit.TracerContext{*r.Context},
 			groups:   r.Groups,
 			res:      r.Resources,
@@ -60,10 +48,18 @@ func (bld *MetricsBatchBuilder) Add(p []byte) {
 	}
 }
 
+// MetricsBatchBuilder implements builder
+type MetricsBatchBuilder struct{}
+
 // Build builds the batch payloads if not empty
-func (bld *MetricsBatchBuilder) Build() [][]byte {
-	pp := make([][]byte, len(bld.byGroups))
-	for _, item := range bld.byGroups {
+func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
+	byGroups := make(map[string]mapItem)
+	for _, p := range input {
+		add(byGroups, p)
+	}
+
+	pp := make([][]byte, len(byGroups))
+	for _, item := range byGroups {
 		r := transit.DynamicResourcesWithServicesRequest{}
 		if len(item.contexts) > 0 {
 			r.Context = &item.contexts[0]

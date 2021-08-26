@@ -3,25 +3,18 @@ package batcher
 import (
 	"context"
 	"math"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
 )
 
 // BatchBuilder defines builder interface
 type BatchBuilder interface {
-	// Add adds single payload to batch
-	Add(p []byte)
 	// Build builds the batch payloads
-	// it's possible that not all single payloads can be combined into one
-	Build() [][]byte
+	// it's possible that not all input payloads can be combined into one
+	Build([][]byte) [][]byte
 }
-
-// BatchBuilderConstructor defines constructor
-type BatchBuilderConstructor func() BatchBuilder
 
 // BatchHandler defines handler
 type BatchHandler func(context.Context, []byte) error
@@ -30,19 +23,19 @@ type BatchHandler func(context.Context, []byte) error
 type Batcher struct {
 	mu sync.Mutex
 
-	cache      *cache.Cache
-	cacheSize  int
+	buf        [][]byte
+	bufSize    int
 	maxBytes   int
 	ticker     *time.Ticker
 	tickerExit chan bool
 
-	batchHandler BatchHandler
-	newBBuilder  BatchBuilderConstructor
+	builder BatchBuilder
+	handler BatchHandler
 }
 
 // NewBatcher returns new instance
 func NewBatcher(
-	newBB BatchBuilderConstructor,
+	bb BatchBuilder,
 	bh BatchHandler,
 	d time.Duration,
 	maxBytes int) *Batcher {
@@ -50,16 +43,15 @@ func NewBatcher(
 		d = math.MaxInt64
 	}
 	bt := Batcher{
-		cache:      cache.New(-1, -1),
-		cacheSize:  0,
+		buf:        make([][]byte, 0),
+		bufSize:    0,
 		maxBytes:   maxBytes,
 		ticker:     time.NewTicker(d),
 		tickerExit: make(chan bool, 1),
 
-		batchHandler: bh,
-		newBBuilder:  newBB,
+		builder: bb,
+		handler: bh,
 	}
-	bt.cache.SetDefault("nextCK", uint64(0))
 
 	/* handle ticker */
 	go func() {
@@ -78,47 +70,37 @@ func NewBatcher(
 }
 
 // Add adds single payload to batch buffer
-func (bt *Batcher) Add(p []byte) error {
-	nextCK, err := bt.cache.IncrementUint64("nextCK", 1)
-	if err != nil {
-		return err
-	}
-	if nextCK == math.MaxUint64 {
-		nextCK = 0
-		bt.cache.SetDefault("nextCK", 0)
-	}
-	bt.cache.SetDefault(strconv.FormatUint(nextCK, 10), p)
-	bt.cacheSize += len(p)
-	if bt.cacheSize > bt.maxBytes {
+func (bt *Batcher) Add(p []byte) {
+	bt.mu.Lock()
+
+	bt.buf = append(bt.buf, p)
+	bt.bufSize += len(p)
+
+	bt.mu.Unlock()
+
+	bt.bufSize += len(p)
+	if bt.bufSize > bt.maxBytes {
 		log.Debug().Msgf("batch buffer size %dKB exceeded the soft limit %dKB",
-			bt.cacheSize/1024, bt.maxBytes/1024)
+			bt.bufSize/1024, bt.maxBytes/1024)
 		bt.Batch()
 	}
-	return err
 }
 
 // Batch processes buffered payloads
 func (bt *Batcher) Batch() {
 	bt.mu.Lock()
 
-	bld := bt.newBBuilder()
-	for ck, c := range bt.cache.Items() {
-		if ck == "nextCK" {
-			continue
-		}
-		p := c.Object.([]byte)
-		bld.Add(p)
-		bt.cacheSize -= len(p)
-		bt.cache.Delete(ck)
-	}
+	buf := bt.buf
+	bt.buf = make([][]byte, 0)
+	bt.bufSize = 0
 
 	bt.mu.Unlock()
 
-	payloads := bld.Build()
+	payloads := bt.builder.Build(buf)
 	if len(payloads) > 0 {
 		for _, p := range payloads {
 			if len(p) > 0 {
-				bt.batchHandler(context.Background(), p)
+				bt.handler(context.Background(), p)
 			}
 		}
 	}

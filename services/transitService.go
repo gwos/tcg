@@ -31,13 +31,13 @@ func GetTransitService() *TransitService {
 			listMetricsHandler: defaultListMetricsHandler,
 		}
 		transitService.eventsBatcher = batcher.NewBatcher(
-			func() batcher.BatchBuilder { return events.NewEventsBatchBuilder() },
+			new(events.EventsBatchBuilder),
 			transitService.sendEvents,
 			transitService.Connector.BatchEvents,
 			transitService.Connector.BatchMaxBytes,
 		)
 		transitService.metricsBatcher = batcher.NewBatcher(
-			func() batcher.BatchBuilder { return metrics.NewMetricsBatchBuilder() },
+			new(metrics.MetricsBatchBuilder),
 			transitService.sendMetrics,
 			transitService.Connector.BatchMetrics,
 			transitService.Connector.BatchMaxBytes,
@@ -114,7 +114,8 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 	if service.Connector.BatchEvents == 0 {
 		return service.sendEvents(ctx, payload)
 	}
-	return service.eventsBatcher.Add(payload)
+	service.eventsBatcher.Add(payload)
+	return nil
 }
 
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
@@ -187,7 +188,8 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	if service.Connector.BatchMetrics == 0 {
 		return service.sendMetrics(ctx, payload)
 	}
-	return service.metricsBatcher.Add(payload)
+	service.metricsBatcher.Add(payload)
+	return nil
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
