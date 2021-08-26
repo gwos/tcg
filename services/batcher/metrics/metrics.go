@@ -2,6 +2,8 @@ package metrics
 
 import (
 	"encoding/json"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/gwos/tcg/milliseconds"
@@ -11,19 +13,19 @@ import (
 
 // MetricsBatchBuilder implements builder
 type MetricsBatchBuilder struct {
-	tContexts []transit.TracerContext
-	groupsMap map[string]transit.ResourceGroup
-	resMap    map[string]transit.DynamicMonitoredResource
-	svcMap    map[string]svcMapItem
+	byGroups map[string]mapItem
+}
+
+type mapItem struct {
+	contexts []transit.TracerContext
+	groups   []transit.ResourceGroup
+	res      []transit.DynamicMonitoredResource
 }
 
 // NewMetricsBatchBuilder returns new instance
 func NewMetricsBatchBuilder() *MetricsBatchBuilder {
 	return &MetricsBatchBuilder{
-		tContexts: make([]transit.TracerContext, 0),
-		groupsMap: make(map[string]transit.ResourceGroup),
-		resMap:    make(map[string]transit.DynamicMonitoredResource),
-		svcMap:    make(map[string]svcMapItem),
+		byGroups: make(map[string]mapItem),
 	}
 }
 
@@ -34,65 +36,61 @@ func (bld *MetricsBatchBuilder) Add(p []byte) {
 		log.Err(err).
 			RawJSON("payload", p).
 			Msg("could not unmarshal metrics payload for batch")
+		return
+	}
+
+	for i := range r.Resources {
+		for j := range r.Resources[i].Services {
+			applyTime(&r.Resources[i], &r.Resources[i].Services[j], r.Context.TimeStamp)
+		}
+		applyTime(&r.Resources[i], &transit.DynamicMonitoredService{}, r.Context.TimeStamp)
+	}
+
+	k := makeGKey(r.Groups)
+	if item, ok := bld.byGroups[k]; ok {
+		item.contexts = append(item.contexts, *r.Context)
+		item.res = append(item.res, r.Resources...)
+		bld.byGroups[k] = item
 	} else {
-		bld.tContexts = append(bld.tContexts, *r.Context)
-		for _, g := range r.Groups {
-			bld.groupsMap[string(g.Type)+":"+g.GroupName] = g
+		bld.byGroups[k] = mapItem{
+			contexts: []transit.TracerContext{*r.Context},
+			groups:   r.Groups,
+			res:      r.Resources,
 		}
-		for _, res := range r.Resources {
-			resK := string(res.Type) + ":" + res.Name
-			for _, svc := range res.Services {
-				applyTime(&res, &svc, r.Context.TimeStamp) // ensure time fields
-				svcK := string(res.Type) + ":" + res.Name + "::" + string(svc.Type) + ":" + svc.Name
-				bld.svcMap[svcK] = svcMapItem{
-					resK: resK,
-					svcK: svcK,
-					svc:  svc,
-				}
+	}
+}
+
+// Build builds the batch payloads if not empty
+func (bld *MetricsBatchBuilder) Build() [][]byte {
+	pp := make([][]byte, len(bld.byGroups))
+	for _, item := range bld.byGroups {
+		r := transit.DynamicResourcesWithServicesRequest{}
+		if len(item.contexts) > 0 {
+			r.Context = &item.contexts[0]
+		}
+		r.Groups = item.groups
+		r.Resources = item.res
+		if len(r.Resources) > 0 {
+			p, err := json.Marshal(r)
+			if err == nil {
+				log.Debug().Msgf("batched %d resources in %d groups",
+					len(r.Resources), len(r.Groups))
+				pp = append(pp, p)
+				continue
 			}
-			applyTime(&res, &transit.DynamicMonitoredService{}, r.Context.TimeStamp) // ensure resource time fields in case of empty services
-			res.Services = []transit.DynamicMonitoredService{}
-			bld.resMap[resK] = res
+			log.Err(err).
+				Interface("resources", r).
+				Msg("could not marshal resources")
 		}
 	}
+	return pp
 }
 
-// Build builds the batch payload if not empty
-func (bld *MetricsBatchBuilder) Build() ([]byte, error) {
-	r := transit.DynamicResourcesWithServicesRequest{}
-	if len(bld.tContexts) > 0 {
-		r.Context = &bld.tContexts[0]
-	}
-	for _, g := range bld.groupsMap {
-		r.Groups = append(r.Groups, g)
-	}
-	for _, svcItem := range bld.svcMap {
-		res := bld.resMap[svcItem.resK]
-		res.Services = append(res.Services, svcItem.svc)
-		bld.resMap[svcItem.resK] = res
-	}
-	for _, res := range bld.resMap {
-		r.Resources = append(r.Resources, res)
-	}
-
-	if len(r.Resources) > 0 {
-		log.Debug().Msgf("batched %d resources with %d services in %d groups",
-			len(r.Resources), len(bld.svcMap), len(bld.groupsMap))
-		return json.Marshal(r)
-	}
-	return nil, nil
-}
-
-type svcMapItem struct {
-	resK string
-	svcK string
-	svc  transit.DynamicMonitoredService
-}
-
-func applyTime(res *transit.DynamicMonitoredResource,
+func applyTime(
+	res *transit.DynamicMonitoredResource,
 	svc *transit.DynamicMonitoredService,
-	ts milliseconds.MillisecondTimestamp) {
-
+	ts milliseconds.MillisecondTimestamp,
+) {
 	if ts.IsZero() {
 		ts = milliseconds.MillisecondTimestamp{Time: time.Now()}
 	}
@@ -114,4 +112,13 @@ func applyTime(res *transit.DynamicMonitoredResource,
 		res.NextCheckTime = ts
 		svc.NextCheckTime = ts
 	}
+}
+
+func makeGKey(gg []transit.ResourceGroup) string {
+	keys := make([]string, len(gg))
+	for _, g := range gg {
+		keys = append(keys, string(g.Type)+":"+g.GroupName)
+	}
+	sort.Strings(keys)
+	return strings.Join(keys, "#")
 }
