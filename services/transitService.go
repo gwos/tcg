@@ -7,6 +7,7 @@ import (
 
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/services/batcher"
+	"github.com/gwos/tcg/services/batcher/events"
 	"github.com/gwos/tcg/services/batcher/metrics"
 )
 
@@ -15,6 +16,7 @@ type TransitService struct {
 	*AgentService
 	listMetricsHandler func() ([]byte, error)
 
+	eventsBatcher  *batcher.Batcher
 	metricsBatcher *batcher.Batcher
 }
 
@@ -28,6 +30,12 @@ func GetTransitService() *TransitService {
 			AgentService:       GetAgentService(),
 			listMetricsHandler: defaultListMetricsHandler,
 		}
+		transitService.eventsBatcher = batcher.NewBatcher(
+			func() batcher.BatchBuilder { return events.NewEventsBatchBuilder() },
+			transitService.sendEvents,
+			transitService.Connector.BatchEvents,
+			transitService.Connector.BatchMaxBytes,
+		)
 		transitService.metricsBatcher = batcher.NewBatcher(
 			func() batcher.BatchBuilder { return metrics.NewMetricsBatchBuilder() },
 			transitService.sendMetrics,
@@ -103,6 +111,13 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
+	if service.Connector.BatchEvents == 0 {
+		return service.sendEvents(ctx, payload)
+	}
+	return service.eventsBatcher.Add(payload)
+}
+
+func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
 	var (
 		b   []byte
 		err error

@@ -87,6 +87,7 @@ func (l LogLevel) String() string {
 type Connector struct {
 	transit.AgentIdentity `yaml:",inline"`
 
+	BatchEvents   time.Duration `yaml:"batchEvents"`
 	BatchMetrics  time.Duration `yaml:"batchMetrics"`
 	BatchMaxBytes int           `yaml:"batchMaxBytes"`
 
@@ -337,6 +338,7 @@ type Config struct {
 func defaults() Config {
 	return Config{
 		Connector: &Connector{
+			BatchEvents:             0,
 			BatchMetrics:            0,
 			BatchMaxBytes:           1024 * 1024, // 1MB
 			ControllerAddr:          ":8099",
