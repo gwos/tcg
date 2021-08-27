@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/gwos/tcg/batcher"
+	"github.com/gwos/tcg/batcher/events"
+	"github.com/gwos/tcg/batcher/metrics"
 	"github.com/gwos/tcg/nats"
-	"github.com/gwos/tcg/services/batcher"
-	"github.com/gwos/tcg/services/batcher/events"
-	"github.com/gwos/tcg/services/batcher/metrics"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces

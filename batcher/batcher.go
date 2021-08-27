@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // BatchBuilder defines builder interface
@@ -90,19 +92,29 @@ func (bt *Batcher) Add(p []byte) {
 func (bt *Batcher) Batch() {
 	bt.mu.Lock()
 
-	buf := bt.buf
-	bt.buf = make([][]byte, 0)
-	bt.bufSize = 0
+	buf, bufSize := bt.buf, bt.bufSize
+	bt.buf, bt.bufSize = make([][]byte, 0), 0
 
 	bt.mu.Unlock()
+	if len(buf) > 0 {
+		go func() {
+			/* cannot use services package due to import cycle */
+			ctx, span := otel.GetTracerProvider().
+				Tracer("batcher").Start(context.Background(), "Batch:Build")
+			defer func() {
+				span.SetAttributes(attribute.Int("bufferSize", bufSize))
+				span.End()
+			}()
 
-	payloads := bt.builder.Build(buf)
-	if len(payloads) > 0 {
-		for _, p := range payloads {
-			if len(p) > 0 {
-				bt.handler(context.Background(), p)
+			payloads := bt.builder.Build(buf)
+			if len(payloads) > 0 {
+				for _, p := range payloads {
+					if len(p) > 0 {
+						bt.handler(ctx, p)
+					}
+				}
 			}
-		}
+		}()
 	}
 }
 
