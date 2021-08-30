@@ -124,6 +124,9 @@ func GetAgentService() *AgentService {
 			Str("AgentID", agentService.AgentID).
 			Str("AppType", agentService.AppType).
 			Str("AppName", agentService.AppName).
+			Str("BatchEvents", agentService.BatchEvents.String()).
+			Str("BatchMetrics", agentService.BatchMetrics.String()).
+			Int("BatchMaxBytes", agentService.BatchMaxBytes).
 			Str("ControllerAddr", agentService.ControllerAddr).
 			Str("DSClient", agentService.dsClient.HostName).
 			Msg("starting with config")
@@ -520,14 +523,20 @@ func (service *AgentService) config(data []byte) error {
 		return err
 	}
 	log.Debug().
-		Str("AgentID", agentService.AgentID).
-		Str("AppType", agentService.AppType).
-		Str("AppName", agentService.AppName).
-		Str("ControllerAddr", agentService.ControllerAddr).
-		Str("DSClient", agentService.dsClient.HostName).
+		Str("AgentID", service.AgentID).
+		Str("AppType", service.AppType).
+		Str("AppName", service.AppName).
+		Str("BatchEvents", service.BatchEvents.String()).
+		Str("BatchMetrics", service.BatchMetrics.String()).
+		Int("BatchMaxBytes", service.BatchMaxBytes).
+		Str("ControllerAddr", service.ControllerAddr).
+		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
 
-	controller.authCache.Flush()
+	// ensure nested services properly initialized
+	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)
+	GetTransitService().metricsBatcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
+	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	// notify C-API config change
@@ -550,6 +559,13 @@ func (service *AgentService) config(data []byte) error {
 }
 
 func (service *AgentService) exit() error {
+	GetTransitService().eventsBatcher.Exit()
+	GetTransitService().metricsBatcher.Exit()
+
+	if service.tracerProvider != nil {
+		service.tracerProvider.ForceFlush(context.Background())
+	}
+
 	/* wrap exitHandler with recover */
 	c := make(chan struct{}, 1)
 	go func(fn func()) {
