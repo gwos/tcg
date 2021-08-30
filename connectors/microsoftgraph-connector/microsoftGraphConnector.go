@@ -102,7 +102,7 @@ var (
 		string(ViewEmail):      false,
 		string(ViewSecurity):   false,
 	}
-	sharePointSite      = "gwosjoey.sharepoint.com"
+	sharePointSite      = "username.sharepoint.com"
 	sharePointSubSite   = "GWOS"
 	outlookEmailAddress = ""
 )

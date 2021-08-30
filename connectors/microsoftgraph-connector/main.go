@@ -34,9 +34,9 @@ func main() {
 
 	// TODO: get these options from configuration (Views)
 	//////////////////////////////////////////////////////////////////////////////////////////////////
-	tmpSharePointSite := env.GetString("SHAREPOINT_SITE", "gwosjoey.sharepoint.com")
+	tmpSharePointSite := env.GetString("SHAREPOINT_SITE", "site.sharepoint.com")
 	tmpSharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "GWOS")
-	tmpOutlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "davidt@gwosjoey.onmicrosoft.com")
+	tmpOutlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "outlook@site.microsoft.com")
 
 	connector.SetOptions(tmpSharePointSite, tmpSharePointSubSite, tmpOutlookEmailAddress)
 	//////////////////////////////////////////////////////////////////////////////////////////////////

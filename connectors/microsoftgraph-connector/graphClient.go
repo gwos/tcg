@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	masRetries = 5
+	maxRetries = 5
 )
 
 var httpClient = &http.Client{
@@ -137,7 +137,7 @@ func Do(request *http.Request) (*http.Response, error) {
 		time.Sleep(time.Duration(counter) * time.Second)
 		response, err = httpClient.Do(request)
 		counter++
-		if counter == masRetries+1 {
+		if counter == maxRetries+1 {
 			return response, err
 		}
 	}
