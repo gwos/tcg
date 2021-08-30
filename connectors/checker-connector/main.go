@@ -103,7 +103,7 @@ func taskHandler(task ScheduleTask) func() {
 			err     error
 			res     []byte
 
-			monitoredResources *[]transit.DynamicMonitoredResource
+			monitoredResources *[]transit.MonitoredResource
 		)
 		if task.CombinedOutput {
 			handler = cmd.CombinedOutput

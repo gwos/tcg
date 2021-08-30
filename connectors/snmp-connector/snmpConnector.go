@@ -75,7 +75,7 @@ func (connector *SnmpConnector) LoadConfig(config ExtConfig) error {
 	return nil
 }
 
-func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredResource, []transit.DynamicInventoryResource,
+func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	[]transit.ResourceGroup, error) {
 	if connector.config.Views != nil && len(connector.config.Views) > 0 {
 		devices, err := connector.nediClient.GetDevices()
@@ -118,7 +118,7 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.DynamicMonitoredReso
 	}
 
 	mrs := connector.mState.retrieveMonitoredResources(metricDefinitions)
-	var irs []transit.DynamicInventoryResource
+	var irs []transit.InventoryResource
 	var refs []transit.MonitoredResourceRef
 	for _, mr := range mrs {
 		irs = append(irs, mr.ToInventoryResource())

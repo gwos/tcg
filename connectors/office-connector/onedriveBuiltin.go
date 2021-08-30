@@ -10,7 +10,7 @@ import (
 const oneDriveUri = "https://graph.microsoft.com/v1.0/drive"
 
 // OneDrive built-in. Potentially not a built-in, could be data driven
-func OneDrive(service *transit.DynamicMonitoredService, token string) (err error) {
+func OneDrive(service *transit.MonitoredService, token string) (err error) {
 	var (
 		body []byte
 		v    interface{}

@@ -10,7 +10,7 @@ const (
 	securityUri = "https://graph.microsoft.com/beta/security/tiIndicators"
 )
 
-func SecurityAssessments(service *transit.DynamicMonitoredService, token string) (err error) {
+func SecurityAssessments(service *transit.MonitoredService, token string) (err error) {
 	var (
 		v    interface{}
 		c    int

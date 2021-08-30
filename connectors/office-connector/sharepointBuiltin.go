@@ -19,7 +19,7 @@ const (
 // Site
 // Subsite
 // Challenge: where to store parameters
-func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite, sharePointSubSite string) (err error) {
+func SharePoint(service *transit.MonitoredService, token, sharePointSite, sharePointSubSite string) (err error) {
 	var (
 		c       int
 		body    []byte
