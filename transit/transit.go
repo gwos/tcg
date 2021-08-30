@@ -403,7 +403,7 @@ type BaseResource struct {
 	Device string `json:"device,omitempty"`
 }
 
-// DynamicInventoryResource represents a resource that is included in a inventory scan.
+// InventoryResource represents a resource that is included in a inventory scan.
 // Examples include:
 //  * nagios host
 //  * virtual machine instance
@@ -411,59 +411,24 @@ type BaseResource struct {
 //  * storage devices such as disks
 //  * cloud resources such as cloud apps, cloud functions(lambdas)
 //
-// An DynamicInventoryResource is the representation of a specific monitored resource during an inventory scan.
-// Each DynamicInventoryResource contains list of services (InventoryService) (no metrics are sent).
-type DynamicInventoryResource struct {
+// An InventoryResource is the representation of a specific monitored resource during an inventory scan.
+// Each InventoryResource contains list of services (InventoryService) (no metrics are sent).
+type InventoryResource struct {
 	BaseResource
 	// Inventory Service collection
-	Services []DynamicInventoryService `json:"services"`
+	Services []InventoryService `json:"services"`
 }
 
-type InventoryResource struct {
-	// The unique Name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional Description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Device is needed for detection on Foundation side
-	Device string `json:"device,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	Services   []InventoryService    `json:"services"`
-}
-
-// DynamicInventoryService represents a Groundwork Service that is included in a inventory scan.
+// InventoryService represents a Groundwork Service that is included in a inventory scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
 // metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
 //
-// DynamicInventoryService collections are attached to an DynamicInventoryResource during inventory scans.
-type DynamicInventoryService struct {
+// InventoryService collections are attached to an InventoryResource during inventory scans.
+type InventoryService struct {
 	BaseTransitData
 }
 
-type InventoryService struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-}
-
-// A DynamicMonitoredResource defines the current status and services of a resource during a metrics scan.
+// A MonitoredResource defines the current status and services of a resource during a metrics scan.
 // Examples include:
 //  * nagios host
 //  * virtual machine instance
@@ -471,10 +436,10 @@ type InventoryService struct {
 //  * storage devices such as disks
 //  * cloud resources such as cloud apps, cloud functions(lambdas)
 //
-// A DynamicMonitoredResource is the representation of a specific monitored resource during a metric scan.
-// Each DynamicMonitoredResource contains list of services (MonitoredService). A DynamicMonitoredResource does not have metrics,
+// A MonitoredResource is the representation of a specific monitored resource during a metric scan.
+// Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
 // only services.
-type DynamicMonitoredResource struct {
+type MonitoredResource struct {
 	BaseResource
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
@@ -485,37 +450,16 @@ type DynamicMonitoredResource struct {
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Services state collection
-	Services []DynamicMonitoredService `json:"services"`
+	Services []MonitoredService `json:"services"`
 }
 
-type MonitoredResource struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	Services   []MonitoredService    `json:"services"`
-}
-
-// A DynamicMonitoredService represents a Groundwork Service creating during a metrics scan.
+// A MonitoredService represents a Groundwork Service creating during a metrics scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
 // metric variation represented as as single metric time series.
 //
-// A DynamicMonitoredService contains a collection of TimeSeries Metrics.
-// MonitoredService collections are attached to a DynamicMonitoredResource during a metrics scan.
-type DynamicMonitoredService struct {
+// A MonitoredService contains a collection of TimeSeries Metrics.
+// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
+type MonitoredService struct {
 	BaseTransitData
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status,required"`
@@ -529,33 +473,7 @@ type DynamicMonitoredService struct {
 	Metrics []TimeSeries `json:"metrics"`
 }
 
-type MonitoredService struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// metrics
-	Metrics []TimeSeries `json:"metrics"`
-}
-
-func (inventoryResource DynamicInventoryResource) String() string {
+func (inventoryResource InventoryResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
 		inventoryResource.BaseResource.Name, inventoryResource.BaseResource.Type,
 		inventoryResource.BaseResource.Owner, inventoryResource.BaseResource.Category,
@@ -564,14 +482,14 @@ func (inventoryResource DynamicInventoryResource) String() string {
 	)
 }
 
-func (inventoryResource *DynamicInventoryResource) CreateProperty(name string, value TypedValue) {
+func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
 	if inventoryResource.BaseResource.Properties == nil {
 		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
 	inventoryResource.BaseResource.Properties[name] = value
 }
 
-func (monitoredService *DynamicMonitoredService) CreateProperties(properties map[string]interface{}) {
+func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
 	for k, v := range properties {
 		var typedValue TypedValue
 		err := typedValue.toTypedValue(v)
@@ -620,21 +538,21 @@ func (value *TypedValue) toTypedValue(v interface{}) error {
 	return nil
 }
 
-func (inventoryService DynamicInventoryService) String() string {
+func (inventoryService InventoryService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
 		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
 		inventoryService.Category, inventoryService.Description, inventoryService.Properties,
 	)
 }
 
-func (inventoryService *DynamicInventoryService) CreateProperty(name string, value TypedValue) {
+func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
 	if inventoryService.Properties == nil {
 		inventoryService.Properties = make(map[string]TypedValue)
 	}
 	inventoryService.Properties[name] = value
 }
 
-func (monitoredResource DynamicMonitoredResource) String() string {
+func (monitoredResource MonitoredResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredResource.BaseResource.Name,
 		monitoredResource.BaseResource.Type,
@@ -648,14 +566,14 @@ func (monitoredResource DynamicMonitoredResource) String() string {
 	)
 }
 
-func (monitoredResource *DynamicMonitoredResource) CreateProperty(name string, value TypedValue) {
+func (monitoredResource *MonitoredResource) CreateProperty(name string, value TypedValue) {
 	if monitoredResource.BaseResource.Properties == nil {
 		monitoredResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
 	monitoredResource.BaseResource.Properties[name] = value
 }
 
-func (monitoredService DynamicMonitoredService) String() string {
+func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
 		monitoredService.LastCheckTime.String(), monitoredService.NextCheckTime.String(),
@@ -663,7 +581,7 @@ func (monitoredService DynamicMonitoredService) String() string {
 	)
 }
 
-func (monitoredService *DynamicMonitoredService) CreateProperty(name string, value TypedValue) {
+func (monitoredService *MonitoredService) CreateProperty(name string, value TypedValue) {
 	if monitoredService.Properties == nil {
 		monitoredService.Properties = make(map[string]TypedValue)
 	}
@@ -753,32 +671,18 @@ func (resourceGroup ResourceGroup) String() string {
 	)
 }
 
-// DynamicResourcesWithServicesRequest defines SendResourcesWithMetrics payload
-type DynamicResourcesWithServicesRequest struct {
-	Context   *TracerContext             `json:"context,omitempty"`
-	Resources []DynamicMonitoredResource `json:"resources"`
-	Groups    []ResourceGroup            `json:"groups,omitempty"`
-}
-
+// ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
-func (resourcesWithServicesRequest DynamicResourcesWithServicesRequest) String() string {
+func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",
 		resourcesWithServicesRequest.Context.String(),
 		resourcesWithServicesRequest.Resources,
 	)
-}
-
-// DynamicInventoryRequest defines SynchronizeInventory payload
-type DynamicInventoryRequest struct {
-	Context       *TracerContext             `json:"context,omitempty"`
-	OwnershipType HostOwnershipType          `json:"ownershipType,omitempty"`
-	Resources     []DynamicInventoryResource `json:"resources"`
-	Groups        []ResourceGroup            `json:"groups,omitempty"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
@@ -789,7 +693,7 @@ type InventoryRequest struct {
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
 }
 
-func (inventoryRequest DynamicInventoryRequest) String() string {
+func (inventoryRequest InventoryRequest) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		inventoryRequest.Context.String(), inventoryRequest.Resources, inventoryRequest.Groups,
 	)
@@ -989,23 +893,23 @@ type HostsAndServices struct {
 	SetServices               bool     `json:"setServices"`
 }
 
-func (mr *DynamicMonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
+func (mr *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
 	return MonitoredResourceRef{Name: mr.Name, Type: Host, Owner: mr.Owner}
 }
 
-func (mr *DynamicMonitoredResource) ToInventoryResource() DynamicInventoryResource {
-	var services []DynamicInventoryService
+func (mr *MonitoredResource) ToInventoryResource() InventoryResource {
+	var services []InventoryService
 	for _, ms := range mr.Services {
 		services = append(services, ms.ToInventoryService())
 	}
-	return DynamicInventoryResource{
+	return InventoryResource{
 		BaseResource: mr.BaseResource,
 		Services:     services,
 	}
 }
 
-func (ms *DynamicMonitoredService) ToInventoryService() DynamicInventoryService {
-	return DynamicInventoryService{
+func (ms *MonitoredService) ToInventoryService() InventoryService {
+	return InventoryService{
 		BaseTransitData: ms.BaseTransitData,
 	}
 }

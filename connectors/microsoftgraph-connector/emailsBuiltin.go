@@ -12,7 +12,7 @@ import (
 const baseGraphUri = "https://graph.microsoft.com/v1.0/users/%s/messages?"
 
 // Emails built in
-func Emails(service *transit.DynamicMonitoredService, token, outlookEmailAddress string) (err error) {
+func Emails(service *transit.MonitoredService, token, outlookEmailAddress string) (err error) {
 	var (
 		c    int
 		body []byte

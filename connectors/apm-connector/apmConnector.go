@@ -91,7 +91,7 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]transit.DynamicMonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	var textParser expfmt.TextParser
 	var promParser PromParser
 	var prometheusServices map[string]*dto.MetricFamily
@@ -302,8 +302,8 @@ func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) [
 }
 
 func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
-	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.DynamicMonitoredResource, error) {
-	var monitoredResources []transit.DynamicMonitoredResource
+	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
+	var monitoredResources []transit.MonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	hostToDeviceMap := make(map[string]string)
 	for _, prometheusService := range prometheusServices {
@@ -317,7 +317,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
 	}
 	for hostName, host := range hostsMap {
-		services := make([]transit.DynamicMonitoredService, 0, len(host))
+		services := make([]transit.MonitoredService, 0, len(host))
 		/* sort names for hashSum consistency */
 		serviceNames := make([]string, 0, len(host))
 		for s := range host {

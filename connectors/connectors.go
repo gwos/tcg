@@ -38,7 +38,7 @@ var CheckInterval = DefaultCheckInterval
 // if no method for pattern found template won't be modified and will be left containing "{value}" text: "The value is {value}"
 const statusTextPattern = `\{(.*?)\}`
 
-var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredService) (string, error){
+var statusTextValGetters = map[string]func(service *transit.MonitoredService) (string, error){
 	"{value}":    extractValueForStatusText,
 	"{interval}": extractIntervalForStatusText,
 }
@@ -92,7 +92,7 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResource, groups *[]transit.ResourceGroup) error {
+func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, groups *[]transit.ResourceGroup) error {
 	var (
 		b   []byte
 		err error
@@ -105,7 +105,7 @@ func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResour
 		)
 	}()
 
-	request := transit.DynamicResourcesWithServicesRequest{
+	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
 		Resources: resources,
 	}
@@ -126,7 +126,7 @@ func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResour
 }
 
 // SendInventory processes inventory payload
-func SendInventory(ctx context.Context, resources []transit.DynamicInventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
+func SendInventory(ctx context.Context, resources []transit.InventoryResource, resourceGroups []transit.ResourceGroup, ownershipType transit.HostOwnershipType) error {
 	var (
 		b   []byte
 		err error
@@ -139,7 +139,7 @@ func SendInventory(ctx context.Context, resources []transit.DynamicInventoryReso
 		)
 	}()
 
-	request := transit.DynamicInventoryRequest{
+	request := transit.InventoryRequest{
 		Context:       services.GetTransitService().MakeTracerContext(),
 		OwnershipType: ownershipType,
 		Resources:     resources,
@@ -154,8 +154,8 @@ func SendInventory(ctx context.Context, resources []transit.DynamicInventoryReso
 }
 
 // Inventory Constructors
-func CreateInventoryService(name string, owner string) transit.DynamicInventoryService {
-	return transit.DynamicInventoryService{
+func CreateInventoryService(name string, owner string) transit.InventoryService {
+	return transit.InventoryService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
 			Type:  transit.Service,
@@ -165,8 +165,8 @@ func CreateInventoryService(name string, owner string) transit.DynamicInventoryS
 }
 
 // makes and modifies a copy, doesn't modify services
-func CreateInventoryResource(name string, services []transit.DynamicInventoryService) transit.DynamicInventoryResource {
-	resource := transit.DynamicInventoryResource{
+func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
+	resource := transit.InventoryResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
@@ -197,7 +197,7 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 	return group
 }
 
-func FillGroupWithResources(group transit.ResourceGroup, resources []transit.DynamicInventoryResource) transit.ResourceGroup {
+func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
 	var monitoredResourceRefs []transit.MonitoredResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
@@ -396,7 +396,7 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 // BuildServiceForMetric creates metric based on data provided in metric builder and if metric successfully created
 // creates service with same name as metric which contains only this one metric
 // returns the result of service creation
-func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.DynamicMonitoredService, error) {
+func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*transit.MonitoredService, error) {
 	metric, err := BuildMetric(metricBuilder)
 	if err != nil {
 		log.Err(err).Msgf("could not create metric for process: %s", metricBuilder.Name)
@@ -411,7 +411,7 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 }
 
 func BuildServiceForMetricWithStatusText(hostName string, metricBuilder MetricBuilder,
-	statusMessages map[transit.MonitorStatus]string) (*transit.DynamicMonitoredService, error) {
+	statusMessages map[transit.MonitorStatus]string) (*transit.MonitoredService, error) {
 	service, err := BuildServiceForMetric(hostName, metricBuilder)
 	if err != nil {
 		log.Err(err).Msgf("could not create service %s:%s", hostName, metricBuilder.CustomName)
@@ -423,7 +423,7 @@ func BuildServiceForMetricWithStatusText(hostName string, metricBuilder MetricBu
 	return service, err
 }
 
-func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.DynamicMonitoredService, error) {
+func BuildServiceForMultiMetric(hostName string, serviceName string, customName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
 	metrics := make([]transit.TimeSeries, len(metricBuilders))
 	for index, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
@@ -437,7 +437,7 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 	return CreateService(gwServiceName, hostName, metrics)
 }
 
-func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.DynamicMonitoredService, error) {
+func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
 	var timeSeries []transit.TimeSeries
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
@@ -453,9 +453,9 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // CreateService makes node
 // required params: name, owner(resource)
 // optional params: metrics
-func CreateService(name string, owner string, args ...interface{}) (*transit.DynamicMonitoredService, error) {
+func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
 	checkTime := time.Now().Local()
-	service := transit.DynamicMonitoredService{
+	service := transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
 			Type:  transit.Service,
@@ -491,9 +491,9 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 // CreateResource makes node
 // required params: name
 // optional params: services
-func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitoredResource, error) {
+func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
 	checkTime := time.Now().Local()
-	resource := transit.DynamicMonitoredResource{
+	resource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
@@ -506,8 +506,8 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 	}
 	for _, arg := range args {
 		switch arg.(type) {
-		case []transit.DynamicMonitoredService:
-			resource.Services = arg.([]transit.DynamicMonitoredService)
+		case []transit.MonitoredService:
+			resource.Services = arg.([]transit.MonitoredService)
 			if len(resource.Services) > 0 {
 				resource.LastCheckTime = resource.Services[0].LastCheckTime
 				resource.NextCheckTime = resource.Services[0].NextCheckTime
@@ -528,7 +528,7 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 	return &resource, nil
 }
 
-func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit.MonitorStatus {
+func CalculateResourceStatus(services []transit.MonitoredService) transit.MonitorStatus {
 
 	// TODO: implement logic
 
@@ -663,8 +663,8 @@ func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, cri
 }
 
 // EvaluateExpressions calculates synthetic metrics
-func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.DynamicMonitoredService {
-	var result []transit.DynamicMonitoredService
+func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
+	var result []transit.MonitoredService
 	vars := make(map[string]interface{})
 
 	for _, service := range services {
@@ -693,7 +693,7 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 				} else {
 					endTime := metric.Interval.EndTime.Time
 					startTime := metric.Interval.StartTime.Time
-					result[i] = transit.DynamicMonitoredService{
+					result[i] = transit.MonitoredService{
 						BaseTransitData: transit.BaseTransitData{
 							Name:  result[i].Name,
 							Type:  transit.Service,
@@ -839,7 +839,7 @@ func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) str
 	return fmt.Sprintf("%.0f second(s)", s)
 }
 
-func addServiceStatusText(patternMessage string, service *transit.DynamicMonitoredService) {
+func addServiceStatusText(patternMessage string, service *transit.MonitoredService) {
 	if service == nil {
 		log.Error().Msg("service is nil")
 		return
@@ -865,7 +865,7 @@ func addServiceStatusText(patternMessage string, service *transit.DynamicMonitor
 	service.LastPlugInOutput = statusText
 }
 
-func addThresholdsToStatusText(statusText string, service *transit.DynamicMonitoredService) string {
+func addThresholdsToStatusText(statusText string, service *transit.MonitoredService) string {
 	if service == nil {
 		log.Error().Msg("service is nil")
 		return statusText
@@ -910,7 +910,7 @@ func addThresholdsToStatusText(statusText string, service *transit.DynamicMonito
 	return statusText
 }
 
-func extractValueForStatusText(service *transit.DynamicMonitoredService) (string, error) {
+func extractValueForStatusText(service *transit.MonitoredService) (string, error) {
 	if len(service.Metrics) == 1 {
 		return getValueText(service.Metrics[0].Value)
 	}
@@ -939,11 +939,11 @@ func getValueText(value *transit.TypedValue) (string, error) {
 	return "", errors.New("unknown value type")
 }
 
-func extractIntervalForStatusText(service *transit.DynamicMonitoredService) (string, error) {
+func extractIntervalForStatusText(service *transit.MonitoredService) (string, error) {
 	return FormatTimeForStatusMessage(CheckInterval, time.Minute), nil
 }
 
-func buildHostStatusText(services []transit.DynamicMonitoredService) string {
+func buildHostStatusText(services []transit.MonitoredService) string {
 	var ok, warn, critical, other int
 	for _, service := range services {
 		switch service.Status {

@@ -37,7 +37,7 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
-	var iServices []transit.DynamicInventoryService
+	var iServices []transit.InventoryService
 	is1 := connectors.CreateInventoryService(Service1, Resource1)
 	is2 := connectors.CreateInventoryService(Service2, Resource1)
 	iServices = append(iServices, is1, is2)
@@ -84,13 +84,13 @@ func main() {
 	fmt.Printf("service 1 created with metrics: %+v\n", service2)
 
 	// Create a Monitored Resource and Add Service
-	resource1, _ := connectors.CreateResource(Resource1, []transit.DynamicMonitoredService{*service1})
+	resource1, _ := connectors.CreateResource(Resource1, []transit.MonitoredService{*service1})
 	fmt.Printf("resource 1 created with services: %+v\n", resource1)
-	resource2, _ := connectors.CreateResource(Resource2, []transit.DynamicMonitoredService{*service2})
+	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if enableTransit {
-		connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{*resource1, *resource2}, nil)
+		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
 	}
 }
 
@@ -119,7 +119,7 @@ func LowLevelExamples() {
 	}
 
 	// Example Service
-	var localLoadService = transit.DynamicMonitoredService{
+	var localLoadService = transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name: "local_load",
 			Type: transit.Service,
@@ -139,7 +139,7 @@ func LowLevelExamples() {
 		Metrics:          []transit.TimeSeries{sampleValue},
 	}
 
-	geneva := transit.DynamicMonitoredResource{
+	geneva := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: "geneva",
@@ -158,11 +158,11 @@ func LowLevelExamples() {
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Services:         []transit.DynamicMonitoredService{localLoadService},
+		Services:         []transit.MonitoredService{localLoadService},
 	}
 
 	// Build Monitored Resources
-	resources := []transit.DynamicMonitoredResource{geneva}
+	resources := []transit.MonitoredResource{geneva}
 
 	// TODO: call into API
 
