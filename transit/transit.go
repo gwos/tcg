@@ -179,6 +179,7 @@ type TimeInterval struct {
 	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
+// String implements Stringer interface
 func (value TimeInterval) String() string {
 	return fmt.Sprintf("[%s, %s]",
 		value.EndTime.String(),
@@ -209,6 +210,7 @@ type TypedValue struct {
 	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
+// String implements Stringer interface
 func (value TypedValue) String() string {
 	switch value.ValueType {
 	case IntegerType:
@@ -225,6 +227,44 @@ func (value TypedValue) String() string {
 	return ""
 }
 
+func (value *TypedValue) ToTypedValue(v interface{}) error {
+	switch v.(type) {
+	case bool:
+		value.ValueType = BooleanType
+		value.BoolValue = v.(bool)
+	case float32:
+		value.ValueType = DoubleType
+		value.DoubleValue = float64(v.(float32))
+	case float64:
+		value.ValueType = DoubleType
+		value.DoubleValue = v.(float64)
+	case int:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int))
+	case int8:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int8))
+	case int16:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int16))
+	case int32:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int32))
+	case int64:
+		value.ValueType = IntegerType
+		value.IntegerValue = v.(int64)
+	case string:
+		value.ValueType = StringType
+		value.StringValue = v.(string)
+	case milliseconds.MillisecondTimestamp:
+		value.ValueType = TimeType
+		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
+	default:
+		return errors.New("unable to convert to typed value: unsupported type")
+	}
+	return nil
+}
+
 // ThresholdValue describes threshold
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
@@ -232,6 +272,7 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
+// String implements Stringer interface
 func (thresholdValue ThresholdValue) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		thresholdValue.SampleType, thresholdValue.Label, thresholdValue.Value.String())
@@ -259,6 +300,7 @@ type TimeSeries struct {
 	MetricExpression  string            `json:"-"`
 }
 
+// String implements Stringer interface
 func (timeSeries TimeSeries) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
 		timeSeries.MetricName, timeSeries.SampleType, timeSeries.Interval.String(), timeSeries.Value.String(),
@@ -345,6 +387,7 @@ type MetricDescriptor struct {
 	MetricKind MetricKind `json:"metricKind"`
 }
 
+// String implements Stringer interface
 func (metricDescriptor MetricDescriptor) String() string {
 	return fmt.Sprintf("%s - %s", metricDescriptor.Type, metricDescriptor.CustomName)
 }
@@ -366,6 +409,7 @@ type LabelDescriptor struct {
 	ValueType ValueType `json:"valueType,omitempty"`
 }
 
+// String implements Stringer interface
 func (labelDescriptor LabelDescriptor) String() string {
 	return fmt.Sprintf("[%s, %s, %s]", labelDescriptor.Description, labelDescriptor.Key, labelDescriptor.ValueType)
 }
@@ -377,6 +421,7 @@ type ThresholdDescriptor struct {
 	Value int32  `json:"value"`
 }
 
+// String implements Stringer interface
 func (thresholdDescriptor ThresholdDescriptor) String() string {
 	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
@@ -419,6 +464,23 @@ type InventoryResource struct {
 	Services []InventoryService `json:"services"`
 }
 
+// String implements Stringer interface
+func (inventoryResource InventoryResource) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
+		inventoryResource.BaseResource.Name, inventoryResource.BaseResource.Type,
+		inventoryResource.BaseResource.Owner, inventoryResource.BaseResource.Category,
+		inventoryResource.BaseResource.Description, inventoryResource.BaseResource.Device,
+		inventoryResource.BaseResource.Properties, inventoryResource.Services,
+	)
+}
+
+func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
+	if inventoryResource.BaseResource.Properties == nil {
+		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
+	}
+	inventoryResource.BaseResource.Properties[name] = value
+}
+
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
 // In cloud systems, services are usually modeled as a complex metric definition, with each sampled
 // metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
@@ -426,6 +488,21 @@ type InventoryResource struct {
 // InventoryService collections are attached to an InventoryResource during inventory scans.
 type InventoryService struct {
 	BaseTransitData
+}
+
+// String implements Stringer interface
+func (inventoryService InventoryService) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
+		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
+		inventoryService.Category, inventoryService.Description, inventoryService.Properties,
+	)
+}
+
+func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
+	if inventoryService.Properties == nil {
+		inventoryService.Properties = make(map[string]TypedValue)
+	}
+	inventoryService.Properties[name] = value
 }
 
 // A MonitoredResource defines the current status and services of a resource during a metrics scan.
@@ -453,105 +530,7 @@ type MonitoredResource struct {
 	Services []MonitoredService `json:"services"`
 }
 
-// A MonitoredService represents a Groundwork Service creating during a metrics scan.
-// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series.
-//
-// A MonitoredService contains a collection of TimeSeries Metrics.
-// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
-type MonitoredService struct {
-	BaseTransitData
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// metrics
-	Metrics []TimeSeries `json:"metrics"`
-}
-
-func (inventoryResource InventoryResource) String() string {
-	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
-		inventoryResource.BaseResource.Name, inventoryResource.BaseResource.Type,
-		inventoryResource.BaseResource.Owner, inventoryResource.BaseResource.Category,
-		inventoryResource.BaseResource.Description, inventoryResource.BaseResource.Device,
-		inventoryResource.BaseResource.Properties, inventoryResource.Services,
-	)
-}
-
-func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
-	if inventoryResource.BaseResource.Properties == nil {
-		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
-	}
-	inventoryResource.BaseResource.Properties[name] = value
-}
-
-func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
-	for k, v := range properties {
-		var typedValue TypedValue
-		err := typedValue.toTypedValue(v)
-		if err != nil {
-			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
-		}
-		monitoredService.CreateProperty(k, typedValue)
-	}
-}
-
-func (value *TypedValue) toTypedValue(v interface{}) error {
-	switch v.(type) {
-	case bool:
-		value.ValueType = BooleanType
-		value.BoolValue = v.(bool)
-	case float32:
-		value.ValueType = DoubleType
-		value.DoubleValue = float64(v.(float32))
-	case float64:
-		value.ValueType = DoubleType
-		value.DoubleValue = v.(float64)
-	case int:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int))
-	case int8:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int8))
-	case int16:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int16))
-	case int32:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int32))
-	case int64:
-		value.ValueType = IntegerType
-		value.IntegerValue = v.(int64)
-	case string:
-		value.ValueType = StringType
-		value.StringValue = v.(string)
-	case milliseconds.MillisecondTimestamp:
-		value.ValueType = TimeType
-		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
-	default:
-		return errors.New("unable to convert to typed value: unsupported type")
-	}
-	return nil
-}
-
-func (inventoryService InventoryService) String() string {
-	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
-		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
-		inventoryService.Category, inventoryService.Description, inventoryService.Properties,
-	)
-}
-
-func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
-	if inventoryService.Properties == nil {
-		inventoryService.Properties = make(map[string]TypedValue)
-	}
-	inventoryService.Properties[name] = value
-}
-
+// String implements Stringer interface
 func (monitoredResource MonitoredResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredResource.BaseResource.Name,
@@ -573,6 +552,42 @@ func (monitoredResource *MonitoredResource) CreateProperty(name string, value Ty
 	monitoredResource.BaseResource.Properties[name] = value
 }
 
+func (monitoredResource *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
+	return MonitoredResourceRef{Name: monitoredResource.Name, Type: Host, Owner: monitoredResource.Owner}
+}
+
+func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResource {
+	var services []InventoryService
+	for _, ms := range monitoredResource.Services {
+		services = append(services, ms.ToInventoryService())
+	}
+	return InventoryResource{
+		BaseResource: monitoredResource.BaseResource,
+		Services:     services,
+	}
+}
+
+// A MonitoredService represents a Groundwork Service creating during a metrics scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series.
+//
+// A MonitoredService contains a collection of TimeSeries Metrics.
+// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
+type MonitoredService struct {
+	BaseTransitData
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// metrics
+	Metrics []TimeSeries `json:"metrics"`
+}
+
+// String implements Stringer interface
 func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
@@ -588,6 +603,23 @@ func (monitoredService *MonitoredService) CreateProperty(name string, value Type
 	monitoredService.Properties[name] = value
 }
 
+func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
+	for k, v := range properties {
+		var typedValue TypedValue
+		err := typedValue.ToTypedValue(v)
+		if err != nil {
+			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
+		}
+		monitoredService.CreateProperty(k, typedValue)
+	}
+}
+
+func (monitoredService *MonitoredService) ToInventoryService() InventoryService {
+	return InventoryService{
+		BaseTransitData: monitoredService.BaseTransitData,
+	}
+}
+
 // MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {
 	// The unique name of the resource
@@ -599,6 +631,7 @@ type MonitoredResourceRef struct {
 	Owner string `json:"owner,omitempty"`
 }
 
+// String implements Stringer interface
 func (monitoredResourceRef MonitoredResourceRef) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		monitoredResourceRef.Name,
@@ -616,6 +649,7 @@ type TracerContext struct {
 	Version    VersionString                     `json:"version"`
 }
 
+// String implements Stringer interface
 func (tracerContext TracerContext) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
 		tracerContext.AppType, tracerContext.AgentID, tracerContext.TraceToken,
@@ -632,6 +666,7 @@ type OperationResult struct {
 	EntityID int    `json:"entityID"`
 }
 
+// String implements Stringer interface
 func (operationResult OperationResult) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %d]",
 		operationResult.Entity, operationResult.Status, operationResult.Message,
@@ -650,6 +685,7 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
+// String implements Stringer interface
 func (operationResults OperationResults) String() string {
 	return fmt.Sprintf("[%d, %d, %s, %s, %d, %d, %s]",
 		operationResults.ResourcesAdded, operationResults.ResourcesDeleted, operationResults.EntityType,
@@ -665,6 +701,7 @@ type ResourceGroup struct {
 	Resources   []MonitoredResourceRef `json:"resources,required"`
 }
 
+// String implements Stringer interface
 func (resourceGroup ResourceGroup) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s]",
 		resourceGroup.GroupName, resourceGroup.Type, resourceGroup.Description, resourceGroup.Resources,
@@ -678,6 +715,7 @@ type ResourcesWithServicesRequest struct {
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
+// String implements Stringer interface
 func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",
 		resourcesWithServicesRequest.Context.String(),
@@ -693,6 +731,7 @@ type InventoryRequest struct {
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
 }
 
+// String implements Stringer interface
 func (inventoryRequest InventoryRequest) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		inventoryRequest.Context.String(), inventoryRequest.Resources, inventoryRequest.Groups,
@@ -711,6 +750,7 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+// String implements Stringer interface
 func (incidentAlert IncidentAlert) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
 		incidentAlert.IncidentID, incidentAlert.ResourceName, incidentAlert.Status, incidentAlert.StartedAt.String(),
@@ -723,6 +763,7 @@ type GroundworkEventsRequest struct {
 	Events []GroundworkEvent `json:"events"`
 }
 
+// String implements Stringer interface
 func (groundworkEventsRequest GroundworkEventsRequest) String() string {
 	return fmt.Sprintf("[%s]", groundworkEventsRequest.Events)
 }
@@ -753,6 +794,7 @@ type GroundworkEvent struct {
 	ApplicationName   string `json:"applicationName,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEvent GroundworkEvent) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		groundworkEvent.Device, groundworkEvent.Host, groundworkEvent.Service, groundworkEvent.OperationStatus,
@@ -762,6 +804,13 @@ func (groundworkEvent GroundworkEvent) String() string {
 		groundworkEvent.AppType, groundworkEvent.MonitorServer, groundworkEvent.ConsolidationName,
 		groundworkEvent.LogType, groundworkEvent.ErrorType, groundworkEvent.LoggerName, groundworkEvent.ApplicationName,
 	)
+}
+
+type View struct {
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Extensions  map[string]interface{} `json:"extensions,omitempty"`
 }
 
 // MonitorConnection describes the connection to the monitored system
@@ -777,13 +826,7 @@ type MonitorConnection struct {
 	ConnectorID int         `json:"connectorId"`
 }
 
-type View struct {
-	Name        string                 `json:"name"`
-	DisplayName string                 `json:"displayName"`
-	Enabled     bool                   `json:"enabled"`
-	Extensions  map[string]interface{} `json:"extensions,omitempty"`
-}
-
+// String implements Stringer interface
 func (monitorConnection MonitorConnection) String() string {
 	return fmt.Sprintf("[%d, %s, %s, %s, %t, %s, %s, %d]",
 		monitorConnection.ID, monitorConnection.Server, monitorConnection.UserName, monitorConnection.Password,
@@ -805,6 +848,7 @@ type GroundworkEventAck struct {
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEventAck GroundworkEventAck) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
 		groundworkEventAck.AppType, groundworkEventAck.Host, groundworkEventAck.Service,
@@ -824,6 +868,7 @@ type GroundworkEventUnack struct {
 	Service string `json:"service,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEventUnack GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
@@ -836,6 +881,7 @@ type MetricsProfile struct {
 	Metrics     []MetricDefinition `json:"metrics"`
 }
 
+// String implements Stringer interface
 func (metricsProfile MetricsProfile) String() string {
 	return fmt.Sprintf("[%s, %s, %t, %s]",
 		metricsProfile.Name, metricsProfile.ProfileType,
@@ -860,6 +906,7 @@ type MetricDefinition struct {
 	Format            string      `json:"format,omitempty"`
 }
 
+// String implements Stringer interface
 func (metricDefinition MetricDefinition) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %t, %t, %s, %s, %s, %s, %s, %d, %d, %s, %s]",
 		metricDefinition.Name, metricDefinition.CustomName, metricDefinition.Description, metricDefinition.Monitored,
@@ -891,27 +938,6 @@ type HostsAndServices struct {
 	ServiceGroupCategoryNames []string `json:"serviceGroupCategoryNames"`
 	SetHosts                  bool     `json:"setHosts"`
 	SetServices               bool     `json:"setServices"`
-}
-
-func (mr *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
-	return MonitoredResourceRef{Name: mr.Name, Type: Host, Owner: mr.Owner}
-}
-
-func (mr *MonitoredResource) ToInventoryResource() InventoryResource {
-	var services []InventoryService
-	for _, ms := range mr.Services {
-		services = append(services, ms.ToInventoryService())
-	}
-	return InventoryResource{
-		BaseResource: mr.BaseResource,
-		Services:     services,
-	}
-}
-
-func (ms *MonitoredService) ToInventoryService() InventoryService {
-	return InventoryService{
-		BaseTransitData: ms.BaseTransitData,
-	}
 }
 
 // AgentIdentity defines TCG Agent Identity
