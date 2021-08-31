@@ -50,6 +50,7 @@ type Config struct {
 	StoreType           string
 	StoreMaxAge         time.Duration
 	StoreMaxBytes       int64
+	StoreMaxMsgs        int
 	StoreBufferSize     int
 	StoreReadBufferSize int
 }
@@ -82,6 +83,7 @@ func StartServer(config Config) error {
 	}
 	stanOpts.StoreLimits.MaxAge = config.StoreMaxAge
 	stanOpts.StoreLimits.MaxBytes = config.StoreMaxBytes
+	stanOpts.StoreLimits.MaxMsgs = config.StoreMaxMsgs
 	stanOpts.FileStoreOpts.BufferSize = config.StoreBufferSize
 	stanOpts.FileStoreOpts.ReadBufferSize = config.StoreReadBufferSize
 
