@@ -156,6 +156,8 @@ type Connector struct {
 	NatsStoreMaxAge time.Duration `yaml:"natsStoreMaxAge"`
 	// How many bytes are allowed per-channel
 	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
+	// How many messages are allowed per-channel
+	NatsStoreMaxMsgs int `yaml:"natsStoreMaxMsgs"`
 	// NatsStoreBufferSize for FileStore type
 	// size (in bytes) of the buffer used during file store operations
 	NatsStoreBufferSize int `yaml:"-"`
@@ -363,6 +365,7 @@ func defaults() Config {
 			NatsStoreType:           "FILE",
 			NatsStoreMaxAge:         time.Hour * 24 * 10,     // 10days
 			NatsStoreMaxBytes:       1024 * 1024 * 1024 * 50, // 50GB
+			NatsStoreMaxMsgs:        1000000,                 // 1 000 000
 			NatsStoreBufferSize:     1024 * 1024 * 2,         // 2MB
 			NatsStoreReadBufferSize: 1024 * 1024 * 2,         // 2MB
 		},

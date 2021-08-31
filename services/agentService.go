@@ -653,6 +653,7 @@ func (service *AgentService) startNats() error {
 		StoreType:           service.Connector.NatsStoreType,
 		StoreMaxAge:         service.Connector.NatsStoreMaxAge,
 		StoreMaxBytes:       service.Connector.NatsStoreMaxBytes,
+		StoreMaxMsgs:        service.Connector.NatsStoreMaxMsgs,
 		StoreBufferSize:     service.Connector.NatsStoreBufferSize,
 		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
 	})
