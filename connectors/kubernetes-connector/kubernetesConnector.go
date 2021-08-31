@@ -56,7 +56,7 @@ const (
 	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
 	PodsHostGroup                    = "pods-"
 	NamespaceDefault                 = "default"
-	defaultKubernetesClusterEndpoint = "gwos.bluesunrise.com:8001"
+	defaultKubernetesClusterEndpoint = ""
 )
 
 type KubernetesConnector struct {
