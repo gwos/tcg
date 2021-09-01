@@ -158,7 +158,7 @@ func CreateInventoryService(name string, owner string) transit.InventoryService 
 	return transit.InventoryService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
-			Type:  transit.Service,
+			Type:  transit.ResourceTypeService,
 			Owner: owner,
 		},
 	}
@@ -170,7 +170,7 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 	}
@@ -458,7 +458,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 	service := transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
-			Type:  transit.Service,
+			Type:  transit.ResourceTypeService,
 			Owner: owner,
 		},
 		Status:        transit.ServiceOk,
@@ -497,7 +497,7 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: name,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 		Status:        transit.HostUp,
@@ -696,7 +696,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 					result[i] = transit.MonitoredService{
 						BaseTransitData: transit.BaseTransitData{
 							Name:  result[i].Name,
-							Type:  transit.Service,
+							Type:  transit.ResourceTypeService,
 							Owner: result[i].Owner,
 						},
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),

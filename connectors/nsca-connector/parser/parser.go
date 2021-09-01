@@ -79,7 +79,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
 					Name: resName,
-					Type: transit.Host,
+					Type: transit.ResourceTypeHost,
 				},
 			},
 			Services: make([]transit.MonitoredService, 0, len(services)),
@@ -229,7 +229,7 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  svcName,
-				Type:  transit.Service,
+				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
 			Status:           status,
@@ -336,7 +336,7 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  svcName,
-				Type:  transit.Service,
+				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
 			Status:           status,

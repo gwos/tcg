@@ -234,7 +234,7 @@ func resource() transit.MonitoredResource {
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 		Status:        transit.HostUp,
@@ -248,7 +248,7 @@ func service(i int) transit.MonitoredService {
 	return transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
-			Type:  transit.Service,
+			Type:  transit.ResourceTypeService,
 			Owner: TestHostName,
 		},
 		Status:        transit.ServiceOk,
@@ -277,7 +277,7 @@ func inventoryResource() transit.InventoryResource {
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 	}

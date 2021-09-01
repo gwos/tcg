@@ -122,7 +122,7 @@ func LowLevelExamples() {
 	var localLoadService = transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name: "local_load",
-			Type: transit.Service,
+			Type: transit.ResourceTypeService,
 			Properties: map[string]transit.TypedValue{
 				"stateType":       {StringValue: "SOFT"},
 				"checkType":       {StringValue: "ACTIVE"},
@@ -143,7 +143,7 @@ func LowLevelExamples() {
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: "geneva",
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 				Properties: map[string]transit.TypedValue{
 					"stateType":       {StringValue: "SOFT"},
 					"checkType":       {StringValue: "ACTIVE"},
