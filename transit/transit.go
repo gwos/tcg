@@ -428,10 +428,10 @@ func (thresholdDescriptor ThresholdDescriptor) String() string {
 
 type BaseTransitData struct {
 	// The unique name of the resource
-	Name string `json:"name,required"`
+	Name string `json:"name"`
 	// Type: Required. The resource type of the resource
 	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
+	Type ResourceType `json:"type"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
 	// CloudHub Categorization of resources
@@ -519,7 +519,7 @@ func (inventoryService *InventoryService) CreateProperty(name string, value Type
 type MonitoredResource struct {
 	BaseResource
 	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
+	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
 	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
@@ -576,7 +576,7 @@ func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResou
 type MonitoredService struct {
 	BaseTransitData
 	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
+	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
 	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
@@ -623,7 +623,7 @@ func (monitoredService *MonitoredService) ToInventoryService() InventoryService 
 // MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {
 	// The unique name of the resource
-	Name string `json:"name,required"`
+	Name string `json:"name"`
 	// Type: Optional. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,omitempty"`
@@ -695,10 +695,10 @@ func (operationResults OperationResults) String() string {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName   string                 `json:"groupName,required"`
-	Type        GroupType              `json:"type,required"`
+	GroupName   string                 `json:"groupName"`
+	Type        GroupType              `json:"type"`
 	Description string                 `json:"description,omitempty"`
-	Resources   []MonitoredResourceRef `json:"resources,required"`
+	Resources   []MonitoredResourceRef `json:"resources"`
 }
 
 // String implements Stringer interface
@@ -741,7 +741,7 @@ func (inventoryRequest InventoryRequest) String() string {
 // IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
 	IncidentID    string                            `json:"incidentId"`
-	ResourceName  string                            `json:"resourceName,required"`
+	ResourceName  string                            `json:"resourceName"`
 	Status        string                            `json:"status"`
 	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
 	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
@@ -771,10 +771,10 @@ func (groundworkEventsRequest GroundworkEventsRequest) String() string {
 // GroundworkEvent describes event
 type GroundworkEvent struct {
 	Device              string                            `json:"device,omitempty"`
-	Host                string                            `json:"host,required"`
+	Host                string                            `json:"host"`
 	Service             string                            `json:"service,omitempty"`
 	OperationStatus     string                            `json:"operationStatus,omitempty"`
-	MonitorStatus       string                            `json:"monitorStatus,required"`
+	MonitorStatus       string                            `json:"monitorStatus"`
 	Severity            string                            `json:"severity,omitempty"`
 	ApplicationSeverity string                            `json:"applicationSeverity,omitempty"`
 	Component           string                            `json:"component,omitempty"`
@@ -783,8 +783,8 @@ type GroundworkEvent struct {
 	TypeRule            string                            `json:"typeRule,omitempty"`
 	TextMessage         string                            `json:"textMessage,omitempty"`
 	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
-	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
-	AppType             string                            `json:"appType,required"`
+	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate"`
+	AppType             string                            `json:"appType"`
 	// Update level attributes (update only)
 	MonitorServer     string `json:"monitorServer,omitempty"`
 	ConsolidationName string `json:"consolidationName,omitempty"`
@@ -841,8 +841,8 @@ type GroundworkEventsAckRequest struct {
 
 // GroundworkEventAck describes event ack
 type GroundworkEventAck struct {
-	AppType            string `json:"appType,required"`
-	Host               string `json:"host,required"`
+	AppType            string `json:"appType"`
+	Host               string `json:"host"`
 	Service            string `json:"service,omitempty"`
 	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
@@ -863,8 +863,8 @@ type GroundworkEventsUnackRequest struct {
 
 // GroundworkEventUnack describes event ack
 type GroundworkEventUnack struct {
-	AppType string `json:"appType,required"`
-	Host    string `json:"host,required"`
+	AppType string `json:"appType"`
+	Host    string `json:"host"`
 	Service string `json:"service,omitempty"`
 }
 
