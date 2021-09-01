@@ -544,7 +544,7 @@ func initializeEntrypoints() []services.Entrypoint {
 			URL:    "/suggest/:viewName",
 			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
-				if c.Param("viewName") == string(transit.Process) {
+				if c.Param("viewName") == string(transit.ServiceTypeProcess) {
 					c.JSON(http.StatusOK, listSuggestions(""))
 				} else {
 					c.JSON(http.StatusOK, []transit.MetricDefinition{})
@@ -555,7 +555,7 @@ func initializeEntrypoints() []services.Entrypoint {
 			URL:    "/suggest/:viewName/:name",
 			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
-				if c.Param("viewName") == string(transit.Process) {
+				if c.Param("viewName") == string(transit.ServiceTypeProcess) {
 					c.JSON(http.StatusOK, listSuggestions(c.Param("name")))
 				} else {
 					c.JSON(http.StatusOK, []transit.MetricDefinition{})

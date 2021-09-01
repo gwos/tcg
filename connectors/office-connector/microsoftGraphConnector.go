@@ -214,7 +214,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 
 	hostResource := MicrosoftGraphResource{
 		Name:    interacApp,
-		Type:    transit.Host,
+		Type:    transit.ResourceTypeHost,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
@@ -224,7 +224,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.Host,
+		Type:  transit.ResourceTypeHost,
 	})
 
 	// create one Drive metrics
@@ -357,7 +357,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	}
 	hostResource := MicrosoftGraphResource{
 		Name:    office365App,
-		Type:    transit.Host,
+		Type:    transit.ResourceTypeHost,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
@@ -367,7 +367,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.Host,
+		Type:  transit.ResourceTypeHost,
 	})
 	odata := ODataServicePayload{}
 	//randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))

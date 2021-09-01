@@ -271,7 +271,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 			if !containsRef(refs, hostName) {
 				groups[groupName] = append(groups[groupName], transit.MonitoredResourceRef{
 					Name: hostName,
-					Type: transit.Host,
+					Type: transit.ResourceTypeHost,
 				})
 			}
 			if resourceIndex != -1 {

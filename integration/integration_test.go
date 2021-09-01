@@ -77,14 +77,14 @@ func buildInventoryRequest(t *testing.T) []byte {
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 		Services: []transit.InventoryService{
 			{
 				BaseTransitData: transit.BaseTransitData{
 					Name:  "test",
-					Type:  transit.Hypervisor,
+					Type:  transit.ResourceTypeHypervisor,
 					Owner: TestHostName,
 				},
 			},
@@ -108,7 +108,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 		Status:        transit.HostUp,
@@ -118,7 +118,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 			{
 				BaseTransitData: transit.BaseTransitData{
 					Name:  "test",
-					Type:  transit.Service,
+					Type:  transit.ResourceTypeService,
 					Owner: TestHostName,
 				},
 				Status:        transit.ServiceOk,

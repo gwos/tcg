@@ -282,7 +282,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		monitorStatus, message := connector.calculateNodeStatus(&node)
 		resource := KubernetesResource{
 			Name:     node.Name,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
@@ -334,7 +334,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
 			Name:  resource.Name,
 			Owner: clusterHostGroupName,
-			Type:  transit.Host,
+			Type:  transit.ResourceTypeHost,
 		}
 		index = index + 1
 	}
@@ -362,7 +362,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
 			Name:     podName,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
@@ -381,7 +381,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		} else {
@@ -393,7 +393,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		}
@@ -606,7 +606,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 				}
 				message.WriteString(condition.Message)
 				if status == transit.HostUp {
-					status = transit.Warning
+					status = transit.HostWarning
 				}
 			}
 		}

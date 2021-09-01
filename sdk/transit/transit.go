@@ -97,6 +97,7 @@ const (
 	ServiceUnknown             MonitorStatus = "SERVICE_UNKNOWN"
 	HostUp                     MonitorStatus = "HOST_UP"
 	HostUnscheduledDown        MonitorStatus = "HOST_UNSCHEDULED_DOWN"
+	HostWarning                MonitorStatus = "HOST_WARNING"
 	HostPending                MonitorStatus = "HOST_PENDING"
 	HostScheduledDown          MonitorStatus = "HOST_SCHEDULED_DOWN"
 	HostUnreachable            MonitorStatus = "HOST_UNREACHABLE"
@@ -109,18 +110,19 @@ type ResourceType string
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
-	Host           ResourceType = "host"
-	Hypervisor     ResourceType = "hypervisor"
-	Instance       ResourceType = "instance"
-	VirtualMachine ResourceType = "virtual-machine"
-	CloudApp       ResourceType = "cloud-app"
-	CloudFunction  ResourceType = "cloud-function"
-	LoadBalancer   ResourceType = "load-balancer"
-	Container      ResourceType = "container"
-	Storage        ResourceType = "storage"
-	Network        ResourceType = "network"
-	NetworkSwitch  ResourceType = "network-switch"
-	NetworkDevice  ResourceType = "network-device"
+	ResourceTypeHost           ResourceType = "host"
+	ResourceTypeService        ResourceType = "service"
+	ResourceTypeHypervisor     ResourceType = "hypervisor"
+	ResourceTypeInstance       ResourceType = "instance"
+	ResourceTypeVirtualMachine ResourceType = "virtual-machine"
+	ResourceTypeCloudApp       ResourceType = "cloud-app"
+	ResourceTypeCloudFunction  ResourceType = "cloud-function"
+	ResourceTypeLoadBalancer   ResourceType = "load-balancer"
+	ResourceTypeContainer      ResourceType = "container"
+	ResourceTypeStorage        ResourceType = "storage"
+	ResourceTypeNetwork        ResourceType = "network"
+	ResourceTypeNetworkSwitch  ResourceType = "network-switch"
+	ResourceTypeNetworkDevice  ResourceType = "network-device"
 )
 
 // ServiceType defines the service type
@@ -128,8 +130,8 @@ type ServiceType string
 
 // Possible Types
 const (
-	Process ServiceType = "Process"
-	Service             = "Service"
+	ServiceTypeProcess ServiceType = "Process"
+	ServiceTypeService ServiceType = "Service"
 )
 
 // GroupType defines the foundation group type
@@ -148,10 +150,10 @@ type MetricSampleType string
 // TimeSeries Metric Sample Possible Types
 const (
 	Value    MetricSampleType = "Value"
-	Warning                   = "Warning"
-	Critical                  = "Critical"
-	Min                       = "Min"
-	Max                       = "Max"
+	Warning  MetricSampleType = "Warning"
+	Critical MetricSampleType = "Critical"
+	Min      MetricSampleType = "Min"
+	Max      MetricSampleType = "Max"
 )
 
 // TimeInterval defines a closed time interval. It extends from the start time
@@ -554,7 +556,7 @@ func (monitoredResource *MonitoredResource) CreateProperty(name string, value Ty
 }
 
 func (monitoredResource *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
-	return MonitoredResourceRef{Name: monitoredResource.Name, Type: Host, Owner: monitoredResource.Owner}
+	return MonitoredResourceRef{Name: monitoredResource.Name, Type: ResourceTypeHost, Owner: monitoredResource.Owner}
 }
 
 func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResource {
