@@ -15,14 +15,14 @@ import (
 )
 
 var (
+	connector         KubernetesConnector
+	chksum            []byte
+	fresh             = true
 	extConfig         = &ExtConfig{}
+	ctxCancel, cancel = context.WithCancel(context.Background())
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	chksum            []byte
-	connector         KubernetesConnector
-	ctxCancel, cancel = context.WithCancel(context.Background())
-	count             = 0
 )
 
 func main() {
@@ -30,14 +30,14 @@ func main() {
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
 
-	log.Info().Msg("waiting for configuration to be delivered ...")
+	log.Info().Msg("Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Err(err).Msg("could not demand config")
+		log.Err(err).Msg("Could not demand config")
 		return
 	}
 
 	if err := connectors.Start(); err != nil {
-		log.Err(err).Msg("could not start connector")
+		log.Err(err).Msg("Could not start connector")
 		return
 	}
 
@@ -48,7 +48,7 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info().Msg("configuration received")
+	log.Info().Msg("Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		EndPoint:  defaultKubernetesClusterEndpoint,
@@ -60,13 +60,13 @@ func configHandler(data []byte) {
 	tMetProf := &transit.MetricsProfile{}
 
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Err(err).Msg("could not parse config")
+		log.Err(err).Msg("Could not parse config")
 		return
 	}
 
 	if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
 		if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
-			log.Err(err).Msg("could not write to file")
+			log.Err(err).Msg("Could not write to file")
 		}
 	}
 
@@ -91,16 +91,20 @@ func configHandler(data []byte) {
 	monitorConnection.Extensions = extConfig
 
 	/* Process checksums */
-	chk, err := connectors.Hashsum(extConfig)
+	chk, err := connectors.Hashsum(extConfig, tMetProf, tMonConn)
 	if err != nil || !bytes.Equal(chksum, chk) {
-		// TODO: process inventory
+		fresh = true
 	}
 	if err == nil {
 		chksum = chk
 	}
 
-	if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
-		log.Err(err).Msg("could not initialize connector")
+	if monitorConnection.ConnectorID != 0 {
+		if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
+			log.Err(err).Msg("Could not initialize connector")
+		}
+	} else {
+		connector.Shutdown()
 	}
 
 	/* Restart periodic loop */
@@ -113,29 +117,31 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if connector.kapi != nil {
 		inventory, monitored, groups := connector.Collect(extConfig)
-		log.Debug().Msgf("collected %d:%d:%d", len(inventory), len(monitored), len(groups))
+		log.Debug().Msgf("Collected %d:%d:%d", len(inventory), len(monitored), len(groups))
 
-		if count == 0 {
+		if fresh {
 			err := connectors.SendInventory(
 				context.Background(),
 				inventory,
 				groups,
 				extConfig.Ownership,
 			)
-			log.Err(err).Msg("sending inventory")
-			count = count + 1
+			// TODO: better way to assure sync completion?
+			log.Err(err).Msg("Sending inventory")
+			time.Sleep(3 * time.Second)
 		}
-		time.Sleep(3 * time.Second) // TODO: better way to assure sync completion?
 		err := connectors.SendMetrics(context.Background(), monitored, &groups)
-		log.Err(err).Msg("sending metrics")
+		log.Err(err).Msg("Sending metrics")
 	}
 }
 
 func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	for _, metric := range metricsArray {
-		if metric.ServiceType == string(ViewNodes) {
-			metrics[metric.Name] = metric
+	if metricsArray != nil {
+		for _, metric := range metricsArray {
+			if metric.ServiceType == string(ViewNodes) {
+				metrics[metric.Name] = metric
+			}
 		}
 	}
 
@@ -145,9 +151,11 @@ func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]tra
 
 func buildPodMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	for _, metric := range metricsArray {
-		if metric.ServiceType == string(ViewPods) {
-			metrics[metric.Name] = metric
+	if metricsArray != nil {
+		for _, metric := range metricsArray {
+			if metric.ServiceType == string(ViewPods) {
+				metrics[metric.Name] = metric
+			}
 		}
 	}
 
