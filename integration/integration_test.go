@@ -73,27 +73,27 @@ func TestIntegration(t *testing.T) {
 }
 
 func buildInventoryRequest(t *testing.T) []byte {
-	inventoryResource := transit.DynamicInventoryResource{
+	inventoryResource := transit.InventoryResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
-		Services: []transit.DynamicInventoryService{
+		Services: []transit.InventoryService{
 			{
 				BaseTransitData: transit.BaseTransitData{
 					Name:  "test",
-					Type:  transit.Hypervisor,
+					Type:  transit.ResourceTypeHypervisor,
 					Owner: TestHostName,
 				},
 			},
 		},
 	}
 
-	inventoryRequest := transit.DynamicInventoryRequest{
+	inventoryRequest := transit.InventoryRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.DynamicInventoryResource{inventoryResource},
+		Resources: []transit.InventoryResource{inventoryResource},
 		Groups:    nil,
 	}
 
@@ -104,21 +104,21 @@ func buildInventoryRequest(t *testing.T) []byte {
 }
 
 func buildResourceWithMetricsRequest(t *testing.T) []byte {
-	monitoredResource := transit.DynamicMonitoredResource{
+	monitoredResource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 		Status:        transit.HostUp,
 		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		Services: []transit.DynamicMonitoredService{
+		Services: []transit.MonitoredService{
 			{
 				BaseTransitData: transit.BaseTransitData{
 					Name:  "test",
-					Type:  transit.Service,
+					Type:  transit.ResourceTypeService,
 					Owner: TestHostName,
 				},
 				Status:        transit.ServiceOk,
@@ -143,9 +143,9 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 		},
 	}
 
-	request := transit.DynamicResourcesWithServicesRequest{
+	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.DynamicMonitoredResource{monitoredResource},
+		Resources: []transit.MonitoredResource{monitoredResource},
 	}
 
 	b, err := json.Marshal(request)

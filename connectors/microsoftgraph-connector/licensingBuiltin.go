@@ -13,7 +13,7 @@ const (
 )
 
 // AddonLicenseMetrics licensing built-in - could be data driven.
-func AddonLicenseMetrics(service *transit.DynamicMonitoredService, token string) (err error) {
+func AddonLicenseMetrics(service *transit.MonitoredService, token string) (err error) {
 	var (
 		c    int
 		body []byte

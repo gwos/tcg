@@ -96,6 +96,7 @@ const (
 	ServiceUnknown             MonitorStatus = "SERVICE_UNKNOWN"
 	HostUp                     MonitorStatus = "HOST_UP"
 	HostUnscheduledDown        MonitorStatus = "HOST_UNSCHEDULED_DOWN"
+	HostWarning                MonitorStatus = "HOST_WARNING"
 	HostPending                MonitorStatus = "HOST_PENDING"
 	HostScheduledDown          MonitorStatus = "HOST_SCHEDULED_DOWN"
 	HostUnreachable            MonitorStatus = "HOST_UNREACHABLE"
@@ -108,18 +109,19 @@ type ResourceType string
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
-	Host           ResourceType = "host"
-	Hypervisor     ResourceType = "hypervisor"
-	Instance       ResourceType = "instance"
-	VirtualMachine ResourceType = "virtual-machine"
-	CloudApp       ResourceType = "cloud-app"
-	CloudFunction  ResourceType = "cloud-function"
-	LoadBalancer   ResourceType = "load-balancer"
-	Container      ResourceType = "container"
-	Storage        ResourceType = "storage"
-	Network        ResourceType = "network"
-	NetworkSwitch  ResourceType = "network-switch"
-	NetworkDevice  ResourceType = "network-device"
+	ResourceTypeHost           ResourceType = "host"
+	ResourceTypeService        ResourceType = "service"
+	ResourceTypeHypervisor     ResourceType = "hypervisor"
+	ResourceTypeInstance       ResourceType = "instance"
+	ResourceTypeVirtualMachine ResourceType = "virtual-machine"
+	ResourceTypeCloudApp       ResourceType = "cloud-app"
+	ResourceTypeCloudFunction  ResourceType = "cloud-function"
+	ResourceTypeLoadBalancer   ResourceType = "load-balancer"
+	ResourceTypeContainer      ResourceType = "container"
+	ResourceTypeStorage        ResourceType = "storage"
+	ResourceTypeNetwork        ResourceType = "network"
+	ResourceTypeNetworkSwitch  ResourceType = "network-switch"
+	ResourceTypeNetworkDevice  ResourceType = "network-device"
 )
 
 // ServiceType defines the service type
@@ -127,8 +129,8 @@ type ServiceType string
 
 // Possible Types
 const (
-	Process ServiceType = "Process"
-	Service             = "Service"
+	ServiceTypeProcess ServiceType = "Process"
+	ServiceTypeService ServiceType = "Service"
 )
 
 // GroupType defines the foundation group type
@@ -147,10 +149,10 @@ type MetricSampleType string
 // TimeSeries Metric Sample Possible Types
 const (
 	Value    MetricSampleType = "Value"
-	Warning                   = "Warning"
-	Critical                  = "Critical"
-	Min                       = "Min"
-	Max                       = "Max"
+	Warning  MetricSampleType = "Warning"
+	Critical MetricSampleType = "Critical"
+	Min      MetricSampleType = "Min"
+	Max      MetricSampleType = "Max"
 )
 
 // TimeInterval defines a closed time interval. It extends from the start time
@@ -179,6 +181,7 @@ type TimeInterval struct {
 	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
+// String implements Stringer interface
 func (value TimeInterval) String() string {
 	return fmt.Sprintf("[%s, %s]",
 		value.EndTime.String(),
@@ -209,6 +212,7 @@ type TypedValue struct {
 	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
+// String implements Stringer interface
 func (value TypedValue) String() string {
 	switch value.ValueType {
 	case IntegerType:
@@ -225,6 +229,44 @@ func (value TypedValue) String() string {
 	return ""
 }
 
+func (value *TypedValue) ToTypedValue(v interface{}) error {
+	switch v.(type) {
+	case bool:
+		value.ValueType = BooleanType
+		value.BoolValue = v.(bool)
+	case float32:
+		value.ValueType = DoubleType
+		value.DoubleValue = float64(v.(float32))
+	case float64:
+		value.ValueType = DoubleType
+		value.DoubleValue = v.(float64)
+	case int:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int))
+	case int8:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int8))
+	case int16:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int16))
+	case int32:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v.(int32))
+	case int64:
+		value.ValueType = IntegerType
+		value.IntegerValue = v.(int64)
+	case string:
+		value.ValueType = StringType
+		value.StringValue = v.(string)
+	case milliseconds.MillisecondTimestamp:
+		value.ValueType = TimeType
+		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
+	default:
+		return errors.New("unable to convert to typed value: unsupported type")
+	}
+	return nil
+}
+
 // ThresholdValue describes threshold
 type ThresholdValue struct {
 	SampleType MetricSampleType `json:"sampleType"`
@@ -232,6 +274,7 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
+// String implements Stringer interface
 func (thresholdValue ThresholdValue) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		thresholdValue.SampleType, thresholdValue.Label, thresholdValue.Value.String())
@@ -259,6 +302,7 @@ type TimeSeries struct {
 	MetricExpression  string            `json:"-"`
 }
 
+// String implements Stringer interface
 func (timeSeries TimeSeries) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
 		timeSeries.MetricName, timeSeries.SampleType, timeSeries.Interval.String(), timeSeries.Value.String(),
@@ -345,6 +389,7 @@ type MetricDescriptor struct {
 	MetricKind MetricKind `json:"metricKind"`
 }
 
+// String implements Stringer interface
 func (metricDescriptor MetricDescriptor) String() string {
 	return fmt.Sprintf("%s - %s", metricDescriptor.Type, metricDescriptor.CustomName)
 }
@@ -366,6 +411,7 @@ type LabelDescriptor struct {
 	ValueType ValueType `json:"valueType,omitempty"`
 }
 
+// String implements Stringer interface
 func (labelDescriptor LabelDescriptor) String() string {
 	return fmt.Sprintf("[%s, %s, %s]", labelDescriptor.Description, labelDescriptor.Key, labelDescriptor.ValueType)
 }
@@ -377,16 +423,17 @@ type ThresholdDescriptor struct {
 	Value int32  `json:"value"`
 }
 
+// String implements Stringer interface
 func (thresholdDescriptor ThresholdDescriptor) String() string {
 	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
 
 type BaseTransitData struct {
 	// The unique name of the resource
-	Name string `json:"name,required"`
+	Name string `json:"name"`
 	// Type: Required. The resource type of the resource
 	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
+	Type ResourceType `json:"type"`
 	// Owner relationship for associations like hypervisor->virtual machine
 	Owner string `json:"owner,omitempty"`
 	// CloudHub Categorization of resources
@@ -403,7 +450,7 @@ type BaseResource struct {
 	Device string `json:"device,omitempty"`
 }
 
-// DynamicInventoryResource represents a resource that is included in a inventory scan.
+// InventoryResource represents a resource that is included in a inventory scan.
 // Examples include:
 //  * nagios host
 //  * virtual machine instance
@@ -411,151 +458,16 @@ type BaseResource struct {
 //  * storage devices such as disks
 //  * cloud resources such as cloud apps, cloud functions(lambdas)
 //
-// An DynamicInventoryResource is the representation of a specific monitored resource during an inventory scan.
-// Each DynamicInventoryResource contains list of services (InventoryService) (no metrics are sent).
-type DynamicInventoryResource struct {
+// An InventoryResource is the representation of a specific monitored resource during an inventory scan.
+// Each InventoryResource contains list of services (InventoryService) (no metrics are sent).
+type InventoryResource struct {
 	BaseResource
 	// Inventory Service collection
-	Services []DynamicInventoryService `json:"services"`
+	Services []InventoryService `json:"services"`
 }
 
-type InventoryResource struct {
-	// The unique Name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional Description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Device is needed for detection on Foundation side
-	Device string `json:"device,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	Services   []InventoryService    `json:"services"`
-}
-
-// DynamicInventoryService represents a Groundwork Service that is included in a inventory scan.
-// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
-//
-// DynamicInventoryService collections are attached to an DynamicInventoryResource during inventory scans.
-type DynamicInventoryService struct {
-	BaseTransitData
-}
-
-type InventoryService struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-}
-
-// A DynamicMonitoredResource defines the current status and services of a resource during a metrics scan.
-// Examples include:
-//  * nagios host
-//  * virtual machine instance
-//  * RDS database
-//  * storage devices such as disks
-//  * cloud resources such as cloud apps, cloud functions(lambdas)
-//
-// A DynamicMonitoredResource is the representation of a specific monitored resource during a metric scan.
-// Each DynamicMonitoredResource contains list of services (MonitoredService). A DynamicMonitoredResource does not have metrics,
-// only services.
-type DynamicMonitoredResource struct {
-	BaseResource
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// Services state collection
-	Services []DynamicMonitoredService `json:"services"`
-}
-
-type MonitoredResource struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	Services   []MonitoredService    `json:"services"`
-}
-
-// A DynamicMonitoredService represents a Groundwork Service creating during a metrics scan.
-// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
-// metric variation represented as as single metric time series.
-//
-// A DynamicMonitoredService contains a collection of TimeSeries Metrics.
-// MonitoredService collections are attached to a DynamicMonitoredResource during a metrics scan.
-type DynamicMonitoredService struct {
-	BaseTransitData
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// metrics
-	Metrics []TimeSeries `json:"metrics"`
-}
-
-type MonitoredService struct {
-	// The unique name of the resource
-	Name string `json:"name,required"`
-	// Type: Required. The resource type of the resource
-	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
-	Type ResourceType `json:"type,required"`
-	// Owner relationship for associations like hypervisor->virtual machine
-	Owner string `json:"owner,omitempty"`
-	// CloudHub Categorization of resources
-	Category string `json:"category,omitempty"`
-	// Optional description of this resource, such as Nagios notes
-	Description string `json:"description,omitempty"`
-	// Foundation Properties
-	Properties map[string]TypedValue `json:"properties,omitempty"`
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status,required"`
-	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
-	// metrics
-	Metrics []TimeSeries `json:"metrics"`
-}
-
-func (inventoryResource DynamicInventoryResource) String() string {
+// String implements Stringer interface
+func (inventoryResource InventoryResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
 		inventoryResource.BaseResource.Name, inventoryResource.BaseResource.Type,
 		inventoryResource.BaseResource.Owner, inventoryResource.BaseResource.Category,
@@ -564,77 +476,64 @@ func (inventoryResource DynamicInventoryResource) String() string {
 	)
 }
 
-func (inventoryResource *DynamicInventoryResource) CreateProperty(name string, value TypedValue) {
+func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
 	if inventoryResource.BaseResource.Properties == nil {
 		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
 	inventoryResource.BaseResource.Properties[name] = value
 }
 
-func (monitoredService *DynamicMonitoredService) CreateProperties(properties map[string]interface{}) {
-	for k, v := range properties {
-		var typedValue TypedValue
-		err := typedValue.toTypedValue(v)
-		if err != nil {
-			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
-		}
-		monitoredService.CreateProperty(k, typedValue)
-	}
+// InventoryService represents a Groundwork Service that is included in a inventory scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series. During inventory scans, TCG does not gather metric samples.
+//
+// InventoryService collections are attached to an InventoryResource during inventory scans.
+type InventoryService struct {
+	BaseTransitData
 }
 
-func (value *TypedValue) toTypedValue(v interface{}) error {
-	switch v.(type) {
-	case bool:
-		value.ValueType = BooleanType
-		value.BoolValue = v.(bool)
-	case float32:
-		value.ValueType = DoubleType
-		value.DoubleValue = float64(v.(float32))
-	case float64:
-		value.ValueType = DoubleType
-		value.DoubleValue = v.(float64)
-	case int:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int))
-	case int8:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int8))
-	case int16:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int16))
-	case int32:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int32))
-	case int64:
-		value.ValueType = IntegerType
-		value.IntegerValue = v.(int64)
-	case string:
-		value.ValueType = StringType
-		value.StringValue = v.(string)
-	case milliseconds.MillisecondTimestamp:
-		value.ValueType = TimeType
-		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
-	default:
-		return errors.New("unable to convert to typed value: unsupported type")
-	}
-	return nil
-}
-
-func (inventoryService DynamicInventoryService) String() string {
+// String implements Stringer interface
+func (inventoryService InventoryService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s]",
 		inventoryService.Name, inventoryService.Type, inventoryService.Owner,
 		inventoryService.Category, inventoryService.Description, inventoryService.Properties,
 	)
 }
 
-func (inventoryService *DynamicInventoryService) CreateProperty(name string, value TypedValue) {
+func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
 	if inventoryService.Properties == nil {
 		inventoryService.Properties = make(map[string]TypedValue)
 	}
 	inventoryService.Properties[name] = value
 }
 
-func (monitoredResource DynamicMonitoredResource) String() string {
+// A MonitoredResource defines the current status and services of a resource during a metrics scan.
+// Examples include:
+//  * nagios host
+//  * virtual machine instance
+//  * RDS database
+//  * storage devices such as disks
+//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//
+// A MonitoredResource is the representation of a specific monitored resource during a metric scan.
+// Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
+// only services.
+type MonitoredResource struct {
+	BaseResource
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// Services state collection
+	Services []MonitoredService `json:"services"`
+}
+
+// String implements Stringer interface
+func (monitoredResource MonitoredResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredResource.BaseResource.Name,
 		monitoredResource.BaseResource.Type,
@@ -648,14 +547,50 @@ func (monitoredResource DynamicMonitoredResource) String() string {
 	)
 }
 
-func (monitoredResource *DynamicMonitoredResource) CreateProperty(name string, value TypedValue) {
+func (monitoredResource *MonitoredResource) CreateProperty(name string, value TypedValue) {
 	if monitoredResource.BaseResource.Properties == nil {
 		monitoredResource.BaseResource.Properties = make(map[string]TypedValue)
 	}
 	monitoredResource.BaseResource.Properties[name] = value
 }
 
-func (monitoredService DynamicMonitoredService) String() string {
+func (monitoredResource *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
+	return MonitoredResourceRef{Name: monitoredResource.Name, Type: ResourceTypeHost, Owner: monitoredResource.Owner}
+}
+
+func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResource {
+	var services []InventoryService
+	for _, ms := range monitoredResource.Services {
+		services = append(services, ms.ToInventoryService())
+	}
+	return InventoryResource{
+		BaseResource: monitoredResource.BaseResource,
+		Services:     services,
+	}
+}
+
+// A MonitoredService represents a Groundwork Service creating during a metrics scan.
+// In cloud systems, services are usually modeled as a complex metric definition, with each sampled
+// metric variation represented as as single metric time series.
+//
+// A MonitoredService contains a collection of TimeSeries Metrics.
+// MonitoredService collections are attached to a MonitoredResource during a metrics scan.
+type MonitoredService struct {
+	BaseTransitData
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// metrics
+	Metrics []TimeSeries `json:"metrics"`
+}
+
+// String implements Stringer interface
+func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
 		monitoredService.LastCheckTime.String(), monitoredService.NextCheckTime.String(),
@@ -663,17 +598,34 @@ func (monitoredService DynamicMonitoredService) String() string {
 	)
 }
 
-func (monitoredService *DynamicMonitoredService) CreateProperty(name string, value TypedValue) {
+func (monitoredService *MonitoredService) CreateProperty(name string, value TypedValue) {
 	if monitoredService.Properties == nil {
 		monitoredService.Properties = make(map[string]TypedValue)
 	}
 	monitoredService.Properties[name] = value
 }
 
+func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
+	for k, v := range properties {
+		var typedValue TypedValue
+		err := typedValue.ToTypedValue(v)
+		if err != nil {
+			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
+		}
+		monitoredService.CreateProperty(k, typedValue)
+	}
+}
+
+func (monitoredService *MonitoredService) ToInventoryService() InventoryService {
+	return InventoryService{
+		BaseTransitData: monitoredService.BaseTransitData,
+	}
+}
+
 // MonitoredResourceRef references a MonitoredResource in a group collection
 type MonitoredResourceRef struct {
 	// The unique name of the resource
-	Name string `json:"name,required"`
+	Name string `json:"name"`
 	// Type: Optional. The resource type uniquely defining the resource type
 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
 	Type ResourceType `json:"type,omitempty"`
@@ -681,6 +633,7 @@ type MonitoredResourceRef struct {
 	Owner string `json:"owner,omitempty"`
 }
 
+// String implements Stringer interface
 func (monitoredResourceRef MonitoredResourceRef) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		monitoredResourceRef.Name,
@@ -698,6 +651,7 @@ type TracerContext struct {
 	Version    VersionString                     `json:"version"`
 }
 
+// String implements Stringer interface
 func (tracerContext TracerContext) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
 		tracerContext.AppType, tracerContext.AgentID, tracerContext.TraceToken,
@@ -714,6 +668,7 @@ type OperationResult struct {
 	EntityID int    `json:"entityID"`
 }
 
+// String implements Stringer interface
 func (operationResult OperationResult) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %d]",
 		operationResult.Entity, operationResult.Status, operationResult.Message,
@@ -732,6 +687,7 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
+// String implements Stringer interface
 func (operationResults OperationResults) String() string {
 	return fmt.Sprintf("[%d, %d, %s, %s, %d, %d, %s]",
 		operationResults.ResourcesAdded, operationResults.ResourcesDeleted, operationResults.EntityType,
@@ -741,44 +697,32 @@ func (operationResults OperationResults) String() string {
 
 // ResourceGroup defines group entity
 type ResourceGroup struct {
-	GroupName   string                 `json:"groupName,required"`
-	Type        GroupType              `json:"type,required"`
+	GroupName   string                 `json:"groupName"`
+	Type        GroupType              `json:"type"`
 	Description string                 `json:"description,omitempty"`
-	Resources   []MonitoredResourceRef `json:"resources,required"`
+	Resources   []MonitoredResourceRef `json:"resources"`
 }
 
+// String implements Stringer interface
 func (resourceGroup ResourceGroup) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s]",
 		resourceGroup.GroupName, resourceGroup.Type, resourceGroup.Description, resourceGroup.Resources,
 	)
 }
 
-// DynamicResourcesWithServicesRequest defines SendResourcesWithMetrics payload
-type DynamicResourcesWithServicesRequest struct {
-	Context   *TracerContext             `json:"context,omitempty"`
-	Resources []DynamicMonitoredResource `json:"resources"`
-	Groups    []ResourceGroup            `json:"groups,omitempty"`
-}
-
+// ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
 	Context   *TracerContext      `json:"context,omitempty"`
 	Resources []MonitoredResource `json:"resources"`
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
-func (resourcesWithServicesRequest DynamicResourcesWithServicesRequest) String() string {
+// String implements Stringer interface
+func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",
 		resourcesWithServicesRequest.Context.String(),
 		resourcesWithServicesRequest.Resources,
 	)
-}
-
-// DynamicInventoryRequest defines SynchronizeInventory payload
-type DynamicInventoryRequest struct {
-	Context       *TracerContext             `json:"context,omitempty"`
-	OwnershipType HostOwnershipType          `json:"ownershipType,omitempty"`
-	Resources     []DynamicInventoryResource `json:"resources"`
-	Groups        []ResourceGroup            `json:"groups,omitempty"`
 }
 
 // InventoryRequest defines SynchronizeInventory payload
@@ -789,7 +733,8 @@ type InventoryRequest struct {
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
 }
 
-func (inventoryRequest DynamicInventoryRequest) String() string {
+// String implements Stringer interface
+func (inventoryRequest InventoryRequest) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		inventoryRequest.Context.String(), inventoryRequest.Resources, inventoryRequest.Groups,
 	)
@@ -798,7 +743,7 @@ func (inventoryRequest DynamicInventoryRequest) String() string {
 // IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
 	IncidentID    string                            `json:"incidentId"`
-	ResourceName  string                            `json:"resourceName,required"`
+	ResourceName  string                            `json:"resourceName"`
 	Status        string                            `json:"status"`
 	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
 	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
@@ -807,6 +752,7 @@ type IncidentAlert struct {
 	Summary       string                            `json:"summary,omitempty"`
 }
 
+// String implements Stringer interface
 func (incidentAlert IncidentAlert) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
 		incidentAlert.IncidentID, incidentAlert.ResourceName, incidentAlert.Status, incidentAlert.StartedAt.String(),
@@ -819,6 +765,7 @@ type GroundworkEventsRequest struct {
 	Events []GroundworkEvent `json:"events"`
 }
 
+// String implements Stringer interface
 func (groundworkEventsRequest GroundworkEventsRequest) String() string {
 	return fmt.Sprintf("[%s]", groundworkEventsRequest.Events)
 }
@@ -826,10 +773,10 @@ func (groundworkEventsRequest GroundworkEventsRequest) String() string {
 // GroundworkEvent describes event
 type GroundworkEvent struct {
 	Device              string                            `json:"device,omitempty"`
-	Host                string                            `json:"host,required"`
+	Host                string                            `json:"host"`
 	Service             string                            `json:"service,omitempty"`
 	OperationStatus     string                            `json:"operationStatus,omitempty"`
-	MonitorStatus       string                            `json:"monitorStatus,required"`
+	MonitorStatus       string                            `json:"monitorStatus"`
 	Severity            string                            `json:"severity,omitempty"`
 	ApplicationSeverity string                            `json:"applicationSeverity,omitempty"`
 	Component           string                            `json:"component,omitempty"`
@@ -838,8 +785,8 @@ type GroundworkEvent struct {
 	TypeRule            string                            `json:"typeRule,omitempty"`
 	TextMessage         string                            `json:"textMessage,omitempty"`
 	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
-	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
-	AppType             string                            `json:"appType,required"`
+	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate"`
+	AppType             string                            `json:"appType"`
 	// Update level attributes (update only)
 	MonitorServer     string `json:"monitorServer,omitempty"`
 	ConsolidationName string `json:"consolidationName,omitempty"`
@@ -849,6 +796,7 @@ type GroundworkEvent struct {
 	ApplicationName   string `json:"applicationName,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEvent GroundworkEvent) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		groundworkEvent.Device, groundworkEvent.Host, groundworkEvent.Service, groundworkEvent.OperationStatus,
@@ -858,6 +806,13 @@ func (groundworkEvent GroundworkEvent) String() string {
 		groundworkEvent.AppType, groundworkEvent.MonitorServer, groundworkEvent.ConsolidationName,
 		groundworkEvent.LogType, groundworkEvent.ErrorType, groundworkEvent.LoggerName, groundworkEvent.ApplicationName,
 	)
+}
+
+type View struct {
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Extensions  map[string]interface{} `json:"extensions,omitempty"`
 }
 
 // MonitorConnection describes the connection to the monitored system
@@ -873,13 +828,7 @@ type MonitorConnection struct {
 	ConnectorID int         `json:"connectorId"`
 }
 
-type View struct {
-	Name        string                 `json:"name"`
-	DisplayName string                 `json:"displayName"`
-	Enabled     bool                   `json:"enabled"`
-	Extensions  map[string]interface{} `json:"extensions,omitempty"`
-}
-
+// String implements Stringer interface
 func (monitorConnection MonitorConnection) String() string {
 	return fmt.Sprintf("[%d, %s, %s, %s, %t, %s, %s, %d]",
 		monitorConnection.ID, monitorConnection.Server, monitorConnection.UserName, monitorConnection.Password,
@@ -894,13 +843,14 @@ type GroundworkEventsAckRequest struct {
 
 // GroundworkEventAck describes event ack
 type GroundworkEventAck struct {
-	AppType            string `json:"appType,required"`
-	Host               string `json:"host,required"`
+	AppType            string `json:"appType"`
+	Host               string `json:"host"`
 	Service            string `json:"service,omitempty"`
 	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEventAck GroundworkEventAck) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
 		groundworkEventAck.AppType, groundworkEventAck.Host, groundworkEventAck.Service,
@@ -915,11 +865,12 @@ type GroundworkEventsUnackRequest struct {
 
 // GroundworkEventUnack describes event ack
 type GroundworkEventUnack struct {
-	AppType string `json:"appType,required"`
-	Host    string `json:"host,required"`
+	AppType string `json:"appType"`
+	Host    string `json:"host"`
 	Service string `json:"service,omitempty"`
 }
 
+// String implements Stringer interface
 func (groundworkEventUnack GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
 		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
@@ -932,6 +883,7 @@ type MetricsProfile struct {
 	Metrics     []MetricDefinition `json:"metrics"`
 }
 
+// String implements Stringer interface
 func (metricsProfile MetricsProfile) String() string {
 	return fmt.Sprintf("[%s, %s, %t, %s]",
 		metricsProfile.Name, metricsProfile.ProfileType,
@@ -956,6 +908,7 @@ type MetricDefinition struct {
 	Format            string      `json:"format,omitempty"`
 }
 
+// String implements Stringer interface
 func (metricDefinition MetricDefinition) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %t, %t, %s, %s, %s, %s, %s, %d, %d, %s, %s]",
 		metricDefinition.Name, metricDefinition.CustomName, metricDefinition.Description, metricDefinition.Monitored,
@@ -987,27 +940,6 @@ type HostsAndServices struct {
 	ServiceGroupCategoryNames []string `json:"serviceGroupCategoryNames"`
 	SetHosts                  bool     `json:"setHosts"`
 	SetServices               bool     `json:"setServices"`
-}
-
-func (mr *DynamicMonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
-	return MonitoredResourceRef{Name: mr.Name, Type: Host, Owner: mr.Owner}
-}
-
-func (mr *DynamicMonitoredResource) ToInventoryResource() DynamicInventoryResource {
-	var services []DynamicInventoryService
-	for _, ms := range mr.Services {
-		services = append(services, ms.ToInventoryService())
-	}
-	return DynamicInventoryResource{
-		BaseResource: mr.BaseResource,
-		Services:     services,
-	}
-}
-
-func (ms *DynamicMonitoredService) ToInventoryService() DynamicInventoryService {
-	return DynamicInventoryService{
-		BaseTransitData: ms.BaseTransitData,
-	}
 }
 
 // AgentIdentity defines TCG Agent Identity

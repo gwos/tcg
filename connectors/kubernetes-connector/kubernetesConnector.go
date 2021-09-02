@@ -73,7 +73,7 @@ type KubernetesResource struct {
 	Status   transit.MonitorStatus
 	Message  string
 	Labels   map[string]string
-	Services map[string]transit.DynamicMonitoredService
+	Services map[string]transit.MonitoredService
 }
 
 func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
@@ -156,7 +156,7 @@ func (connector *KubernetesConnector) Shutdown() {
 }
 
 // Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
+func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 
 	// gather inventory and Metrics
 	metricsPerContainer := true
@@ -172,13 +172,13 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 	}
 
 	// convert to arrays as expected by TCG
-	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
-	monitored := make([]transit.DynamicMonitoredResource, len(monitoredState))
+	inventory := make([]transit.InventoryResource, len(monitoredState))
+	monitored := make([]transit.MonitoredResource, len(monitoredState))
 	hostGroups := make([]transit.ResourceGroup, len(groups))
 	index := 0
 	for _, resource := range monitoredState {
 		// convert inventory
-		services := make([]transit.DynamicInventoryService, len(resource.Services))
+		services := make([]transit.InventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
 			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
@@ -186,13 +186,13 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 		}
 		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
 		// convert monitored state
-		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
+		mServices := make([]transit.MonitoredService, len(resource.Services))
 		serviceIndex = 0
 		for _, service := range resource.Services {
 			mServices[serviceIndex] = service
 			serviceIndex = serviceIndex + 1
 		}
-		monitored[index] = transit.DynamicMonitoredResource{
+		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
 					Name: resource.Name,
@@ -244,11 +244,11 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		monitorStatus, message := connector.calculateNodeStatus(&node)
 		resource := KubernetesResource{
 			Name:     node.Name,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
-			Services: make(map[string]transit.DynamicMonitoredService),
+			Services: make(map[string]transit.MonitoredService),
 		}
 		monitoredState[resource.Name] = resource
 		// process services
@@ -296,7 +296,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
 			Name:  resource.Name,
 			Owner: clusterHostGroupName,
-			Type:  transit.Host,
+			Type:  transit.ResourceTypeHost,
 		}
 		index = index + 1
 	}
@@ -324,11 +324,11 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
 			Name:     podName,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
-			Services: make(map[string]transit.DynamicMonitoredService),
+			Services: make(map[string]transit.MonitoredService),
 		}
 		monitoredState[resource.Name] = resource
 		// no services to process at this stage
@@ -343,7 +343,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		} else {
@@ -355,7 +355,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		}
@@ -475,7 +475,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 		return
 	}
 	builderMap := make(map[string][]connectors.MetricBuilder)
-	serviceMap := make(map[string]transit.DynamicMonitoredService)
+	serviceMap := make(map[string]transit.MonitoredService)
 	for key, metricDefinition := range cfg.Views[ViewPods] {
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
@@ -524,7 +524,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					}
 					builders = append(builders, metricBuilder)
 					smKey := key + "-" + resource.Name
-					var monitoredService *transit.DynamicMonitoredService
+					var monitoredService *transit.MonitoredService
 					if result, found := serviceMap[smKey]; found {
 						monitoredService = &result
 						metric, _ := connectors.BuildMetric(metricBuilder)
@@ -568,7 +568,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 				}
 				message.WriteString(condition.Message)
 				if status == transit.HostUp {
-					status = transit.Warning
+					status = transit.HostWarning
 				}
 			}
 		}

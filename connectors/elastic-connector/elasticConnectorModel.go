@@ -116,10 +116,10 @@ func (monitoringState *MonitoringState) updateHosts(values map[string]int, servi
 	}
 }
 
-func (monitoringState *MonitoringState) toTransitResources() ([]transit.DynamicMonitoredResource, []transit.DynamicInventoryResource) {
+func (monitoringState *MonitoringState) toTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
 	hosts := monitoringState.Hosts
-	mrs := make([]transit.DynamicMonitoredResource, len(hosts))
-	irs := make([]transit.DynamicInventoryResource, len(hosts))
+	mrs := make([]transit.MonitoredResource, len(hosts))
+	irs := make([]transit.InventoryResource, len(hosts))
 	i := 0
 	for _, host := range hosts {
 		monitoredServices, inventoryServices := host.toTransitResources(monitoringState.Metrics)
@@ -140,9 +140,9 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.DynamicM
 	return mrs, irs
 }
 
-func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.DynamicMonitoredService, []transit.DynamicInventoryService) {
-	monitoredServices := make([]transit.DynamicMonitoredService, len(host.services))
-	inventoryServices := make([]transit.DynamicInventoryService, len(host.services))
+func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
+	monitoredServices := make([]transit.MonitoredService, len(host.services))
+	inventoryServices := make([]transit.InventoryService, len(host.services))
 	if metricDefinitions == nil {
 		return monitoredServices, inventoryServices
 	}
@@ -211,7 +211,7 @@ func (monitoringState *MonitoringState) toResourceGroups() []transit.ResourceGro
 		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
 		k := 0
 		for host := range hostsInGroup {
-			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.Host)
+			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.ResourceTypeHost)
 			monitoredResourceRefs[k] = monitoredResourceRef
 			k++
 		}
