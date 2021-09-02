@@ -56,7 +56,7 @@ const (
 	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
 	PodsHostGroup                    = "pods-"
 	NamespaceDefault                 = "default"
-	defaultKubernetesClusterEndpoint = "gwos.bluesunrise.com:8001"
+	defaultKubernetesClusterEndpoint = ""
 )
 
 type KubernetesConnector struct {
@@ -153,6 +153,11 @@ func (connector *KubernetesConnector) Ping() error {
 }
 
 func (connector *KubernetesConnector) Shutdown() {
+	connector.ctx = nil
+	connector.kapi = nil
+	connector.mapi = nil
+	connector.kClientSet = nil
+	connector.config = ExtConfig{}
 }
 
 // Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
