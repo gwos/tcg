@@ -38,13 +38,13 @@ const (
 )
 
 type MetricsMap map[string][]transit.TimeSeries
-type ServicesMap map[string][]transit.MonitoredService
+type ServicesMap map[string][]transit.DynamicMonitoredService
 
-func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
+func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
-		monitoredResources        []transit.MonitoredResource
+		monitoredResources        []transit.DynamicMonitoredResource
 		serviceNameToMetricsMap   MetricsMap
 		resourceNameToServicesMap ServicesMap
 		err                       error
@@ -75,14 +75,14 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 	}
 
 	for resName, services := range resourceNameToServicesMap {
-		res := transit.MonitoredResource{
+		res := transit.DynamicMonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
 					Name: resName,
-					Type: transit.ResourceTypeHost,
+					Type: transit.Host,
 				},
 			},
-			Services: make([]transit.MonitoredService, 0, len(services)),
+			Services: make([]transit.DynamicMonitoredService, 0, len(services)),
 		}
 		/* filter and apply host-check results */
 		resFlag := false
@@ -226,10 +226,10 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
-		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
+		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  svcName,
-				Type:  transit.ResourceTypeService,
+				Type:  transit.Service,
 				Owner: resName,
 			},
 			Status:           status,
@@ -333,10 +333,10 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
-		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
+		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
 			BaseTransitData: transit.BaseTransitData{
 				Name:  svcName,
-				Type:  transit.ResourceTypeService,
+				Type:  transit.Service,
 				Owner: resName,
 			},
 			Status:           status,
@@ -352,7 +352,7 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
 	for key, value := range servicesMap {
 		keys := make(map[string]bool)
-		var list []transit.MonitoredService
+		var list []transit.DynamicMonitoredService
 		for _, entry := range value {
 			if _, value := keys[entry.Name]; !value {
 				keys[entry.Name] = true
