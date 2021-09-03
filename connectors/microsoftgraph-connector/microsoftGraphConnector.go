@@ -49,7 +49,7 @@ type MicrosoftGraphResource struct {
 	Status   transit.MonitorStatus
 	Message  string
 	Labels   map[string]string
-	Services map[string]*transit.MonitoredService
+	Services map[string]*transit.DynamicMonitoredService
 }
 
 type ODataServicePayload struct {
@@ -138,7 +138,7 @@ func (connector *MicrosoftGraphConnector) Shutdown() {
 }
 
 // Collect inventory and metrics for all graph resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
+func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
 	log.Info().Msg("Starting collection...")
 	_ = Initialize()
 	log.Info().Msg("After init...")
@@ -155,13 +155,13 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 	_ = connector.collectBuiltins(monitoredState, &msGroup)
 	groups[microsoftGroup] = msGroup
 	log.Info().Msg("inventory and metrics gathered....")
-	inventory := make([]transit.InventoryResource, len(monitoredState))
-	monitored := make([]transit.MonitoredResource, len(monitoredState))
+	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
+	monitored := make([]transit.DynamicMonitoredResource, len(monitoredState))
 	hostGroups := make([]transit.ResourceGroup, len(groups))
 	index := 0
 	for _, resource := range monitoredState {
 		// convert inventory
-		srvs := make([]transit.InventoryService, len(resource.Services))
+		srvs := make([]transit.DynamicInventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
 			srvs[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
@@ -169,14 +169,14 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 		}
 		inventory[index] = connectors.CreateInventoryResource(resource.Name, srvs)
 		// convert monitored state
-		mServices := make([]transit.MonitoredService, len(resource.Services))
+		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
 		serviceIndex = 0
 		for _, service := range resource.Services {
 			mServices[serviceIndex] = *service
 			serviceIndex = serviceIndex + 1
 		}
 		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-		monitored[index] = transit.MonitoredResource{
+		monitored[index] = transit.DynamicMonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
 					Name: resource.Name,
@@ -204,17 +204,17 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 
 	hostResource := MicrosoftGraphResource{
 		Name:    interacApp,
-		Type:    transit.ResourceTypeHost,
+		Type:    transit.Host,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]*transit.MonitoredService),
+		Services: make(map[string]*transit.DynamicMonitoredService),
 	}
 	monitoredState[interacApp] = hostResource
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.ResourceTypeHost,
+		Type:  transit.Host,
 	})
 
 	// create one Drive metrics
@@ -347,17 +347,17 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	}
 	hostResource := MicrosoftGraphResource{
 		Name:    office365App,
-		Type:    transit.ResourceTypeHost,
+		Type:    transit.Host,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]*transit.MonitoredService),
+		Services: make(map[string]*transit.DynamicMonitoredService),
 	}
 	monitoredState[office365App] = hostResource
 	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.ResourceTypeHost,
+		Type:  transit.Host,
 	})
 	odata := ODataServicePayload{}
 	//randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -375,7 +375,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	return nil
 }
 
-func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]*transit.MonitoredService) error {
+func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]*transit.DynamicMonitoredService) error {
 	body, err := ExecuteRequest(officeEndPoint+tenantID+currentStatusPath, officeToken)
 	if err != nil {
 		return err

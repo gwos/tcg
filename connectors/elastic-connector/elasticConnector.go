@@ -147,7 +147,7 @@ func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 }
 
 // CollectMetrics retrives metric data
-func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
+func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredResource, []transit.DynamicInventoryResource, []transit.ResourceGroup) {
 	var err error
 
 	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")

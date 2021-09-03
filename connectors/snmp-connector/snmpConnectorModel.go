@@ -48,8 +48,8 @@ func (state *MonitoringState) Init() {
 	state.devices = make(map[string]DeviceExt)
 }
 
-func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredResource {
-	mResources := make([]transit.MonitoredResource, len(state.devices))
+func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[string]transit.MetricDefinition) []transit.DynamicMonitoredResource {
+	mResources := make([]transit.DynamicMonitoredResource, len(state.devices))
 	i := 0
 	for _, device := range state.devices {
 		mServices := device.retrieveMonitoredServices(metricDefinitions)
@@ -66,8 +66,8 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 	return mResources
 }
 
-func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredService {
-	mServices := make([]transit.MonitoredService, len(device.Interfaces))
+func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]transit.MetricDefinition) []transit.DynamicMonitoredService {
+	mServices := make([]transit.DynamicMonitoredService, len(device.Interfaces))
 
 	if metricDefinitions == nil {
 		return mServices

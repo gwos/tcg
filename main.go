@@ -37,7 +37,7 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
-	var iServices []transit.InventoryService
+	var iServices []transit.DynamicInventoryService
 	is1 := connectors.CreateInventoryService(Service1, Resource1)
 	is2 := connectors.CreateInventoryService(Service2, Resource1)
 	iServices = append(iServices, is1, is2)
@@ -84,13 +84,13 @@ func main() {
 	fmt.Printf("service 1 created with metrics: %+v\n", service2)
 
 	// Create a Monitored Resource and Add Service
-	resource1, _ := connectors.CreateResource(Resource1, []transit.MonitoredService{*service1})
+	resource1, _ := connectors.CreateResource(Resource1, []transit.DynamicMonitoredService{*service1})
 	fmt.Printf("resource 1 created with services: %+v\n", resource1)
-	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
+	resource2, _ := connectors.CreateResource(Resource2, []transit.DynamicMonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if enableTransit {
-		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
+		connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{*resource1, *resource2}, nil)
 	}
 }
 
@@ -119,10 +119,10 @@ func LowLevelExamples() {
 	}
 
 	// Example Service
-	var localLoadService = transit.MonitoredService{
+	var localLoadService = transit.DynamicMonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name: "local_load",
-			Type: transit.ResourceTypeService,
+			Type: transit.Service,
 			Properties: map[string]transit.TypedValue{
 				"stateType":       {StringValue: "SOFT"},
 				"checkType":       {StringValue: "ACTIVE"},
@@ -139,11 +139,11 @@ func LowLevelExamples() {
 		Metrics:          []transit.TimeSeries{sampleValue},
 	}
 
-	geneva := transit.MonitoredResource{
+	geneva := transit.DynamicMonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
 				Name: "geneva",
-				Type: transit.ResourceTypeHost,
+				Type: transit.Host,
 				Properties: map[string]transit.TypedValue{
 					"stateType":       {StringValue: "SOFT"},
 					"checkType":       {StringValue: "ACTIVE"},
@@ -158,11 +158,11 @@ func LowLevelExamples() {
 		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
 		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Services:         []transit.MonitoredService{localLoadService},
+		Services:         []transit.DynamicMonitoredService{localLoadService},
 	}
 
 	// Build Monitored Resources
-	resources := []transit.MonitoredResource{geneva}
+	resources := []transit.DynamicMonitoredResource{geneva}
 
 	// TODO: call into API
 
