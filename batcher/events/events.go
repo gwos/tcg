@@ -2,10 +2,9 @@ package events
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 // EventsBatchBuilder implements builder
@@ -17,10 +16,9 @@ func (bld *EventsBatchBuilder) Build(input [][]byte) [][]byte {
 	for _, p := range input {
 		r := transit.GroundworkEventsRequest{}
 		if err := json.Unmarshal(p, &r); err != nil {
-			log.With(log.Fields{
-				"error":   err,
-				"payload": p,
-			}).Log(log.ErrorLevel, "could not unmarshal events payload for batch")
+			log.Err(err).
+				RawJSON("payload", p).
+				Msg("could not unmarshal events payload for batch")
 			continue
 		}
 		events = append(events, r.Events...)
@@ -30,13 +28,12 @@ func (bld *EventsBatchBuilder) Build(input [][]byte) [][]byte {
 		r := transit.GroundworkEventsRequest{Events: events}
 		p, err := json.Marshal(r)
 		if err == nil {
-			log.Debug(fmt.Sprintf("batched %d events", len(r.Events)))
+			log.Debug().Msgf("batched %d events", len(r.Events))
 			return [][]byte{p}
 		}
-		log.With(log.Fields{
-			"error":  err,
-			"events": r,
-		}).Log(log.ErrorLevel, "could not marshal events")
+		log.Err(err).
+			Interface("events", r).
+			Msg("could not marshal events")
 	}
 	return nil
 }

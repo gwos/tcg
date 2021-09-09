@@ -2,14 +2,13 @@ package batcher
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/log"
-	apitrace "go.opentelemetry.io/otel/api/trace"
-	"go.opentelemetry.io/otel/label"
+	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // BatchBuilder defines builder interface
@@ -83,8 +82,8 @@ func (bt *Batcher) Add(p []byte) {
 
 	bt.bufSize += len(p)
 	if bt.bufSize > bt.maxBytes {
-		log.Debug(fmt.Sprintf("batch buffer size %dKB exceeded the soft limit %dKB",
-			bt.bufSize/1024, bt.maxBytes/1024))
+		log.Debug().Msgf("batch buffer size %dKB exceeded the soft limit %dKB",
+			bt.bufSize/1024, bt.maxBytes/1024)
 		bt.Batch()
 	}
 }
@@ -100,11 +99,10 @@ func (bt *Batcher) Batch() {
 	if len(buf) > 0 {
 		go func() {
 			/* cannot use services package due to import cycle */
-			// ctx, span := otel.GetTracerProvider().
-			ctx, span := apitrace.NoopTracerProvider().
+			ctx, span := otel.GetTracerProvider().
 				Tracer("batcher").Start(context.Background(), "Batch:Build")
 			defer func() {
-				span.SetAttributes(label.Int("bufferSize", bufSize))
+				span.SetAttributes(attribute.Int("bufferSize", bufSize))
 				span.End()
 			}()
 

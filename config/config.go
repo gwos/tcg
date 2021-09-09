@@ -7,14 +7,23 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/transit"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/semconv"
 	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
 )
@@ -41,27 +50,24 @@ func GetBuildInfo() BuildInfo {
 	return BuildInfo{buildTag, buildTime}
 }
 
-// ConfigStringConstant defines string constant type
-type ConfigStringConstant string
-
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
 //   for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv           ConfigStringConstant = "TCG_CONFIG"
-	ConfigName                               = "tcg_config.yaml"
-	EnvConfigPrefix                          = "TCG"
-	SecKeyEnv                                = "TCG_SECKEY"
-	SecVerPrefix                             = "_v1_"
-	InstallationModeEnv                      = "INSTALLATION_MODE"
-	InstallationModeCMC                      = "CHILD_MANAGED_CHILD"
-	InstallationModePMC                      = "PARENT_MANAGED_CHILD"
-	InstallationModeP                        = "PARENT"
-	InstallationModeS                        = "STANDALONE"
+	ConfigEnv           = "TCG_CONFIG"
+	ConfigName          = "tcg_config.yaml"
+	EnvConfigPrefix     = "TCG"
+	SecKeyEnv           = "TCG_SECKEY"
+	SecVerPrefix        = "_v1_"
+	InstallationModeEnv = "INSTALLATION_MODE"
+	InstallationModeCMC = "CHILD_MANAGED_CHILD"
+	InstallationModePMC = "PARENT_MANAGED_CHILD"
+	InstallationModeP   = "PARENT"
+	InstallationModeS   = "STANDALONE"
 )
 
-// LogLevel defines levels for logrus
+// LogLevel defines levels in logrus-style
 type LogLevel int
 
 // Enum levels
@@ -79,9 +85,7 @@ func (l LogLevel) String() string {
 // Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
-	AgentID string `yaml:"agentId"`
-	AppName string `yaml:"appName"`
-	AppType string `yaml:"appType"`
+	transit.AgentIdentity `yaml:",inline"`
 
 	BatchEvents   time.Duration `yaml:"batchEvents"`
 	BatchMetrics  time.Duration `yaml:"batchMetrics"`
@@ -109,13 +113,14 @@ type Connector struct {
 	// if 0 turn off condensing
 	LogCondense time.Duration `yaml:"logCondense"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile        string        `yaml:"logFile"`
-	LogFileMaxAge  time.Duration `yaml:"logFileMaxAge"`
-	LogFileMaxSize int64         `yaml:"logFileMaxSize"`
+	LogFile        string `yaml:"logFile"`
+	LogFileMaxSize int64  `yaml:"logFileMaxSize"`
 	// Log files are rotated count times before being removed.
 	// If count is 0, old versions are removed rather than rotated.
 	LogFileRotate int      `yaml:"logFileRotate"`
 	LogLevel      LogLevel `yaml:"logLevel"`
+	LogNoColor    bool     `yaml:"logNoColor"`
+	LogTimeFormat string   `yaml:"logTimeFormat"`
 
 	// NatsAckWait is the time the NATS server will wait before resending a message
 	// Should be greater then the GWClient request duration
@@ -313,14 +318,12 @@ func (con *DSConnection) Decode(value string) error {
 
 // Jaegertracing defines the configuration of telemetry provider
 type Jaegertracing struct {
-	// Agent defines address for communicating via UDP,
-	// like jaeger-agent:6831
-	// Is ignored if the Collector is specified
+	// Agent defines address for communicating with AgentJaegerThriftCompactUDP,
+	// hostport, like jaeger-agent:6831
 	Agent string `yaml:"agent"`
 	// Collector defines traces endpoint,
-	// in case the client should connect directly to the Collector,
-	// like http://jaeger-collector:14268/api/traces
-	// If specified, the AgentAddress is ignored
+	// in case the client should connect directly to the CollectorHTTP,
+	// endpoint, like http://jaeger-collector:14268/api/traces
 	Collector string `yaml:"collector"`
 	// Tags defines tracer-level tags, which get added to all reported spans
 	Tags map[string]string `yaml:"tags"`
@@ -341,16 +344,17 @@ func defaults() Config {
 			BatchMetrics:            0,
 			BatchMaxBytes:           1024 * 1024, // 1MB
 			ControllerAddr:          ":8099",
-			ControllerReadTimeout:   time.Duration(time.Second * 10),
-			ControllerWriteTimeout:  time.Duration(time.Second * 20),
-			ControllerStartTimeout:  time.Duration(time.Second * 4),
-			ControllerStopTimeout:   time.Duration(time.Second * 4),
+			ControllerReadTimeout:   time.Second * 10,
+			ControllerWriteTimeout:  time.Second * 20,
+			ControllerStartTimeout:  time.Second * 4,
+			ControllerStopTimeout:   time.Second * 4,
 			LogCondense:             0,
-			LogFileMaxAge:           time.Duration(time.Hour * 24 * 30), // 30days,
-			LogFileMaxSize:          1024 * 1024 * 10,                   // 10MB
+			LogFileMaxSize:          1024 * 1024 * 10, // 10MB
 			LogFileRotate:           5,
 			LogLevel:                1,
-			NatsAckWait:             time.Duration(time.Second * 30),
+			LogNoColor:              false,
+			LogTimeFormat:           time.RFC3339,
+			NatsAckWait:             time.Second * 30,
 			NatsMaxInflight:         1024,
 			NatsMaxPubAcksInflight:  1024,
 			NatsMaxPayload:          1024 * 1024 * 80, // 80MB
@@ -373,47 +377,47 @@ func defaults() Config {
 // GetConfig implements Singleton pattern
 func GetConfig() *Config {
 	once.Do(func() {
-		logBuf := make(map[string]interface{}, 3)
+		/* buffer the logging while configuring */
+		logBuf := &logger.LogBuffer{
+			Level: zerolog.TraceLevel,
+			Size:  16,
+		}
+		log.Logger = zerolog.New(logBuf).
+			With().Timestamp().Caller().Logger()
+		log.Info().Msgf("Build info: %s / %s", buildTag, buildTime)
+
 		c := defaults()
 		cfg = &c
-
-		if data, err := ioutil.ReadFile(cfg.configPath()); err != nil {
-			logBuf["ioutil.ReadFile"] = err
+		if data, err := ioutil.ReadFile(cfg.ConfigPath()); err != nil {
+			log.Warn().Err(err).
+				Str("configPath", cfg.ConfigPath()).
+				Msg("could not read config")
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
-				logBuf["yaml.Unmarshal"] = err
+				log.Err(err).
+					Str("configPath", cfg.ConfigPath()).
+					Msg("could not parse config")
 			}
 		}
-
 		if err := envconfig.Process(EnvConfigPrefix, cfg); err != nil {
-			logBuf["envconfig.Process"] = err
+			log.Err(err).
+				Str("EnvConfigPrefix", EnvConfigPrefix).
+				Msg("could not process config environment")
 		}
-
-		log.Config(
-			cfg.Connector.LogFile,
-			cfg.Connector.LogFileMaxAge,
-			cfg.Connector.LogFileMaxSize,
-			cfg.Connector.LogFileRotate,
-			int(cfg.Connector.LogLevel),
-			cfg.Connector.LogCondense,
-		)
-		log.Info(fmt.Sprintf("Build info: %s / %s", buildTag, buildTime))
-		if len(logBuf) > 0 {
-			log.With(logBuf).Warn()
-		}
+		cfg.initLogger()
+		logger.WriteLogBuffer(logBuf)
 	})
 	return cfg
 }
 
-func (cfg Config) configPath() string {
-	configPath := os.Getenv(string(ConfigEnv))
+// ConfigPath returns config file path
+func (cfg Config) ConfigPath() string {
+	configPath := os.Getenv(ConfigEnv)
 	if configPath == "" {
-		wd, err := os.Getwd()
-		if err != nil {
-			log.Warn(err)
-			wd = ""
+		configPath = ConfigName
+		if wd, err := os.Getwd(); err == nil {
+			configPath = path.Join(wd, ConfigName)
 		}
-		configPath = path.Join(wd, ConfigName)
 	}
 	return configPath
 }
@@ -421,7 +425,7 @@ func (cfg Config) configPath() string {
 func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
 	if err := json.Unmarshal(data, &dto); err != nil {
-		log.Error("|config.go| : [loadConnector] : ", err.Error())
+		log.Err(err).Msg("could not parse connector")
 		return nil, err
 	}
 	cfg.Connector.AgentID = dto.AgentID
@@ -446,7 +450,7 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 		} `json:"advanced,omitempty"`
 	}
 	if err := json.Unmarshal(data, &s); err != nil {
-		log.Error("|config.go| : [loadAdvancedPrefixes] : ", err.Error())
+		log.Err(err).Msg("could not parse advanced")
 		return err
 	}
 	for _, c := range cfg.GWConnections {
@@ -492,11 +496,15 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
 	newCfg := &c
 	/* load config file */
-	if data, err := ioutil.ReadFile(newCfg.configPath()); err != nil {
-		log.Warn(err)
+	if data, err := ioutil.ReadFile(newCfg.ConfigPath()); err != nil {
+		log.Warn().Err(err).
+			Str("configPath", cfg.ConfigPath()).
+			Msg("could not read config")
 	} else {
 		if err := yaml.Unmarshal(data, newCfg); err != nil {
-			log.Warn(err)
+			log.Warn().Err(err).
+				Str("configPath", newCfg.ConfigPath()).
+				Msg("could not parse config")
 		}
 	}
 	/* load as ConnectorDTO */
@@ -514,15 +522,20 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	}
 	/* override config file */
 	if output, err := yaml.Marshal(newCfg); err != nil {
-		log.Warn(err)
+		log.Err(err).
+			Msg("could not prepare config for writing")
 	} else {
-		if err := ioutil.WriteFile(newCfg.configPath(), output, 0644); err != nil {
-			log.Warn(err)
+		if err := ioutil.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
+			log.Err(err).
+				Str("configPath", newCfg.ConfigPath()).
+				Msg("could not write config")
 		}
 	}
 	/* load environment */
 	if err := envconfig.Process(EnvConfigPrefix, newCfg); err != nil {
-		log.Warn(err)
+		log.Err(err).
+			Str("EnvConfigPrefix", EnvConfigPrefix).
+			Msg("could not process config environment")
 	}
 	/* process PMC */
 	if cfg.IsConfiguringPMC() {
@@ -535,14 +548,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	cfg.GWConnections = newCfg.GWConnections
 
 	/* update logger */
-	log.Config(
-		cfg.Connector.LogFile,
-		cfg.Connector.LogFileMaxAge,
-		cfg.Connector.LogFileMaxSize,
-		cfg.Connector.LogFileRotate,
-		int(cfg.Connector.LogLevel),
-		cfg.Connector.LogCondense,
-	)
+	cfg.initLogger()
 
 	return dto, nil
 }
@@ -551,6 +557,107 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 func (cfg *Config) IsConfiguringPMC() bool {
 	return os.Getenv(InstallationModeEnv) == InstallationModePMC &&
 		cfg.Connector.InstallationMode != InstallationModePMC
+}
+
+// InitTracerProvider inits provider
+func (cfg Config) InitTracerProvider() (*sdktrace.TracerProvider, error) {
+	return cfg.initJaegertracing()
+}
+
+// initJaegertracing inits tracing provider with Jaeger exporter
+func (cfg Config) initJaegertracing() (*sdktrace.TracerProvider, error) {
+	var errNotConfigured = fmt.Errorf("telemetry is not configured")
+	/* Jaegertracing supports a few options to receive spans
+	[https://github.com/jaegertracing/jaeger/blob/master/ports/ports.go]
+	// AgentJaegerThriftCompactUDP is the default port for receiving Jaeger Thrift over UDP in compact encoding
+	AgentJaegerThriftCompactUDP = 6831
+	// AgentJaegerThriftBinaryUDP is the default port for receiving Jaeger Thrift over UDP in binary encoding
+	AgentJaegerThriftBinaryUDP = 6832
+	// AgentZipkinThriftCompactUDP is the default port for receiving Zipkin Thrift over UDP in binary encoding
+	AgentZipkinThriftCompactUDP = 5775
+	// CollectorGRPC is the default port for gRPC server for sending spans
+	CollectorGRPC = 14250
+	// CollectorHTTP is the default port for HTTP server for sending spans (e.g. /api/traces endpoint)
+	CollectorHTTP = 14268
+
+	The otel jaeger exporter supports AgentJaegerThriftCompactUDP and CollectorHTTP protocols.
+	otel-v0.20.0 Note the possible mistakes in defaults:
+		* "6832" for jaeger.WithAgentPort()
+		* "http://localhost:14250" for jaeger.WithCollectorEndpoint()
+
+	Checking configuration to prevent exporter run with internal defaults in environment without receiver.
+	The OTEL_EXPORTER_ env vars take precedence on the TCG config (with TCG_JAEGERTRACING_ env vars).
+	And the Agent entrypoint setting takes precedence on the Collector entrypoint. */
+	otelExporterJaegerAgentHost := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_HOST")
+	otelExporterJaegerAgentPort := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_PORT")
+	otelExporterJaegerEndpoint := os.Getenv("OTEL_EXPORTER_JAEGER_ENDPOINT")
+	otelExporterJaegerPassword := os.Getenv("OTEL_EXPORTER_JAEGER_PASSWORD")
+	otelExporterJaegerUser := os.Getenv("OTEL_EXPORTER_JAEGER_USER")
+	tcgJaegerAgent := cfg.Jaegertracing.Agent
+	tcgJaegerCollector := cfg.Jaegertracing.Collector
+
+	var endpointOption jaeger.EndpointOption
+	switch {
+	case len(otelExporterJaegerAgentHost)+len(otelExporterJaegerAgentPort) != 0:
+		endpointOption = jaeger.WithAgentEndpoint()
+	case len(otelExporterJaegerEndpoint)+len(otelExporterJaegerPassword)+len(otelExporterJaegerUser) != 0:
+		endpointOption = jaeger.WithCollectorEndpoint()
+	case len(tcgJaegerAgent) != 0:
+		if host, port, err := net.SplitHostPort(tcgJaegerAgent); err == nil {
+			endpointOption = jaeger.WithAgentEndpoint(
+				jaeger.WithAgentHost(host),
+				jaeger.WithAgentPort(port),
+			)
+		} else {
+			log.Err(err).Msg("could not parse the JaegerAgent")
+			return nil, err
+		}
+	case len(tcgJaegerCollector) != 0:
+		endpointOption = jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(tcgJaegerCollector))
+	default:
+		log.Debug().Msg(errNotConfigured.Error())
+		return nil, errNotConfigured
+	}
+
+	attrs := []attribute.KeyValue{
+		semconv.ServiceNameKey.String(fmt.Sprintf("%s:%s:%s",
+			cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID)),
+		attribute.String("runtime", "golang"),
+	}
+	for k, v := range cfg.Jaegertracing.Tags {
+		attrs = append(attrs, attribute.String(k, v))
+	}
+
+	exporter, err := jaeger.NewRawExporter(endpointOption)
+	if err != nil {
+		log.Err(err).Msg("could not create exporter")
+		return nil, err
+	}
+	tp := sdktrace.NewTracerProvider(
+		/* Always be sure to batch in production */
+		sdktrace.WithBatcher(exporter),
+		/* Record information about this application in an Resource */
+		sdktrace.WithResource(resource.NewWithAttributes(attrs...)),
+	)
+	return tp, nil
+}
+
+func (cfg Config) initLogger() {
+	opts := []logger.Option{
+		logger.WithCondense(cfg.Connector.LogCondense),
+		logger.WithLastErrors(10),
+		logger.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
+		logger.WithNoColor(cfg.Connector.LogNoColor),
+		logger.WithTimeFormat(cfg.Connector.LogTimeFormat),
+	}
+	if cfg.Connector.LogFile != "" {
+		opts = append(opts, logger.WithLogFile(&logger.LogFile{
+			FilePath: cfg.Connector.LogFile,
+			MaxSize:  cfg.Connector.LogFileMaxSize,
+			Rotate:   cfg.Connector.LogFileRotate,
+		}))
+	}
+	logger.SetLogger(opts...)
 }
 
 // Decrypt decrypts small messages

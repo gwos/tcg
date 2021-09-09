@@ -1,13 +1,13 @@
 package clients
 
 import (
-	"fmt"
-	"github.com/gwos/tcg/log"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/transit"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -218,26 +218,26 @@ func copyQuery(query *EsQuery) *EsQuery {
 func (timestamp *Timestamp) toAbsoluteUtcTime() *Timestamp {
 	from, err := toAbsoluteTime(timestamp.From, true)
 	if err != nil {
-		log.Error("Cannot parse 'from' timestamp: ", err)
+		log.Err(err).Msg("could not parse 'from' timestamp")
 	}
 	to, err := toAbsoluteTime(timestamp.To, false)
 	if err != nil {
-		log.Error("Cannot parse 'to' timestamp: ", err)
+		log.Err(err).Msg("could not parse 'to' timestamp")
 	}
 	timestamp.From = from.In(time.UTC).Format(layout)
 	timestamp.To = to.In(time.UTC).Format(layout)
 	return timestamp
 }
 
-// Converts timeFilter's from/to values to Time in local time zone and returns TimeInterval with appropriate StartTime/EndTime
+// ToTimeInterval converts timeFilter's from/to values to Time in local time zone and returns TimeInterval with appropriate StartTime/EndTime
 func (timeFilter *KTimeFilter) ToTimeInterval() *transit.TimeInterval {
 	startTime, err := toAbsoluteTime(timeFilter.From, true)
 	if err != nil {
-		log.Error("Cannot parse time filter's 'from': ", err)
+		log.Err(err).Msg("could not parse time filter's 'from'")
 	}
 	endTime, err := toAbsoluteTime(timeFilter.To, false)
 	if err != nil {
-		log.Error("Cannot parse time filter's 'to': ", err)
+		log.Err(err).Msg("could not parse time filter's 'to'")
 	}
 	timeInterval := &transit.TimeInterval{
 		StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
@@ -275,7 +275,7 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 		i = -i
 	}
 	if err != nil {
-		log.Error(fmt.Sprintf("Error parsing time filterClause expression: %s", err.Error()))
+		log.Err(err).Msg("could not parse time filterClause expression")
 	}
 	var result time.Time
 	switch period {
@@ -394,7 +394,7 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 		}
 		break
 	default:
-		log.Error("Error parsing time filterClause expression: unknown period format '" + period + "'")
+		log.Error().Msgf("could not parse time filterClause expression: unknown period format '%s'", period)
 	}
 	return result, nil
 }

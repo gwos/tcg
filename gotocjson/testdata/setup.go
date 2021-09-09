@@ -1,12 +1,13 @@
 package setup
 
 import (
-	"github.com/gwos/tcg/log"
-	"github.com/kelseyhightower/envconfig"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path"
 	"sync"
+
+	"github.com/kelseyhightower/envconfig"
+	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 var once sync.Once

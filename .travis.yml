@@ -1,19 +1,16 @@
 language: bash
-
 script:
-  - export DOCKER_HUB_USERNAME=groundworkbot
-  - export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
-  - make --warn-undefined-variables -f travis.Makefile all
-
+- export DOCKER_HUB_USERNAME=groundworkbot
+- export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
+- make --warn-undefined-variables -f travis.Makefile all
 notifications:
   slack:
     rooms:
-      secure: kQqqVFm2Erk9SU2pZRRMhc5aM+H+80TCTGyWk2Pg1UmNa3CZ57/lWISieGPq8sZaZVJvjbQ/WTrTJE7jUlB6rwidXnqNnwCzxEn0VpmPLoIkB2zw4kfM2oSGci25aIFHKSbqCOP8V18IDFEksn7XSEHgPvpbfQlBs8vDUkb3dDaH2ctBVID56nZrW4NpQ26yFGMXWaO4sf9VT+0pskCLfLk8C9T73CNLOAPHsU22nvIz4hlzM/JkHM8BhhqqZf3OfumIyTEefXEJ1WwjcjLxD3uGiqvgrbrAlWjnvGgKDVBl79Kuf3smjJJGD0F98+28FZdvE88DBFE7Wuc3ZSTzXYZLPRO+q26i3Dhg4Fcu8N0VZ4hs7atmvyezGSq2n+HXBS/+PM/CKsQonv7Ri02TmWmw1c3O7EnvrfxSqlnjqbauoXi2mZyc9j+nRqcQRdXMYSn+X3ktrxgybJ1brUYHwXu53brYOUwYFxh0KVWKiA2faHWqkgQZkzuJ7PCjMSjJjWzfFmBpQe1xpzg5qYG22jLVwPrnxfYfwKoIKgnslCgTPaUBPV2b9ohaDZEmEoe5jJCWDv83ppjviNvR1H0KJJdxjwLCBco6Z66gGo6ot3qYHS5fiwWk+y1LWTVz46YC21c5km2AXozbupkVrTv9hIgFZWwkEXAZAqHT9gkEcsI=
+      secure: Ywh5rQMCOhw5x2i8Rm9eGjA0bY+xspSiJ+LkNVMq/iJ2DAjLB2NxXoxt4/P9UxSwifJ2SUTUcMsL8RpKzwpSNG0dhPGZMW0j+pySx8jS2FEfqnwY/bynlWZX0qUUM12FUXVVJ2rsKtCvfNSi03sjVoWwCHpCuMuOmS9LPVPKiwfFJ2QitqgckDf25O+qGV4plryc2GA7W0CRAJ52WqWGqOhWvzEchBrUiZ4g6lyo/5IXMaM4hPHGdYBdxDug0m23r3mZfJ0qWmjW+bms0HWaHY4F4UsGVasoMV0vPeIw+H12wt/1EziIllbj6cWve2UKz+zTi1rjdwmxteIWw+FQ07VqlCdjTcnLbLcnAuIny8662QTpIcB2fL9uB+Qu1d8PbLmtE/kIepTwuM8nswQzm53N6L1UlldS6yGpl7v8zxHYl0pvvnTsTYeWXy/48uR+kyw1YUIZKQhzgoLrHYbdj2IHOum9Gqnf3DBQPz4c77lorCy+xMWnSF34fKheB/tvO0MpBCrXphO++q0lHKCvduux4BhW+swWvG6IvNjBrS7/9orrRwOHbGYuUa/KZ12zHUlFVknZ4djmw0TrtpcsY44Wnsk4bI6oZnHs4xX4YX0g5TexLSEgmZQ9Wos9dLiEA/ahRrzuvE1CUxjFibal45Hslc0bDwP7FJRc62L9nGs=
     on_pull_requests: true
-
   webhooks:
-    on_success: always # default: always
-    on_failure: always # default: always
-    on_start: always   # default: never
-    on_cancel: always # default: always
-    on_error: always # default: always
+    on_success: always
+    on_failure: always
+    on_start: always
+    on_cancel: always
+    on_error: always

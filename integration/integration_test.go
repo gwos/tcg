@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -35,7 +36,7 @@ var headers map[string]string
 
 func TestIntegration(t *testing.T) {
 	var err error
-	setupIntegration(t, time.Duration(5*time.Second))
+	setupIntegration(t, 5*time.Second)
 	headers, err = connect(t)
 	defer cleanNats(t)
 	defer clean(t, headers)
@@ -61,6 +62,14 @@ func TestIntegration(t *testing.T) {
 	t.Log("Check for host availability in the database")
 	time.Sleep(1 * time.Second)
 	assert.NoError(t, existenceCheck(t, true, HostStatusUp))
+
+	t.Log("Send bad ResourcesWithMetrics payload to GroundWork Foundation")
+	/* expect foundation error, processing should not stop */
+	badPayload := bytes.ReplaceAll(buildResourceWithMetricsRequest(t),
+		[]byte(`context`), []byte(`*ontex*`))
+	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload))
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats)
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport)
 }
 
 func buildInventoryRequest(t *testing.T) []byte {

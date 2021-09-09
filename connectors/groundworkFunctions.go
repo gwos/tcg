@@ -4,14 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/PaesslerAG/gval"
-	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/cache"
-	"github.com/gwos/tcg/log"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/PaesslerAG/gval"
+	"github.com/gin-gonic/gin"
+	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog/log"
 )
+
+// ProcessesCache
+// TODO: move into Server Connector
+var ProcessesCache = cache.New(5*time.Minute, 5*time.Minute)
 
 const (
 	Kb                 = "GW:KB"
@@ -466,7 +472,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	vars := make(map[string]interface{})
 
 	if !override {
-		if processesInterface, exist := cache.ProcessesCache.Get("processes"); exist {
+		if processesInterface, exist := ProcessesCache.Get("processes"); exist {
 			processes := processesInterface.(map[string]float64)
 			for _, param := range expression.Params {
 				if val, exist := processes[strings.ReplaceAll(param.Name, ".", "_")]; exist {
@@ -474,7 +480,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 				}
 			}
 		} else {
-			return -1, errors.New("Processes cache not initialized ")
+			return -1, errors.New("processes cache not initialized ")
 		}
 	} else {
 		for _, param := range expression.Params {
@@ -483,7 +489,7 @@ func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64
 	}
 
 	if len(vars) != len(expression.Params) {
-		return -1, errors.New("Not enough expression parameters ")
+		return -1, errors.New("not enough expression parameters ")
 	}
 	if result, _, err := EvaluateGroundworkExpression(expression.Expression, vars, 0); err == nil {
 		return result, nil
@@ -509,7 +515,9 @@ func EvaluateExpressionHandler(c *gin.Context) {
 		c.JSON(http.StatusOK, result)
 		return
 	}
-	log.Error("[Server Connector]: " + err.Error())
+	log.Err(err).
+		Interface("expression", expression).
+		Msg("could not evaluate expression")
 	c.IndentedJSON(http.StatusBadRequest, err.Error())
 }
 

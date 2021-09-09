@@ -3,15 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"os/exec"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/log"
+	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
-	"go.opentelemetry.io/otel/label"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -36,8 +35,6 @@ var (
 // @host localhost:8099
 // @BasePath /api/v1
 func main() {
-	services.GetController().RegisterEntrypoints(initializeEntrypoints())
-
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(func() {
@@ -46,13 +43,13 @@ func main() {
 		}
 	})
 
-	log.Info("[Checker Connector]: Waiting for configuration to be delivered ...")
+	log.Info().Msg("waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not demand config")
 		return
 	}
 	if err := connectors.Start(); err != nil {
-		log.Error(err)
+		log.Err(err).Msg("could not start connector")
 		return
 	}
 
@@ -61,15 +58,15 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info("[Checker Connector]: Configuration received")
+	log.Info().Msg("configuration received")
 	tExt, tMetProf := &ExtConfig{}, &transit.MetricsProfile{}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
-		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not parse config")
 		return
 	}
 	if err := tExt.Validate(); err != nil {
-		log.Error("[Checker Connector]: Error during parsing config.", err.Error())
+		log.Err(err).Msg("could not validate config")
 		return
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
@@ -101,11 +98,11 @@ func taskHandler(task ScheduleTask) func() {
 		cmd := exec.Command(task.Command[0], task.Command[1:]...)
 		cmd.Env = task.Environment
 		var (
-			handler     func() ([]byte, error)
-			err         error
-			res         []byte
-			span, spanN services.TraceSpan
-			ctx, ctxN   context.Context
+			handler func() ([]byte, error)
+			err     error
+			res     []byte
+
+			monitoredResources *[]transit.DynamicMonitoredResource
 		)
 		if task.CombinedOutput {
 			handler = cmd.CombinedOutput
@@ -113,43 +110,56 @@ func taskHandler(task ScheduleTask) func() {
 			handler = cmd.Output
 		}
 
-		ctx, span = services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
+		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
-			span.SetAttributes(
-				label.Int("payloadLen", len(res)),
-				label.String("error", fmt.Sprint(err)),
-				label.String("task", task.String()),
+			services.EndTraceSpan(span,
+				services.TraceAttrError(err),
+				services.TraceAttrPayloadLen(res),
+				services.TraceAttrString("task", task.String()),
 			)
-			span.End()
 		}()
-		_, spanN = services.StartTraceSpan(ctx, "connectors", "command")
 
+		_, span2 := services.StartTraceSpan(ctx, "connectors", "command")
 		res, err = handler()
 
-		span.SetAttributes(
-			label.Int("payloadLen", len(res)),
-			label.String("error", fmt.Sprint(err)),
-			label.Array("command", task.Command),
+		services.EndTraceSpan(span2,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(res),
+			services.TraceAttrArray("command", task.Command),
 		)
-		spanN.End()
 
-		logEntry := log.With(log.Fields{"task": task, "res": string(res)})
 		if err != nil {
-			logEntry.Warn("[Checker Connector]: Error running command:", err.Error())
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("task failed")
 			return
 		}
-		logEntry.Debug("[Checker Connector]: Success in command execution")
+		log.Debug().
+			Interface("task", task).
+			Bytes("res", res).
+			Msg("task done")
 
-		ctxN, spanN = services.StartTraceSpan(ctx, "connectors", "processMetrics")
+		_, span3 := services.StartTraceSpan(ctx, "connectors", "parse")
+		monitoredResources, err = parser.Parse(res, task.DataFormat)
 
-		if _, err = processMetrics(ctxN, res, task.DataFormat); err != nil {
-			log.Warn("[Checker Connector]: Error processing metrics:", err.Error())
-		}
-
-		span.SetAttributes(
-			label.Int("payloadLen", len(res)),
-			label.String("error", fmt.Sprint(err)),
+		services.EndTraceSpan(span3,
+			services.TraceAttrError(err),
+			services.TraceAttrPayloadLen(res),
 		)
-		spanN.End()
+
+		if err != nil {
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("could not parse metrics")
+			return
+		}
+		if err = connectors.SendMetrics(ctx, *monitoredResources, nil); err != nil {
+			log.Warn().Err(err).
+				Interface("task", task).
+				Bytes("res", res).
+				Msg("could not send metrics")
+		}
 	}
 }
