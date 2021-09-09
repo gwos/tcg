@@ -17,6 +17,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
+	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/milliseconds"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -405,7 +407,39 @@ func (controller *Controller) stop(c *gin.Context) {
 // @Param   gwos-app-name    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stats(c *gin.Context) {
-	c.JSON(http.StatusOK, controller.Stats())
+	type StatsCompat struct {
+		AgentID string `json:"agentID"`
+		AppName string `json:"appName"`
+		AppType string `json:"appType"`
+
+		BytesSent              int                                `json:"bytesSent"`
+		MetricsSent            int                                `json:"metricsSent"`
+		MessagesSent           int                                `json:"messagesSent"`
+		LastInventoryRun       *milliseconds.MillisecondTimestamp `json:"lastInventoryRun,omitempty"`
+		LastMetricsRun         *milliseconds.MillisecondTimestamp `json:"lastMetricsRun,omitempty"`
+		LastAlertRun           *milliseconds.MillisecondTimestamp `json:"lastAlertRun,omitempty"`
+		ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
+		ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
+		UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
+
+		LastErrors []logger.LogRecord `json:"lastErrors"`
+	}
+	stats := controller.Stats()
+	c.JSON(http.StatusOK, StatsCompat{
+		AgentID:                stats.AgentID,
+		AppName:                stats.AppName,
+		AppType:                stats.AppType,
+		BytesSent:              stats.BytesSent,
+		MetricsSent:            stats.MetricsSent,
+		MessagesSent:           stats.MessagesSent,
+		LastInventoryRun:       stats.LastInventoryRun,
+		LastMetricsRun:         stats.LastMetricsRun,
+		LastAlertRun:           stats.LastAlertRun,
+		ExecutionTimeInventory: stats.ExecutionTimeInventory,
+		ExecutionTimeMetrics:   stats.ExecutionTimeMetrics,
+		UpSince:                stats.UpSince,
+		LastErrors:             stats.LastErrors,
+	})
 }
 
 //
@@ -416,7 +450,16 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Success 200 {object} services.AgentIdentity
 // @Router  /agent [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
-	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
+	type AICompat struct {
+		AgentID string `json:"agentID"`
+		AppName string `json:"appName"`
+		AppType string `json:"appType"`
+	}
+	c.JSON(http.StatusOK, AICompat{
+		AgentID: controller.AgentID,
+		AppName: controller.AppName,
+		AppType: controller.AppType,
+	})
 }
 
 //
