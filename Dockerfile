@@ -33,7 +33,7 @@ RUN sh -x \
     && build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
     && ldflags="-X 'github.com/gwos/tcg/config.buildTime=${build_time}'" \
     && ldflags="${ldflags} -X 'github.com/gwos/tcg/config.buildTag=${TRAVIS_TAG}'" \
-    && for d in ./connectors/*connector/; \
+    && for d in /go/src/connectors/*connector/; \
     do  cd "$d"; pwd; \
         CGO_ENABLED=0; \
         if [[ "$d" == *nsca* ]] ; then CGO_ENABLED=1; fi; \
