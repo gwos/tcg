@@ -2,8 +2,10 @@ package services
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"strings"
@@ -13,20 +15,27 @@ import (
 	"github.com/gin-gonic/contrib/cors"
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/gwos/tcg/log"
+	"github.com/patrickmn/go-cache"
+	"github.com/rs/zerolog/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/swaggo/gin-swagger/swaggerFiles"
-	"go.opentelemetry.io/otel/label"
+	"golang.org/x/crypto/blake2b"
 )
 
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*TransitService
+	authCache   *cache.Cache
 	entrypoints []Entrypoint
 	srv         *http.Server
+}
+
+// Credentials defines type of AuthCache items
+type Credentials struct {
+	GwosAppName  string
+	GwosAPIToken string
 }
 
 // Entrypoint describes controller API
@@ -46,6 +55,7 @@ func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
 			GetTransitService(),
+			cache.New(8*time.Hour, time.Hour),
 			[]Entrypoint{},
 			nil,
 		}
@@ -67,7 +77,7 @@ func (controller *Controller) RemoveEntrypoints() {
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
 	if controller.srv != nil {
-		log.Warn("StartController: already started")
+		log.Warn().Msg("controller already started")
 		return nil
 	}
 
@@ -93,7 +103,7 @@ func (controller *Controller) startController() error {
 	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
-		controller.agentStatus.Controller = Running
+		controller.agentStatus.Controller = StatusRunning
 		for {
 			controller.srv = &http.Server{
 				Addr:         addr,
@@ -103,10 +113,10 @@ func (controller *Controller) startController() error {
 			}
 			var err error
 			if certFile != "" && keyFile != "" {
-				log.Info("[Controller]: Start listen TLS: ", addr)
+				log.Info().Msgf("controller starts listen TLS: %s", addr)
 				err = controller.srv.ListenAndServeTLS(certFile, keyFile)
 			} else {
-				log.Info("[Controller]: Start listen: ", addr)
+				log.Info().Msgf("controller starts listen: %s", addr)
 				err = controller.srv.ListenAndServe()
 			}
 			/* getting here after http.Server exit */
@@ -114,17 +124,17 @@ func (controller *Controller) startController() error {
 			/* catch the "bind: address already in use" error */
 			if err != nil && tcgerr.IsErrorAddressInUse(err) &&
 				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
-				log.Warn("[Controller]: ", err, ": retrying http.Server start")
+				log.Warn().Err(err).Msg("controller retrying http.Server start")
 				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
 				continue
 			} else if err != nil && err != http.ErrServerClosed {
-				log.Error("[Controller]: http.Server error: ", err)
+				log.Err(err).Msg("controller got http.Server error")
 			}
 			idleTimer.Stop()
 			break
 		}
-		controller.agentStatus.Controller = Stopped
+		controller.agentStatus.Controller = StatusStopped
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
 	<-idleTimer.C
@@ -140,9 +150,9 @@ func (controller *Controller) stopController() error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), controller.Connector.ControllerStopTimeout)
 	go func() {
-		log.Info("[Controller]: Shutdown ...")
+		log.Info().Msg("controller shutdown ...")
 		if err := controller.srv.Shutdown(ctx); err != nil {
-			log.Warn("[Controller]: Shutdown:", err)
+			log.Warn().Msgf("controller got %s", err)
 		}
 		cancel()
 	}()
@@ -167,24 +177,20 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
+	/* validate payload */
 	var dto config.ConnectorDTO
 	if err := json.Unmarshal(payload, &dto); err != nil {
-		log.Error("|controller.go| : [config] : ", err)
-		c.JSON(http.StatusBadRequest, "unmarshal connector dto")
+		log.Err(err).Msg("could not unmarshal connector dto")
+		c.JSON(http.StatusBadRequest, "could not unmarshal connector dto")
 		return
 	}
-
-	credentials := cache.Credentials{
-		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
-		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
-	}
-	err = controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, dto.DSConnection.HostName)
+	/* process payload */
+	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, fmt.Sprintf("Couldn't validate config token request: %s", dto.DSConnection.HostName))
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
 	}
-
-	_, _ = controller.ctrlPushAsync(payload, ctrlSubjConfig, nil)
-	c.JSON(http.StatusOK, nil)
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -204,12 +210,11 @@ func (controller *Controller) events(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+		EndTraceSpan(span,
+			TraceAttrError(err),
+			TraceAttrPayloadLen(payload),
+			TraceAttrEntrypoint(c.FullPath()),
 		)
-		span.End()
 	}()
 
 	payload, err = c.GetRawData()
@@ -242,12 +247,11 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+		EndTraceSpan(span,
+			TraceAttrError(err),
+			TraceAttrPayloadLen(payload),
+			TraceAttrEntrypoint(c.FullPath()),
 		)
-		span.End()
 	}()
 
 	payload, err = c.GetRawData()
@@ -280,12 +284,11 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 	)
 	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		span.SetAttributes(
-			label.Int("payloadLen", len(payload)),
-			label.String("error", fmt.Sprint(err)),
-			label.String("entrypoint", c.FullPath()),
+		EndTraceSpan(span,
+			TraceAttrError(err),
+			TraceAttrPayloadLen(payload),
+			TraceAttrEntrypoint(c.FullPath()),
 		)
-		span.End()
 	}()
 
 	payload, err = c.GetRawData()
@@ -333,12 +336,12 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) resetNats(c *gin.Context) {
-	ctrl, err := controller.ResetNatsAsync(nil)
+	task, err := controller.ResetNatsAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -354,16 +357,16 @@ func (controller *Controller) resetNats(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Running && status.Ctrl == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Running, 0})
+	if status.Transport == StatusRunning && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusRunning, 0})
 		return
 	}
-	ctrl, err := controller.StartTransportAsync(nil)
+	task, err := controller.StartTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -379,16 +382,16 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == Stopped && status.Ctrl == nil {
-		c.JSON(http.StatusOK, ConnectorStatusDTO{Stopped, 0})
+	if status.Transport == StatusStopped && status.task == nil {
+		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusStopped, 0})
 		return
 	}
-	ctrl, err := controller.StopTransportAsync(nil)
+	task, err := controller.StopTransportAsync()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, ConnectorStatusDTO{Processing, ctrl.Idx})
+	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
 //
@@ -396,7 +399,7 @@ func (controller *Controller) stop(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentIdentityStats
+// @Success 200 {object} services.AgentStatsExt
 // @Failure 401 {string} string "Unauthorized"
 // @Router  /stats [get]
 // @Param   gwos-app-name    header    string     true        "Auth header"
@@ -413,12 +416,7 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Success 200 {object} services.AgentIdentity
 // @Router  /agent [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
-	agentIdentity := AgentIdentity{
-		AgentID: controller.Connector.AgentID,
-		AppName: controller.Connector.AppName,
-		AppType: controller.Connector.AppType,
-	}
-	c.JSON(http.StatusOK, agentIdentity)
+	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
 }
 
 //
@@ -434,8 +432,8 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
 	statusDTO := ConnectorStatusDTO{status.Transport, 0}
-	if status.Ctrl != nil {
-		statusDTO = ConnectorStatusDTO{Processing, status.Ctrl.Idx}
+	if status.task != nil {
+		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
 	}
 	c.JSON(http.StatusOK, statusDTO)
 }
@@ -454,38 +452,95 @@ func (controller *Controller) version(c *gin.Context) {
 	c.JSON(http.StatusOK, config.GetBuildInfo())
 }
 
-func (controller *Controller) validateToken(c *gin.Context) {
-	// check local pin
+func (controller *Controller) checkAccess(c *gin.Context) {
+	if len(controller.dsClient.HostName) == 0 && len(controller.gwClients) == 0 {
+		log.Info().Str("url", c.Request.URL.Redacted()).
+			Msg("omit access check on empty config")
+		return
+	}
+
+	/* check local pin */
 	pin := controller.Connector.ControllerPin
 	if len(pin) > 0 && pin == c.Request.Header.Get("X-PIN") {
+		log.Debug().Str("url", c.Request.URL.Redacted()).
+			Msg("access allowed with X-PIN")
 		return
 	}
 
-	credentials := cache.Credentials{
-		GwosAppName:  c.Request.Header.Get("GWOS-APP-NAME"),
-		GwosAPIToken: c.Request.Header.Get("GWOS-API-TOKEN"),
-	}
-
-	if credentials.GwosAppName == "" || credentials.GwosAPIToken == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": `Invalid GWOS-APP-NAME or GWOS-API-TOKEN`})
-		c.Abort()
-		return
-	}
-
-	key := fmt.Sprintf("%s:%s", credentials.GwosAppName, credentials.GwosAPIToken)
-
-	_, isCached := cache.AuthCache.Get(key)
-	if !isCached {
-		err := controller.dsClient.ValidateToken(credentials.GwosAppName, credentials.GwosAPIToken, "")
+	hashFn := func(args ...string) (string, error) {
+		h, err := blake2b.New512(nil)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return "", err
+		}
+		for _, s := range args {
+			if _, err := io.WriteString(h, s); err != nil {
+				return "", err
+			}
+		}
+		sum := h.Sum(nil)
+		return hex.EncodeToString(sum[:]), nil
+	}
+
+	/* check basic auth */
+	if username, password, hasAuth := c.Request.BasicAuth(); hasAuth {
+		var err error
+		defer func() {
+			if err == nil {
+				log.Debug().Str("url", c.Request.URL.Redacted()).
+					Str("username", username).
+					Msg("access allowed with BASIC")
+				return
+			}
+			log.Warn().Err(err).Str("url", c.Request.URL.Redacted()).
+				Str("username", username).
+				Msg("access disallowed with BASIC")
+			c.AbortWithStatusJSON(http.StatusUnauthorized,
+				gin.H{"error": err.Error()})
+		}()
+
+		if !(len(username) > 0 && len(password) > 0 && len(controller.gwClients) > 0) {
+			err = fmt.Errorf("misconfigured basic auth")
 			return
 		}
+		ck, err := hashFn(username, password)
+		if err == nil {
+			if _, isCached := controller.authCache.Get(ck); !isCached {
+				if _, err = controller.gwClients[0].AuthenticatePassword(username, password); err == nil {
+					err = controller.authCache.Add(ck, true, time.Hour)
+				}
+			}
+		}
+		return
+	}
 
-		err = cache.AuthCache.Add(key, credentials, 8*time.Hour)
-		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	/* check gwos auth */
+	gwosAppName := c.Request.Header.Get("GWOS-APP-NAME")
+	gwosAPIToken := c.Request.Header.Get("GWOS-API-TOKEN")
+	var err error
+	defer func() {
+		if err == nil {
+			log.Debug().Str("url", c.Request.URL.Redacted()).
+				Str("gwosAppName", gwosAppName).
+				Msg("access allowed with GWOS")
 			return
+		}
+		log.Warn().Err(err).Str("url", c.Request.URL.Redacted()).
+			Str("gwosAppName", gwosAppName).
+			Msg("access disallowed with GWOS")
+		c.AbortWithStatusJSON(http.StatusUnauthorized,
+			gin.H{"error": err.Error()})
+	}()
+
+	if !(len(gwosAppName) > 0 && len(gwosAPIToken) > 0 && len(controller.dsClient.HostName) > 0) {
+		err = fmt.Errorf("misconfigured gwos auth")
+		return
+	}
+	ck, err := hashFn(gwosAppName, gwosAPIToken)
+	if err == nil {
+		if _, isCached := controller.authCache.Get(ck); !isCached {
+			if err = controller.dsClient.ValidateToken(gwosAppName, gwosAPIToken); err == nil {
+				err = controller.authCache.Add(ck, true, time.Hour)
+			}
 		}
 	}
 }
@@ -494,13 +549,15 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
-	apiV1Group := router.Group("/api/v1")
-	apiV1Config := router.Group("/api/v1/config")
+	/* public entrypoints */
 	apiV1Identity := router.Group("/api/v1/identity")
-	apiV1Group.Use(controller.validateToken)
+	apiV1Identity.GET("", controller.agentIdentity)
 
-	apiV1Config.POST("", controller.config)
-	apiV1Group.GET("/version", controller.version)
+	/* private entrypoints */
+	apiV1Group := router.Group("/api/v1")
+	apiV1Group.Use(controller.checkAccess)
+
+	apiV1Group.POST("/config", controller.config)
 	apiV1Group.POST("/events", controller.events)
 	apiV1Group.POST("/events-ack", controller.eventsAck)
 	apiV1Group.POST("/events-unack", controller.eventsUnack)
@@ -510,7 +567,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.POST("/stop", controller.stop)
 	apiV1Group.GET("/stats", controller.stats)
 	apiV1Group.GET("/status", controller.status)
-	apiV1Identity.GET("", controller.agentIdentity)
+	apiV1Group.GET("/version", controller.version)
 
 	for _, entrypoint := range entrypoints {
 		switch entrypoint.Method {

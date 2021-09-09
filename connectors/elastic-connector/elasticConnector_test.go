@@ -16,7 +16,7 @@ import (
 
 func TestInitFullConfig(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "config")
-	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
 	testMetric1View1 := transit.MetricDefinition{
@@ -65,7 +65,7 @@ func TestInitFullConfig(t *testing.T) {
 		HostNameField:      "eccTestHostNameLabel",
 		HostGroupField:     "eccTestHostGroupLabel",
 		GroupNameByUser:    false,
-		CheckInterval:      time.Duration(5) * time.Minute,
+		CheckInterval:      time.Minute * 5,
 		Ownership:          transit.Yield,
 		AppType:            "testAppType",
 		AgentID:            "testAgentId",
@@ -149,7 +149,7 @@ func TestInitFullConfig(t *testing.T) {
 
 func TestInitConfigWithNotPresentedValues(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "config")
-	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{
@@ -187,7 +187,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 
 func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "config")
-	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{
@@ -231,7 +231,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 
 func TestHandleEmptyConfig(t *testing.T) {
 	tmpFile, _ := ioutil.TempFile("", "config")
-	_ = os.Setenv(string(config.ConfigEnv), tmpFile.Name())
+	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
 	expected := ExtConfig{

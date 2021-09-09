@@ -14,10 +14,10 @@ import (
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/label"
+	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // ElasticView describes flow
@@ -101,7 +101,7 @@ func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) 
 	esClient := clients.EsClient{Servers: cfg.Servers}
 	err := esClient.InitEsClient()
 	if err != nil {
-		log.Error("|elasticConnector.go| : [initClients] : Cannot initialize ES client.")
+		log.Err(err).Msg("could not initialize ES client")
 		return kibanaClient, esClient, errors.New("cannot initialize ES client")
 	}
 	return kibanaClient, esClient, nil
@@ -153,7 +153,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
 	defer func() {
 		spanCollectMetrics.SetAttributes(
-			label.String("error", fmt.Sprint(err)),
+			attribute.String("error", fmt.Sprint(err)),
 		)
 		spanCollectMetrics.End()
 	}()
@@ -163,8 +163,8 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 	connector.monitoringState = monitoringState
 
 	spanMonitoringState.SetAttributes(
-		label.Int("monitoringState.Hosts", len(monitoringState.Hosts)),
-		label.Int("monitoringState.Metrics", len(monitoringState.Metrics)),
+		attribute.Int("monitoringState.Hosts", len(monitoringState.Hosts)),
+		attribute.Int("monitoringState.Metrics", len(monitoringState.Metrics)),
 	)
 	spanMonitoringState.End()
 
@@ -178,11 +178,11 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredR
 			err = connector.collectStoredQueriesMetrics(queries)
 			break
 		default:
-			log.Warn("Not supported view: ", view)
+			log.Warn().Str("view", view).Msg("not supported view")
 			break
 		}
 		if err != nil {
-			log.Error("|elasticConnector.go| : [CollectMetrics] : Collection interrupted.")
+			log.Err(err).Msg("collection interrupted")
 			break
 		}
 
@@ -210,7 +210,7 @@ func (connector *ElasticConnector) ListSuggestions(view string, name string) []s
 		}
 		break
 	default:
-		log.Warn("Not supported view: ", view)
+		log.Warn().Str("view", view).Msg("not supported view")
 		break
 	}
 	return suggestions
@@ -258,7 +258,7 @@ func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
 func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) error {
 	storedQueries := connector.kibanaClient.RetrieveStoredQueries(titles)
 	if storedQueries == nil || len(storedQueries) == 0 {
-		log.Info("No stored queries retrieved.")
+		log.Info().Msg("no stored queries retrieved")
 		return nil
 	}
 
@@ -271,15 +271,14 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 		timeInterval := storedQuery.Attributes.TimeFilter.ToTimeInterval()
 		isAggregatable, err := connector.esClient.IsAggregatable([]string{connector.config.HostNameField}, indexes)
 		if err != nil {
-			log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] : Unable to proceed as ES client could not be initialized.")
+			log.Err(err).Msg("unable to proceed as ES client could not be initialized")
 			return err
 		}
 		var result map[string]int
 		if isAggregatable[connector.config.HostNameField] {
 			result, err = connector.esClient.CountHits(connector.config.HostNameField, indexes, &query)
 			if err != nil {
-				log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] :" +
-					" Unable to proceed as ES client could not be initialized.")
+				log.Err(err).Msg("unable to proceed as ES client could not be initialized")
 				return err
 			}
 		} else {
@@ -287,8 +286,7 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 			for hostName := range connector.monitoringState.Hosts {
 				hits, err := connector.esClient.CountHitsForHost(hostName, connector.config.HostNameField, indexes, &query)
 				if err != nil {
-					log.Error("|elasticConnector.go| : [collectStoredQueriesMetrics] :" +
-						" Unable to proceed as ES client could not be initialized.")
+					log.Err(err).Msg("unable to proceed as ES client could not be initialized")
 					return err
 				}
 				result[hostName] = hits

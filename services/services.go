@@ -3,11 +3,19 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
-	"go.opentelemetry.io/otel/api/trace"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Define NATS subjects
@@ -24,10 +32,10 @@ type Status string
 
 // Status
 const (
-	Processing Status = "processing"
-	Running           = "running"
-	Stopped           = "stopped"
-	Unknown           = "unknown"
+	StatusProcessing Status = "processing"
+	StatusRunning    Status = "running"
+	StatusStopped    Status = "stopped"
+	StatusUnknown    Status = "unknown"
 )
 
 // AgentStats defines TCG Agent statistics
@@ -41,31 +49,18 @@ type AgentStats struct {
 	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
 	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
 	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
-	LastErrors             []LastError                        `json:"lastErrors"`
 }
 
-// LastError defines
-type LastError struct {
-	Message string                             `json:"message"`
-	Time    *milliseconds.MillisecondTimestamp `json:"time"`
-}
-
-// AgentIdentity defines TCG Agent Identity
-type AgentIdentity struct {
-	AgentID string `json:"agentID"`
-	AppName string `json:"appName"`
-	AppType string `json:"appType"`
-}
-
-// AgentIdentityStats defines complex type
-type AgentIdentityStats struct {
-	AgentIdentity
+// AgentStatsExt defines complex type
+type AgentStatsExt struct {
+	transit.AgentIdentity
 	AgentStats
+	LastErrors []logger.LogRecord
 }
 
 // AgentStatus defines TCG Agent status
 type AgentStatus struct {
-	Ctrl       *CtrlAction
+	task       *taskQueue.Task
 	Controller Status
 	Nats       Status
 	Transport  Status
@@ -91,14 +86,14 @@ type AgentServices interface {
 	Stats() AgentStats
 	Status() AgentStatus
 
-	ExitAsync(chan error) (*CtrlAction, error)
-	ResetNatsAsync(chan error) (*CtrlAction, error)
-	StartControllerAsync(chan error) (*CtrlAction, error)
-	StopControllerAsync(chan error) (*CtrlAction, error)
-	StartNatsAsync(chan error) (*CtrlAction, error)
-	StopNatsAsync(chan error) (*CtrlAction, error)
-	StartTransportAsync(chan error) (*CtrlAction, error)
-	StopTransportAsync(chan error) (*CtrlAction, error)
+	ExitAsync() (*taskQueue.Task, error)
+	ResetNatsAsync() (*taskQueue.Task, error)
+	StartControllerAsync() (*taskQueue.Task, error)
+	StopControllerAsync() (*taskQueue.Task, error)
+	StartNatsAsync() (*taskQueue.Task, error)
+	StopNatsAsync() (*taskQueue.Task, error)
+	StartTransportAsync() (*taskQueue.Task, error)
+	StopTransportAsync() (*taskQueue.Task, error)
 
 	Exit() error
 	ResetNats() error
@@ -133,13 +128,51 @@ type Controllers interface {
 // TraceSpan aliases trace.Span interface
 type TraceSpan trace.Span
 
+// TraceAttrOption defines option to set span attribute
+type TraceAttrOption func(span TraceSpan)
+
 // StartTraceSpan starts a span
 func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	return GetAgentService().telemetryProvider.
+	return otel.GetTracerProvider().
 		Tracer(tracerName).Start(ctx, spanName, opts...)
+}
+
+// EndTraceSpan ends span, optionally sets attributes
+func EndTraceSpan(span TraceSpan, opts ...TraceAttrOption) {
+	for _, optFn := range opts {
+		optFn(span)
+	}
+	span.End()
+}
+
+// TraceAttrArray sets an int attribute
+func TraceAttrArray(k string, v interface{}) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Array(k, v)) }
+}
+
+// TraceAttrInt sets an int attribute
+func TraceAttrInt(k string, v int) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Int(k, v)) }
+}
+
+// TraceAttrString sets a string attribute
+func TraceAttrString(k, v string) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String(k, v)) }
+}
+
+// TraceAttrEntrypoint sets an entrypoint attribute
+func TraceAttrEntrypoint(v string) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String("entrypoint", v)) }
+}
+
+// TraceAttrError sets an error attribute
+func TraceAttrError(v error) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.String("error", fmt.Sprint(v))) }
+}
+
+// TraceAttrPayloadLen sets a payloadLen attribute
+func TraceAttrPayloadLen(v []byte) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.Int("payloadLen", len(v))) }
 }
 
 type payloadType byte
@@ -155,8 +188,8 @@ const (
 	typeSetInDowntime
 )
 
-func (s payloadType) String() string {
-	return [...]string{
+func (t payloadType) all() []string {
+	return []string{
 		"undefined",
 		"events",
 		"eventsAck",
@@ -165,47 +198,154 @@ func (s payloadType) String() string {
 		"metrics",
 		"clearInDowntime",
 		"setInDowntime",
-	}[s]
+	}
+}
+
+func (t payloadType) String() string {
+	return t.all()[t]
+}
+
+func (t *payloadType) FromString(s string) error {
+	for i, v := range t.all() {
+		if s == v {
+			*t = payloadType(i)
+			return nil
+		}
+	}
+	return fmt.Errorf("unknown payload type")
 }
 
 type natsPayload struct {
-	Payload     []byte
 	SpanContext trace.SpanContext
-	Type        payloadType
+
+	Payload []byte
+	Type    payloadType
 }
 
-// MarshalText implements json.Marshaler.
-func (t natsPayload) MarshalText() ([]byte, error) {
-	var b bytes.Buffer
-	if err := b.WriteByte(byte(t.Type)); err != nil {
-		return nil, err
-	}
-	if _, err := b.Write(t.SpanContext.SpanID[:]); err != nil {
-		return nil, err
-	}
-	if _, err := b.Write(t.SpanContext.TraceID[:]); err != nil {
-		return nil, err
-	}
-	if err := b.WriteByte(byte(t.SpanContext.TraceFlags)); err != nil {
-		return nil, err
-	}
-	if _, err := b.Write(t.Payload[:]); err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
+// Marshal implements Marshaler
+// internally it applyes the latest format version
+func (p natsPayload) Marshal() ([]byte, error) {
+	return p.marshalV2()
 }
 
-// UnmarshalText implements json.Unmarshaler.
-func (t *natsPayload) UnmarshalText(input []byte) error {
-	b := bytes.NewBuffer(input)
-	t.Type = payloadType(b.Next(1)[0])
-	if _, err := b.Read(t.SpanContext.SpanID[:]); err != nil {
+// Unmarshal implements Unmarshaler
+// internally it applyes implementation based on format version
+func (p *natsPayload) Unmarshal(input []byte) error {
+	if len(input) == 0 {
+		return nil
+	}
+	switch {
+	case input[0] < 8:
+		return p.unmarshalV1(input)
+	case bytes.HasPrefix(input, []byte(`{"v2":`)):
+		return p.unmarshalV2(input)
+	default:
+		return fmt.Errorf("unknown payload format")
+	}
+}
+
+func (p natsPayload) marshalV1() ([]byte, error) {
+	spanID := p.SpanContext.SpanID()
+	traceID := p.SpanContext.TraceID()
+	traceFlags := p.SpanContext.TraceFlags()
+	buf := make([]byte, 0, len(p.Payload)+26)
+	buf = append(buf, byte(p.Type))
+	buf = append(buf, spanID[:]...)
+	buf = append(buf, traceID[:]...)
+	buf = append(buf, byte(traceFlags))
+	buf = append(buf, p.Payload...)
+	return buf, nil
+}
+
+func (p *natsPayload) unmarshalV1(input []byte) error {
+	/* process input bytes as:
+	byte     payloadType
+	[8]byte  SpanContext SpanID
+	[16]byte SpanContext TraceID
+	byte     SpanContext TraceFlags
+	[]byte   Payload */
+	var (
+		spanID     [8]byte
+		traceID    [16]byte
+		traceFlags byte
+	)
+	buf := bytes.NewBuffer(input)
+	p.Type = payloadType(buf.Next(1)[0])
+	if _, err := buf.Read(spanID[:]); err != nil {
 		return err
 	}
-	if _, err := b.Read(t.SpanContext.TraceID[:]); err != nil {
+	if _, err := buf.Read(traceID[:]); err != nil {
 		return err
 	}
-	t.SpanContext.TraceFlags = b.Next(1)[0]
-	t.Payload = b.Bytes()
+	traceFlags = buf.Next(1)[0]
+	p.Payload = buf.Bytes()
+	p.SpanContext = trace.NewSpanContext(trace.SpanContextConfig{
+		SpanID:     spanID,
+		TraceID:    traceID,
+		TraceFlags: trace.TraceFlags(traceFlags),
+	})
+	return nil
+}
+
+/* natsPayload2 used for json encoding
+takes only simple fields from SpanContext because of
+trace.SpanContextConfig doesn't support unmarshaling (otel-v.0.20.0)
+trace.SpanIDFromHex and trace.TraceIDFromHex don't support zero values
+suitable in case of NoopTracerProvider */
+type natsPayload2 struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+
+	SpanID     string `json:"spanID"`
+	TraceID    string `json:"traceID"`
+	TraceFlags uint8  `json:"traceFlags"`
+}
+
+func (p natsPayload) marshalV2() ([]byte, error) {
+	spanID := p.SpanContext.SpanID()
+	traceID := p.SpanContext.TraceID()
+	traceFlags := p.SpanContext.TraceFlags()
+	buf := make([]byte, 0, len(p.Payload)+132)
+	buf = append(buf, `{"v2":{"type":"`...)
+	buf = append(buf, p.Type.String()...)
+	buf = append(buf, `","payload":`...)
+	buf = append(buf, p.Payload...)
+	buf = append(buf, `,"spanID":"`...)
+	buf = append(buf, hex.EncodeToString(spanID[:])...)
+	buf = append(buf, `","traceID":"`...)
+	buf = append(buf, hex.EncodeToString(traceID[:])...)
+	buf = append(buf, `","traceFlags":`...)
+	buf = strconv.AppendUint(buf, uint64(traceFlags), 10)
+	buf = append(buf, `}}`...)
+	return buf, nil
+}
+
+func (p *natsPayload) unmarshalV2(input []byte) error {
+	var p2 natsPayload2
+	if err := json.Unmarshal(input[6:len(input)-1], &p2); err != nil {
+		return err
+	}
+	spanCtxCfg := trace.SpanContextConfig{
+		TraceFlags: trace.TraceFlags(p2.TraceFlags),
+	}
+	if v, err := hex.DecodeString(p2.SpanID); err == nil {
+		copy(spanCtxCfg.SpanID[:], v)
+	} else {
+		return err
+	}
+	if v, err := hex.DecodeString(p2.TraceID); err == nil {
+		copy(spanCtxCfg.TraceID[:], v)
+	} else {
+		return err
+	}
+	var pt payloadType
+	if err := pt.FromString(p2.Type); err != nil {
+		return err
+	}
+	*p = natsPayload{
+		Type:        pt,
+		Payload:     p2.Payload,
+		SpanContext: trace.NewSpanContext(spanCtxCfg),
+	}
 	return nil
 }

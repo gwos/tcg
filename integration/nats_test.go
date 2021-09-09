@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gwos/tcg/cache"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/milliseconds"
@@ -40,7 +39,7 @@ const (
 // TCG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, time.Duration(5*time.Second))
+	setupIntegration(t, 5*time.Second)
 	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
 	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
@@ -79,7 +78,7 @@ func TestNatsQueue_1(t *testing.T) {
 // TCG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, time.Duration(30*time.Second))
+	setupIntegration(t, 30*time.Second)
 	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
 	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
 	assert.NoError(t, services.GetTransitService().StopTransport())
@@ -123,7 +122,7 @@ func TestNatsQueue_2(t *testing.T) {
 //Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, time.Duration(30*time.Second))
+	setupIntegration(t, 30*time.Second)
 	m0 := services.GetTransitService().Stats().MessagesSent
 
 	var resources []transit.DynamicMonitoredResource
@@ -212,7 +211,6 @@ func cleanNats(t *testing.T) {
 	cmd := exec.Command("rm", "-rf", TestConfigNatsStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
-	cache.DispatcherDoneCache.Flush()
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
 

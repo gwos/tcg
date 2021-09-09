@@ -2,14 +2,13 @@ package metrics
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/log"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 type mapItem struct {
@@ -22,10 +21,9 @@ type mapItem struct {
 func add(byGroups map[string]mapItem, p []byte) {
 	r := transit.DynamicResourcesWithServicesRequest{}
 	if err := json.Unmarshal(p, &r); err != nil {
-		log.With(log.Fields{
-			"error":   err,
-			"payload": p,
-		}).Log(log.ErrorLevel, "could not unmarshal metrics payload for batch")
+		log.Err(err).
+			RawJSON("payload", p).
+			Msg("could not unmarshal metrics payload for batch")
 		return
 	}
 
@@ -71,15 +69,14 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
 		if len(r.Resources) > 0 {
 			p, err := json.Marshal(r)
 			if err == nil {
-				log.Debug(fmt.Sprintf("batched %d resources in %d groups",
-					len(r.Resources), len(r.Groups)))
+				log.Debug().Msgf("batched %d resources in %d groups",
+					len(r.Resources), len(r.Groups))
 				pp = append(pp, p)
 				continue
 			}
-			log.With(log.Fields{
-				"error":     err,
-				"resources": r,
-			}).Log(log.ErrorLevel, "could not marshal resources")
+			log.Err(err).
+				Interface("resources", r).
+				Msg("could not marshal resources")
 		}
 	}
 	return pp

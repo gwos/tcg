@@ -2,19 +2,14 @@ package clients
 
 import (
 	"fmt"
-	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/log"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
-)
 
-// DSOperations defines DalekServices operations interface
-type DSOperations interface {
-	Reload(agentID string) error
-	ValidateToken(appName, apiToken string) error
-}
+	"github.com/gwos/tcg/config"
+	"github.com/rs/zerolog/log"
+)
 
 // Define entrypoints for DSOperations
 const (
@@ -22,15 +17,15 @@ const (
 	DSEntrypointValidateToken = "/dalekservices/validate-token"
 )
 
-// DSClient implements DSOperations interface
+// DSClient implements DS API operations
 type DSClient struct {
 	*config.DSConnection
 }
 
-// ValidateToken implements DSOperations.ValidateToken.
-func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL string) error {
+// ValidateToken calls API
+func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		log.Warn("DSClient: Omit ValidateToken on demand config")
+		log.Info().Msg("DSClient is not configured")
 		return nil
 	}
 
@@ -38,85 +33,75 @@ func (client *DSClient) ValidateToken(appName, apiToken string, dalekServicesURL
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-
 	formValues := map[string]string{
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-	if dalekServicesURL == "" {
-		dalekServicesURL = client.DSConnection.HostName
-	}
 	entrypoint := url.URL{
-		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
-		Host:   dalekServicesURL,
+		Scheme: makeDalekServicesScheme(client.HostName),
+		Host:   client.HostName,
 		Path:   DSEntrypointValidateToken,
 	}
-
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, entrypoint.String(), headers, formValues, nil)
-
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   entrypoint.String(),
-	})
-	logEntryLevel := log.DebugLevel
-	defer func() { logEntry.Log(logEntryLevel, "DSClient: ValidateToken") }()
+	req, err := (&Req{
+		URL:     entrypoint.String(),
+		Method:  http.MethodPost,
+		Headers: headers,
+		Form:    formValues,
+	}).Send()
 
 	if err == nil {
-		if statusCode == 201 {
-			b, _ := strconv.ParseBool(string(byteResponse))
-			if b {
+		if req.Status == 201 {
+			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
+				req.LogWith(log.Debug()).Msg("validate token")
 				return nil
 			}
-			return fmt.Errorf("invalid gwos-app-name or gwos-api-token")
+			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
+			req.LogWith(log.Warn()).Err(eee).Msg("could not validate token")
+			return eee
 		}
-		return fmt.Errorf(string(byteResponse))
+		eee := fmt.Errorf(string(req.Response))
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not validate token")
+		return eee
 	}
-
+	req.LogWith(log.Warn()).Msg("could not validate token")
 	return err
 }
 
-// Reload implements DSOperations.Reload.
+// Reload calls API
 func (client *DSClient) Reload(agentID string) error {
+	if len(client.HostName) == 0 {
+		log.Info().Msg("DSClient is not configured")
+		return nil
+	}
 	headers := map[string]string{
 		"Accept":       "application/json",
 		"Content-Type": "application/json",
 	}
-	reqURL := (&url.URL{
-		Scheme: makeDalekServicesScheme(client.DSConnection.HostName),
-		Host:   client.DSConnection.HostName,
+	entrypoint := url.URL{
+		Scheme: makeDalekServicesScheme(client.HostName),
+		Host:   client.HostName,
 		Path:   strings.ReplaceAll(DSEntrypointReload, ":agentID", agentID),
-	}).String()
-
-	statusCode, byteResponse, err := SendRequest(http.MethodPost, reqURL, headers, nil, nil)
-
-	logEntry := log.With(log.Fields{
-		"error":      err,
-		"statusCode": statusCode,
-	}).WithDebug(log.Fields{
-		"response": string(byteResponse),
-		"headers":  headers,
-		"reqURL":   reqURL,
-	})
-	logEntryLevel := log.InfoLevel
-
-	defer func() { logEntry.Log(logEntryLevel, "DSClient: Reload") }()
-
-	if statusCode == 404 {
-		logEntry.WithField("Hint", "Check AgentAI")
 	}
-	if err != nil {
-		logEntryLevel = log.ErrorLevel
-		return err
+	req, err := (&Req{
+		URL:     entrypoint.String(),
+		Method:  http.MethodPost,
+		Headers: headers,
+	}).Send()
+
+	if err == nil {
+		if req.Status == 201 {
+			req.LogWith(log.Info()).Msg("request for reload")
+			return nil
+		}
+		eee := fmt.Errorf(string(req.Response))
+		if req.Status == 404 {
+			req.LogWith(log.Warn()).Err(eee).Msg("could not request for reload: check AgentID")
+		}
+		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not request for reload")
+		return eee
 	}
-	if statusCode != 201 {
-		logEntryLevel = log.WarnLevel
-		return fmt.Errorf(string(byteResponse))
-	}
-	return nil
+	req.LogWith(log.Warn()).Msg("could not request for reload")
+	return err
 }
 
 // Create the scheme (http or https) based on hostName prefix
