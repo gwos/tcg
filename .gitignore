@@ -8,12 +8,7 @@
 *.iml
 tcg
 test_libtransit
-connectors/apm-connector/apm-connector
-connectors/checker-connector/checker-connector
-connectors/elastic-connector/elastic-connector
-connectors/kubernetes-connector/kubernetes-connector
-connectors/nsca-connector/nsca-connector
-connectors/server-connector/server-connector
+connectors/*-connector/*-connector
 examples/apm/pull/go/go
 
 # Temporary files

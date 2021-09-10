@@ -55,7 +55,7 @@ type AgentStats struct {
 type AgentStatsExt struct {
 	transit.AgentIdentity
 	AgentStats
-	LastErrors []logger.LogRecord
+	LastErrors []logger.LogRecord `json:"lastErrors"`
 }
 
 // AgentStatus defines TCG Agent status
