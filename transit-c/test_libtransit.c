@@ -31,6 +31,18 @@ And all environment variables supported by libtransit itself:
 For more info see package `config`
 */
 
+/* define handlers for extended libtransit functions */
+uintptr_t (*createInventoryRequest)() = NULL;
+uintptr_t (*createInventoryResource)(char *name, char *resType) = NULL;
+uintptr_t (*createInventoryService)(char *name, char *resType) = NULL;
+uintptr_t (*createMonitoredResource)(char *name, char *resType) = NULL;
+uintptr_t (*createMonitoredService)(char *name, char *resType) = NULL;
+void (*addResource)(uintptr_t *pReq, uintptr_t pRes) = NULL;
+void (*addService)(uintptr_t *pRes, uintptr_t pSvc) = NULL;
+void (*setName)(uintptr_t *handle, char *s) = NULL;
+void (*deleteHandle)(uintptr_t *handle) = NULL;
+bool (*sendInventory)(uintptr_t pInvReq, char *errBuf, size_t errBufLen) = NULL;
+
 /* define handlers for general libtransit functions */
 bool (*getAgentIdentity)(char *buf, size_t bufLen, char *errBuf,
                          size_t errBufLen) = NULL;
@@ -98,6 +110,17 @@ void load_libtransit() {
   if (!libtransit_handle) {
     fail(dlerror());
   }
+
+  createInventoryRequest = find_symbol("CreateInventoryRequest");
+  createInventoryResource = find_symbol("CreateInventoryResource");
+  createInventoryService = find_symbol("CreateInventoryService");
+  createMonitoredResource = find_symbol("CreateMonitoredResource");
+  createMonitoredService = find_symbol("CreateMonitoredService");
+  addResource = find_symbol("AddResource");
+  addService = find_symbol("AddService");
+  setName = find_symbol("SetName");
+  deleteHandle = find_symbol("DeleteHandle");
+  sendInventory = find_symbol("SendInventory");
 
   getAgentIdentity = find_symbol("GetAgentIdentity");
   goSetenv = find_symbol("GoSetenv");
@@ -312,8 +335,37 @@ void test_SendResourcesWithMetrics() {
   }
 }
 
+void test_SendInventory() {
+  uintptr_t invReq = createInventoryRequest();
+  uintptr_t invRes = createInventoryResource("invRes", "host");
+  uintptr_t invSvc = createInventoryService("invSvc", "service");
+  uintptr_t monSvc = createMonitoredService("monSvc", "service");
+
+  setName(&invRes, "resource-01");
+  setName(&invSvc, "service-01");
+  setName(&monSvc, "service-02");
+
+  addService(&invRes, invSvc);
+  addService(&invRes, monSvc);
+  addResource(&invReq, invRes);
+
+  char errBuf[ERR_BUF_LEN] = "";
+  bool res = sendInventory(invReq, errBuf, ERR_BUF_LEN);
+
+  deleteHandle(&invReq);
+  deleteHandle(&invRes);
+  deleteHandle(&invSvc);
+  deleteHandle(&monSvc);
+
+  if (!res) {
+    fail(errBuf);
+  }
+}
+
 int main(void) {
   load_libtransit();
+  test_SendInventory();
+
   test_libtransit_control();
   test_SendResourcesWithMetrics();
 

@@ -1,8 +1,9 @@
 package main
 
-//#include <stddef.h>
-//#include <stdlib.h>
 //#include <stdbool.h>
+//#include <stddef.h>
+//#include <stdint.h>
+//#include <stdlib.h>
 //
 ///* getTextHandlerType defines a function type that returns an allocated string.
 // * It should be safe to call `C.free` on it. */
@@ -25,9 +26,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"runtime/cgo"
 	"unsafe"
 
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
+	"github.com/rs/zerolog/log"
 )
 
 func init() {
@@ -289,5 +293,178 @@ func GetAgentIdentity(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.
 		return false
 	}
 	bufStr(buf, bufLen, string(res))
+	return true
+}
+
+/* Extended interface with cgo handles */
+
+// CreateInventoryRequest returns a handle
+//export CreateInventoryRequest
+func CreateInventoryRequest() C.uintptr_t {
+	p := new(transit.InventoryRequest)
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// CreateInventoryResource returns a handle
+//export CreateInventoryResource
+func CreateInventoryResource(
+	name *C.char,
+	resType *C.char,
+) C.uintptr_t {
+	p := new(transit.InventoryResource)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// CreateInventoryService returns a handle
+//export CreateInventoryService
+func CreateInventoryService(
+	name *C.char,
+	resType *C.char,
+) C.uintptr_t {
+	p := new(transit.InventoryService)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// CreateMonitoredResource returns a handle
+//export CreateMonitoredResource
+func CreateMonitoredResource(
+	name *C.char,
+	resType *C.char,
+) C.uintptr_t {
+	p := new(transit.MonitoredResource)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// CreateMonitoredService returns a handle
+//export CreateMonitoredService
+func CreateMonitoredService(
+	name *C.char,
+	resType *C.char,
+) C.uintptr_t {
+	p := new(transit.MonitoredService)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// DeleteHandle invalidates a handle.
+// This method should only be called once the C code no longer has a copy of the handle value.
+//export DeleteHandle
+func DeleteHandle(handle *C.uintptr_t) {
+	cgo.Handle(*handle).Delete()
+}
+
+// AddResource appends resource into inventory
+//export AddResource
+func AddResource(pReq *C.uintptr_t, pRes C.uintptr_t) {
+	var v interface{}
+	hReq, hRes := cgo.Handle(*pReq), cgo.Handle(pRes)
+	req := hReq.Value().(*transit.InventoryRequest)
+
+	switch hRes.Value().(type) {
+	case *transit.InventoryResource:
+		res := hRes.Value().(*transit.InventoryResource)
+		req.Resources = append(req.Resources, *res)
+		v = req
+	case *transit.MonitoredResource:
+		res := hRes.Value().(*transit.MonitoredResource).ToInventoryResource()
+		req.Resources = append(req.Resources, res)
+		v = req
+	}
+	if v != nil {
+		hReq.Delete()
+		*pReq = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+// AddService appends service in resource
+//export AddService
+func AddService(pRes *C.uintptr_t, pSvc C.uintptr_t) {
+	var v interface{}
+	hRes, hSvc := cgo.Handle(*pRes), cgo.Handle(pSvc)
+	switch hRes.Value().(type) {
+	case *transit.InventoryResource:
+		res := hRes.Value().(*transit.InventoryResource)
+		switch hSvc.Value().(type) {
+		case *transit.InventoryService:
+			svc := hSvc.Value().(*transit.InventoryService)
+			res.Services = append(res.Services, *svc)
+			v = res
+		case *transit.MonitoredService:
+			svc := hSvc.Value().(*transit.MonitoredService).ToInventoryService()
+			res.Services = append(res.Services, svc)
+			v = res
+		}
+	case *transit.MonitoredResource:
+		res := hRes.Value().(*transit.MonitoredResource)
+		switch hSvc.Value().(type) {
+		case *transit.InventoryService:
+			svc := hSvc.Value().(*transit.InventoryService)
+			s := new(transit.MonitoredService)
+			s.BaseTransitData = svc.BaseTransitData
+			s.Status = transit.ServicePending
+			res.Services = append(res.Services, *s)
+			v = res
+		case *transit.MonitoredService:
+			svc := hSvc.Value().(*transit.MonitoredService)
+			res.Services = append(res.Services, *svc)
+			v = res
+		}
+	}
+	if v != nil {
+		hRes.Delete()
+		*pRes = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetName
+func SetName(p *C.uintptr_t, s *C.char) {
+	var v interface{}
+	h := cgo.Handle(*p)
+	switch h.Value().(type) {
+	case *transit.InventoryResource:
+		val := h.Value().(*transit.InventoryResource)
+		val.Name = C.GoString(s)
+		v = val
+	case *transit.InventoryService:
+		val := h.Value().(*transit.InventoryService)
+		val.Name = C.GoString(s)
+		v = val
+	case *transit.MonitoredResource:
+		val := h.Value().(*transit.MonitoredResource)
+		val.Name = C.GoString(s)
+		v = val
+	case *transit.MonitoredService:
+		val := h.Value().(*transit.MonitoredService)
+		val.Name = C.GoString(s)
+		v = val
+	}
+	if v != nil {
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SendInventory
+func SendInventory(pInvReq C.uintptr_t, errBuf *C.char, errBufLen C.size_t) bool {
+	invReq := cgo.Handle(pInvReq).Value().(*transit.InventoryRequest)
+	invReq.Context = services.GetTransitService().MakeTracerContext()
+	p, err := json.Marshal(invReq)
+	log.Debug().Err(err).RawJSON("payload", p).Msg("inventory")
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	if err := services.GetTransitService().
+		SynchronizeInventory(context.Background(), p); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
 	return true
 }
