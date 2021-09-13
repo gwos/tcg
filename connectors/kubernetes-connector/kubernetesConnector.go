@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"gopkg.in/yaml.v3"
 	"strings"
 	"time"
 
@@ -67,6 +68,24 @@ type KubernetesConnector struct {
 	ctx        context.Context
 }
 
+type Cluster struct {
+	Cl struct {
+		Server string `yaml:"server"`
+	} `yaml:"cluster"`
+}
+
+type User struct {
+	User struct {
+		Token string `yaml:"token"`
+	}
+}
+
+type KubernetesYaml struct {
+	Kind     string    `yaml:"kind"`
+	Users    []User    `yaml:"users"`
+	Clusters []Cluster `yaml:"clusters"`
+}
+
 type KubernetesResource struct {
 	Name     string
 	Type     transit.ResourceType
@@ -113,7 +132,20 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		kConfig.BearerToken = extConfig.KubernetesBearerToken
 		log.Info().Msg("using Bearer Token auth")
 	case ConfigFile:
-		// TODO:
+		fConfig := KubernetesYaml{}
+		err := yaml.Unmarshal([]byte(config.KubernetesConfigFile), &fConfig)
+		if err != nil {
+			return err
+		}
+
+		if len(fConfig.Clusters) != 1 || len(fConfig.Users) != 1 ||
+			fConfig.Clusters[0].Cl.Server == "" || fConfig.Users[0].User.Token == "" || fConfig.Kind != "Config" {
+			return errors.New("Invalid configuration file!")
+		}
+
+		kConfig.BearerToken = fConfig.Users[0].User.Token
+		kConfig.Host = fConfig.Clusters[0].Cl.Server
+
 		log.Info().Msg("using YAML File auth")
 	}
 
