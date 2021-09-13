@@ -5,7 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 
-// #include "libtransit.h" /* refs */
+#include "libtransit.h" /* refs */
 #include "util.h"
 
 #ifndef NUL_TERM_LEN
@@ -32,8 +32,8 @@ For more info see package `config`
 */
 
 /* define handlers for general libtransit functions */
-bool (*getConnectorConfig)(char *buf, size_t bufLen, char *errBuf,
-                           size_t errBufLen) = NULL;
+bool (*getAgentIdentity)(char *buf, size_t bufLen, char *errBuf,
+                         size_t errBufLen) = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
 bool (*sendEvents)(char *payloadJSON, char *errBuf, size_t errBufLen) = NULL;
@@ -54,21 +54,21 @@ bool (*stopController)(char *errBuf, size_t errBufLen) = NULL;
 bool (*stopNats)(char *errBuf, size_t errBufLen) = NULL;
 bool (*stopTransport)(char *errBuf, size_t errBufLen) = NULL;
 
-/* listMetricsHandler implements getTextHandlerType */
-char *listMetricsHandler() {
+/* list_metrics_handler implements getTextHandlerType */
+char *list_metrics_handler() {
   char *payload = "{\"key\":\"value\"}";
 
   size_t bufLen = strlen(payload) + NUL_TERM_LEN;
   char *buf = malloc(bufLen);
   strcpy(buf, payload);
 
-  printf("\nlistMetricsHandler: %s : %ld", buf, bufLen);
+  printf("\nlist_metrics_handler: %s : %ld", buf, bufLen);
   return buf;
 }
 
-bool demandConfigHandler() {
-    printf("DemandConfig was called by the TCG\n");
-    return true;
+bool demand_config_handler() {
+  printf("DemandConfig was called by the TCG\n");
+  return true;
 }
 
 void *libtransit_handle;
@@ -99,7 +99,7 @@ void load_libtransit() {
     fail(dlerror());
   }
 
-  getConnectorConfig = find_symbol("GetConnectorConfig");
+  getAgentIdentity = find_symbol("GetAgentIdentity");
   goSetenv = find_symbol("GoSetenv");
   registerListMetricsHandler = find_symbol("RegisterListMetricsHandler");
   sendEvents = find_symbol("SendEvents");
@@ -143,9 +143,9 @@ void test_libtransit_control() {
   }
 
   // Check config
-  printf("Testing GetConnectorConfig ...\n");
+  printf("Testing GetAgentIdentity ...\n");
   char buf[1024] = "";
-  res = getConnectorConfig(buf, 1024, errBuf, ERR_BUF_LEN);
+  res = getAgentIdentity(buf, 1024, errBuf, ERR_BUF_LEN);
   if (!res) {
     fail(errBuf);
   }
@@ -258,7 +258,7 @@ void test_libtransit_control() {
   }
 
   printf("Testing RegisterListMetricsHandler ...\n");
-  registerListMetricsHandler(listMetricsHandler);
+  registerListMetricsHandler(list_metrics_handler);
 
   printf("Testing StopNats ...\n");
   res = stopNats(errBuf, ERR_BUF_LEN);
@@ -294,7 +294,7 @@ void test_libtransit_control() {
   }
 
   printf("Testing registerDemandConfigHandler ...\n");
-  registerDemandConfigHandler(demandConfigHandler);
+  registerDemandConfigHandler(demand_config_handler);
 
   system("sh ./transit-c/send_config_script.sh");
 }
