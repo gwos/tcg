@@ -101,6 +101,7 @@ func configHandler(data []byte) {
 
 	if monitorConnection.ConnectorID != 0 {
 		if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
+			connector.Shutdown()
 			log.Err(err).Msg("Could not initialize connector")
 		}
 	} else {
