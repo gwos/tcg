@@ -238,8 +238,8 @@ func resource() transit.DynamicMonitoredResource {
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Services:      []transit.DynamicMonitoredService{},
 	}
 }
@@ -252,15 +252,15 @@ func service(i int) transit.DynamicMonitoredService {
 			Owner: TestHostName,
 		},
 		Status:        transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
+					StartTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,

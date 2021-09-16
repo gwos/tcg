@@ -184,8 +184,8 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
+			LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}

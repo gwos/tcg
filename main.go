@@ -64,8 +64,8 @@ func main() {
 	// create with interval
 	now := time.Now()
 	interval := &transit.TimeInterval{
-		EndTime:   milliseconds.MillisecondTimestamp{Time: now},
-		StartTime: milliseconds.MillisecondTimestamp{Time: now},
+		EndTime:   &milliseconds.MillisecondTimestamp{Time: now},
+		StartTime: &milliseconds.MillisecondTimestamp{Time: now},
 	}
 	metric3, _ := connectors.CreateMetric(DiskUsed, 65.82, transit.GB, interval)
 	// add tags
@@ -112,7 +112,7 @@ func LowLevelExamples() {
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
 		SampleType: transit.Value,
-		Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
+		Interval:   &transit.TimeInterval{EndTime: &now, StartTime: &now},
 		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
 		Thresholds: &[]transit.ThresholdValue{warningThreshold, errorThreshold},
 		Unit:       "%{cpu}",
@@ -133,8 +133,8 @@ func LowLevelExamples() {
 			},
 		},
 		Status:           transit.ServiceOk,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "foo | bar",
 		Metrics:          []transit.TimeSeries{sampleValue},
 	}
@@ -155,8 +155,8 @@ func LowLevelExamples() {
 			},
 		},
 		Status:           transit.HostUp,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Services:         []transit.DynamicMonitoredService{localLoadService},
 	}

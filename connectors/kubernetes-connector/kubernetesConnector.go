@@ -205,8 +205,8 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
+			LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
+			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}

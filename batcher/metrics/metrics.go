@@ -85,10 +85,10 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
 func applyTime(
 	res *transit.DynamicMonitoredResource,
 	svc *transit.DynamicMonitoredService,
-	ts milliseconds.MillisecondTimestamp,
+	ts *milliseconds.MillisecondTimestamp,
 ) {
-	if ts.IsZero() {
-		ts = milliseconds.MillisecondTimestamp{Time: time.Now()}
+	if ts == nil || ts.IsZero() {
+		ts = &milliseconds.MillisecondTimestamp{Time: time.Now()}
 	}
 	switch {
 	case res.LastCheckTime.IsZero() && !svc.LastCheckTime.IsZero():

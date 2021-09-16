@@ -236,8 +236,8 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 	}
 	if metricBuilder.StartTimestamp != nil && metricBuilder.EndTimestamp != nil {
 		timeInterval := &transit.TimeInterval{
-			StartTime: *metricBuilder.StartTimestamp,
-			EndTime:   *metricBuilder.EndTimestamp,
+			StartTime: metricBuilder.StartTimestamp,
+			EndTime:   metricBuilder.EndTimestamp,
 		}
 		args = append(args, timeInterval)
 	} else if metricBuilder.StartTimestamp != nil || metricBuilder.EndTimestamp != nil {
@@ -343,8 +343,8 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	if metric.Interval == nil {
 		interval := time.Now()
 		metric.Interval = &transit.TimeInterval{
-			EndTime:   milliseconds.MillisecondTimestamp{Time: interval},
-			StartTime: milliseconds.MillisecondTimestamp{Time: interval},
+			EndTime:   &milliseconds.MillisecondTimestamp{Time: interval},
+			StartTime: &milliseconds.MillisecondTimestamp{Time: interval},
 		}
 	}
 	if metric.Unit == "" {
@@ -462,8 +462,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 			Owner: owner,
 		},
 		Status:        transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
+		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime},
+		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -471,8 +471,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 			service.Metrics = arg.([]transit.TimeSeries)
 			if len(service.Metrics) > 0 {
 				checkTime = service.Metrics[len(service.Metrics)-1].Interval.EndTime.Time
-				service.LastCheckTime = milliseconds.MillisecondTimestamp{Time: checkTime}
-				service.NextCheckTime = milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)}
+				service.LastCheckTime = &milliseconds.MillisecondTimestamp{Time: checkTime}
+				service.NextCheckTime = &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)}
 			}
 		case map[string]interface{}:
 			service.CreateProperties(arg.(map[string]interface{}))
@@ -501,8 +501,8 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
+		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime},
+		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -700,15 +700,15 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 							Owner: result[i].Owner,
 						},
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
-						LastCheckTime:    milliseconds.MillisecondTimestamp{Time: endTime},
-						NextCheckTime:    milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)},
+						LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: endTime},
+						NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
 								SampleType: transit.Value,
 								Interval: &transit.TimeInterval{
-									EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
-									StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
+									EndTime:   &milliseconds.MillisecondTimestamp{Time: endTime},
+									StartTime: &milliseconds.MillisecondTimestamp{Time: startTime},
 								},
 								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{
