@@ -14,7 +14,6 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
@@ -230,6 +229,8 @@ func parseJSON(filePath string) ([]byte, error) {
 }
 
 func resource() transit.MonitoredResource {
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	return transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
@@ -238,13 +239,15 @@ func resource() transit.MonitoredResource {
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: &lastCheckTime,
+		NextCheckTime: &nextCheckTime,
 		Services:      []transit.MonitoredService{},
 	}
 }
 
 func service(i int) transit.MonitoredService {
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	return transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
@@ -252,15 +255,15 @@ func service(i int) transit.MonitoredService {
 			Owner: TestHostName,
 		},
 		Status:        transit.ServiceOk,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		LastCheckTime: &lastCheckTime,
+		NextCheckTime: &nextCheckTime,
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   &lastCheckTime,
+					StartTime: &lastCheckTime,
 				},
 				Value: &transit.TypedValue{
 					ValueType:    transit.IntegerType,

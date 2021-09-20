@@ -13,7 +13,6 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
@@ -104,6 +103,8 @@ func buildInventoryRequest(t *testing.T) []byte {
 }
 
 func buildResourceWithMetricsRequest(t *testing.T) []byte {
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	monitoredResource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
@@ -112,8 +113,8 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: &lastCheckTime,
+		NextCheckTime: &nextCheckTime,
 		Services: []transit.MonitoredService{
 			{
 				BaseTransitData: transit.BaseTransitData{
@@ -122,15 +123,15 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 					Owner: TestHostName,
 				},
 				Status:        transit.ServiceOk,
-				LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
-				NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+				LastCheckTime: &lastCheckTime,
+				NextCheckTime: &nextCheckTime,
 				Metrics: []transit.TimeSeries{
 					{
 						MetricName: "testMetric",
 						SampleType: transit.Value,
 						Interval: &transit.TimeInterval{
-							EndTime:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
-							StartTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+							EndTime:   &lastCheckTime,
+							StartTime: &lastCheckTime,
 						},
 						Value: &transit.TypedValue{
 							ValueType:    transit.IntegerType,

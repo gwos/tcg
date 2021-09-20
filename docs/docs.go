@@ -453,7 +453,7 @@ var doc = `{
         }
     },
     "definitions": {
-        "milliseconds.MillisecondTimestamp": {
+        "transit.Timestamp": {
             "type": "object"
         },
         "services.AgentIdentity": {
@@ -493,7 +493,7 @@ var doc = `{
                 },
                 "lastAlertRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "lastErrors": {
                     "type": "array",
@@ -503,11 +503,11 @@ var doc = `{
                 },
                 "lastInventoryRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "lastMetricsRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "messagesSent": {
                     "type": "integer"
@@ -517,7 +517,7 @@ var doc = `{
                 },
                 "upSince": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 }
             }
         },
@@ -558,7 +558,7 @@ var doc = `{
                 },
                 "time": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 }
             }
         }

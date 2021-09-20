@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
@@ -85,10 +83,10 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
 func applyTime(
 	res *transit.MonitoredResource,
 	svc *transit.MonitoredService,
-	ts *milliseconds.MillisecondTimestamp,
+	ts *transit.Timestamp,
 ) {
 	if ts == nil || ts.IsZero() {
-		ts = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		ts = transit.NewTimestamp()
 	}
 	switch {
 	case res.LastCheckTime.IsZero() && !svc.LastCheckTime.IsZero():

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/logzer"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/taskQueue"
 	"go.opentelemetry.io/otel/trace"
@@ -38,15 +37,15 @@ const (
 
 // AgentStats defines TCG Agent statistics
 type AgentStats struct {
-	BytesSent              int                                `json:"bytesSent"`
-	MetricsSent            int                                `json:"metricsSent"`
-	MessagesSent           int                                `json:"messagesSent"`
-	LastInventoryRun       *milliseconds.MillisecondTimestamp `json:"lastInventoryRun,omitempty"`
-	LastMetricsRun         *milliseconds.MillisecondTimestamp `json:"lastMetricsRun,omitempty"`
-	LastAlertRun           *milliseconds.MillisecondTimestamp `json:"lastAlertRun,omitempty"`
-	ExecutionTimeInventory time.Duration                      `json:"executionTimeInventory"`
-	ExecutionTimeMetrics   time.Duration                      `json:"executionTimeMetrics"`
-	UpSince                *milliseconds.MillisecondTimestamp `json:"upSince"`
+	BytesSent              int                `json:"bytesSent"`
+	MetricsSent            int                `json:"metricsSent"`
+	MessagesSent           int                `json:"messagesSent"`
+	LastInventoryRun       *transit.Timestamp `json:"lastInventoryRun,omitempty"`
+	LastMetricsRun         *transit.Timestamp `json:"lastMetricsRun,omitempty"`
+	LastAlertRun           *transit.Timestamp `json:"lastAlertRun,omitempty"`
+	ExecutionTimeInventory time.Duration      `json:"executionTimeInventory"`
+	ExecutionTimeMetrics   time.Duration      `json:"executionTimeMetrics"`
+	UpSince                *transit.Timestamp `json:"upSince"`
 }
 
 // AgentStatsExt defines complex type

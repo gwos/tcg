@@ -1,4 +1,4 @@
-package milliseconds
+package transit
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func TestMillisecondTimestamp_UnmarshalJSON(t *testing.T) {
+func TestTimestamp_UnmarshalJSON(t *testing.T) {
 	type fields struct {
 		Time time.Time
 	}
@@ -43,19 +43,19 @@ func TestMillisecondTimestamp_UnmarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := &MillisecondTimestamp{}
+			tr := &Timestamp{}
 			if err := tr.UnmarshalJSON(tt.args.input); (err != nil) != tt.wantErr {
-				t.Errorf("MillisecondTimestamp.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Timestamp.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if !tr.Time.Equal(tt.fields.Time) {
-				t.Errorf("MillisecondTimestamp.UnmarshalJSON() = %v, want %v", tr, tt.fields)
+				t.Errorf("Timestamp.UnmarshalJSON() = %v, want %v", tr, tt.fields)
 			}
 		})
 	}
 }
 
-func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
+func TestTimestamp_MarshalJSON(t *testing.T) {
 	type fields struct {
 		Time time.Time
 	}
@@ -86,27 +86,27 @@ func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tr := MillisecondTimestamp{
+			tr := Timestamp{
 				Time: tt.fields.Time,
 			}
 			got, err := tr.MarshalJSON()
-			// log.Println(tt.name, tr, got, err, string(got))
+			// println(tt.name, tr, got, err, string(got))
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MillisecondTimestamp.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Timestamp.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MillisecondTimestamp.MarshalJSON() = %v, want %v", got, tt.want)
+				t.Errorf("Timestamp.MarshalJSON() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestStructMarshalJSON(t *testing.T) {
+func TestTimestampStructMarshalJSON(t *testing.T) {
 	value := struct {
-		NamedField MillisecondTimestamp
+		NamedField Timestamp
 	}{
-		MillisecondTimestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+		Timestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
 	}
 	output, err := json.Marshal(value)
 	expected := `{"NamedField":"1609372800000"}`
@@ -118,15 +118,15 @@ func TestStructMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestStructUnmarshalJSON(t *testing.T) {
+func TestTimestampStructUnmarshalJSON(t *testing.T) {
 	input := []byte(`{"NamedField":"1609372800000"}`)
 	value := struct {
-		NamedField MillisecondTimestamp
+		NamedField Timestamp
 	}{}
 	expected := struct {
-		NamedField MillisecondTimestamp
+		NamedField Timestamp
 	}{
-		MillisecondTimestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+		Timestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
 	}
 
 	err := json.Unmarshal(input, &value)
@@ -138,8 +138,8 @@ func TestStructUnmarshalJSON(t *testing.T) {
 	}
 }
 
-// BenchmarkMarshallerSprintf benchmarks Sprintf based marshaller
-func BenchmarkMarshallerSprintf(b *testing.B) {
+// BenchmarkTimestampMarshallerSprintf benchmarks Sprintf based marshaller
+func BenchmarkTimestampMarshallerSprintf(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		t1 := time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second)
 		i1 := t1.UnixNano() / int64(time.Millisecond)
@@ -150,8 +150,8 @@ func BenchmarkMarshallerSprintf(b *testing.B) {
 	}
 }
 
-// BenchmarkMarshallerAppend benchmarks slice append based marshaller
-func BenchmarkMarshallerAppend(b *testing.B) {
+// BenchmarkTimestampMarshallerAppend benchmarks slice append based marshaller
+func BenchmarkTimestampMarshallerAppend(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		t1 := time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second)
 		i1 := t1.UnixNano() / int64(time.Millisecond)

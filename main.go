@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 )
 
@@ -62,10 +61,10 @@ func main() {
 	critical2, _ := connectors.CreateCriticalThreshold(PercentFreeMetricCritical, 90.8)
 	metric2.Thresholds = &[]transit.ThresholdValue{*warning2, *critical2}
 	// create with interval
-	now := time.Now()
+	timestamp := transit.NewTimestamp()
 	interval := &transit.TimeInterval{
-		EndTime:   &milliseconds.MillisecondTimestamp{Time: now},
-		StartTime: &milliseconds.MillisecondTimestamp{Time: now},
+		EndTime:   timestamp,
+		StartTime: timestamp,
 	}
 	metric3, _ := connectors.CreateMetric(DiskUsed, 65.82, transit.GB, interval)
 	// add tags
@@ -108,11 +107,12 @@ func LowLevelExamples() {
 		Label:      "local_load_5_cr",
 		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: 85.0}}
 	random := rand.Float64() * 100.0
-	now := milliseconds.MillisecondTimestamp{Time: time.Now()}
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 5)
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
 		SampleType: transit.Value,
-		Interval:   &transit.TimeInterval{EndTime: &now, StartTime: &now},
+		Interval:   &transit.TimeInterval{EndTime: &lastCheckTime, StartTime: &lastCheckTime},
 		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
 		Thresholds: &[]transit.ThresholdValue{warningThreshold, errorThreshold},
 		Unit:       "%{cpu}",
@@ -129,12 +129,12 @@ func LowLevelExamples() {
 				"PerformanceData": {StringValue: "007-321 RAD"},
 				"ExecutionTime":   {DoubleValue: 3.0},
 				"CurrentAttempt":  {IntegerValue: 2},
-				"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+				"InceptionTime":   {TimeValue: &lastCheckTime},
 			},
 		},
 		Status:           transit.ServiceOk,
-		LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime:    &lastCheckTime,
+		NextCheckTime:    &nextCheckTime,
 		LastPlugInOutput: "foo | bar",
 		Metrics:          []transit.TimeSeries{sampleValue},
 	}
@@ -150,13 +150,13 @@ func LowLevelExamples() {
 					"PerformanceData": {StringValue: "007-321 RAD"},
 					"ExecutionTime":   {DoubleValue: 3.0},
 					"CurrentAttempt":  {IntegerValue: 2},
-					"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+					"InceptionTime":   {TimeValue: &lastCheckTime},
 				},
 			},
 		},
 		Status:           transit.HostUp,
-		LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
+		LastCheckTime:    &lastCheckTime,
+		NextCheckTime:    &nextCheckTime,
 		LastPlugInOutput: "44/55/888 QA00005-BC",
 		Services:         []transit.MonitoredService{localLoadService},
 	}

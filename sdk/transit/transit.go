@@ -4,10 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/gwos/tcg/sdk/logper"
-	"github.com/gwos/tcg/sdk/milliseconds"
 )
 
 // VersionString defines type of constant
@@ -174,19 +172,19 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime *milliseconds.MillisecondTimestamp `json:"endTime"`
+	EndTime *Timestamp `json:"endTime"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime *milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
+	StartTime *Timestamp `json:"startTime,omitempty"`
 }
 
 // String implements Stringer interface
 func (value TimeInterval) String() string {
 	return fmt.Sprintf("[%s, %s]",
-		value.EndTime.String(),
-		value.StartTime.String(),
+		value.EndTime,
+		value.StartTime,
 	)
 }
 
@@ -210,7 +208,7 @@ type TypedValue struct {
 	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
+	TimeValue *Timestamp `json:"timeValue,omitempty"`
 }
 
 // String implements Stringer interface
@@ -259,9 +257,9 @@ func (value *TypedValue) FromInterface(v interface{}) error {
 	case string:
 		value.ValueType = StringType
 		value.StringValue = v.(string)
-	case *milliseconds.MillisecondTimestamp:
+	case *Timestamp:
 		value.ValueType = TimeType
-		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
+		value.TimeValue = v.(*Timestamp)
 	default:
 		return errors.New("unable to convert to typed value: unsupported type")
 	}
@@ -524,9 +522,9 @@ type MonitoredResource struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
-	LastCheckTime *milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime *Timestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime *milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime *Timestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Services state collection
@@ -540,8 +538,8 @@ func (monitoredResource MonitoredResource) String() string {
 		monitoredResource.BaseResource.Type,
 		monitoredResource.BaseResource.Owner,
 		monitoredResource.Status,
-		monitoredResource.LastCheckTime.String(),
-		monitoredResource.NextCheckTime.String(),
+		monitoredResource.LastCheckTime,
+		monitoredResource.NextCheckTime,
 		monitoredResource.LastPlugInOutput,
 		monitoredResource.BaseResource.Properties,
 		monitoredResource.Services,
@@ -581,9 +579,9 @@ type MonitoredService struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
-	LastCheckTime *milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime *Timestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime *milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime *Timestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// metrics
@@ -594,7 +592,7 @@ type MonitoredService struct {
 func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
-		monitoredService.LastCheckTime.String(), monitoredService.NextCheckTime.String(),
+		monitoredService.LastCheckTime, monitoredService.NextCheckTime,
 		monitoredService.LastPlugInOutput, monitoredService.Properties, monitoredService.Metrics,
 	)
 }
@@ -646,11 +644,11 @@ func (monitoredResourceRef MonitoredResourceRef) String() string {
 
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string                            `json:"appType"`
-	AgentID    string                            `json:"agentId"`
-	TraceToken string                            `json:"traceToken"`
-	TimeStamp  *milliseconds.MillisecondTimestamp `json:"timeStamp"`
-	Version    VersionString                     `json:"version"`
+	AppType    string        `json:"appType"`
+	AgentID    string        `json:"agentId"`
+	TraceToken string        `json:"traceToken"`
+	TimeStamp  *Timestamp    `json:"timeStamp"`
+	Version    VersionString `json:"version"`
 }
 
 // String implements Stringer interface
@@ -744,14 +742,14 @@ func (inventoryRequest InventoryRequest) String() string {
 
 // IncidentAlert describes alerts received from cloud services
 type IncidentAlert struct {
-	IncidentID    string                            `json:"incidentId"`
-	ResourceName  string                            `json:"resourceName"`
-	Status        string                            `json:"status"`
-	StartedAt     *milliseconds.MillisecondTimestamp `json:"startedAt"`
-	EndedAt       *milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
-	ConditionName string                            `json:"conditionName"`
-	URL           string                            `json:"url,omitempty"`
-	Summary       string                            `json:"summary,omitempty"`
+	IncidentID    string     `json:"incidentId"`
+	ResourceName  string     `json:"resourceName"`
+	Status        string     `json:"status"`
+	StartedAt     *Timestamp `json:"startedAt"`
+	EndedAt       *Timestamp `json:"endedAt,omitempty"`
+	ConditionName string     `json:"conditionName"`
+	URL           string     `json:"url,omitempty"`
+	Summary       string     `json:"summary,omitempty"`
 }
 
 // String implements Stringer interface
@@ -774,21 +772,21 @@ func (groundworkEventsRequest GroundworkEventsRequest) String() string {
 
 // GroundworkEvent describes event
 type GroundworkEvent struct {
-	Device              string                            `json:"device,omitempty"`
-	Host                string                            `json:"host"`
-	Service             string                            `json:"service,omitempty"`
-	OperationStatus     string                            `json:"operationStatus,omitempty"`
-	MonitorStatus       string                            `json:"monitorStatus"`
-	Severity            string                            `json:"severity,omitempty"`
-	ApplicationSeverity string                            `json:"applicationSeverity,omitempty"`
-	Component           string                            `json:"component,omitempty"`
-	SubComponent        string                            `json:"subComponent,omitempty"`
-	Priority            string                            `json:"priority,omitempty"`
-	TypeRule            string                            `json:"typeRule,omitempty"`
-	TextMessage         string                            `json:"textMessage,omitempty"`
-	LastInsertDate      *milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
-	ReportDate          *milliseconds.MillisecondTimestamp `json:"reportDate"`
-	AppType             string                            `json:"appType"`
+	Device              string     `json:"device,omitempty"`
+	Host                string     `json:"host"`
+	Service             string     `json:"service,omitempty"`
+	OperationStatus     string     `json:"operationStatus,omitempty"`
+	MonitorStatus       string     `json:"monitorStatus"`
+	Severity            string     `json:"severity,omitempty"`
+	ApplicationSeverity string     `json:"applicationSeverity,omitempty"`
+	Component           string     `json:"component,omitempty"`
+	SubComponent        string     `json:"subComponent,omitempty"`
+	Priority            string     `json:"priority,omitempty"`
+	TypeRule            string     `json:"typeRule,omitempty"`
+	TextMessage         string     `json:"textMessage,omitempty"`
+	LastInsertDate      *Timestamp `json:"lastInsertDate,omitempty"`
+	ReportDate          *Timestamp `json:"reportDate"`
+	AppType             string     `json:"appType"`
 	// Update level attributes (update only)
 	MonitorServer     string `json:"monitorServer,omitempty"`
 	ConsolidationName string `json:"consolidationName,omitempty"`
@@ -1093,9 +1091,4 @@ var MonitorStatusWeightService = map[MonitorStatus]int{
 	ServiceWarning:             30,
 	ServiceScheduledCritical:   50,
 	ServiceUnscheduledCritical: 100,
-}
-
-// NewTimestamp returns a new timestamp setted to UTC now.
-func NewTimestamp() milliseconds.MillisecondTimestamp {
-	return milliseconds.MillisecondTimestamp{Time: time.Now().UTC()}
 }

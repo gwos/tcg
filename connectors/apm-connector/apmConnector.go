@@ -11,13 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/snappy"
-
 	"github.com/gin-gonic/gin"
+	"github.com/golang/snappy"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/logper"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	dto "github.com/prometheus/client_model/go"
@@ -180,9 +178,9 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 
 	for _, metric := range prometheusService.GetMetric() {
 		groupName, hostName, serviceName, device = "", "", "", ""
-		var timestamp = time.Now()
+		timestamp := transit.NewTimestamp()
 		if metric.TimestampMs != nil {
-			timestamp = time.Unix(0, *metric.TimestampMs*int64(time.Millisecond))
+			*timestamp = transit.Timestamp{Time: time.Unix(0, *metric.TimestampMs*int64(time.Millisecond))}
 		}
 		values := makeValue(*prometheusService.Name, prometheusService.Type, metric)
 		if len(values) == 0 {
@@ -194,8 +192,8 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 			metricBuilder := connectors.MetricBuilder{
 				Name:           name,
 				Value:          value,
-				StartTimestamp: &milliseconds.MillisecondTimestamp{Time: timestamp},
-				EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: timestamp},
+				StartTimestamp: timestamp,
+				EndTimestamp:   timestamp,
 				Graphed:        true,
 				Tags:           make(map[string]string),
 			}

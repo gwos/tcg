@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 )
 
@@ -98,8 +97,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 			res.Services = append(res.Services, svc)
 		}
 		if !resFlag {
-			res.LastCheckTime = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-			res.NextCheckTime = &milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
+			res.LastCheckTime = transit.NewTimestamp()
 			res.Status = transit.CalculateResourceStatus(res.Services)
 		}
 		monitoredResources = append(monitoredResources, res)
@@ -108,12 +106,12 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 	return &monitoredResources, nil
 }
 
-func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
+func getTime(str string) (*transit.Timestamp, error) {
 	i, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	return &milliseconds.MillisecondTimestamp{Time: time.Unix(i, 0)}, nil
+	return &transit.Timestamp{Time: time.Unix(i, 0).UTC()}, nil
 }
 
 func getStatus(str string) (transit.MonitorStatus, error) {
@@ -139,7 +137,7 @@ func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
 		if match == nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
 		}
-		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		timestamp := transit.NewTimestamp()
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
 			if t, err := getTime(ts); err == nil {
 				timestamp = t
@@ -213,7 +211,7 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		if match == nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
 		}
-		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		timestamp := transit.NewTimestamp()
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
 			if t, err := getTime(ts); err == nil {
 				timestamp = t
@@ -234,7 +232,6 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 			},
 			Status:           status,
 			LastCheckTime:    timestamp,
-			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: msg,
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
@@ -341,7 +338,6 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 			},
 			Status:           status,
 			LastCheckTime:    timestamp,
-			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: msg,
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})

@@ -5,11 +5,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
-
-	"github.com/gwos/tcg/sdk/milliseconds"
 )
 
-func TestStructMarshalJSON(t *testing.T) {
+func TestMonitoredServiceMarshalJSON(t *testing.T) {
 	expected := `{"name":"monSvc","type":"service","status":"SERVICE_OK","lastCheckTime":"1609372800000","metrics":[]}`
 	monSvc := MonitoredService{
 		BaseTransitData: BaseTransitData{
@@ -17,7 +15,7 @@ func TestStructMarshalJSON(t *testing.T) {
 			Type: ResourceTypeService,
 		},
 		Status:        ServiceOk,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+		LastCheckTime: &Timestamp{Time: time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
 		Metrics:       []TimeSeries{},
 	}
 	output, err := json.Marshal(monSvc)
@@ -29,7 +27,7 @@ func TestStructMarshalJSON(t *testing.T) {
 	}
 }
 
-func TestStructUnmarshalJSON(t *testing.T) {
+func TestMonitoredServiceUnmarshalJSON(t *testing.T) {
 	input := []byte(`{"name":"monSvc","type":"service","status":"SERVICE_OK","lastCheckTime":"1609372800000","metrics":[]}`)
 	expected := MonitoredService{
 		BaseTransitData: BaseTransitData{
@@ -37,7 +35,7 @@ func TestStructUnmarshalJSON(t *testing.T) {
 			Type: ResourceTypeService,
 		},
 		Status:        ServiceOk,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
+		LastCheckTime: &Timestamp{Time: time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
 		Metrics:       []TimeSeries{},
 	}
 	var value MonitoredService

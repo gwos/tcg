@@ -8,7 +8,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
@@ -73,7 +72,7 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 		return mServices
 	}
 
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	i := 0
 	for _, iFace := range device.Interfaces {
 		var metricsBuilder []connectors.MetricBuilder
@@ -106,8 +105,8 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					UnitType:       unitType,
 					Warning:        metricDefinition.WarningThreshold,
 					Critical:       metricDefinition.CriticalThreshold,
-					StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-					EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+					StartTimestamp: timestamp,
+					EndTimestamp:   timestamp,
 					Graphed:        metricDefinition.Graphed,
 
 					Value: nil,

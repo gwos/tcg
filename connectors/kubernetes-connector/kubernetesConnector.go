@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
@@ -238,8 +237,8 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
+			LastCheckTime:    transit.NewTimestamp(),
+			NextCheckTime:    transit.NewTimestamp(), // TODO: interval
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}
@@ -431,8 +430,8 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 					Warning:  metricDefinition.WarningThreshold,
 					Critical: metricDefinition.CriticalThreshold,
 				}
-				metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
-				metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
+				metricBuilder.StartTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
+				metricBuilder.EndTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 				monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 				if err != nil {
@@ -487,8 +486,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
-					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.StartTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
+					metricBuilder.EndTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					metricBuilders = append(metricBuilders, metricBuilder)
 					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
 					if err != nil {
@@ -551,8 +550,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
-					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.StartTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
+					metricBuilder.EndTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					var builders []connectors.MetricBuilder
 					if result, found := builderMap[resource.Name]; found {
 						builders = result

@@ -5,14 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/services"
-
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
+	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
 )
 
@@ -185,7 +182,8 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 			mServices[serviceIndex] = *service
 			serviceIndex = serviceIndex + 1
 		}
-		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		lastCheckTime := *transit.NewTimestamp()
+		nextCheckTime := lastCheckTime.Add(connectors.CheckInterval)
 		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseTransitData: transit.BaseTransitData{
@@ -194,8 +192,8 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 				},
 			},
 			Status:           resource.Status,
-			LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
+			LastCheckTime:    &lastCheckTime,
+			NextCheckTime:    &nextCheckTime,
 			LastPlugInOutput: resource.Message,
 			Services:         mServices,
 		}

@@ -1,5 +1,5 @@
 definitions:
-  milliseconds.MillisecondTimestamp:
+  transit.Timestamp:
     type: object
   services.AgentIdentity:
     properties:
@@ -25,24 +25,24 @@ definitions:
       executionTimeMetrics:
         type: string
       lastAlertRun:
-        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        $ref: '#/definitions/transit.Timestamp'
         type: object
       lastErrors:
         items:
           $ref: '#/definitions/services.LastError'
         type: array
       lastInventoryRun:
-        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        $ref: '#/definitions/transit.Timestamp'
         type: object
       lastMetricsRun:
-        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        $ref: '#/definitions/transit.Timestamp'
         type: object
       messagesSent:
         type: integer
       metricsSent:
         type: integer
       upSince:
-        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        $ref: '#/definitions/transit.Timestamp'
         type: object
     type: object
   services.AgentStatus:
@@ -69,7 +69,7 @@ definitions:
       message:
         type: string
       time:
-        $ref: '#/definitions/milliseconds.MillisecondTimestamp'
+        $ref: '#/definitions/transit.Timestamp'
         type: object
     type: object
 info:

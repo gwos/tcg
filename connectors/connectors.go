@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/tracing"
@@ -213,8 +212,8 @@ type MetricBuilder struct {
 	UnitType       interface{}
 	Warning        interface{}
 	Critical       interface{}
-	StartTimestamp *milliseconds.MillisecondTimestamp
-	EndTimestamp   *milliseconds.MillisecondTimestamp
+	StartTimestamp *transit.Timestamp
+	EndTimestamp   *transit.Timestamp
 	Graphed        bool
 	Tags           map[string]string
 }
@@ -332,10 +331,10 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	}
 	// optional interval
 	if metric.Interval == nil {
-		interval := time.Now()
+		timestamp := transit.NewTimestamp()
 		metric.Interval = &transit.TimeInterval{
-			EndTime:   &milliseconds.MillisecondTimestamp{Time: interval},
-			StartTime: &milliseconds.MillisecondTimestamp{Time: interval},
+			EndTime:   timestamp,
+			StartTime: timestamp,
 		}
 	}
 	if metric.Unit == "" {
@@ -445,7 +444,8 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // required params: name, owner(resource)
 // optional params: metrics
 func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
-	checkTime := time.Now().Local()
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	service := transit.MonitoredService{
 		BaseTransitData: transit.BaseTransitData{
 			Name:  name,
@@ -453,17 +453,18 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 			Owner: owner,
 		},
 		Status:        transit.ServiceOk,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime},
-		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
+		LastCheckTime: &lastCheckTime,
+		NextCheckTime: &nextCheckTime,
 	}
 	for _, arg := range args {
 		switch arg.(type) {
 		case []transit.TimeSeries:
 			service.Metrics = arg.([]transit.TimeSeries)
 			if len(service.Metrics) > 0 {
-				checkTime = service.Metrics[len(service.Metrics)-1].Interval.EndTime.Time
-				service.LastCheckTime = &milliseconds.MillisecondTimestamp{Time: checkTime}
-				service.NextCheckTime = &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)}
+				lastCheckTime = *service.Metrics[len(service.Metrics)-1].Interval.EndTime
+				nextCheckTime = lastCheckTime.Add(CheckInterval)
+				service.LastCheckTime = &lastCheckTime
+				service.NextCheckTime = &nextCheckTime
 			}
 		case map[string]interface{}:
 			service.CreateProperties(arg.(map[string]interface{}))
@@ -483,7 +484,8 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 // required params: name
 // optional params: services
 func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
-	checkTime := time.Now().Local()
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	resource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
 			BaseTransitData: transit.BaseTransitData{
@@ -492,8 +494,8 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime},
-		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: checkTime.Add(CheckInterval)},
+		LastCheckTime: &lastCheckTime,
+		NextCheckTime: &nextCheckTime,
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -548,8 +550,10 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 						Msg("could not evaluate expression")
 					continue
 				} else {
-					endTime := metric.Interval.EndTime.Time
-					startTime := metric.Interval.StartTime.Time
+					endTime := metric.Interval.EndTime
+					startTime := metric.Interval.StartTime
+					lastCheckTime := *endTime
+					nextCheckTime := lastCheckTime.Add(CheckInterval)
 					result[i] = transit.MonitoredService{
 						BaseTransitData: transit.BaseTransitData{
 							Name:  result[i].Name,
@@ -557,15 +561,15 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 							Owner: result[i].Owner,
 						},
 						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
-						LastCheckTime:    &milliseconds.MillisecondTimestamp{Time: endTime},
-						NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: endTime.Add(CheckInterval)},
+						LastCheckTime:    &lastCheckTime,
+						NextCheckTime:    &nextCheckTime,
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
 								SampleType: transit.Value,
 								Interval: &transit.TimeInterval{
-									EndTime:   &milliseconds.MillisecondTimestamp{Time: endTime},
-									StartTime: &milliseconds.MillisecondTimestamp{Time: startTime},
+									EndTime:   endTime,
+									StartTime: startTime,
 								},
 								Thresholds: metric.Thresholds,
 								Value: &transit.TypedValue{

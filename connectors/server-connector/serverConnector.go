@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
@@ -145,7 +144,7 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 	}
 
 	processesMap := collectMonitoredProcesses(notDefaultProcesses)
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 
 	for processName, processValues := range processesMap {
 		metricBuilder := connectors.MetricBuilder{
@@ -156,8 +155,8 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 			UnitType:       transit.PercentCPU,
 			Warning:        float64(processValues.warningValue),
 			Critical:       float64(processValues.criticalValue),
-			StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-			EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+			StartTimestamp: timestamp,
+			EndTimestamp:   timestamp,
 			Graphed:        processValues.graphed,
 		}
 		monitoredService, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
@@ -179,7 +178,7 @@ func CollectMetrics(processes []transit.MetricDefinition) *transit.MonitoredReso
 }
 
 func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
 		log.Err(err).Msg("could not get disk usage")
@@ -194,8 +193,8 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -209,7 +208,7 @@ func getTotalDiskUsageService(warningThresholdValue int, criticalThresholdValue 
 }
 
 func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
 		log.Err(err).Msg("could not get disk usage")
@@ -224,8 +223,8 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -239,7 +238,7 @@ func getDiskUsedService(warningThresholdValue int, criticalThresholdValue int, c
 }
 
 func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	diskStats, err := disk.Usage("/")
 	if err != nil {
 		log.Err(err).Msg("could not get disk usage")
@@ -254,8 +253,8 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -269,7 +268,7 @@ func getDiskFreeService(warningThresholdValue int, criticalThresholdValue int, c
 }
 
 func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
 		log.Err(err).Msg("could not get memory usage")
@@ -284,8 +283,8 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -299,7 +298,7 @@ func getTotalMemoryUsageService(warningThresholdValue int, criticalThresholdValu
 }
 
 func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
 		log.Err(err).Msg("could not get memory usage")
@@ -314,8 +313,8 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -329,7 +328,7 @@ func getMemoryUsedService(warningThresholdValue int, criticalThresholdValue int,
 }
 
 func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	vmStats, err := mem.VirtualMemory()
 	if err != nil {
 		log.Err(err).Msg("could not get memory usage")
@@ -344,8 +343,8 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 		UnitType:       transit.MB,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -359,7 +358,7 @@ func getMemoryFreeService(warningThresholdValue int, criticalThresholdValue int,
 }
 
 func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	hostStat, err := host.Info()
 	if err != nil {
 		log.Err(err).Msg("could not get host info")
@@ -374,8 +373,8 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 		UnitType:       transit.UnitCounter,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
@@ -389,7 +388,7 @@ func getNumberOfProcessesService(warningThresholdValue int, criticalThresholdVal
 }
 
 func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, customName string, graphed bool) *transit.MonitoredService {
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	metricBuilder := connectors.MetricBuilder{
 		Name:           TotalCPUUsageServiceName,
 		CustomName:     customName,
@@ -398,8 +397,8 @@ func getTotalCPUUsage(warningThresholdValue int, criticalThresholdValue int, cus
 		UnitType:       transit.PercentCPU,
 		Warning:        int64(warningThresholdValue),
 		Critical:       int64(criticalThresholdValue),
-		StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-		EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
 		Graphed:        graphed,
 	}
 
