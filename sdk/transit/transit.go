@@ -174,12 +174,12 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime milliseconds.MillisecondTimestamp `json:"endTime,omitempty"`
+	EndTime *milliseconds.MillisecondTimestamp `json:"endTime"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
+	StartTime *milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
 // String implements Stringer interface
@@ -259,7 +259,7 @@ func (value *TypedValue) FromInterface(v interface{}) error {
 	case string:
 		value.ValueType = StringType
 		value.StringValue = v.(string)
-	case milliseconds.MillisecondTimestamp:
+	case *milliseconds.MillisecondTimestamp:
 		value.ValueType = TimeType
 		value.TimeValue = v.(*milliseconds.MillisecondTimestamp)
 	default:
@@ -524,9 +524,9 @@ type MonitoredResource struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime *milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime *milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// Services state collection
@@ -581,9 +581,9 @@ type MonitoredService struct {
 	// Restrict to a Groundwork Monitor Status
 	Status MonitorStatus `json:"status"`
 	// The last status check time on this resource
-	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	LastCheckTime *milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
 	// The next status check time on this resource
-	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	NextCheckTime *milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
 	// Nagios plugin output string
 	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
 	// metrics
@@ -649,7 +649,7 @@ type TracerContext struct {
 	AppType    string                            `json:"appType"`
 	AgentID    string                            `json:"agentId"`
 	TraceToken string                            `json:"traceToken"`
-	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	TimeStamp  *milliseconds.MillisecondTimestamp `json:"timeStamp"`
 	Version    VersionString                     `json:"version"`
 }
 
@@ -747,8 +747,8 @@ type IncidentAlert struct {
 	IncidentID    string                            `json:"incidentId"`
 	ResourceName  string                            `json:"resourceName"`
 	Status        string                            `json:"status"`
-	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
-	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
+	StartedAt     *milliseconds.MillisecondTimestamp `json:"startedAt"`
+	EndedAt       *milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
 	ConditionName string                            `json:"conditionName"`
 	URL           string                            `json:"url,omitempty"`
 	Summary       string                            `json:"summary,omitempty"`
@@ -786,8 +786,8 @@ type GroundworkEvent struct {
 	Priority            string                            `json:"priority,omitempty"`
 	TypeRule            string                            `json:"typeRule,omitempty"`
 	TextMessage         string                            `json:"textMessage,omitempty"`
-	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
-	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate"`
+	LastInsertDate      *milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
+	ReportDate          *milliseconds.MillisecondTimestamp `json:"reportDate"`
 	AppType             string                            `json:"appType"`
 	// Update level attributes (update only)
 	MonitorServer     string `json:"monitorServer,omitempty"`

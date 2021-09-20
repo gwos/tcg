@@ -193,7 +193,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	return &transit.TracerContext{
 		AgentID:    agentID,
 		AppType:    appType,
-		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		TimeStamp:  &milliseconds.MillisecondTimestamp{Time: time.Now()},
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}

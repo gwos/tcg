@@ -168,8 +168,8 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 
 			var intervalReplacement string
 			if service.timeInterval != nil {
-				metricBuilder.StartTimestamp = &service.timeInterval.StartTime
-				metricBuilder.EndTimestamp = &service.timeInterval.EndTime
+				metricBuilder.StartTimestamp = service.timeInterval.StartTime
+				metricBuilder.EndTimestamp = service.timeInterval.EndTime
 
 				endTimeNano := service.timeInterval.EndTime.UnixNano()
 				startTimeNano := service.timeInterval.StartTime.UnixNano()

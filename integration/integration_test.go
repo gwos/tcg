@@ -112,8 +112,8 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 			},
 		},
 		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+		LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+		NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 		Services: []transit.MonitoredService{
 			{
 				BaseTransitData: transit.BaseTransitData{
@@ -122,15 +122,15 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 					Owner: TestHostName,
 				},
 				Status:        transit.ServiceOk,
-				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				LastCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+				NextCheckTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 				Metrics: []transit.TimeSeries{
 					{
 						MetricName: "testMetric",
 						SampleType: transit.Value,
 						Interval: &transit.TimeInterval{
-							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+							EndTime:   &milliseconds.MillisecondTimestamp{Time: time.Now()},
+							StartTime: &milliseconds.MillisecondTimestamp{Time: time.Now()},
 						},
 						Value: &transit.TypedValue{
 							ValueType:    transit.IntegerType,

@@ -98,8 +98,8 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 			res.Services = append(res.Services, svc)
 		}
 		if !resFlag {
-			res.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			res.NextCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
+			res.LastCheckTime = &milliseconds.MillisecondTimestamp{Time: time.Now()}
+			res.NextCheckTime = &milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
 			res.Status = transit.CalculateResourceStatus(res.Services)
 		}
 		monitoredResources = append(monitoredResources, res)
@@ -233,8 +233,8 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 				Owner: resName,
 			},
 			Status:           status,
-			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
+			LastCheckTime:    timestamp,
+			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: msg,
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
@@ -340,8 +340,8 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 				Owner: resName,
 			},
 			Status:           status,
-			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
+			LastCheckTime:    timestamp,
+			NextCheckTime:    &milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
 			LastPlugInOutput: msg,
 			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})

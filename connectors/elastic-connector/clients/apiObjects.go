@@ -240,8 +240,8 @@ func (timeFilter *KTimeFilter) ToTimeInterval() *transit.TimeInterval {
 		log.Err(err).Msg("could not parse time filter's 'to'")
 	}
 	timeInterval := &transit.TimeInterval{
-		StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
-		EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
+		StartTime: &milliseconds.MillisecondTimestamp{Time: startTime},
+		EndTime:   &milliseconds.MillisecondTimestamp{Time: endTime},
 	}
 	return timeInterval
 }
