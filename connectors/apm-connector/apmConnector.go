@@ -337,7 +337,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 						}
 					}
 					if message, ok := m.Tags["message"]; ok {
-						service.LastPlugInOutput = message
+						service.LastPluginOutput = message
 						delete(m.Tags, "message")
 					}
 				}

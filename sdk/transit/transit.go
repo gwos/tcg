@@ -1,8 +1,8 @@
 package transit
 
 import (
-	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	"github.com/gwos/tcg/sdk/logper"
@@ -193,19 +193,19 @@ type TypedValue struct {
 	ValueType ValueType `json:"valueType"`
 
 	// BoolValue: A Boolean value: true or false.
-	BoolValue bool `json:"boolValue,omitempty"`
+	BoolValue *bool `json:"boolValue,omitempty"`
 
 	// DoubleValue: A 64-bit double-precision floating-point number. Its
 	// magnitude is approximately &plusmn;10<sup>&plusmn;300</sup> and it
 	// has 16 significant digits of precision.
-	DoubleValue float64 `json:"doubleValue"`
+	DoubleValue *float64 `json:"doubleValue,omitempty"`
 
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	IntegerValue int64 `json:"integerValue"`
+	IntegerValue *int64 `json:"integerValue,omitempty"`
 
 	// StringValue: A variable-length string value.
-	StringValue string `json:"stringValue,omitempty"`
+	StringValue *string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
 	TimeValue *Timestamp `json:"timeValue,omitempty"`
@@ -215,55 +215,111 @@ type TypedValue struct {
 func (value TypedValue) String() string {
 	switch value.ValueType {
 	case IntegerType:
-		return strconv.FormatInt(value.IntegerValue, 10)
+		return strconv.FormatInt(*value.IntegerValue, 10)
 	case StringType:
-		return value.StringValue
+		return *value.StringValue
 	case DoubleType:
-		return fmt.Sprintf("%f", value.DoubleValue)
+		return fmt.Sprintf("%f", *value.DoubleValue)
 	case BooleanType:
-		return strconv.FormatBool(value.BoolValue)
+		return strconv.FormatBool(*value.BoolValue)
 	case TimeType:
 		return value.TimeValue.String()
 	}
 	return ""
 }
 
-func (value *TypedValue) FromInterface(v interface{}) error {
+// NewTypedValue returns a reference to TypedValue or nil
+func NewTypedValue(v interface{}) *TypedValue {
+	p := new(TypedValue)
 	switch v.(type) {
 	case bool:
-		value.ValueType = BooleanType
-		value.BoolValue = v.(bool)
+		p.ValueType = BooleanType
+		p.BoolValue = new(bool)
+		*p.BoolValue = v.(bool)
+	case *bool:
+		p.ValueType = BooleanType
+		p.BoolValue = new(bool)
+		*p.BoolValue = *v.(*bool)
 	case float32:
-		value.ValueType = DoubleType
-		value.DoubleValue = float64(v.(float32))
+		p.ValueType = DoubleType
+		p.DoubleValue = new(float64)
+		*p.DoubleValue = float64(v.(float32))
+	case *float32:
+		p.ValueType = DoubleType
+		p.DoubleValue = new(float64)
+		*p.DoubleValue = float64(*v.(*float32))
 	case float64:
-		value.ValueType = DoubleType
-		value.DoubleValue = v.(float64)
+		p.ValueType = DoubleType
+		p.DoubleValue = new(float64)
+		*p.DoubleValue = v.(float64)
+	case *float64:
+		p.ValueType = DoubleType
+		p.DoubleValue = new(float64)
+		*p.DoubleValue = *v.(*float64)
 	case int:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int))
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(v.(int))
+	case *int:
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(*v.(*int))
 	case int8:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int8))
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(v.(int8))
+	case *int8:
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(*v.(*int8))
 	case int16:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int16))
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(v.(int16))
+	case *int16:
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(*v.(*int16))
 	case int32:
-		value.ValueType = IntegerType
-		value.IntegerValue = int64(v.(int32))
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(v.(int32))
+	case *int32:
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = int64(*v.(*int32))
 	case int64:
-		value.ValueType = IntegerType
-		value.IntegerValue = v.(int64)
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = v.(int64)
+	case *int64:
+		p.ValueType = IntegerType
+		p.IntegerValue = new(int64)
+		*p.IntegerValue = *v.(*int64)
 	case string:
-		value.ValueType = StringType
-		value.StringValue = v.(string)
+		p.ValueType = StringType
+		p.StringValue = new(string)
+		*p.StringValue = v.(string)
+	case *string:
+		p.ValueType = StringType
+		p.StringValue = new(string)
+		*p.StringValue = *v.(*string)
+	case Timestamp:
+		p.ValueType = TimeType
+		p.TimeValue = new(Timestamp)
+		*p.TimeValue = v.(Timestamp)
 	case *Timestamp:
-		value.ValueType = TimeType
-		value.TimeValue = v.(*Timestamp)
+		p.ValueType = TimeType
+		p.TimeValue = new(Timestamp)
+		*p.TimeValue = *v.(*Timestamp)
+	case TypedValue:
+		*p = v.(TypedValue)
+	case *TypedValue:
+		*p = *v.(*TypedValue)
 	default:
-		return errors.New("unable to convert to typed value: unsupported type")
+		return nil
 	}
-	return nil
+	return p
 }
 
 // ThresholdValue describes threshold
@@ -427,7 +483,7 @@ func (thresholdDescriptor ThresholdDescriptor) String() string {
 	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
 
-type BaseTransitData struct {
+type BaseInfo struct {
 	// The unique name of the resource
 	Name string `json:"name"`
 	// Type: Required. The resource type of the resource
@@ -443,10 +499,49 @@ type BaseTransitData struct {
 	Properties map[string]TypedValue `json:"properties,omitempty"`
 }
 
+func (p *BaseInfo) SetCategory(s string) {
+	p.Category = s
+}
+
+func (p *BaseInfo) SetDescription(s string) {
+	p.Description = s
+}
+
+func (p *BaseInfo) SetName(s string) {
+	p.Name = s
+}
+
+func (p *BaseInfo) SetOwner(s string) {
+	p.Owner = s
+}
+
+func (p *BaseInfo) SetProperty(k string, v interface{}) {
+	t := NewTypedValue(v)
+	if t == nil {
+		logper.Error(nil, "could not set property %s on %s: unsupported value type: %T",
+			k, p.Name, reflect.TypeOf(v))
+		return
+	}
+	if p.Properties == nil {
+		p.Properties = make(map[string]TypedValue)
+	}
+	p.Properties[k] = *t
+}
+
+func (p *BaseInfo) CreateProperties(properties map[string]interface{}) {
+	for k, v := range properties {
+		p.SetProperty(k, v)
+	}
+}
+
 type BaseResource struct {
-	BaseTransitData
+	BaseInfo
 	// Device (usually IP address), leave empty if not available, will default to name
 	Device string `json:"device,omitempty"`
+}
+
+func (p *BaseResource) SetDevice(s string) {
+	p.Device = s
 }
 
 // InventoryResource represents a resource that is included in a inventory scan.
@@ -465,6 +560,10 @@ type InventoryResource struct {
 	Services []InventoryService `json:"services"`
 }
 
+func (p *InventoryResource) AddService(svc InventoryService) {
+	p.Services = append(p.Services, svc)
+}
+
 // String implements Stringer interface
 func (inventoryResource InventoryResource) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
@@ -475,11 +574,18 @@ func (inventoryResource InventoryResource) String() string {
 	)
 }
 
-func (inventoryResource *InventoryResource) CreateProperty(name string, value TypedValue) {
-	if inventoryResource.BaseResource.Properties == nil {
-		inventoryResource.BaseResource.Properties = make(map[string]TypedValue)
+func (p InventoryResource) ToMonitoredResource() MonitoredResource {
+	var services []MonitoredService
+	for _, svc := range p.Services {
+		services = append(services, svc.ToMonitoredService())
 	}
-	inventoryResource.BaseResource.Properties[name] = value
+	return MonitoredResource{
+		BaseResource: p.BaseResource,
+		MonitoredInfo: MonitoredInfo{
+			Status: HostPending,
+		},
+		Services: services,
+	}
 }
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
@@ -488,7 +594,17 @@ func (inventoryResource *InventoryResource) CreateProperty(name string, value Ty
 //
 // InventoryService collections are attached to an InventoryResource during inventory scans.
 type InventoryService struct {
-	BaseTransitData
+	BaseInfo
+}
+
+func (p InventoryService) ToMonitoredService() MonitoredService {
+	return MonitoredService{
+		BaseInfo: p.BaseInfo,
+		MonitoredInfo: MonitoredInfo{
+			Status: ServicePending,
+		},
+		Metrics: []TimeSeries{},
+	}
 }
 
 // String implements Stringer interface
@@ -499,11 +615,31 @@ func (inventoryService InventoryService) String() string {
 	)
 }
 
-func (inventoryService *InventoryService) CreateProperty(name string, value TypedValue) {
-	if inventoryService.Properties == nil {
-		inventoryService.Properties = make(map[string]TypedValue)
-	}
-	inventoryService.Properties[name] = value
+type MonitoredInfo struct {
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status"`
+	// The last status check time on this resource
+	LastCheckTime *Timestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime *Timestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPluginOutput string `json:"lastPluginOutput,omitempty"`
+}
+
+func (p *MonitoredInfo) SetStatus(s MonitorStatus) {
+	p.Status = s
+}
+
+func (p *MonitoredInfo) SetLastPluginOutput(s string) {
+	p.LastPluginOutput = s
+}
+
+func (p *MonitoredInfo) SetLastCheckTime(t *Timestamp) {
+	p.LastCheckTime = t
+}
+
+func (p *MonitoredInfo) SetNextCheckTime(t *Timestamp) {
+	p.NextCheckTime = t
 }
 
 // A MonitoredResource defines the current status and services of a resource during a metrics scan.
@@ -519,14 +655,7 @@ func (inventoryService *InventoryService) CreateProperty(name string, value Type
 // only services.
 type MonitoredResource struct {
 	BaseResource
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status"`
-	// The last status check time on this resource
-	LastCheckTime *Timestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime *Timestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	MonitoredInfo
 	// Services state collection
 	Services []MonitoredService `json:"services"`
 }
@@ -540,30 +669,27 @@ func (monitoredResource MonitoredResource) String() string {
 		monitoredResource.Status,
 		monitoredResource.LastCheckTime,
 		monitoredResource.NextCheckTime,
-		monitoredResource.LastPlugInOutput,
+		monitoredResource.LastPluginOutput,
 		monitoredResource.BaseResource.Properties,
 		monitoredResource.Services,
 	)
 }
 
-func (monitoredResource *MonitoredResource) CreateProperty(name string, value TypedValue) {
-	if monitoredResource.BaseResource.Properties == nil {
-		monitoredResource.BaseResource.Properties = make(map[string]TypedValue)
-	}
-	monitoredResource.BaseResource.Properties[name] = value
+func (p *MonitoredResource) AddService(svc MonitoredService) {
+	p.Services = append(p.Services, svc)
 }
 
 func (monitoredResource *MonitoredResource) ToMonitoredResourceRef() MonitoredResourceRef {
 	return MonitoredResourceRef{Name: monitoredResource.Name, Type: ResourceTypeHost, Owner: monitoredResource.Owner}
 }
 
-func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResource {
+func (p MonitoredResource) ToInventoryResource() InventoryResource {
 	var services []InventoryService
-	for _, ms := range monitoredResource.Services {
-		services = append(services, ms.ToInventoryService())
+	for _, svc := range p.Services {
+		services = append(services, svc.ToInventoryService())
 	}
 	return InventoryResource{
-		BaseResource: monitoredResource.BaseResource,
+		BaseResource: p.BaseResource,
 		Services:     services,
 	}
 }
@@ -575,15 +701,8 @@ func (monitoredResource *MonitoredResource) ToInventoryResource() InventoryResou
 // A MonitoredService contains a collection of TimeSeries Metrics.
 // MonitoredService collections are attached to a MonitoredResource during a metrics scan.
 type MonitoredService struct {
-	BaseTransitData
-	// Restrict to a Groundwork Monitor Status
-	Status MonitorStatus `json:"status"`
-	// The last status check time on this resource
-	LastCheckTime *Timestamp `json:"lastCheckTime,omitempty"`
-	// The next status check time on this resource
-	NextCheckTime *Timestamp `json:"nextCheckTime,omitempty"`
-	// Nagios plugin output string
-	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	BaseInfo
+	MonitoredInfo
 	// metrics
 	Metrics []TimeSeries `json:"metrics"`
 }
@@ -593,32 +712,13 @@ func (monitoredService MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
 		monitoredService.Name, monitoredService.Type, monitoredService.Owner, monitoredService.Status,
 		monitoredService.LastCheckTime, monitoredService.NextCheckTime,
-		monitoredService.LastPlugInOutput, monitoredService.Properties, monitoredService.Metrics,
+		monitoredService.LastPluginOutput, monitoredService.Properties, monitoredService.Metrics,
 	)
 }
 
-func (monitoredService *MonitoredService) CreateProperty(name string, value TypedValue) {
-	if monitoredService.Properties == nil {
-		monitoredService.Properties = make(map[string]TypedValue)
-	}
-	monitoredService.Properties[name] = value
-}
-
-func (monitoredService *MonitoredService) CreateProperties(properties map[string]interface{}) {
-	for k, v := range properties {
-		var typedValue TypedValue
-		err := typedValue.FromInterface(v)
-		if err != nil {
-			logper.Error(nil, "could not create property %s of service %s: %s",
-				k, monitoredService.Name, err)
-		}
-		monitoredService.CreateProperty(k, typedValue)
-	}
-}
-
-func (monitoredService *MonitoredService) ToInventoryService() InventoryService {
+func (p MonitoredService) ToInventoryService() InventoryService {
 	return InventoryService{
-		BaseTransitData: monitoredService.BaseTransitData,
+		BaseInfo: p.BaseInfo,
 	}
 }
 
@@ -717,6 +817,10 @@ type ResourcesWithServicesRequest struct {
 	Groups    []ResourceGroup     `json:"groups,omitempty"`
 }
 
+func (p *ResourcesWithServicesRequest) AddResource(res MonitoredResource) {
+	p.Resources = append(p.Resources, res)
+}
+
 // String implements Stringer interface
 func (resourcesWithServicesRequest ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",
@@ -731,6 +835,10 @@ type InventoryRequest struct {
 	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
 	Resources     []InventoryResource `json:"resources"`
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
+}
+
+func (p *InventoryRequest) AddResource(res InventoryResource) {
+	p.Resources = append(p.Resources, res)
 }
 
 // String implements Stringer interface
@@ -863,31 +971,31 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 	if warning != nil {
 		switch warning.ValueType {
 		case IntegerType:
-			warningValue = float64(warning.IntegerValue)
+			warningValue = float64(*warning.IntegerValue)
 		case DoubleType:
-			warningValue = warning.DoubleValue
+			warningValue = *warning.DoubleValue
 		}
 	}
 
 	if critical != nil {
 		switch critical.ValueType {
 		case IntegerType:
-			criticalValue = float64(critical.IntegerValue)
+			criticalValue = float64(*critical.IntegerValue)
 		case DoubleType:
-			criticalValue = critical.DoubleValue
+			criticalValue = *critical.DoubleValue
 		}
 	}
 
 	switch value.ValueType {
 	case IntegerType:
 		if warning == nil && criticalValue == -1 {
-			if float64(value.IntegerValue) >= criticalValue {
+			if float64(*value.IntegerValue) >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
 			return ServiceOk
 		}
 		if critical == nil && (warning != nil && warningValue == -1) {
-			if float64(value.IntegerValue) >= warningValue {
+			if float64(*value.IntegerValue) >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
@@ -897,31 +1005,31 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 		}
 		// is it a reverse comparison (low to high)
 		if (warning != nil && critical != nil) && warningValue > criticalValue {
-			if float64(value.IntegerValue) <= criticalValue {
+			if float64(*value.IntegerValue) <= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if float64(value.IntegerValue) <= warningValue {
+			if float64(*value.IntegerValue) <= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		} else {
-			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= criticalValue {
+			if (warning != nil && critical != nil) && float64(*value.IntegerValue) >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= warningValue {
+			if (warning != nil && critical != nil) && float64(*value.IntegerValue) >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		}
 	case DoubleType:
 		if warning == nil && criticalValue == -1 {
-			if value.DoubleValue >= criticalValue {
+			if *value.DoubleValue >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
 			return ServiceOk
 		}
 		if critical == nil && (warning != nil && warningValue == -1) {
-			if value.DoubleValue >= warningValue {
+			if *value.DoubleValue >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
@@ -931,18 +1039,18 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 		}
 		// is it a reverse comparison (low to high)
 		if warningValue > criticalValue {
-			if value.DoubleValue <= criticalValue {
+			if *value.DoubleValue <= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if value.DoubleValue <= warningValue {
+			if *value.DoubleValue <= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		} else {
-			if value.DoubleValue >= criticalValue {
+			if *value.DoubleValue >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if value.DoubleValue >= warningValue {
+			if *value.DoubleValue >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk

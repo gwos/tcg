@@ -105,7 +105,7 @@ func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, gro
 	for i := range request.Resources {
 		monitoredServices := EvaluateExpressions(request.Resources[i].Services)
 		request.Resources[i].Services = monitoredServices
-		request.Resources[i].LastPlugInOutput = buildHostStatusText(monitoredServices)
+		request.Resources[i].LastPluginOutput = buildHostStatusText(monitoredServices)
 	}
 	b, err = json.Marshal(request)
 	if err != nil {
@@ -146,7 +146,7 @@ func SendInventory(ctx context.Context, resources []transit.InventoryResource, r
 // Inventory Constructors
 func CreateInventoryService(name string, owner string) transit.InventoryService {
 	return transit.InventoryService{
-		BaseTransitData: transit.BaseTransitData{
+		BaseInfo: transit.BaseInfo{
 			Name:  name,
 			Type:  transit.ResourceTypeService,
 			Owner: owner,
@@ -158,7 +158,7 @@ func CreateInventoryService(name string, owner string) transit.InventoryService 
 func CreateInventoryResource(name string, services []transit.InventoryService) transit.InventoryResource {
 	resource := transit.InventoryResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: name,
 				Type: transit.ResourceTypeHost,
 			},
@@ -286,30 +286,14 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 //
 func CreateMetric(name string, value interface{}, args ...interface{}) (*transit.TimeSeries, error) {
 	// set the value based on variable type
-	var typedValue transit.TypedValue
-	switch value.(type) {
-	case int:
-		typedValue = transit.TypedValue{
-			ValueType:    transit.IntegerType,
-			IntegerValue: int64(value.(int)),
-		}
-	case int64:
-		typedValue = transit.TypedValue{
-			ValueType:    transit.IntegerType,
-			IntegerValue: value.(int64),
-		}
-	case float64:
-		typedValue = transit.TypedValue{
-			ValueType:   transit.DoubleType,
-			DoubleValue: value.(float64),
-		}
-	default:
+	typedValue := transit.NewTypedValue(value)
+	if typedValue == nil {
 		return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(value))
 	}
 	metric := transit.TimeSeries{
 		MetricName: name,
 		SampleType: transit.Value,
-		Value:      &typedValue,
+		Value:      typedValue,
 	}
 	// optional argument processing
 	// var arguments []interface{} = make([]interface{}, len(args))
@@ -354,31 +338,15 @@ func CreateCriticalThreshold(label string, value interface{}) (*transit.Threshol
 func CreateThreshold(thresholdType transit.MetricSampleType, label string, value interface{}) (*transit.ThresholdValue, error) {
 	// create the threshold type
 	// set the value based on variable type
-	var typedValue transit.TypedValue
-	switch value.(type) {
-	case int:
-		typedValue = transit.TypedValue{
-			ValueType:    transit.IntegerType,
-			IntegerValue: int64(value.(int)),
-		}
-	case int64:
-		typedValue = transit.TypedValue{
-			ValueType:    transit.IntegerType,
-			IntegerValue: value.(int64),
-		}
-	case float64:
-		typedValue = transit.TypedValue{
-			ValueType:   transit.DoubleType,
-			DoubleValue: value.(float64),
-		}
-	default:
+	typedValue := transit.NewTypedValue(value)
+	if typedValue == nil {
 		return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(value))
 	}
 	// create the threshold
 	threshold := transit.ThresholdValue{
 		SampleType: thresholdType,
 		Label:      label,
-		Value:      &typedValue,
+		Value:      typedValue,
 	}
 	return &threshold, nil
 }
@@ -447,14 +415,16 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 	lastCheckTime := *transit.NewTimestamp()
 	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	service := transit.MonitoredService{
-		BaseTransitData: transit.BaseTransitData{
+		BaseInfo: transit.BaseInfo{
 			Name:  name,
 			Type:  transit.ResourceTypeService,
 			Owner: owner,
 		},
-		Status:        transit.ServiceOk,
-		LastCheckTime: &lastCheckTime,
-		NextCheckTime: &nextCheckTime,
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.ServiceOk,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -488,14 +458,16 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	resource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: name,
 				Type: transit.ResourceTypeHost,
 			},
 		},
-		Status:        transit.HostUp,
-		LastCheckTime: &lastCheckTime,
-		NextCheckTime: &nextCheckTime,
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.HostUp,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
 	}
 	for _, arg := range args {
 		switch arg.(type) {
@@ -531,7 +503,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 			if metric.MetricComputeType != transit.Synthetic {
 				switch metric.Value.ValueType {
 				case transit.IntegerType:
-					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = float64(metric.Value.IntegerValue)
+					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = float64(*metric.Value.IntegerValue)
 				case transit.DoubleType:
 					vars[strings.ReplaceAll(metric.MetricName, ".", "_")] = metric.Value.DoubleValue
 				}
@@ -555,14 +527,16 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 					lastCheckTime := *endTime
 					nextCheckTime := lastCheckTime.Add(CheckInterval)
 					result[i] = transit.MonitoredService{
-						BaseTransitData: transit.BaseTransitData{
+						BaseInfo: transit.BaseInfo{
 							Name:  result[i].Name,
 							Type:  transit.ResourceTypeService,
 							Owner: result[i].Owner,
 						},
-						LastPlugInOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
-						LastCheckTime:    &lastCheckTime,
-						NextCheckTime:    &nextCheckTime,
+						MonitoredInfo: transit.MonitoredInfo{
+							LastPluginOutput: fmt.Sprintf(" Expression: %s", metric.MetricExpression),
+							LastCheckTime:    &lastCheckTime,
+							NextCheckTime:    &nextCheckTime,
+						},
 						Metrics: []transit.TimeSeries{
 							{
 								MetricName: metric.MetricName,
@@ -572,11 +546,7 @@ func EvaluateExpressions(services []transit.MonitoredService) []transit.Monitore
 									StartTime: startTime,
 								},
 								Thresholds: metric.Thresholds,
-								Value: &transit.TypedValue{
-									ValueType:    metric.Value.ValueType,
-									IntegerValue: int64(value),
-									DoubleValue:  value,
-								},
+								Value:      transit.NewTypedValue(value),
 							},
 						},
 					}
@@ -723,7 +693,7 @@ func addServiceStatusText(patternMessage string, service *transit.MonitoredServi
 		}
 	}
 	statusText := addThresholdsToStatusText(patternMessage, service)
-	service.LastPlugInOutput = statusText
+	service.LastPluginOutput = statusText
 }
 
 func addThresholdsToStatusText(statusText string, service *transit.MonitoredService) string {
@@ -786,13 +756,13 @@ func getValueText(value *transit.TypedValue) (string, error) {
 	}
 	switch value.ValueType {
 	case transit.IntegerType:
-		return strconv.Itoa(int(value.IntegerValue)), nil
+		return strconv.Itoa(int(*value.IntegerValue)), nil
 	case transit.DoubleType:
-		return fmt.Sprintf("%f", value.DoubleValue), nil
+		return fmt.Sprintf("%f", *value.DoubleValue), nil
 	case transit.StringType:
-		return value.StringValue, nil
+		return *value.StringValue, nil
 	case transit.BooleanType:
-		return strconv.FormatBool(value.BoolValue), nil
+		return strconv.FormatBool(*value.BoolValue), nil
 	case transit.TimeType:
 		return FormatTimeForStatusMessage(time.Duration(value.TimeValue.UnixNano()), time.Second), nil
 	}

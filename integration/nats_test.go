@@ -233,15 +233,17 @@ func resource() transit.MonitoredResource {
 	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	return transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
 				Type: transit.ResourceTypeHost,
 			},
 		},
-		Status:        transit.HostUp,
-		LastCheckTime: &lastCheckTime,
-		NextCheckTime: &nextCheckTime,
-		Services:      []transit.MonitoredService{},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.HostUp,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
+		Services: []transit.MonitoredService{},
 	}
 }
 
@@ -249,14 +251,16 @@ func service(i int) transit.MonitoredService {
 	lastCheckTime := *transit.NewTimestamp()
 	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	return transit.MonitoredService{
-		BaseTransitData: transit.BaseTransitData{
+		BaseInfo: transit.BaseInfo{
 			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
 			Type:  transit.ResourceTypeService,
 			Owner: TestHostName,
 		},
-		Status:        transit.ServiceOk,
-		LastCheckTime: &lastCheckTime,
-		NextCheckTime: &nextCheckTime,
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.ServiceOk,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
@@ -265,11 +269,8 @@ func service(i int) transit.MonitoredService {
 					EndTime:   &lastCheckTime,
 					StartTime: &lastCheckTime,
 				},
-				Value: &transit.TypedValue{
-					ValueType:    transit.IntegerType,
-					IntegerValue: int64(i),
-				},
-				Unit: transit.MB,
+				Value: transit.NewTypedValue(i),
+				Unit:  transit.MB,
 			},
 		},
 	}
@@ -278,7 +279,7 @@ func service(i int) transit.MonitoredService {
 func inventoryResource() transit.InventoryResource {
 	return transit.InventoryResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
 				Type: transit.ResourceTypeHost,
 			},
@@ -288,7 +289,7 @@ func inventoryResource() transit.InventoryResource {
 
 func inventoryService(i int) transit.InventoryService {
 	return transit.InventoryService{
-		BaseTransitData: transit.BaseTransitData{
+		BaseInfo: transit.BaseInfo{
 			Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
 			Type:  "network-device",
 			Owner: TestHostName,

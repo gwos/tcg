@@ -76,7 +76,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 	for resName, services := range resourceNameToServicesMap {
 		res := transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resName,
 					Type: transit.ResourceTypeHost,
 				},
@@ -88,7 +88,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 		for _, svc := range services {
 			if svc.Name == "" {
 				resFlag = true
-				res.LastPlugInOutput = svc.LastPlugInOutput
+				res.LastPluginOutput = svc.LastPluginOutput
 				res.LastCheckTime = svc.LastCheckTime
 				res.NextCheckTime = svc.NextCheckTime
 				res.Status = svc.Status
@@ -225,15 +225,17 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
 		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name:  svcName,
 				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
-			Status:           status,
-			LastCheckTime:    timestamp,
-			LastPlugInOutput: msg,
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           status,
+				LastCheckTime:    timestamp,
+				LastPluginOutput: msg,
+			},
+			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
 	return removeDuplicateServices(servicesMap), nil
@@ -331,15 +333,17 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
 		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name:  svcName,
 				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
-			Status:           status,
-			LastCheckTime:    timestamp,
-			LastPlugInOutput: msg,
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           status,
+				LastCheckTime:    timestamp,
+				LastPluginOutput: msg,
+			},
+			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
 	return removeDuplicateServices(servicesMap), nil

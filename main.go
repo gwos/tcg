@@ -101,11 +101,13 @@ func LowLevelExamples() {
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
 		Label:      "local_load_5_wn",
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: 70.0}}
+		Value:      transit.NewTypedValue(70.0),
+	}
 	errorThreshold := transit.ThresholdValue{
 		SampleType: transit.Critical,
 		Label:      "local_load_5_cr",
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: 85.0}}
+		Value:      transit.NewTypedValue(85.0),
+	}
 	random := rand.Float64() * 100.0
 	lastCheckTime := *transit.NewTimestamp()
 	nextCheckTime := lastCheckTime.Add(time.Minute * 5)
@@ -113,52 +115,54 @@ func LowLevelExamples() {
 		MetricName: "local_load_5",
 		SampleType: transit.Value,
 		Interval:   &transit.TimeInterval{EndTime: &lastCheckTime, StartTime: &lastCheckTime},
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
+		Value:      transit.NewTypedValue(random),
 		Thresholds: &[]transit.ThresholdValue{warningThreshold, errorThreshold},
 		Unit:       "%{cpu}",
 	}
 
 	// Example Service
 	var localLoadService = transit.MonitoredService{
-		BaseTransitData: transit.BaseTransitData{
+		BaseInfo: transit.BaseInfo{
 			Name: "local_load",
 			Type: transit.ResourceTypeService,
 			Properties: map[string]transit.TypedValue{
-				"stateType":       {StringValue: "SOFT"},
-				"checkType":       {StringValue: "ACTIVE"},
-				"PerformanceData": {StringValue: "007-321 RAD"},
-				"ExecutionTime":   {DoubleValue: 3.0},
-				"CurrentAttempt":  {IntegerValue: 2},
-				"InceptionTime":   {TimeValue: &lastCheckTime},
+				"stateType":       *transit.NewTypedValue("SOFT"),
+				"checkType":       *transit.NewTypedValue("ACTIVE"),
+				"PerformanceData": *transit.NewTypedValue("007-321 RAD"),
+				"ExecutionTime":   *transit.NewTypedValue(3.0),
+				"CurrentAttempt":  *transit.NewTypedValue(2),
+				"InceptionTime":   *transit.NewTypedValue(lastCheckTime),
 			},
 		},
-		Status:           transit.ServiceOk,
-		LastCheckTime:    &lastCheckTime,
-		NextCheckTime:    &nextCheckTime,
-		LastPlugInOutput: "foo | bar",
-		Metrics:          []transit.TimeSeries{sampleValue},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:           transit.ServiceOk,
+			LastCheckTime:    &lastCheckTime,
+			NextCheckTime:    &nextCheckTime,
+			LastPluginOutput: "foo | bar",
+		}, Metrics: []transit.TimeSeries{sampleValue},
 	}
 
 	geneva := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: "geneva",
 				Type: transit.ResourceTypeHost,
 				Properties: map[string]transit.TypedValue{
-					"stateType":       {StringValue: "SOFT"},
-					"checkType":       {StringValue: "ACTIVE"},
-					"PerformanceData": {StringValue: "007-321 RAD"},
-					"ExecutionTime":   {DoubleValue: 3.0},
-					"CurrentAttempt":  {IntegerValue: 2},
-					"InceptionTime":   {TimeValue: &lastCheckTime},
+					"stateType":       *transit.NewTypedValue("SOFT"),
+					"checkType":       *transit.NewTypedValue("ACTIVE"),
+					"PerformanceData": *transit.NewTypedValue("007-321 RAD"),
+					"ExecutionTime":   *transit.NewTypedValue(3.0),
+					"CurrentAttempt":  *transit.NewTypedValue(2),
+					"InceptionTime":   *transit.NewTypedValue(lastCheckTime),
 				},
 			},
 		},
-		Status:           transit.HostUp,
-		LastCheckTime:    &lastCheckTime,
-		NextCheckTime:    &nextCheckTime,
-		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Services:         []transit.MonitoredService{localLoadService},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:           transit.HostUp,
+			LastCheckTime:    &lastCheckTime,
+			NextCheckTime:    &nextCheckTime,
+			LastPluginOutput: "44/55/888 QA00005-BC",
+		}, Services: []transit.MonitoredService{localLoadService},
 	}
 
 	// Build Monitored Resources

@@ -186,16 +186,18 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 		nextCheckTime := lastCheckTime.Add(connectors.CheckInterval)
 		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resource.Name,
 					Type: resource.Type,
 				},
 			},
-			Status:           resource.Status,
-			LastCheckTime:    &lastCheckTime,
-			NextCheckTime:    &nextCheckTime,
-			LastPlugInOutput: resource.Message,
-			Services:         mServices,
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           resource.Status,
+				LastCheckTime:    &lastCheckTime,
+				NextCheckTime:    &nextCheckTime,
+				LastPluginOutput: resource.Message,
+			},
+			Services: mServices,
 		}
 		index = index + 1
 	}
@@ -237,9 +239,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No OneDrive metrics available"
+				monitoredService.LastPluginOutput = "No OneDrive metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -259,9 +261,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 			// monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f", monitoredService.Metrics[0].Value.DoubleValue, monitoredService.Metrics[1].Value.DoubleValue)
 		} else {
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No licensing metrics available"
+				monitoredService.LastPluginOutput = "No licensing metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -281,9 +283,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No SharePoint metrics available"
+				monitoredService.LastPluginOutput = "No SharePoint metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -303,9 +305,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No EMAIL metrics available"
+				monitoredService.LastPluginOutput = "No EMAIL metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -324,9 +326,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 			// monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread", monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No Security metrics available"
+				monitoredService.LastPluginOutput = "No Security metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -392,7 +394,7 @@ func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[st
 	_ = json.Unmarshal(body, &odata)
 	for _, ods := range odata.Services {
 		if monitoredService, ok := monitoredServices[ods.WorkloadDisplayName]; ok {
-			monitoredService.Status, monitoredService.LastPlugInOutput = connector.translateServiceStatus(ods.Status)
+			monitoredService.Status, monitoredService.LastPluginOutput = connector.translateServiceStatus(ods.Status)
 			monitoredServices[ods.WorkloadDisplayName] = monitoredService
 			var upCount float64 = 0
 			var totalCount float64 = 0

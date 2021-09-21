@@ -37,11 +37,27 @@ uintptr_t (*createInventoryResource)(char *name, char *resType) = NULL;
 uintptr_t (*createInventoryService)(char *name, char *resType) = NULL;
 uintptr_t (*createMonitoredResource)(char *name, char *resType) = NULL;
 uintptr_t (*createMonitoredService)(char *name, char *resType) = NULL;
+uintptr_t (*createResourcesWithServicesRequest)() = NULL;
+void (*deleteHandle)(uintptr_t *p) = NULL;
 void (*addResource)(uintptr_t *pReq, uintptr_t pRes) = NULL;
 void (*addService)(uintptr_t *pRes, uintptr_t pSvc) = NULL;
-void (*setName)(uintptr_t *handle, char *s) = NULL;
-void (*deleteHandle)(uintptr_t *handle) = NULL;
+void (*setCategory)(uintptr_t *p, char *s) = NULL;
+void (*setDescription)(uintptr_t *p, char *s) = NULL;
+void (*setDevice)(uintptr_t *p, char *s) = NULL;
+void (*setOwner)(uintptr_t *p, char *s) = NULL;
+void (*setName)(uintptr_t *p, char *s) = NULL;
+void (*setPropertyBool)(uintptr_t *p, char *k, _Bool t) = NULL;
+void (*setPropertyDouble)(uintptr_t *p, char *k, double t) = NULL;
+void (*setPropertyInt)(uintptr_t *p, char *k, long long int t) = NULL;
+void (*setPropertyStr)(uintptr_t *p, char *k, char *t) = NULL;
+void (*setPropertyTime)(uintptr_t *p, char *k, long long sec,
+                        long long nsec) = NULL;
+void (*setStatus)(uintptr_t *p, char *s) = NULL;
+void (*setLastPluginOutput)(uintptr_t *p, char *s) = NULL;
+void (*setLastCheckTime)(uintptr_t *p, long long sec, long long nsec) = NULL;
+void (*setNextCheckTime)(uintptr_t *p, long long sec, long long nsec) = NULL;
 bool (*sendInventory)(uintptr_t pInvReq, char *errBuf, size_t errBufLen) = NULL;
+bool (*sendMetrics)(uintptr_t pReq, char *errBuf, size_t errBufLen) = NULL;
 
 /* define handlers for general libtransit functions */
 bool (*getAgentIdentity)(char *buf, size_t bufLen, char *errBuf,
@@ -116,11 +132,27 @@ void load_libtransit() {
   createInventoryService = find_symbol("CreateInventoryService");
   createMonitoredResource = find_symbol("CreateMonitoredResource");
   createMonitoredService = find_symbol("CreateMonitoredService");
+  createResourcesWithServicesRequest =
+      find_symbol("CreateResourcesWithServicesRequest");
+  deleteHandle = find_symbol("DeleteHandle");
   addResource = find_symbol("AddResource");
   addService = find_symbol("AddService");
+  setCategory = find_symbol("SetCategory");
+  setDescription = find_symbol("SetDescription");
+  setDevice = find_symbol("SetDevice");
+  setOwner = find_symbol("SetOwner");
   setName = find_symbol("SetName");
-  deleteHandle = find_symbol("DeleteHandle");
+  setPropertyBool = find_symbol("SetPropertyBool");
+  setPropertyDouble = find_symbol("SetPropertyDouble");
+  setPropertyInt = find_symbol("SetPropertyInt");
+  setPropertyStr = find_symbol("SetPropertyStr");
+  setPropertyTime = find_symbol("SetPropertyTime");
+  setStatus = find_symbol("SetStatus");
+  setLastPluginOutput = find_symbol("SetLastPluginOutput");
+  setLastCheckTime = find_symbol("SetLastCheckTime");
+  setNextCheckTime = find_symbol("SetNextCheckTime");
   sendInventory = find_symbol("SendInventory");
+  sendMetrics = find_symbol("SendMetrics");
 
   getAgentIdentity = find_symbol("GetAgentIdentity");
   goSetenv = find_symbol("GoSetenv");
@@ -344,9 +376,15 @@ void test_SendInventory() {
   setName(&invRes, "resource-01");
   setName(&invSvc, "service-01");
   setName(&monSvc, "service-02");
+  setPropertyBool(&invRes, "prop-bool1", true);
+  setPropertyBool(&invRes, "prop-bool2", false);
+  setPropertyDouble(&invRes, "prop-double", 0.11);
+  setPropertyInt(&invRes, "prop-int", 11);
+  setPropertyStr(&invRes, "prop-str", "str-33");
+  setPropertyTime(&invRes, "prop-time", 1609372800, 0);
 
   addService(&invRes, invSvc);
-  addService(&invRes, monSvc);
+  addService(&invRes, monSvc);  // do noting
   addResource(&invReq, invRes);
 
   char errBuf[ERR_BUF_LEN] = "";
@@ -362,9 +400,44 @@ void test_SendInventory() {
   }
 }
 
+void test_SendMetrics() {
+  uintptr_t monReq = createResourcesWithServicesRequest();
+  uintptr_t monRes = createMonitoredResource("monRes", "host");
+  uintptr_t monSvc = createMonitoredService("monSvc", "service");
+  uintptr_t invSvc = createInventoryService("invSvc", "service");
+
+  setName(&monRes, "resource-01");
+  setName(&monSvc, "service-01");
+  setName(&invSvc, "service-02");
+  setLastPluginOutput(&monSvc, "last-plugin-output");
+  setLastCheckTime(&monSvc, 1609372800, 0);
+
+  addService(&monRes, invSvc);  // do noting
+  addService(&monRes, monSvc);
+  addResource(&monReq, monRes);
+
+  char errBuf[ERR_BUF_LEN] = "";
+  bool res = sendMetrics(monReq, errBuf, ERR_BUF_LEN);
+
+  deleteHandle(&monReq);
+  deleteHandle(&monRes);
+  deleteHandle(&invSvc);
+  deleteHandle(&monSvc);
+
+  if (!res) {
+    fail(errBuf);
+  }
+}
+
 int main(void) {
   load_libtransit();
+
+  startNats(NULL, 0);
+
   test_SendInventory();
+  test_SendMetrics();
+
+  stopNats(NULL, 0);
 
   test_libtransit_control();
   test_SendResourcesWithMetrics();

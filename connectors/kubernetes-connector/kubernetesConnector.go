@@ -231,16 +231,18 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 		}
 		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resource.Name,
 					Type: resource.Type,
 				},
 			},
-			Status:           resource.Status,
-			LastCheckTime:    transit.NewTimestamp(),
-			NextCheckTime:    transit.NewTimestamp(), // TODO: interval
-			LastPlugInOutput: resource.Message,
-			Services:         mServices,
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           resource.Status,
+				LastCheckTime:    transit.NewTimestamp(),
+				NextCheckTime:    transit.NewTimestamp(), // TODO: interval
+				LastPluginOutput: resource.Message,
+			},
+			Services: mServices,
 		}
 		index = index + 1
 	}

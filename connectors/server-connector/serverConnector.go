@@ -520,10 +520,10 @@ func collectProcesses() map[string]float64 {
 		monitoredService := function.(func(int, int, string, bool) *transit.MonitoredService)(-1, -1, "", true)
 		if monitoredService != nil {
 			if monitoredService.Metrics[0].Value.ValueType == transit.DoubleType {
-				processes[strings.ReplaceAll(name, ".", "_")] = monitoredService.Metrics[0].Value.DoubleValue
+				processes[strings.ReplaceAll(name, ".", "_")] = *monitoredService.Metrics[0].Value.DoubleValue
 			}
 			if monitoredService.Metrics[0].Value.ValueType == transit.IntegerType {
-				processes[strings.ReplaceAll(name, ".", "_")] = float64(monitoredService.Metrics[0].Value.IntegerValue)
+				processes[strings.ReplaceAll(name, ".", "_")] = float64(*monitoredService.Metrics[0].Value.IntegerValue)
 			}
 		}
 	}

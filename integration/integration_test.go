@@ -74,14 +74,14 @@ func TestIntegration(t *testing.T) {
 func buildInventoryRequest(t *testing.T) []byte {
 	inventoryResource := transit.InventoryResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
 				Type: transit.ResourceTypeHost,
 			},
 		},
 		Services: []transit.InventoryService{
 			{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name:  "test",
 					Type:  transit.ResourceTypeHypervisor,
 					Owner: TestHostName,
@@ -107,24 +107,28 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
 	monitoredResource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
 				Type: transit.ResourceTypeHost,
 			},
 		},
-		Status:        transit.HostUp,
-		LastCheckTime: &lastCheckTime,
-		NextCheckTime: &nextCheckTime,
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.HostUp,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
 		Services: []transit.MonitoredService{
 			{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name:  "test",
 					Type:  transit.ResourceTypeService,
 					Owner: TestHostName,
 				},
-				Status:        transit.ServiceOk,
-				LastCheckTime: &lastCheckTime,
-				NextCheckTime: &nextCheckTime,
+				MonitoredInfo: transit.MonitoredInfo{
+					Status:        transit.ServiceOk,
+					LastCheckTime: &lastCheckTime,
+					NextCheckTime: &nextCheckTime,
+				},
 				Metrics: []transit.TimeSeries{
 					{
 						MetricName: "testMetric",
@@ -133,11 +137,8 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 							EndTime:   &lastCheckTime,
 							StartTime: &lastCheckTime,
 						},
-						Value: &transit.TypedValue{
-							ValueType:    transit.IntegerType,
-							IntegerValue: 1000,
-						},
-						Unit: transit.MB,
+						Value: transit.NewTypedValue(1000),
+						Unit:  transit.MB,
 					},
 				},
 			},
