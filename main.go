@@ -54,12 +54,12 @@ func main() {
 	metric1, _ := connectors.CreateMetric(CpuMetric, 75)
 	warning1, _ := connectors.CreateWarningThreshold(CpuMetricWarning, 60)
 	critical1, _ := connectors.CreateCriticalThreshold(CpuMetricCritical, 90)
-	metric1.Thresholds = &[]transit.ThresholdValue{*warning1, *critical1}
+	metric1.Thresholds = []transit.ThresholdValue{*warning1, *critical1}
 	// Create Double Metric with Thresholds and Unit Type
 	metric2, _ := connectors.CreateMetric(PercentFreeMetric, 99.82, transit.PercentCPU)
 	warning2, _ := connectors.CreateWarningThreshold(PercentFreeMetricWarning, 80.5)
 	critical2, _ := connectors.CreateCriticalThreshold(PercentFreeMetricCritical, 90.8)
-	metric2.Thresholds = &[]transit.ThresholdValue{*warning2, *critical2}
+	metric2.Thresholds = []transit.ThresholdValue{*warning2, *critical2}
 	// create with interval
 	timestamp := transit.NewTimestamp()
 	interval := &transit.TimeInterval{
@@ -68,8 +68,8 @@ func main() {
 	}
 	metric3, _ := connectors.CreateMetric(DiskUsed, 65.82, transit.GB, interval)
 	// add tags
-	metric3.CreateTag("myTag1", "myTagValue1")
-	metric3.CreateTag("myTag2", "myTagValue2")
+	metric3.SetTag("myTag1", "myTagValue1")
+	metric3.SetTag("myTag2", "myTagValue2")
 
 	// display ...
 	fmt.Printf("metric 1 created with thresholds: %+v\n", metric1)
@@ -116,7 +116,7 @@ func LowLevelExamples() {
 		SampleType: transit.Value,
 		Interval:   &transit.TimeInterval{EndTime: &lastCheckTime, StartTime: &lastCheckTime},
 		Value:      transit.NewTypedValue(random),
-		Thresholds: &[]transit.ThresholdValue{warningThreshold, errorThreshold},
+		Thresholds: []transit.ThresholdValue{warningThreshold, errorThreshold},
 		Unit:       "%{cpu}",
 	}
 

@@ -326,10 +326,14 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
+func (p *ThresholdValue) SetValue(v interface{}) {
+	p.Value = NewTypedValue(v)
+}
+
 // String implements Stringer interface
-func (thresholdValue ThresholdValue) String() string {
+func (p ThresholdValue) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		thresholdValue.SampleType, thresholdValue.Label, thresholdValue.Value.String())
+		p.SampleType, p.Label, p.Value.String())
 }
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
@@ -349,23 +353,57 @@ type TimeSeries struct {
 	Value             *TypedValue       `json:"value"`
 	Tags              map[string]string `json:"tags,omitempty"`
 	Unit              UnitType          `json:"unit,omitempty"`
-	Thresholds        *[]ThresholdValue `json:"thresholds,omitempty"`
+	Thresholds        []ThresholdValue  `json:"thresholds,omitempty"`
 	MetricComputeType ComputeType       `json:"-"`
 	MetricExpression  string            `json:"-"`
 }
 
-// String implements Stringer interface
-func (timeSeries TimeSeries) String() string {
-	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
-		timeSeries.MetricName, timeSeries.SampleType, timeSeries.Interval.String(), timeSeries.Value.String(),
-		timeSeries.Tags, timeSeries.Unit, *timeSeries.Thresholds)
+func (p *TimeSeries) AddThreshold(t ThresholdValue) {
+	p.Thresholds = append(p.Thresholds, t)
 }
 
-func (timeSeries *TimeSeries) CreateTag(name string, value string) {
-	if timeSeries.Tags == nil {
-		timeSeries.Tags = make(map[string]string)
+func (p *TimeSeries) SetName(s string) {
+	p.MetricName = s
+}
+
+func (p *TimeSeries) SetSampleType(s MetricSampleType) {
+	p.SampleType = s
+}
+
+func (p *TimeSeries) SetIntervalEnd(t *Timestamp) {
+	if p.Interval == nil {
+		p.Interval = new(TimeInterval)
 	}
-	timeSeries.Tags[name] = value
+	p.Interval.EndTime = t
+}
+
+func (p *TimeSeries) SetIntervalStart(t *Timestamp) {
+	if p.Interval == nil {
+		p.Interval = new(TimeInterval)
+	}
+	p.Interval.StartTime = t
+}
+
+func (p *TimeSeries) SetValue(v interface{}) {
+	p.Value = NewTypedValue(v)
+}
+
+func (p *TimeSeries) SetTag(k string, v string) {
+	if p.Tags == nil {
+		p.Tags = make(map[string]string)
+	}
+	p.Tags[k] = v
+}
+
+func (p *TimeSeries) SetUnit(s UnitType) {
+	p.Unit = s
+}
+
+// String implements Stringer interface
+func (p TimeSeries) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
+		p.MetricName, p.SampleType, p.Interval.String(), p.Value.String(),
+		p.Tags, p.Unit, p.Thresholds)
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -625,7 +663,7 @@ func CalculateServiceStatus(metrics *[]TimeSeries) (MonitorStatus, error) {
 	for _, metric := range *metrics {
 		if metric.Thresholds != nil {
 			var warning, critical ThresholdValue
-			for _, threshold := range *metric.Thresholds {
+			for _, threshold := range metric.Thresholds {
 				switch threshold.SampleType {
 				case Warning:
 					warning = threshold

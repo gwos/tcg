@@ -266,7 +266,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 		thresholds = append(thresholds, *criticalThreshold)
 	}
 	if len(thresholds) > 0 {
-		metric.Thresholds = &thresholds
+		metric.Thresholds = thresholds
 	}
 
 	return metric, nil
@@ -706,7 +706,7 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 		crt := noneThresholdText
 		metric := service.Metrics[0]
 		if metric.Thresholds != nil {
-			for _, th := range *metric.Thresholds {
+			for _, th := range metric.Thresholds {
 				thresholdType := th.SampleType
 				if transit.Warning == thresholdType || transit.Critical == thresholdType {
 					value, err := getValueText(th.Value)

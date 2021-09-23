@@ -39,25 +39,44 @@ uintptr_t (*createMonitoredResource)(char *name, char *resType) = NULL;
 uintptr_t (*createMonitoredService)(char *name, char *resType) = NULL;
 uintptr_t (*createResourceGroup)(char *name, char *grType) = NULL;
 uintptr_t (*createResourcesWithServicesRequest)() = NULL;
+uintptr_t (*createTimeSeries)(char *name) = NULL;
+uintptr_t (*createThresholdValue)(char *lbl, char *st) = NULL;
 void (*deleteHandle)(uintptr_t *p) = NULL;
+
 void (*addResource)(uintptr_t *pTarget, uintptr_t p) = NULL;
 void (*addResourceGroup)(uintptr_t *pTarget, uintptr_t p) = NULL;
 void (*addService)(uintptr_t *pTarget, uintptr_t p) = NULL;
+void (*addThreshold)(uintptr_t *pTarget, uintptr_t p) = NULL;
+void (*addMetric)(uintptr_t *pTarget, uintptr_t p) = NULL;
+
+void (*calcStatus)(uintptr_t *p) = NULL;
+
 void (*setCategory)(uintptr_t *p, char *s) = NULL;
 void (*setDescription)(uintptr_t *p, char *s) = NULL;
 void (*setDevice)(uintptr_t *p, char *s) = NULL;
 void (*setOwner)(uintptr_t *p, char *s) = NULL;
 void (*setName)(uintptr_t *p, char *s) = NULL;
+
 void (*setPropertyBool)(uintptr_t *p, char *k, _Bool t) = NULL;
 void (*setPropertyDouble)(uintptr_t *p, char *k, double t) = NULL;
 void (*setPropertyInt)(uintptr_t *p, char *k, long long int t) = NULL;
 void (*setPropertyStr)(uintptr_t *p, char *k, char *t) = NULL;
 void (*setPropertyTime)(uintptr_t *p, char *k, long long sec,
                         long long nsec) = NULL;
+void (*setValueBool)(uintptr_t *p, _Bool t) = NULL;
+void (*setValueDouble)(uintptr_t *p, double t) = NULL;
+void (*setValueInt)(uintptr_t *p, long long int t) = NULL;
+void (*setValueStr)(uintptr_t *p, char *t) = NULL;
+void (*setValueTime)(uintptr_t *p, long long sec, long long nsec) = NULL;
+
+void (*setIntervalEnd)(uintptr_t *p, long long sec, long long nsec) = NULL;
+void (*setIntervalStart)(uintptr_t *p, long long sec, long long nsec) = NULL;
+void (*setTag)(uintptr_t *p, char *k, char *t) = NULL;
 void (*setStatus)(uintptr_t *p, char *s) = NULL;
 void (*setLastPluginOutput)(uintptr_t *p, char *s) = NULL;
 void (*setLastCheckTime)(uintptr_t *p, long long sec, long long nsec) = NULL;
 void (*setNextCheckTime)(uintptr_t *p, long long sec, long long nsec) = NULL;
+
 bool (*sendInventory)(uintptr_t pInvReq, char *errBuf, size_t errBufLen) = NULL;
 bool (*sendMetrics)(uintptr_t pReq, char *errBuf, size_t errBufLen) = NULL;
 
@@ -137,10 +156,15 @@ void load_libtransit() {
   createResourceGroup = find_symbol("CreateResourceGroup");
   createResourcesWithServicesRequest =
       find_symbol("CreateResourcesWithServicesRequest");
+  createTimeSeries = find_symbol("CreateTimeSeries");
+  createThresholdValue = find_symbol("CreateThresholdValue");
   deleteHandle = find_symbol("DeleteHandle");
   addResource = find_symbol("AddResource");
   addResourceGroup = find_symbol("AddResourceGroup");
   addService = find_symbol("AddService");
+  addThreshold = find_symbol("AddThreshold");
+  addMetric = find_symbol("AddMetric");
+  calcStatus = find_symbol("CalcStatus");
   setCategory = find_symbol("SetCategory");
   setDescription = find_symbol("SetDescription");
   setDevice = find_symbol("SetDevice");
@@ -151,6 +175,14 @@ void load_libtransit() {
   setPropertyInt = find_symbol("SetPropertyInt");
   setPropertyStr = find_symbol("SetPropertyStr");
   setPropertyTime = find_symbol("SetPropertyTime");
+  setValueBool = find_symbol("SetValueBool");
+  setValueDouble = find_symbol("SetValueDouble");
+  setValueInt = find_symbol("SetValueInt");
+  setValueStr = find_symbol("SetValueStr");
+  setValueTime = find_symbol("SetValueTime");
+  setIntervalEnd = find_symbol("SetIntervalEnd");
+  setIntervalStart = find_symbol("SetIntervalStart");
+  setTag = find_symbol("SetTag");
   setStatus = find_symbol("SetStatus");
   setLastPluginOutput = find_symbol("SetLastPluginOutput");
   setLastCheckTime = find_symbol("SetLastCheckTime");
@@ -421,8 +453,41 @@ void test_SendMetrics() {
   setLastPluginOutput(&monSvc, "last-plugin-output");
   setLastCheckTime(&monSvc, 1609372800, 0);
 
+  uintptr_t crit = createThresholdValue("lbl-crit", "Critical");
+  uintptr_t warn = createThresholdValue("lbl-warn", "Warning");
+  setValueInt(&crit, 90);
+  setValueInt(&warn, 70);
+  uintptr_t metric1 = createTimeSeries("metric-1");
+  uintptr_t metric2 = createTimeSeries("metric-2");
+  uintptr_t metric3 = createTimeSeries("metric-3");
+  setIntervalEnd(&metric1, 1609372800, 0);
+  setIntervalEnd(&metric2, 1609372800, 0);
+  setIntervalEnd(&metric3, 1609372800, 0);
+  setValueInt(&metric1, 10);
+  setValueInt(&metric2, 20);
+  setValueInt(&metric3, 30);
+
+  addThreshold(&metric1, crit);
+  addThreshold(&metric1, warn);
+  addThreshold(&metric2, crit);
+  addThreshold(&metric2, warn);
+  addThreshold(&metric3, crit);
+  addThreshold(&metric3, warn);
+
+  addMetric(&monSvc, metric1);
+  addMetric(&monSvc, metric2);
+  addMetric(&monSvc, metric3);
+  deleteHandle(&crit);
+  deleteHandle(&warn);
+  deleteHandle(&metric1);
+  deleteHandle(&metric2);
+  deleteHandle(&metric3);
+
   addService(&monRes, invSvc);  // do noting
   addService(&monRes, monSvc);
+
+  calcStatus(&monRes);
+
   addResource(&monReq, monRes);
   addResource(&resGroup, monRes);
   addResourceGroup(&monReq, resGroup);

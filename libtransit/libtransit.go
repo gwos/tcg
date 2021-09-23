@@ -379,6 +379,28 @@ func CreateResourcesWithServicesRequest() C.uintptr_t {
 	return C.uintptr_t(cgo.NewHandle(p))
 }
 
+// CreateTimeSeries returns a handle
+//export CreateTimeSeries
+func CreateTimeSeries(
+	name *C.char,
+) C.uintptr_t {
+	p := new(transit.TimeSeries)
+	p.MetricName = C.GoString(name)
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
+// CreateThresholdValue returns a handle
+//export CreateThresholdValue
+func CreateThresholdValue(
+	lbl *C.char,
+	st *C.char,
+) C.uintptr_t {
+	p := new(transit.ThresholdValue)
+	p.Label = C.GoString(lbl)
+	p.SampleType = transit.MetricSampleType(C.GoString(st))
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
 // DeleteHandle invalidates a handle.
 // This method should only be called once the C code no longer has a copy of the handle value.
 //export DeleteHandle
@@ -467,6 +489,60 @@ func AddService(pTarget *C.uintptr_t, p C.uintptr_t) {
 			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
 			return
 		}
+	}
+}
+
+// AddThreshold appends threshold
+//export AddThreshold
+func AddThreshold(pTarget *C.uintptr_t, p C.uintptr_t) {
+	hTarget, h := cgo.Handle(*pTarget), cgo.Handle(p)
+	if vTarget, ok := hTarget.Value().(interface {
+		AddThreshold(transit.ThresholdValue)
+	}); ok {
+		if v, ok := h.Value().(*transit.ThresholdValue); ok {
+			vTarget.AddThreshold(*v)
+			hTarget.Delete()
+			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
+		}
+	}
+}
+
+// AddMetric appends metric
+//export AddMetric
+func AddMetric(pTarget *C.uintptr_t, p C.uintptr_t) {
+	hTarget, h := cgo.Handle(*pTarget), cgo.Handle(p)
+	if vTarget, ok := hTarget.Value().(interface {
+		AddMetric(transit.TimeSeries)
+	}); ok {
+		if v, ok := h.Value().(*transit.TimeSeries); ok {
+			vTarget.AddMetric(*v)
+			hTarget.Delete()
+			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
+		}
+	}
+}
+
+//export CalcStatus
+func CalcStatus(p *C.uintptr_t) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(*transit.MonitoredResource); ok {
+		v.SetStatus(transit.CalculateResourceStatus(v.Services))
+		for i := range v.Services {
+			if status, err := transit.CalculateServiceStatus(&v.Services[i].Metrics); err == nil {
+				v.Services[i].SetStatus(status)
+			}
+		}
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+		return
+	}
+	if v, ok := h.Value().(*transit.MonitoredService); ok {
+		if status, err := transit.CalculateServiceStatus(&v.Metrics); err == nil {
+			v.SetStatus(status)
+		}
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+		return
 	}
 }
 
@@ -593,6 +669,101 @@ func SetPropertyTime(p *C.uintptr_t, k *C.char, sec, nsec C.longlong) {
 	}); ok {
 		v.SetProperty(C.GoString(k),
 			transit.Timestamp{Time: time.Unix(int64(sec), int64(nsec)).UTC()})
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetValueBool
+func SetValueBool(p *C.uintptr_t, t C.bool) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface {
+		SetValue(interface{})
+	}); ok {
+		v.SetValue(bool(t))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetValueDouble
+func SetValueDouble(p *C.uintptr_t, t C.double) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface {
+		SetValue(interface{})
+	}); ok {
+		v.SetValue(float64(t))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetValueInt
+func SetValueInt(p *C.uintptr_t, t C.longlong) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface {
+		SetValue(interface{})
+	}); ok {
+		v.SetValue(int64(t))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetValueStr
+func SetValueStr(p *C.uintptr_t, t *C.char) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface {
+		SetValue(interface{})
+	}); ok {
+		v.SetValue(C.GoString(t))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetValueTime
+func SetValueTime(p *C.uintptr_t, sec, nsec C.longlong) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface {
+		SetValue(interface{})
+	}); ok {
+		v.SetValue(
+			transit.Timestamp{Time: time.Unix(int64(sec), int64(nsec)).UTC()})
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetIntervalEnd
+func SetIntervalEnd(p *C.uintptr_t, sec, nsec C.longlong) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface{ SetIntervalEnd(*transit.Timestamp) }); ok {
+		t := transit.NewTimestamp()
+		t.Time = time.Unix(int64(sec), int64(nsec)).UTC()
+		v.SetIntervalEnd(t)
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetIntervalStart
+func SetIntervalStart(p *C.uintptr_t, sec, nsec C.longlong) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface{ SetIntervalStart(*transit.Timestamp) }); ok {
+		t := transit.NewTimestamp()
+		t.Time = time.Unix(int64(sec), int64(nsec)).UTC()
+		v.SetIntervalStart(t)
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+	}
+}
+
+//export SetTag
+func SetTag(p *C.uintptr_t, k, t *C.char) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface{ SetTag(string, string) }); ok {
+		v.SetTag(C.GoString(k), C.GoString(t))
 		h.Delete()
 		*p = C.uintptr_t(cgo.NewHandle(v))
 	}

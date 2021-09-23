@@ -86,6 +86,10 @@ type MonitoredService struct {
 	Metrics []TimeSeries `json:"metrics"`
 }
 
+func (p *MonitoredService) AddMetric(t TimeSeries) {
+	p.Metrics = append(p.Metrics, t)
+}
+
 // String implements Stringer interface
 func (p MonitoredService) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s]",
