@@ -62,10 +62,6 @@ func (p *MonitoredResource) AddService(svc MonitoredService) {
 	p.Services = append(p.Services, svc)
 }
 
-func (p *MonitoredResource) ToResourceRef() ResourceRef {
-	return ResourceRef{Name: p.Name, Type: p.Type, Owner: p.Owner}
-}
-
 func (p MonitoredResource) ToInventoryResource() InventoryResource {
 	var services []InventoryService
 	for _, svc := range p.Services {
@@ -114,6 +110,10 @@ type ResourcesWithServicesRequest struct {
 
 func (p *ResourcesWithServicesRequest) AddResource(res MonitoredResource) {
 	p.Resources = append(p.Resources, res)
+}
+
+func (p *ResourcesWithServicesRequest) AddResourceGroup(gr ResourceGroup) {
+	p.Groups = append(p.Groups, gr)
 }
 
 // String implements Stringer interface

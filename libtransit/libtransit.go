@@ -358,6 +358,19 @@ func CreateMonitoredService(
 	return C.uintptr_t(cgo.NewHandle(p))
 }
 
+// CreateResourceGroup returns a handle
+//export CreateResourceGroup
+func CreateResourceGroup(
+	name *C.char,
+	grType *C.char,
+) C.uintptr_t {
+	p := new(transit.ResourceGroup)
+	p.GroupName = C.GoString(name)
+	p.Type = transit.GroupType(C.GoString(grType))
+	p.Resources = []transit.ResourceRef{}
+	return C.uintptr_t(cgo.NewHandle(p))
+}
+
 // CreateResourcesWithServicesRequest returns a handle
 //export CreateResourcesWithServicesRequest
 func CreateResourcesWithServicesRequest() C.uintptr_t {
@@ -397,6 +410,38 @@ func AddResource(pTarget *C.uintptr_t, p C.uintptr_t) {
 			return
 		}
 	}
+	if vTarget, ok := hTarget.Value().(interface {
+		AddResource(transit.ResourceRef)
+	}); ok {
+		if res, ok := h.Value().(*transit.ResourceRef); ok {
+			vTarget.AddResource(*res)
+			hTarget.Delete()
+			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
+			return
+		}
+		if res, ok := h.Value().(interface{ ToResourceRef() transit.ResourceRef }); ok {
+			vTarget.AddResource(res.ToResourceRef())
+			hTarget.Delete()
+			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
+			return
+		}
+	}
+}
+
+// AddResourceGroup appends resource group
+//export AddResourceGroup
+func AddResourceGroup(pTarget *C.uintptr_t, p C.uintptr_t) {
+	hTarget, h := cgo.Handle(*pTarget), cgo.Handle(p)
+	if vTarget, ok := hTarget.Value().(interface {
+		AddResourceGroup(transit.ResourceGroup)
+	}); ok {
+		if res, ok := h.Value().(*transit.ResourceGroup); ok {
+			vTarget.AddResourceGroup(*res)
+			hTarget.Delete()
+			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
+			return
+		}
+	}
 }
 
 // AddService appends service
@@ -422,6 +467,23 @@ func AddService(pTarget *C.uintptr_t, p C.uintptr_t) {
 			*pTarget = C.uintptr_t(cgo.NewHandle(vTarget))
 			return
 		}
+	}
+}
+
+//export SetType
+func SetType(p *C.uintptr_t, s *C.char) {
+	h := cgo.Handle(*p)
+	if v, ok := h.Value().(interface{ SetType(transit.GroupType) }); ok {
+		v.SetType(transit.GroupType(C.GoString(s)))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+		return
+	}
+	if v, ok := h.Value().(interface{ SetType(transit.ResourceType) }); ok {
+		v.SetType(transit.ResourceType(C.GoString(s)))
+		h.Delete()
+		*p = C.uintptr_t(cgo.NewHandle(v))
+		return
 	}
 }
 

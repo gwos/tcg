@@ -37,10 +37,12 @@ uintptr_t (*createInventoryResource)(char *name, char *resType) = NULL;
 uintptr_t (*createInventoryService)(char *name, char *resType) = NULL;
 uintptr_t (*createMonitoredResource)(char *name, char *resType) = NULL;
 uintptr_t (*createMonitoredService)(char *name, char *resType) = NULL;
+uintptr_t (*createResourceGroup)(char *name, char *grType) = NULL;
 uintptr_t (*createResourcesWithServicesRequest)() = NULL;
 void (*deleteHandle)(uintptr_t *p) = NULL;
-void (*addResource)(uintptr_t *pReq, uintptr_t pRes) = NULL;
-void (*addService)(uintptr_t *pRes, uintptr_t pSvc) = NULL;
+void (*addResource)(uintptr_t *pTarget, uintptr_t p) = NULL;
+void (*addResourceGroup)(uintptr_t *pTarget, uintptr_t p) = NULL;
+void (*addService)(uintptr_t *pTarget, uintptr_t p) = NULL;
 void (*setCategory)(uintptr_t *p, char *s) = NULL;
 void (*setDescription)(uintptr_t *p, char *s) = NULL;
 void (*setDevice)(uintptr_t *p, char *s) = NULL;
@@ -132,10 +134,12 @@ void load_libtransit() {
   createInventoryService = find_symbol("CreateInventoryService");
   createMonitoredResource = find_symbol("CreateMonitoredResource");
   createMonitoredService = find_symbol("CreateMonitoredService");
+  createResourceGroup = find_symbol("CreateResourceGroup");
   createResourcesWithServicesRequest =
       find_symbol("CreateResourcesWithServicesRequest");
   deleteHandle = find_symbol("DeleteHandle");
   addResource = find_symbol("AddResource");
+  addResourceGroup = find_symbol("AddResourceGroup");
   addService = find_symbol("AddService");
   setCategory = find_symbol("SetCategory");
   setDescription = find_symbol("SetDescription");
@@ -372,6 +376,7 @@ void test_SendInventory() {
   uintptr_t invRes = createInventoryResource("invRes", "host");
   uintptr_t invSvc = createInventoryService("invSvc", "service");
   uintptr_t monSvc = createMonitoredService("monSvc", "service");
+  uintptr_t resGroup = createResourceGroup("group-01", "HostGroup");
 
   setName(&invRes, "resource-01");
   setName(&invSvc, "service-01");
@@ -386,6 +391,8 @@ void test_SendInventory() {
   addService(&invRes, invSvc);
   addService(&invRes, monSvc);  // do noting
   addResource(&invReq, invRes);
+  addResource(&resGroup, invRes);
+  addResourceGroup(&invReq, resGroup);
 
   char errBuf[ERR_BUF_LEN] = "";
   bool res = sendInventory(invReq, errBuf, ERR_BUF_LEN);
@@ -394,6 +401,7 @@ void test_SendInventory() {
   deleteHandle(&invRes);
   deleteHandle(&invSvc);
   deleteHandle(&monSvc);
+  deleteHandle(&resGroup);
 
   if (!res) {
     fail(errBuf);
@@ -405,6 +413,7 @@ void test_SendMetrics() {
   uintptr_t monRes = createMonitoredResource("monRes", "host");
   uintptr_t monSvc = createMonitoredService("monSvc", "service");
   uintptr_t invSvc = createInventoryService("invSvc", "service");
+  uintptr_t resGroup = createResourceGroup("group-01", "HostGroup");
 
   setName(&monRes, "resource-01");
   setName(&monSvc, "service-01");
@@ -415,6 +424,8 @@ void test_SendMetrics() {
   addService(&monRes, invSvc);  // do noting
   addService(&monRes, monSvc);
   addResource(&monReq, monRes);
+  addResource(&resGroup, monRes);
+  addResourceGroup(&monReq, resGroup);
 
   char errBuf[ERR_BUF_LEN] = "";
   bool res = sendMetrics(monReq, errBuf, ERR_BUF_LEN);
@@ -423,6 +434,7 @@ void test_SendMetrics() {
   deleteHandle(&monRes);
   deleteHandle(&invSvc);
   deleteHandle(&monSvc);
+  deleteHandle(&resGroup);
 
   if (!res) {
     fail(errBuf);

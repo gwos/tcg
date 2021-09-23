@@ -72,6 +72,10 @@ func (p *BaseResource) SetDevice(s string) {
 	p.Device = s
 }
 
+func (p BaseResource) ToResourceRef() ResourceRef {
+	return ResourceRef{Name: p.Name, Type: p.Type, Owner: p.Owner}
+}
+
 // InventoryResource represents a resource that is included in a inventory scan.
 // Examples include:
 //  * nagios host
@@ -98,10 +102,6 @@ func (p InventoryResource) String() string {
 		p.Name, p.Type, p.Owner, p.Category, p.Description, p.Properties,
 		p.Device, p.Services,
 	)
-}
-
-func (p *InventoryResource) ToResourceRef() ResourceRef {
-	return ResourceRef{Name: p.Name, Type: p.Type, Owner: p.Owner}
 }
 
 // InventoryService represents a Groundwork Service that is included in a inventory scan.
@@ -144,6 +144,22 @@ type ResourceGroup struct {
 	Resources   []ResourceRef `json:"resources"`
 }
 
+func (p *ResourceGroup) AddResource(res ResourceRef) {
+	p.Resources = append(p.Resources, res)
+}
+
+func (p *ResourceGroup) SetName(s string) {
+	p.GroupName = s
+}
+
+func (p *ResourceGroup) SetType(s GroupType) {
+	p.Type = s
+}
+
+func (p *ResourceGroup) SetDescription(s string) {
+	p.Description = s
+}
+
 // String implements Stringer interface
 func (p ResourceGroup) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s]",
@@ -160,6 +176,10 @@ type InventoryRequest struct {
 
 func (p *InventoryRequest) AddResource(res InventoryResource) {
 	p.Resources = append(p.Resources, res)
+}
+
+func (p *InventoryRequest) AddResourceGroup(gr ResourceGroup) {
+	p.Groups = append(p.Groups, gr)
 }
 
 // String implements Stringer interface
