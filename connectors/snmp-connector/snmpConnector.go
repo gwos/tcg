@@ -119,10 +119,10 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 
 	mrs := connector.mState.retrieveMonitoredResources(metricDefinitions)
 	var irs []transit.InventoryResource
-	var refs []transit.MonitoredResourceRef
+	var refs []transit.ResourceRef
 	for _, mr := range mrs {
 		irs = append(irs, mr.ToInventoryResource())
-		refs = append(refs, mr.ToMonitoredResourceRef())
+		refs = append(refs, mr.ToResourceRef())
 	}
 	rgs := []transit.ResourceGroup{{GroupName: hostGroup, Type: transit.HostGroup, Resources: refs}}
 

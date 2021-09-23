@@ -272,7 +272,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 	groups[clusterHostGroupName] = transit.ResourceGroup{
 		GroupName: clusterHostGroupName,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.MonitoredResourceRef, len(nodes.Items)),
+		Resources: make([]transit.ResourceRef, len(nodes.Items)),
 	}
 	index := 0
 	for _, node := range nodes.Items {
@@ -332,7 +332,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 		}
 		// add to default Cluster group
-		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
+		groups[clusterHostGroupName].Resources[index] = transit.ResourceRef{
 			Name:  resource.Name,
 			Owner: clusterHostGroupName,
 			Type:  transit.ResourceTypeHost,
@@ -379,7 +379,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		}
 		groupsMap[resource.Name] = true
 		if group, ok := groups[podHostGroup]; ok {
-			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+			group.Resources = append(group.Resources, transit.ResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
 				Type:  transit.ResourceTypeHost,
@@ -389,9 +389,9 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			group = transit.ResourceGroup{
 				GroupName: podHostGroup,
 				Type:      transit.HostGroup,
-				Resources: make([]transit.MonitoredResourceRef, 0),
+				Resources: make([]transit.ResourceRef, 0),
 			}
-			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+			group.Resources = append(group.Resources, transit.ResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
 				Type:  transit.ResourceTypeHost,

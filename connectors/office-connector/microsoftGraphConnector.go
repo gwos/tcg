@@ -155,7 +155,7 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 	msGroup := transit.ResourceGroup{
 		GroupName: microsoftGroup,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.MonitoredResourceRef, 0),
+		Resources: make([]transit.ResourceRef, 0),
 	}
 	_ = connector.collectInventory(monitoredState, &msGroup)
 	_ = connector.collectStatus(monitoredState[office365App].Services)
@@ -221,7 +221,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		Services: make(map[string]*transit.MonitoredService),
 	}
 	monitoredState[interacApp] = hostResource
-	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+	group.Resources = append(group.Resources, transit.ResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
 		Type:  transit.ResourceTypeHost,
@@ -364,7 +364,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 		Services: make(map[string]*transit.MonitoredService),
 	}
 	monitoredState[office365App] = hostResource
-	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+	group.Resources = append(group.Resources, transit.ResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
 		Type:  transit.ResourceTypeHost,

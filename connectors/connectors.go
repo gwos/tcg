@@ -168,8 +168,8 @@ func CreateInventoryResource(name string, services []transit.InventoryService) t
 	return resource
 }
 
-func CreateMonitoredResourceRef(name string, owner string, resourceType transit.ResourceType) transit.MonitoredResourceRef {
-	resource := transit.MonitoredResourceRef{
+func CreateResourceRef(name string, owner string, resourceType transit.ResourceType) transit.ResourceRef {
+	resource := transit.ResourceRef{
 		Name:  name,
 		Type:  resourceType,
 		Owner: owner,
@@ -177,7 +177,7 @@ func CreateMonitoredResourceRef(name string, owner string, resourceType transit.
 	return resource
 }
 
-func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.MonitoredResourceRef) transit.ResourceGroup {
+func CreateResourceGroup(name string, description string, groupType transit.GroupType, resources []transit.ResourceRef) transit.ResourceGroup {
 	group := transit.ResourceGroup{
 		GroupName:   name,
 		Type:        groupType,
@@ -188,10 +188,10 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 }
 
 func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
-	var monitoredResourceRefs []transit.MonitoredResourceRef
+	var monitoredResourceRefs []transit.ResourceRef
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
-			transit.MonitoredResourceRef{
+			transit.ResourceRef{
 				Name: resource.BaseResource.Name,
 				Type: resource.BaseResource.Type,
 			},

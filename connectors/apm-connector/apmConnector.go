@@ -24,7 +24,7 @@ import (
 )
 
 var (
-	inventoryGroupsStorage = make(map[string]map[string][]transit.MonitoredResourceRef)
+	inventoryGroupsStorage = make(map[string]map[string][]transit.ResourceRef)
 )
 
 // Resource defines APM Source
@@ -112,7 +112,7 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 			return nil, nil, err
 		}
 	}
-	groups := make(map[string][]transit.MonitoredResourceRef)
+	groups := make(map[string][]transit.ResourceRef)
 	monitoredResources, err := parsePrometheusServices(prometheusServices, groups, resourceIndex)
 	if err != nil {
 		return nil, nil, err
@@ -172,7 +172,7 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 // extracts from Prometheus format to intermediate Host Maps format
 // modifies hostsMap parameter
 func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
-	groups map[string][]transit.MonitoredResourceRef,
+	groups map[string][]transit.ResourceRef,
 	hostsMap map[string]map[string][]connectors.MetricBuilder, resourceIndex int, hostToDeviceMap map[string]string) {
 	var groupName, hostName, serviceName, device string
 
@@ -263,11 +263,11 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 			// add or update the groups collection
 			refs, groupFound := groups[groupName]
 			if !groupFound {
-				refs = []transit.MonitoredResourceRef{}
+				refs = []transit.ResourceRef{}
 				refs = groups[groupName]
 			}
 			if !containsRef(refs, hostName) {
-				groups[groupName] = append(groups[groupName], transit.MonitoredResourceRef{
+				groups[groupName] = append(groups[groupName], transit.ResourceRef{
 					Name: hostName,
 					Type: transit.ResourceTypeHost,
 				})
@@ -279,7 +279,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 	}
 }
 
-func containsRef(refs []transit.MonitoredResourceRef, hostName string) bool {
+func containsRef(refs []transit.ResourceRef, hostName string) bool {
 	for _, host := range refs {
 		if host.Name == hostName {
 			return true
@@ -288,7 +288,7 @@ func containsRef(refs []transit.MonitoredResourceRef, hostName string) bool {
 	return false
 }
 
-func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) []transit.ResourceGroup {
+func constructResourceGroups(groups map[string][]transit.ResourceRef) []transit.ResourceGroup {
 	var resourceGroups []transit.ResourceGroup
 	for groupName, resources := range groups {
 		resourceGroups = append(resourceGroups, transit.ResourceGroup{
@@ -301,7 +301,7 @@ func constructResourceGroups(groups map[string][]transit.MonitoredResourceRef) [
 }
 
 func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
-	groups map[string][]transit.MonitoredResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
+	groups map[string][]transit.ResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
 	var monitoredResources []transit.MonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	hostToDeviceMap := make(map[string]string)

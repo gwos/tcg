@@ -208,10 +208,10 @@ func (monitoringState *MonitoringState) toResourceGroups() []transit.ResourceGro
 	rgs := make([]transit.ResourceGroup, len(groups))
 	j := 0
 	for group, hostsInGroup := range groups {
-		monitoredResourceRefs := make([]transit.MonitoredResourceRef, len(hostsInGroup))
+		monitoredResourceRefs := make([]transit.ResourceRef, len(hostsInGroup))
 		k := 0
 		for host := range hostsInGroup {
-			monitoredResourceRef := connectors.CreateMonitoredResourceRef(host, "", transit.ResourceTypeHost)
+			monitoredResourceRef := connectors.CreateResourceRef(host, "", transit.ResourceTypeHost)
 			monitoredResourceRefs[k] = monitoredResourceRef
 			k++
 		}
