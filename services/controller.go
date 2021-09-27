@@ -453,6 +453,11 @@ func (controller *Controller) version(c *gin.Context) {
 }
 
 func (controller *Controller) checkAccess(c *gin.Context) {
+	if config.GetConfig().IsConfiguringPMC() {
+		log.Info().Str("url", c.Request.URL.Redacted()).
+			Msg("omit access check on configuring PARENT_MANAGED_CHILD")
+		return
+	}
 	if len(controller.dsClient.HostName) == 0 && len(controller.gwClients) == 0 {
 		log.Info().Str("url", c.Request.URL.Redacted()).
 			Msg("omit access check on empty config")
