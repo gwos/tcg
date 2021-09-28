@@ -15,4 +15,7 @@ if ! [ -f "${fs_var}/${connector}/tcg_config.yaml" ]; then
 fi
 
 cd "${fs_var}/${connector}" || exit 1
-"${fs_app}/${connector}/${connector}"
+
+# NOTE: do exec to replace shell process
+# so application will receive OS signals
+exec "${fs_app}/${connector}/${connector}"
