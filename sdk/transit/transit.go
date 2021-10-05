@@ -527,11 +527,30 @@ type TracerContext struct {
 	Version    VersionString `json:"version"`
 }
 
+// SetContext sets values if not empty
+func (p *TracerContext) SetContext(c TracerContext) {
+	if c.AgentID != "" {
+		p.AgentID = c.AgentID
+	}
+	if c.AppType != "" {
+		p.AppType = c.AppType
+	}
+	if c.TraceToken != "" {
+		p.TraceToken = c.TraceToken
+	}
+	if c.Version != "" {
+		p.Version = c.Version
+	}
+	if c.TimeStamp != nil {
+		p.TimeStamp = c.TimeStamp
+	}
+}
+
 // String implements Stringer interface
-func (tracerContext TracerContext) String() string {
+func (p TracerContext) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
-		tracerContext.AppType, tracerContext.AgentID, tracerContext.TraceToken,
-		tracerContext.TimeStamp, tracerContext.Version,
+		p.AppType, p.AgentID, p.TraceToken,
+		p.TimeStamp, p.Version,
 	)
 }
 

@@ -13,6 +13,10 @@ https://stackoverflow.com/questions/27930737/import-c-is-unsupported-in-test-loo
 
 func Test_SetCategory(t *testing.T) { test_SetCategory(t) }
 
+func Test_SetContextTimestamp(t *testing.T) { test_SetContextTimestamp(t) }
+
+func Test_SetContextToken(t *testing.T) { test_SetContextToken(t) }
+
 func Test_SetDescription(t *testing.T) { test_SetDescription(t) }
 
 func Test_SetDevice(t *testing.T) { test_SetDevice(t) }

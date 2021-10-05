@@ -120,6 +120,13 @@ func (p *ResourcesWithServicesRequest) AddResourceGroup(gr ResourceGroup) {
 	p.Groups = append(p.Groups, gr)
 }
 
+func (p *ResourcesWithServicesRequest) SetContext(c TracerContext) {
+	if p.Context == nil {
+		p.Context = new(TracerContext)
+	}
+	p.Context.SetContext(c)
+}
+
 // String implements Stringer interface
 func (p ResourcesWithServicesRequest) String() string {
 	return fmt.Sprintf("[%s, %s]",

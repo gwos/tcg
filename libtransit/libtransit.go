@@ -444,6 +444,7 @@ func CalcStatus(target C.uintptr_t) {
 //export CreateInventoryRequest
 func CreateInventoryRequest() C.uintptr_t {
 	p := new(transit.InventoryRequest)
+	p.Context = services.GetTransitService().MakeTracerContext()
 	p.Resources = []transit.InventoryResource{}
 	return C.uintptr_t(cgo.NewHandle(p))
 }
@@ -501,6 +502,7 @@ func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
 //export CreateResourcesWithServicesRequest
 func CreateResourcesWithServicesRequest() C.uintptr_t {
 	p := new(transit.ResourcesWithServicesRequest)
+	p.Context = services.GetTransitService().MakeTracerContext()
 	p.Resources = []transit.MonitoredResource{}
 	return C.uintptr_t(cgo.NewHandle(p))
 }
@@ -540,6 +542,26 @@ func SetCategory(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetCategory(string) }); ok {
 		hv.SetCategory(C.GoString(value))
+	}
+}
+
+// SetContextTimestamp sets context timestamp value on target
+//export SetContextTimestamp
+func SetContextTimestamp(target C.uintptr_t, sec, nsec C.longlong) {
+	h := cgo.Handle(target)
+	if hv, ok := h.Value().(interface{ SetContext(transit.TracerContext) }); ok {
+		t := transit.NewTimestamp()
+		t.Time = time.Unix(int64(sec), int64(nsec)).UTC()
+		hv.SetContext(transit.TracerContext{TimeStamp: t})
+	}
+}
+
+// SetContextToken sets context token value on target
+//export SetContextToken
+func SetContextToken(target C.uintptr_t, value *C.char) {
+	h := cgo.Handle(target)
+	if hv, ok := h.Value().(interface{ SetContext(transit.TracerContext) }); ok {
+		hv.SetContext(transit.TracerContext{TraceToken: C.GoString(value)})
 	}
 }
 
@@ -806,7 +828,6 @@ func MarshallIndentJSON(
 //export SendInventory
 func SendInventory(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	hv := cgo.Handle(req).Value().(*transit.InventoryRequest)
-	hv.Context = services.GetTransitService().MakeTracerContext()
 	bb, err := json.Marshal(hv)
 	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendInventory")
 	if err != nil {
@@ -825,7 +846,6 @@ func SendInventory(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 //export SendMetrics
 func SendMetrics(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	hv := cgo.Handle(req).Value().(*transit.ResourcesWithServicesRequest)
-	hv.Context = services.GetTransitService().MakeTracerContext()
 	bb, err := json.Marshal(hv)
 	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendMetrics")
 	if err != nil {

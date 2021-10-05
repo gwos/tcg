@@ -46,6 +46,60 @@ func test_SetCategory(t *testing.T) {
 	}
 }
 
+func test_SetContextTimestamp(t *testing.T) {
+	v, v1, v2 := "1609372800000", 1609372800, 0
+	tests := []struct {
+		name   string
+		target interface{}
+		field  string
+	}{{
+		name:   "InventoryRequest",
+		target: new(transit.InventoryRequest),
+		field:  "Context",
+	}, {
+		name:   "InventoryService",
+		target: new(transit.ResourcesWithServicesRequest),
+		field:  "Context",
+	}}
+	for _, it := range tests {
+		t.Run(it.name, func(t *testing.T) {
+			h := cgo.NewHandle(it.target)
+			SetContextTimestamp(C.ulong(h), C.longlong(v1), C.longlong(v2))
+			h.Delete()
+			r := reflect.ValueOf(it.target)
+			f := reflect.Indirect(r).FieldByName(it.field)
+			assert.Equal(t, v, f.Interface().(*transit.TracerContext).TimeStamp.String())
+		})
+	}
+}
+
+func test_SetContextToken(t *testing.T) {
+	value := "test-test"
+	tests := []struct {
+		name   string
+		target interface{}
+		field  string
+	}{{
+		name:   "InventoryRequest",
+		target: new(transit.InventoryRequest),
+		field:  "Context",
+	}, {
+		name:   "InventoryService",
+		target: new(transit.ResourcesWithServicesRequest),
+		field:  "Context",
+	}}
+	for _, it := range tests {
+		t.Run(it.name, func(t *testing.T) {
+			h := cgo.NewHandle(it.target)
+			SetContextToken(C.ulong(h), C.CString(value))
+			h.Delete()
+			r := reflect.ValueOf(it.target)
+			f := reflect.Indirect(r).FieldByName(it.field)
+			assert.Equal(t, value, f.Interface().(*transit.TracerContext).TraceToken)
+		})
+	}
+}
+
 func test_SetDescription(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
