@@ -10,7 +10,6 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
-	"k8s.io/utils/env"
 )
 
 var (
@@ -31,15 +30,6 @@ func main() {
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
-
-	// TODO: get these options from configuration (Views)
-	//////////////////////////////////////////////////////////////////////////////////////////////////
-	tmpSharePointSite := env.GetString("SHAREPOINT_SITE", "site.sharepoint.com")
-	tmpSharePointSubSite := env.GetString("SHAREPOINT_SUBSITE", "GWOS")
-	tmpOutlookEmailAddress := env.GetString("OUTLOOK_EMAIL_ADDRESS", "outlook@site.microsoft.com")
-
-	connector.SetOptions(tmpSharePointSite, tmpSharePointSubSite, tmpOutlookEmailAddress)
-	//////////////////////////////////////////////////////////////////////////////////////////////////
 
 	log.Info().Msg("Waiting for configuration to be delivered ...")
 	if err := transitService.DemandConfig(); err != nil {
@@ -120,6 +110,7 @@ func configHandler(data []byte) {
 	}
 
 	connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
+	connector.SetOptions(extConfig.SharePointSite, extConfig.SharePointSubsite, extConfig.OutlookEmail)
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

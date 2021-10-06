@@ -30,12 +30,15 @@ const (
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	TenantId     string                                                     `json:"officeTenantId"`
-	ClientId     string                                                     `json:"officeClientId"`
-	ClientSecret string                                                     `json:"officeClientSecret"`
-	Ownership    transit.HostOwnershipType                                  `json:"ownership,omitempty"`
-	Groups       []transit.ResourceGroup                                    `json:"groups"`
-	Views        map[MicrosoftGraphView]map[string]transit.MetricDefinition `json:"views"`
+	TenantId          string                                                     `json:"officeTenantId"`
+	ClientId          string                                                     `json:"officeClientId"`
+	ClientSecret      string                                                     `json:"officeClientSecret"`
+	SharePointSite    string                                                     `json:"officeSharePointSite"`
+	SharePointSubsite string                                                     `json:"officeSharePointSubSite"`
+	OutlookEmail      string                                                     `json:"officeOutlookEmail"`
+	Ownership         transit.HostOwnershipType                                  `json:"ownership,omitempty"`
+	Groups            []transit.ResourceGroup                                    `json:"groups"`
+	Views             map[MicrosoftGraphView]map[string]transit.MetricDefinition `json:"views"`
 }
 
 type MicrosoftGraphConnector struct {
@@ -90,21 +93,21 @@ type AuthRecord struct {
 }
 
 var (
-	officeToken  string
-	graphToken   string
-	tenantID     = "" // The Directory ID from Azure AD
-	clientID     = "" // The Application ID of the registered app
-	clientSecret = "" // The secret key of the registered app
-	viewStateMap = map[string]bool{
+	officeToken         string
+	graphToken          string
+	tenantID            = "" // The Directory ID from Azure AD
+	clientID            = "" // The Application ID of the registered app
+	clientSecret        = "" // The secret key of the registered app
+	sharePointSite      = "site.sharepoint.com"
+	sharePointSubSite   = "GWOS"
+	outlookEmailAddress = "outlook@site.microsoft.com"
+	viewStateMap        = map[string]bool{
 		string(ViewOneDrive):   false,
 		string(ViewLicensing):  false,
 		string(ViewSharePoint): false,
 		string(ViewEmail):      false,
 		string(ViewSecurity):   false,
 	}
-	sharePointSite      = "username.sharepoint.com"
-	sharePointSubSite   = "GWOS"
-	outlookEmailAddress = ""
 )
 
 const (
@@ -113,7 +116,7 @@ const (
 	officeEndPoint    = "https://manage.office.com/api/v1.0/"
 	servicesPath      = "/ServiceComms/Services"
 	currentStatusPath = "/ServiceComms/CurrentStatus"
-	microsoftGroup    = "Microsoft Apps"
+	microsoftGroup    = "Office Apps"
 	office365App      = "Office365Services"
 	interacApp        = "Office365Graph"
 )
@@ -125,9 +128,15 @@ func (connector *MicrosoftGraphConnector) SetCredentials(tenant, client, secret 
 }
 
 func (connector *MicrosoftGraphConnector) SetOptions(sharePointSiteParam, sharePointSubSiteParam, outlookEmailAddressParam string) {
-	sharePointSite = sharePointSiteParam
-	sharePointSubSite = sharePointSubSiteParam
-	outlookEmailAddress = outlookEmailAddressParam
+	if sharePointSiteParam != "" {
+		sharePointSite = sharePointSiteParam
+	}
+	if sharePointSubSiteParam != "" {
+		sharePointSubSite = sharePointSubSiteParam
+	}
+	if outlookEmailAddressParam != "" {
+		outlookEmailAddress = outlookEmailAddressParam
+	}
 }
 
 func (connector *MicrosoftGraphConnector) Ping() error {
