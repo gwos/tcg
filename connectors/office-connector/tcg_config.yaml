@@ -1,7 +1,7 @@
 connector:
   agentId: ""
-  appName: OFFICE365
-  appType: OFFICE365
+  appName: OFFICE
+  appType: OFFICE
   controllerAddr: 0.0.0.0:8099
   natsFilestoreDir: natsstore
   natsStoreType: FILE

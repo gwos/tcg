@@ -123,6 +123,9 @@ func ExecuteRequest(graphUri, token string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+		if response.StatusCode != 200 {
+			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphUri, response.StatusCode))
+		}
 	}
 	defer func() {
 		_ = response.Body.Close()
