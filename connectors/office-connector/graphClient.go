@@ -124,6 +124,9 @@ func ExecuteRequest(graphUri, token string) ([]byte, error) {
 			return nil, err
 		}
 		if response.StatusCode != 200 {
+			b, _ := ioutil.ReadAll(response.Body)
+			log.Debug().Msg(fmt.Sprintf("[url=%s][response=%s]", graphUri, string(b)))
+			_ = response.Body.Close()
 			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphUri, response.StatusCode))
 		}
 	}
