@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/PaesslerAG/jsonpath"
+	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 )
 
@@ -30,11 +30,11 @@ func AddonLicenseMetrics(service *transit.DynamicMonitoredService, token string)
 		for i := 0; i < c; i++ {
 			sku, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].skuPartNumber", i), v)
 
-			if definition, ok := containsMetric(metricsProfile.Metrics, "licences.prepaid"); ok {
+			if definition, ok := containsMetric(metricsProfile.Metrics, "subscriptions.prepaid"); ok {
 				prepaid, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].prepaidUnits.enabled", i), v)
 				metric := createMetricWithThresholds(
 					sku.(string),
-					".licences.prepaid",
+					".subscriptions.prepaid",
 					prepaid.(float64),
 					float64(definition.WarningThreshold),
 					float64(definition.CriticalThreshold),
@@ -42,17 +42,19 @@ func AddonLicenseMetrics(service *transit.DynamicMonitoredService, token string)
 				service.Metrics = append(service.Metrics, *metric)
 			}
 
-			if definition, ok := containsMetric(metricsProfile.Metrics, "licences.consumed"); ok {
+			if definition, ok := containsMetric(metricsProfile.Metrics, "subscriptions.consumed"); ok {
 				consumed, _ := jsonpath.Get(fmt.Sprintf("$.value[%d].consumedUnits", i), v)
 				metric := createMetricWithThresholds(
 					sku.(string),
-					".licences.consumed",
+					".subscriptions.consumed",
 					consumed.(float64),
 					float64(definition.WarningThreshold),
 					float64(definition.CriticalThreshold),
 				)
 				service.Metrics = append(service.Metrics, *metric)
 			}
+
+			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
 		}
 	}
 
