@@ -1,25 +1,27 @@
 package main
 
-//#include <stdbool.h>
-//#include <stddef.h>
-//#include <stdint.h>
-//#include <stdlib.h>
-//
-///* getTextHandlerType defines a function type that returns an allocated string.
-// * It should be safe to call `C.free` on it. */
-//typedef char *(*getTextHandlerType) ();
-//
-///* invokeGetTextHandler provides a function call by reference.
-// * https://golang.org/cmd/cgo/#hdr-Go_references_to_C */
-//static char *invokeGetTextHandler(getTextHandlerType fn) {
-//	return fn();
-//}
-//
-//typedef bool (*demandConfigHandler) ();
-//
-//static bool invokeDemandConfigHandler(demandConfigHandler fn) {
-//	return fn();
-//}
+/*
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+// getTextHandlerType defines a function type that returns an allocated string.
+// It should be safe to call `C.free` on it.
+typedef char *(*getTextHandlerType) ();
+
+// invokeGetTextHandler provides a function call by reference.
+// https://golang.org/cmd/cgo/#hdr-Go_references_to_C
+static char *invokeGetTextHandler(getTextHandlerType fn) {
+	return fn();
+}
+
+typedef bool (*demandConfigHandler) ();
+
+static bool invokeDemandConfigHandler(demandConfigHandler fn) {
+	return fn();
+}
+*/
 import "C"
 import (
 	"context"
@@ -103,39 +105,6 @@ func ClearInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 func SetInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
 	if err := services.GetTransitService().
 		SetInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// SendEvents is a C API for services.GetTransitService().SendEvents
-//export SendEvents
-func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SendEvents(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// SendEventsAck is a C API for services.GetTransitService().SendEventsAck
-//export SendEventsAck
-func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SendEventsAck(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// SendEventsUnack is a C API for services.GetTransitService().SendEventsUnack
-//export SendEventsUnack
-func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SendEventsUnack(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
@@ -578,8 +547,8 @@ func SetDescription(target C.uintptr_t, value *C.char) {
 //export SetDevice
 func SetDevice(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
-	if v, ok := h.Value().(interface{ SetDevice(string) }); ok {
-		v.SetDevice(C.GoString(value))
+	if hv, ok := h.Value().(interface{ SetDevice(string) }); ok {
+		hv.SetDevice(C.GoString(value))
 	}
 }
 

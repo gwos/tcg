@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// IncidentAlert describes alerts received from cloud services
+// IncidentAlert describes alerts received from cloud services.
 type IncidentAlert struct {
 	IncidentID    string     `json:"incidentId"`
 	ResourceName  string     `json:"resourceName"`
@@ -16,26 +16,27 @@ type IncidentAlert struct {
 	Summary       string     `json:"summary,omitempty"`
 }
 
-// String implements Stringer interface
-func (incidentAlert IncidentAlert) String() string {
+// String implements Stringer interface.
+func (p IncidentAlert) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
-		incidentAlert.IncidentID, incidentAlert.ResourceName, incidentAlert.Status, incidentAlert.StartedAt.String(),
-		incidentAlert.EndedAt.String(), incidentAlert.ConditionName, incidentAlert.URL, incidentAlert.Summary,
+		p.IncidentID, p.ResourceName, p.Status, p.StartedAt.String(),
+		p.EndedAt.String(), p.ConditionName, p.URL, p.Summary,
 	)
 }
 
-// GroundworkEventsRequest describes request payload
+// GroundworkEventsRequest describes request payload.
 type GroundworkEventsRequest struct {
 	Events []GroundworkEvent `json:"events"`
 }
 
-// String implements Stringer interface
-func (groundworkEventsRequest GroundworkEventsRequest) String() string {
-	return fmt.Sprintf("[%s]", groundworkEventsRequest.Events)
+// String implements Stringer interface.
+func (p GroundworkEventsRequest) String() string {
+	return fmt.Sprintf("[%s]", p.Events)
 }
 
-// GroundworkEvent describes event
+// GroundworkEvent describes event.
 type GroundworkEvent struct {
+	AppType             string     `json:"appType"`
 	Device              string     `json:"device,omitempty"`
 	Host                string     `json:"host"`
 	Service             string     `json:"service,omitempty"`
@@ -50,29 +51,28 @@ type GroundworkEvent struct {
 	TextMessage         string     `json:"textMessage,omitempty"`
 	LastInsertDate      *Timestamp `json:"lastInsertDate,omitempty"`
 	ReportDate          *Timestamp `json:"reportDate"`
-	AppType             string     `json:"appType"`
 	// Update level attributes (update only)
-	MonitorServer     string `json:"monitorServer,omitempty"`
+	ApplicationName   string `json:"applicationName,omitempty"`
 	ConsolidationName string `json:"consolidationName,omitempty"`
-	LogType           string `json:"logType,omitempty"`
 	ErrorType         string `json:"errorType,omitempty"`
 	LoggerName        string `json:"loggerName,omitempty"`
-	ApplicationName   string `json:"applicationName,omitempty"`
+	LogType           string `json:"logType,omitempty"`
+	MonitorServer     string `json:"monitorServer,omitempty"`
 }
 
-// String implements Stringer interface
-func (groundworkEvent GroundworkEvent) String() string {
+// String implements Stringer interface.
+func (p GroundworkEvent) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
-		groundworkEvent.Device, groundworkEvent.Host, groundworkEvent.Service, groundworkEvent.OperationStatus,
-		groundworkEvent.MonitorStatus, groundworkEvent.Severity, groundworkEvent.ApplicationSeverity,
-		groundworkEvent.Component, groundworkEvent.SubComponent, groundworkEvent.Priority, groundworkEvent.TypeRule,
-		groundworkEvent.TextMessage, groundworkEvent.LastInsertDate.String(), groundworkEvent.ReportDate.String(),
-		groundworkEvent.AppType, groundworkEvent.MonitorServer, groundworkEvent.ConsolidationName,
-		groundworkEvent.LogType, groundworkEvent.ErrorType, groundworkEvent.LoggerName, groundworkEvent.ApplicationName,
+		p.AppType, p.Device, p.Host, p.Service,
+		p.OperationStatus, p.MonitorStatus, p.Severity, p.ApplicationSeverity,
+		p.Component, p.SubComponent, p.Priority, p.TypeRule,
+		p.TextMessage, p.LastInsertDate.String(), p.ReportDate.String(),
+		p.ApplicationName, p.ConsolidationName, p.ErrorType,
+		p.LoggerName, p.LogType, p.MonitorServer,
 	)
 }
 
-// GroundworkEventsAckRequest describes request payload
+// GroundworkEventsAckRequest describes request payload.
 type GroundworkEventsAckRequest struct {
 	Acks []GroundworkEventAck `json:"acks"`
 }
@@ -86,15 +86,15 @@ type GroundworkEventAck struct {
 	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
 }
 
-// String implements Stringer interface
-func (groundworkEventAck GroundworkEventAck) String() string {
+// String implements Stringer interface.
+func (p GroundworkEventAck) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
-		groundworkEventAck.AppType, groundworkEventAck.Host, groundworkEventAck.Service,
-		groundworkEventAck.AcknowledgedBy, groundworkEventAck.AcknowledgeComment,
+		p.AppType, p.Host, p.Service,
+		p.AcknowledgedBy, p.AcknowledgeComment,
 	)
 }
 
-// GroundworkEventsUnackRequest describes request payload
+// GroundworkEventsUnackRequest describes request payload.
 type GroundworkEventsUnackRequest struct {
 	Unacks []GroundworkEventUnack `json:"unacks"`
 }
@@ -106,8 +106,8 @@ type GroundworkEventUnack struct {
 	Service string `json:"service,omitempty"`
 }
 
-// String implements Stringer interface
-func (groundworkEventUnack GroundworkEventUnack) String() string {
+// String implements Stringer interface.
+func (p GroundworkEventUnack) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
+		p.AppType, p.Host, p.Service)
 }
