@@ -2,275 +2,124 @@ package main
 
 /*
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
-
-// getTextHandlerType defines a function type that returns an allocated string.
-// It should be safe to call `C.free` on it.
-typedef char *(*getTextHandlerType) ();
-
-// invokeGetTextHandler provides a function call by reference.
-// https://golang.org/cmd/cgo/#hdr-Go_references_to_C
-static char *invokeGetTextHandler(getTextHandlerType fn) {
-	return fn();
-}
-
-typedef bool (*demandConfigHandler) ();
-
-static bool invokeDemandConfigHandler(demandConfigHandler fn) {
-	return fn();
-}
 */
 import "C"
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"os"
 	"runtime/cgo"
 	"time"
-	"unsafe"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
 )
 
-func init() {
-	services.AllowSignalHandlers = false
+// CreateInventoryRequest creates payload for SendInventory API.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateInventoryRequest
+func CreateInventoryRequest() C.uintptr_t {
+	p := new(transit.InventoryRequest)
+	p.Context = services.GetTransitService().MakeTracerContext()
+	p.Resources = []transit.InventoryResource{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-func main() {
+// CreateInventoryResource creates an object used in InventoryRequest.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateInventoryResource
+func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
+	p := new(transit.InventoryResource)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Services = []transit.InventoryService{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// min returns minimum value
-func min(x int, rest ...int) int {
-	m := x
-	for _, y := range rest[:] {
-		if m > y {
-			m = y
-		}
-	}
-	return m
+// CreateInventoryService creates an object used in InventoryResource.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateInventoryService
+func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
+	p := new(transit.InventoryService)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// bufStr puts Go string into C buffer
-func bufStr(buf *C.char, bufLen C.size_t, str string) {
-	NulTermLen := 1
-	if bufLen > 0 {
-		/* cast the buf as big enough then use with length respect */
-		b := (*[4096]byte)(unsafe.Pointer(buf))
-		m := min(4096-NulTermLen, int(bufLen)-NulTermLen, len(str))
-		n := copy(b[:], str[:m])
-		b[n] = 0 /* set nul termination */
-	}
+// CreateMonitoredResource creates an object used in ResourcesWithServicesRequest.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateMonitoredResource
+func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
+	p := new(transit.MonitoredResource)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Services = []transit.MonitoredService{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// msgfBufTooSmall formats a message
-func msgfBufTooSmall(n int) string {
-	return fmt.Sprintf("Buffer too small, need at least %d bytes", n)
+// CreateMonitoredService creates an object used in MonitoredResource.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateMonitoredService
+func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
+	p := new(transit.MonitoredService)
+	p.Name = C.GoString(name)
+	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Metrics = []transit.TimeSeries{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// GoSetenv is for use by a calling application to alter environment variables in
-// a manner that will be understood by the Go runtime.  We need it because the standard
-// C-language putenv() and setenv() routines do not alter the Go environment as intended,
-// due to issues with when os.Getenv() or related routines first get called.  To affect
-// the initial config for the services managed by libtransit, calls to GoSetenv() must be
-// made *before* any call to one of the routines that might probe for or attempt to start,
-// stop, or otherwise interact with one of the services.
-//export GoSetenv
-func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) bool {
-	err := os.Setenv(C.GoString(key), C.GoString(value))
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
+// CreateResourceGroup creates an object used in InventoryRequest and ResourcesWithServicesRequest.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateResourceGroup
+func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
+	p := new(transit.ResourceGroup)
+	p.GroupName = C.GoString(name)
+	p.Type = transit.GroupType(C.GoString(grType))
+	p.Resources = []transit.ResourceRef{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// ClearInDowntime is a C API for services.GetTransitService().ClearInDowntime
-//export ClearInDowntime
-func ClearInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		ClearInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
+// CreateResourcesWithServicesRequest creates payload for SendMetrics API.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateResourcesWithServicesRequest
+func CreateResourcesWithServicesRequest() C.uintptr_t {
+	p := new(transit.ResourcesWithServicesRequest)
+	p.Context = services.GetTransitService().MakeTracerContext()
+	p.Resources = []transit.MonitoredResource{}
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// SetInDowntime is a C API for services.GetTransitService().SetInDowntime
-//export SetInDowntime
-func SetInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SetInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
+// CreateThresholdValue creates an object used in TimeSeries.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateThresholdValue
+func CreateThresholdValue(
+	lbl *C.char,
+	sType *C.char,
+) C.uintptr_t {
+	p := new(transit.ThresholdValue)
+	p.Label = C.GoString(lbl)
+	p.SampleType = transit.MetricSampleType(C.GoString(sType))
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
-//export SendResourcesWithMetrics
-func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SendResourceWithMetrics(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
+// CreateTimeSeries creates an object used in MonitoredResource.
+// It returns a handle that should be deleted after use with DeleteHandle.
+//export CreateTimeSeries
+func CreateTimeSeries(
+	name *C.char,
+) C.uintptr_t {
+	p := new(transit.TimeSeries)
+	p.MetricName = C.GoString(name)
+	return C.uintptr_t(cgo.NewHandle(p))
 }
 
-// SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
-//export SynchronizeInventory
-func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().
-		SynchronizeInventory(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
+// DeleteHandle invalidates a handle.
+// This method should only be called once the C code no longer has a copy of the handle value.
+//export DeleteHandle
+func DeleteHandle(target C.uintptr_t) {
+	cgo.Handle(target).Delete()
 }
-
-// StartController is a C API for services.GetTransitService().StartController
-//export StartController
-func StartController(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StartController(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// StopController is a C API for services.GetTransitService().StopController
-//export StopController
-func StopController(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StopController(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// StartNats is a C API for services.GetTransitService().StartNats
-//export StartNats
-func StartNats(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StartNats(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// StopNats is a C API for services.GetTransitService().StopNats
-//export StopNats
-func StopNats(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StopNats(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// StartTransport is a C API for services.GetTransitService().StartTransport
-//export StartTransport
-func StartTransport(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StartTransport(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// StopTransport is a C API for services.GetTransitService().StopTransport
-//export StopTransport
-func StopTransport(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().StopTransport(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// DemandConfig is a C API for services.GetTransitService().DemandConfig
-//export DemandConfig
-func DemandConfig(errBuf *C.char, errBufLen C.size_t) bool {
-	if err := services.GetTransitService().DemandConfig(); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// IsControllerRunning is a C API for services.GetTransitService().Status().Controller
-//export IsControllerRunning
-func IsControllerRunning() bool {
-	return services.GetTransitService().Status().Controller == services.StatusRunning
-}
-
-// IsNatsRunning is a C API for services.GetTransitService().Status().Nats
-//export IsNatsRunning
-func IsNatsRunning() bool {
-	return services.GetTransitService().Status().Nats == services.StatusRunning
-}
-
-// IsTransportRunning is a C API for services.GetTransitService().Status().Transport
-//export IsTransportRunning
-func IsTransportRunning() bool {
-	return services.GetTransitService().Status().Transport == services.StatusRunning
-}
-
-// RegisterListMetricsHandler is a C API for services.GetTransitService().RegisterListMetricsHandler
-//export RegisterListMetricsHandler
-func RegisterListMetricsHandler(fn C.getTextHandlerType) {
-	/* See notes on getTextHandlerType and invokeGetTextHandler */
-	services.GetTransitService().RegisterListMetricsHandler(func() ([]byte, error) {
-		textPtr := C.invokeGetTextHandler(fn)
-		res := []byte(C.GoString(textPtr))
-		C.free(unsafe.Pointer(textPtr))
-		return res, nil
-	})
-}
-
-// RemoveListMetricsHandler is a C API for services.GetTransitService().RemoveListMetricsHandler
-//export RemoveListMetricsHandler
-func RemoveListMetricsHandler() {
-	services.GetTransitService().RemoveListMetricsHandler()
-}
-
-// RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler
-//export RegisterDemandConfigHandler
-func RegisterDemandConfigHandler(fn C.demandConfigHandler) {
-	services.GetTransitService().RegisterDemandConfigHandler(func() bool {
-		return bool(C.invokeDemandConfigHandler(fn))
-	})
-}
-
-// RemoveDemandConfigHandler is a C API for services.GetTransitService().RemoveDemandConfigHandler()
-//export RemoveDemandConfigHandler
-func RemoveDemandConfigHandler() {
-	services.GetTransitService().RemoveDemandConfigHandler()
-}
-
-// GetAgentIdentity is a C API for getting AgentIdentity
-//export GetAgentIdentity
-func GetAgentIdentity(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	res, err := json.Marshal(services.GetTransitService().Connector.AgentIdentity)
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	cStrLen := len(res) + 1
-	if cStrLen > int(bufLen) {
-		bufStr(errBuf, errBufLen, msgfBufTooSmall(cStrLen))
-		return false
-	}
-	bufStr(buf, bufLen, string(res))
-	return true
-}
-
-/* Extended interface with cgo handles */
 
 // AddMetric appends metric value to target
 //export AddMetric
@@ -407,102 +256,6 @@ func CalcStatus(target C.uintptr_t) {
 		}
 		return
 	}
-}
-
-// CreateInventoryRequest returns a handle
-//export CreateInventoryRequest
-func CreateInventoryRequest() C.uintptr_t {
-	p := new(transit.InventoryRequest)
-	p.Context = services.GetTransitService().MakeTracerContext()
-	p.Resources = []transit.InventoryResource{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateInventoryResource returns a handle
-//export CreateInventoryResource
-func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
-	p := new(transit.InventoryResource)
-	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
-	p.Services = []transit.InventoryService{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateInventoryService returns a handle
-//export CreateInventoryService
-func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
-	p := new(transit.InventoryService)
-	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateMonitoredResource returns a handle
-//export CreateMonitoredResource
-func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
-	p := new(transit.MonitoredResource)
-	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
-	p.Services = []transit.MonitoredService{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateMonitoredService returns a handle
-//export CreateMonitoredService
-func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
-	p := new(transit.MonitoredService)
-	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
-	p.Metrics = []transit.TimeSeries{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateResourceGroup returns a handle
-//export CreateResourceGroup
-func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
-	p := new(transit.ResourceGroup)
-	p.GroupName = C.GoString(name)
-	p.Type = transit.GroupType(C.GoString(grType))
-	p.Resources = []transit.ResourceRef{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateResourcesWithServicesRequest returns a handle
-//export CreateResourcesWithServicesRequest
-func CreateResourcesWithServicesRequest() C.uintptr_t {
-	p := new(transit.ResourcesWithServicesRequest)
-	p.Context = services.GetTransitService().MakeTracerContext()
-	p.Resources = []transit.MonitoredResource{}
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateThresholdValue returns a handle
-//export CreateThresholdValue
-func CreateThresholdValue(
-	lbl *C.char,
-	sType *C.char,
-) C.uintptr_t {
-	p := new(transit.ThresholdValue)
-	p.Label = C.GoString(lbl)
-	p.SampleType = transit.MetricSampleType(C.GoString(sType))
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// CreateTimeSeries returns a handle
-//export CreateTimeSeries
-func CreateTimeSeries(
-	name *C.char,
-) C.uintptr_t {
-	p := new(transit.TimeSeries)
-	p.MetricName = C.GoString(name)
-	return C.uintptr_t(cgo.NewHandle(p))
-}
-
-// DeleteHandle invalidates a handle.
-// This method should only be called once the C code no longer has a copy of the handle value.
-//export DeleteHandle
-func DeleteHandle(target C.uintptr_t) {
-	cgo.Handle(target).Delete()
 }
 
 // SetCategory sets category value on target

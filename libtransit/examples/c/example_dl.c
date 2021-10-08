@@ -103,17 +103,14 @@ bool (*marshallIndentJSON)(uintptr_t target, char *prefix, char *indent,
                            size_t errBufLen) = NULL;
 bool (*sendInventory)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
 bool (*sendMetrics)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
+bool (*sendEvents)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
 
 /* define handlers for general libtransit functions */
-bool (*getAgentIdentity)(char *buf, size_t bufLen, char *errBuf,
-                         size_t errBufLen) = NULL;
+char *(*getAgentId)() = NULL;
+char *(*getAppName)() = NULL;
+char *(*getAppType)() = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
-bool (*sendEvents)(char *payloadJSON, char *errBuf, size_t errBufLen) = NULL;
-bool (*sendResourcesWithMetrics)(char *payloadJSON, char *errBuf,
-                                 size_t errBufLen) = NULL;
-bool (*synchronizeInventory)(char *payloadJSON, char *errBuf,
-                             size_t errBufLen) = NULL;
 void (*registerDemandConfigHandler)(bool (*)()) = NULL;
 
 /* define handlers for other libtransit functions */
@@ -218,14 +215,17 @@ void *example_load_libtransit() {
   marshallIndentJSON = find_symbol(lib_handle, "MarshallIndentJSON");
   sendInventory = find_symbol(lib_handle, "SendInventory");
   sendMetrics = find_symbol(lib_handle, "SendMetrics");
+  sendEvents = find_symbol(lib_handle, "SendEvents");
 
-  getAgentIdentity = find_symbol(lib_handle, "GetAgentIdentity");
+  getAgentId = find_symbol(lib_handle, "GetAgentId");
+  getAppName = find_symbol(lib_handle, "GetAppName");
+  getAppType = find_symbol(lib_handle, "GetAppType");
   goSetenv = find_symbol(lib_handle, "GoSetenv");
+  registerDemandConfigHandler =
+      find_symbol(lib_handle, "RegisterDemandConfigHandler");
   registerListMetricsHandler =
       find_symbol(lib_handle, "RegisterListMetricsHandler");
-  sendEvents = find_symbol(lib_handle, "SendEvents");
-  sendResourcesWithMetrics =
-      find_symbol(lib_handle, "SendResourcesWithMetrics");
+
   isControllerRunning = find_symbol(lib_handle, "IsControllerRunning");
   isNatsRunning = find_symbol(lib_handle, "IsNatsRunning");
   isTransportRunning = find_symbol(lib_handle, "IsTransportRunning");
@@ -235,9 +235,6 @@ void *example_load_libtransit() {
   stopController = find_symbol(lib_handle, "StopController");
   stopNats = find_symbol(lib_handle, "StopNats");
   stopTransport = find_symbol(lib_handle, "StopTransport");
-  registerDemandConfigHandler =
-      find_symbol(lib_handle, "RegisterDemandConfigHandler");
-
   return lib_handle;
 }
 
@@ -287,14 +284,45 @@ void example_libtransit_control() {
     }
   }
 
-  // Check config
-  printf("Testing GetAgentIdentity ...\n");
-  char buf[1024] = "";
-  res = getAgentIdentity(buf, 1024, errBuf, ERR_BUF_LEN);
-  if (!res) {
-    fail(errBuf);
+  char *agent_id = getenv("TCG_CONNECTOR_AGENTID");
+  if (!agent_id) {
+    agent_id = "AGENT-ID";
+    res = goSetenv("TCG_CONNECTOR_AGENTID", agent_id, errBuf, ERR_BUF_LEN);
+    if (!res) {
+      fail(errBuf);
+    }
   }
-  printf("\n%s\n\n", buf);
+
+  char *app_name = getenv("TCG_CONNECTOR_APPNAME");
+  if (!app_name) {
+    app_name = "APPNAME";
+    res = goSetenv("TCG_CONNECTOR_APPNAME", app_name, errBuf, ERR_BUF_LEN);
+    if (!res) {
+      fail(errBuf);
+    }
+  }
+
+  char *app_type = getenv("TCG_CONNECTOR_APPTYPE");
+  if (!app_type) {
+    app_type = "APPTYPE";
+    res = goSetenv("TCG_CONNECTOR_APPTYPE", app_type, errBuf, ERR_BUF_LEN);
+    if (!res) {
+      fail(errBuf);
+    }
+  }
+
+  // Check config
+  printf("Testing GetAgentId ...\n");
+  char *ptr;
+  ptr = getAgentId();
+  printf("\nAgentId: %s\n", ptr);
+  free(ptr);
+  ptr = getAppName();
+  printf("\nAppName: %s\n", ptr);
+  free(ptr);
+  ptr = getAppType();
+  printf("\nAppType: %s\n", ptr);
+  free(ptr);
 
   // If true, force a test of StopNats(), to see if it will generate a segfault
   // if NATS has not previously been started.  If false, skip testing the
@@ -401,8 +429,8 @@ void example_libtransit_control() {
     fprintf(stderr, "%s\n", "Transport still not running");
   }
 
-  printf("Testing RegisterListMetricsHandler ...\n");
-  registerListMetricsHandler(list_metrics_handler);
+  //   printf("Testing RegisterListMetricsHandler ...\n");
+  //   registerListMetricsHandler(list_metrics_handler);
 
   printf("Testing registerDemandConfigHandler ...\n");
   registerDemandConfigHandler(demand_config_handler);
