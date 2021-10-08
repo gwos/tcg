@@ -6,20 +6,22 @@ package main
 #include <stdint.h>
 #include <stdlib.h>
 
-// getTextHandlerType defines a function type that returns an allocated string.
+// textGetterType defines a function type that returns an allocated string.
 // It should be safe to call `C.free` on it.
-typedef char *(*getTextHandlerType) ();
+typedef char *(*textGetterType) ();
 
-// invokeGetTextHandler provides a function call by reference.
+// textSetterType defines a function type that accepts a string.
+typedef void (*textSetterType) (char *);
+
+// invokeTextGetter provides a function call by reference.
 // https://golang.org/cmd/cgo/#hdr-Go_references_to_C
-static char *invokeGetTextHandler(getTextHandlerType fn) {
+static char *invokeTextGetter(textGetterType fn) {
 	return fn();
 }
 
-typedef bool (*demandConfigHandler) ();
-
-static bool invokeDemandConfigHandler(demandConfigHandler fn) {
-	return fn();
+// invokeTextSetter provides a function call by reference.
+static void invokeTextSetter(textSetterType fn, char *p) {
+	return fn(p);
 }
 */
 import "C"
@@ -173,12 +175,12 @@ func IsTransportRunning() C.bool {
 
 // RegisterListMetricsHandler is a C API for services.GetTransitService().RegisterListMetricsHandler
 //export RegisterListMetricsHandler
-func RegisterListMetricsHandler(fn C.getTextHandlerType) {
-	/* See notes on getTextHandlerType and invokeGetTextHandler */
+func RegisterListMetricsHandler(fn C.textGetterType) {
+	/* See notes on textGetterType and invokeTextGetter */
 	services.GetTransitService().RegisterListMetricsHandler(func() ([]byte, error) {
-		textPtr := C.invokeGetTextHandler(fn)
-		res := []byte(C.GoString(textPtr))
-		C.free(unsafe.Pointer(textPtr))
+		ptr := C.invokeTextGetter(fn)
+		res := []byte(C.GoString(ptr))
+		C.free(unsafe.Pointer(ptr))
 		return res, nil
 	})
 }
@@ -189,18 +191,20 @@ func RemoveListMetricsHandler() {
 	services.GetTransitService().RemoveListMetricsHandler()
 }
 
-// RegisterDemandConfigHandler is a C API for services.GetTransitService().RegisterDemandConfigHandler
-//export RegisterDemandConfigHandler
-func RegisterDemandConfigHandler(fn C.demandConfigHandler) {
-	services.GetTransitService().RegisterDemandConfigHandler(func() bool {
-		return bool(C.invokeDemandConfigHandler(fn))
+// RegisterConfigHandler is a C API for services.GetTransitService().RegisterConfigHandler
+//export RegisterConfigHandler
+func RegisterConfigHandler(fn C.textSetterType) {
+	services.GetTransitService().RegisterConfigHandler(func(p []byte) {
+		ptr := C.CString(string(p))
+		C.invokeTextSetter(fn, ptr)
+		C.free(unsafe.Pointer(ptr))
 	})
 }
 
-// RemoveDemandConfigHandler is a C API for services.GetTransitService().RemoveDemandConfigHandler()
-//export RemoveDemandConfigHandler
-func RemoveDemandConfigHandler() {
-	services.GetTransitService().RemoveDemandConfigHandler()
+// RemoveConfigHandler is a C API for services.GetTransitService().RemoveConfigHandler()
+//export RemoveConfigHandler
+func RemoveConfigHandler() {
+	services.GetTransitService().RemoveConfigHandler()
 }
 
 // GetAgentId returns AgentID

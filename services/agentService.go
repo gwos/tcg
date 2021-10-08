@@ -47,9 +47,8 @@ type AgentService struct {
 	tracerToken    []byte                   // gw tracing
 	tracerProvider *tracesdk.TracerProvider // otel tracing
 
-	configHandler       func([]byte)
-	demandConfigHandler func() bool
-	exitHandler         func()
+	configHandler func([]byte)
+	exitHandler   func()
 }
 
 type statsCounter struct {
@@ -108,9 +107,8 @@ func GetAgentService() *AgentService {
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
 
-			configHandler:       defaultConfigHandler,
-			demandConfigHandler: defaultDemandConfigHandler,
-			exitHandler:         defaultExitHandler,
+			configHandler: defaultConfigHandler,
+			exitHandler:   defaultExitHandler,
 		}
 
 		go agentService.listenStatsChan()
@@ -200,8 +198,6 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 
 func defaultConfigHandler([]byte) {}
 
-func defaultDemandConfigHandler() bool { return true }
-
 func defaultExitHandler() {}
 
 // Quit returns channel
@@ -219,16 +215,6 @@ func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
 // RemoveConfigHandler removes callback
 func (service *AgentService) RemoveConfigHandler() {
 	service.configHandler = defaultConfigHandler
-}
-
-// RegisterDemandConfigHandler sets callback
-func (service *AgentService) RegisterDemandConfigHandler(fn func() bool) {
-	service.demandConfigHandler = fn
-}
-
-// RemoveDemandConfigHandler removes callback
-func (service *AgentService) RemoveDemandConfigHandler() {
-	service.demandConfigHandler = defaultDemandConfigHandler
 }
 
 // RegisterExitHandler sets callback
@@ -539,10 +525,6 @@ func (service *AgentService) config(data []byte) error {
 	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
-	// notify C-API config change
-	if success := service.demandConfigHandler(); !success {
-		log.Warn().Msg("demandConfigHandler returned 'false'. Continue with previous inventory.")
-	}
 	// TODO: add logic to avoid processing previous inventory in case of callback fails
 	// stop nats processing
 	_ = service.stopTransport()

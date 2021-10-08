@@ -111,7 +111,7 @@ char *(*getAppName)() = NULL;
 char *(*getAppType)() = NULL;
 bool (*goSetenv)(char *key, char *val, char *errBuf, size_t errBufLen) = NULL;
 void (*registerListMetricsHandler)(char *(*)()) = NULL;
-void (*registerDemandConfigHandler)(bool (*)()) = NULL;
+void (*registerConfigHandler)(void (*)(char *)) = NULL;
 
 /* define handlers for other libtransit functions */
 bool (*isControllerRunning)() = NULL;
@@ -124,7 +124,7 @@ bool (*stopController)(char *errBuf, size_t errBufLen) = NULL;
 bool (*stopNats)(char *errBuf, size_t errBufLen) = NULL;
 bool (*stopTransport)(char *errBuf, size_t errBufLen) = NULL;
 
-/* list_metrics_handler implements getTextHandlerType */
+/* list_metrics_handler implements textGetterType */
 char *list_metrics_handler() {
   printf("\n\n  list_metrics_handler called\n\n");
 
@@ -135,9 +135,9 @@ char *list_metrics_handler() {
   return buf;
 }
 
-bool demand_config_handler() {
-  printf("\n\n  demand_config_handler called\n\n");
-  return true;
+/* config_handler implements textSetterType */
+void config_handler(char *p) {
+  printf("\n\n  config_handler called: %s\n\n", p);
 }
 
 // Follow the full approved procedure for finding a symbol, including all the
@@ -221,8 +221,7 @@ void *example_load_libtransit() {
   getAppName = find_symbol(lib_handle, "GetAppName");
   getAppType = find_symbol(lib_handle, "GetAppType");
   goSetenv = find_symbol(lib_handle, "GoSetenv");
-  registerDemandConfigHandler =
-      find_symbol(lib_handle, "RegisterDemandConfigHandler");
+  registerConfigHandler = find_symbol(lib_handle, "RegisterConfigHandler");
   registerListMetricsHandler =
       find_symbol(lib_handle, "RegisterListMetricsHandler");
 
@@ -429,11 +428,11 @@ void example_libtransit_control() {
     fprintf(stderr, "%s\n", "Transport still not running");
   }
 
-  //   printf("Testing RegisterListMetricsHandler ...\n");
-  //   registerListMetricsHandler(list_metrics_handler);
+  printf("Testing RegisterListMetricsHandler ...\n");
+  registerListMetricsHandler(list_metrics_handler);
 
-  printf("Testing registerDemandConfigHandler ...\n");
-  registerDemandConfigHandler(demand_config_handler);
+  printf("Testing registerConfigHandler ...\n");
+  registerConfigHandler(config_handler);
 
   printf("Testing curl ...\n");
   if (system("curl --version") == 0) {
@@ -445,7 +444,8 @@ void example_libtransit_control() {
     system(sh);
     printf("Testing config entrypoint ...\n");
     snprintf(sh, 1024,
-             "curl -v -w'\n\n' -H'X-PIN:%s' -d '{}' 'http://%s/api/v1/config'",
+             "curl -v -w'\n\n' -H'X-PIN:%s' -d'{\"foo\":\"bar\"}' "
+             "'http://%s/api/v1/config'",
              controller_pin, controller_addr);
     system(sh);
   }
