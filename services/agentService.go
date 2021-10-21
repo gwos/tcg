@@ -102,7 +102,7 @@ func GetAgentService() *AgentService {
 				Nats:       StatusStopped,
 				Transport:  StatusStopped,
 			},
-			dsClient:    &clients.DSClient{DSConnection: config.GetConfig().DSConnection},
+			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
@@ -693,7 +693,7 @@ func (service *AgentService) startTransport() error {
 		gwClients[i] = &clients.GWClient{
 			AppName:      service.AppName,
 			AppType:      service.AppType,
-			GWConnection: cons[i],
+			GWConnection: (*clients.GWConnection)(cons[i]),
 		}
 	}
 	service.gwClients = gwClients

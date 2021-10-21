@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -35,11 +34,31 @@ const (
 	GWEntrypointValidateToken                  = "/api/auth/validatetoken"
 )
 
+// GWConnection defines Groundwork Connection configuration
+type GWConnection struct {
+	ID int `yaml:"id"`
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName            string `yaml:"hostName"`
+	UserName            string `yaml:"userName"`
+	Password            string `yaml:"password"`
+	Enabled             bool   `yaml:"enabled"`
+	IsChild             bool   `yaml:"isChild"`
+	DisplayName         string `yaml:"displayName"`
+	MergeHosts          bool   `yaml:"mergeHosts"`
+	LocalConnection     bool   `yaml:"localConnection"`
+	DeferOwnership      string `yaml:"deferOwnership"`
+	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
+	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
+	SendAllInventory    bool   `yaml:"sendAllInventory"`
+	IsDynamicInventory  bool   `yaml:"-"`
+}
+
 // GWClient implements GW API operations
 type GWClient struct {
 	AppName string
 	AppType string
-	*config.GWConnection
+	*GWConnection
 
 	mu   sync.Mutex
 	once sync.Once
@@ -350,7 +369,7 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 		)
 	}
 
-	if config.GetConfig().Connector.IsDynamicInventory {
+	if client.IsDynamicInventory {
 		return client.sendData(ctx, client.uriSendResourceWithMetricsDynamic, payload)
 	}
 

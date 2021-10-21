@@ -156,7 +156,7 @@ func buildResourceWithMetricsRequest(t *testing.T) []byte {
 func connect(t assert.TestingT) (map[string]string, error) {
 	gwClient := &clients.GWClient{
 		AppName:      config.GetConfig().Connector.AppName,
-		GWConnection: config.GetConfig().GWConnections[0],
+		GWConnection: (*clients.GWConnection)(config.GetConfig().GWConnections[0]),
 	}
 	err := gwClient.Connect()
 	assert.NoError(t, err)

@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/transit"
 	"github.com/kelseyhightower/envconfig"
@@ -182,23 +183,7 @@ type ConnectorDTO struct {
 }
 
 // GWConnection defines Groundwork Connection configuration
-type GWConnection struct {
-	ID int `yaml:"id"`
-	// HostName accepts value for combined "host:port"
-	// used as `url.URL{HostName}`
-	HostName            string `yaml:"hostName"`
-	UserName            string `yaml:"userName"`
-	Password            string `yaml:"password"`
-	Enabled             bool   `yaml:"enabled"`
-	IsChild             bool   `yaml:"isChild"`
-	DisplayName         string `yaml:"displayName"`
-	MergeHosts          bool   `yaml:"mergeHosts"`
-	LocalConnection     bool   `yaml:"localConnection"`
-	DeferOwnership      string `yaml:"deferOwnership"`
-	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
-	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
-	SendAllInventory    bool   `yaml:"sendAllInventory"`
-}
+type GWConnection clients.GWConnection
 
 // MarshalYAML implements yaml.Marshaler interface
 // overrides the password field
@@ -297,16 +282,12 @@ func (cons *GWConnections) Decode(value string) error {
 }
 
 // DSConnection defines DalekServices Connection configuration
-type DSConnection struct {
-	// HostName accepts value for combined "host:port"
-	// used as `url.URL{HostName}`
-	HostName string `yaml:"hostName"`
-}
+type DSConnection clients.DSConnection
 
 // Decode implements envconfig.Decoder interface
 // merges incoming value with existed structure
 func (con *DSConnection) Decode(value string) error {
-	var overrides GWConnection
+	var overrides DSConnection
 	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
 		return err
 	}
@@ -540,6 +521,10 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* process PMC */
 	if cfg.IsConfiguringPMC() {
 		newCfg.Connector.InstallationMode = InstallationModePMC
+	}
+	/* apply dynamic inventory flag to gwConnections */
+	for i := range newCfg.GWConnections {
+		newCfg.GWConnections[i].IsDynamicInventory = newCfg.Connector.IsDynamicInventory
 	}
 	/* update config */
 	*cfg.Connector = *newCfg.Connector
