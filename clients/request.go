@@ -7,18 +7,20 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptrace"
 	"net/url"
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 )
 
 var httpClient = &http.Client{
 	Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	},
+}
+
+var HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
+	return ctx, req
 }
 
 // SendRequest wraps HTTP methods
@@ -53,8 +55,8 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	if ctx == nil {
 		request, err = http.NewRequest(httpMethod, requestURL, body)
 	} else {
-		ctx = httptrace.WithClientTrace(ctx, otelhttptrace.NewClientTrace(ctx))
 		request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
+		_, request = HookRequestContext(ctx, request)
 	}
 	if err != nil {
 		return -1, nil, err
