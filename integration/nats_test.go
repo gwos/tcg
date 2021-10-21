@@ -296,7 +296,7 @@ func inventoryService(i int) transit.DynamicInventoryService {
 func removeHost(t *testing.T) {
 	gwClient := &clients.GWClient{
 		AppName:      config.GetConfig().Connector.AppName,
-		GWConnection: config.GetConfig().GWConnections[0],
+		GWConnection: (*clients.GWConnection)(config.GetConfig().GWConnections[0]),
 	}
 	err := gwClient.Connect()
 	assert.NoError(t, err)

@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gwos/tcg/config"
 	"github.com/rs/zerolog/log"
 )
 
@@ -17,9 +16,16 @@ const (
 	DSEntrypointValidateToken = "/dalekservices/validate-token"
 )
 
+// DSConnection defines DalekServices Connection configuration
+type DSConnection struct {
+	// HostName accepts value for combined "host:port"
+	// used as `url.URL{HostName}`
+	HostName string `yaml:"hostName"`
+}
+
 // DSClient implements DS API operations
 type DSClient struct {
-	*config.DSConnection
+	*DSConnection
 }
 
 // ValidateToken calls API
