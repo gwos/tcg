@@ -36,7 +36,7 @@ require (
 	github.com/prometheus/common v0.30.0
 	github.com/prometheus/prometheus v2.5.0+incompatible
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/rs/zerolog v1.23.0
+	github.com/rs/zerolog v1.25.0
 	github.com/shirou/gopsutil v3.21.6+incompatible
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/gin-swagger v1.3.0
@@ -50,12 +50,10 @@ require (
 	go.opentelemetry.io/otel/sdk v1.1.0
 	go.opentelemetry.io/otel/trace v1.1.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
-	golang.org/x/mod v0.4.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.21.3
 	k8s.io/apimachinery v0.21.3
 	k8s.io/client-go v0.21.3
 	k8s.io/metrics v0.21.3
-	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
 )

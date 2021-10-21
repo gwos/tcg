@@ -646,6 +646,24 @@ func (cfg Config) initLogger() {
 		}))
 	}
 	logger.SetLogger(opts...)
+
+	clients.SetLogger(
+		func(fields interface{}, format string, v ...interface{}) {
+			log.Error().Fields(fields).Msgf(format, v...)
+		},
+		func(fields interface{}, format string, v ...interface{}) {
+			log.Warn().Fields(fields).Msgf(format, v...)
+		},
+		func(fields interface{}, format string, v ...interface{}) {
+			log.Info().Fields(fields).Msgf(format, v...)
+		},
+		func(fields interface{}, format string, v ...interface{}) {
+			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+				log.Debug().Fields(fields).Msgf(format, v...)
+			}
+		},
+		func() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel },
+	)
 }
 
 // Decrypt decrypts small messages
