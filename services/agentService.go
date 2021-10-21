@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -25,7 +26,9 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -114,7 +117,7 @@ func GetAgentService() *AgentService {
 
 		go agentService.listenStatsChan()
 		agentService.initTracerToken()
-		agentService.initTracerProvider()
+		agentService.initOTEL()
 		agentService.handleTasks()
 		if AllowSignalHandlers {
 			agentService.hookInterrupt()
@@ -550,7 +553,7 @@ func (service *AgentService) config(data []byte) error {
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
 	}
-	service.initTracerProvider()
+	service.initOTEL()
 	// start nats processing if enabled
 	if service.Connector.Enabled {
 		_ = service.startTransport()
@@ -774,10 +777,19 @@ func (service *AgentService) initTracerToken() {
 	service.tracerToken = tracerToken
 }
 
-// initTracerProvider inits provider
-func (service *AgentService) initTracerProvider() {
+// initOTEL inits open telemetry
+func (service *AgentService) initOTEL() {
 	if tp, err := config.GetConfig().InitTracerProvider(); err == nil {
 		service.tracerProvider = tp
 		otel.SetTracerProvider(tp)
+	}
+
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{}, propagation.Baggage{}))
+
+	clients.HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
+		ctx, req = otelhttptrace.W3C(ctx, req)
+		otelhttptrace.Inject(ctx, req)
+		return ctx, req
 	}
 }
