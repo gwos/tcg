@@ -31,7 +31,7 @@ type DSClient struct {
 // ValidateToken calls API
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		log.Info().Msg("DSClient is not configured")
+		LogInfo(nil, "DSClient is not configured")
 		return nil
 	}
 
@@ -76,7 +76,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 // Reload calls API
 func (client *DSClient) Reload(agentID string) error {
 	if len(client.HostName) == 0 {
-		log.Info().Msg("DSClient is not configured")
+		LogInfo(nil, "DSClient is not configured")
 		return nil
 	}
 	headers := map[string]string{

@@ -455,13 +455,13 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GwServices, error) 
 	reqURL := client.uriServices + BuildQueryParams(params)
 	response, err := client.sendRequest(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		log.Err(err).Msg("could not get GW services")
+		LogError(obj{"error": err}, "could not get GW services")
 		return nil, err
 	}
 	var gwServices GwServices
 	err = json.Unmarshal(response, &gwServices)
 	if err != nil {
-		log.Err(err).Msg("could not parse received GW services")
+		LogError(obj{"error": err}, "could not parse received GW services")
 		return nil, err
 	}
 	return &gwServices, nil
@@ -489,13 +489,13 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	reqURL := client.uriHostGroups + BuildQueryParams(params)
 	response, err := client.sendRequest(context.Background(), http.MethodGet, reqURL, nil)
 	if err != nil {
-		log.Err(err).Msg("could not get GW host groups")
+		LogError(obj{"error": err}, "could not get GW host groups")
 		return nil, err
 	}
 	var gwHostGroups GwHostGroups
 	err = json.Unmarshal(response, &gwHostGroups)
 	if err != nil {
-		log.Err(err).Msg("could not parse received GW host groups")
+		LogError(obj{"error": err}, "could not parse received GW host groups")
 		return nil, err
 	}
 	return &gwHostGroups, nil
@@ -528,9 +528,9 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	}).SendWithContext(ctx)
 
 	if err == nil && req.Status == 401 {
-		log.Info().Msg("could not send request: reconnecting")
+		LogInfo(nil, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {
-			log.Err(err).Msg("could not send request: could not reconnect")
+			LogError(obj{"error": err}, "could not send request: could not reconnect")
 			return nil, err
 		}
 		req.Headers["GWOS-API-TOKEN"] = client.token
