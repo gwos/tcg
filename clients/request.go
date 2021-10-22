@@ -8,9 +8,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var httpClient = &http.Client{
@@ -111,85 +108,6 @@ type Req struct {
 	URL      string
 }
 
-// LogDetailsWith adds data to log event
-// if argument is nil creates Info or Error depending on Err
-func (q Req) LogDetailsWith(e *zerolog.Event) *zerolog.Event {
-	switch {
-	case e == nil && q.Err != nil:
-		e = log.Error()
-	case e == nil && q.Status >= 400:
-		e = log.Warn()
-	case e == nil:
-		e = log.Info()
-	}
-	e.Err(q.Err).
-		Int("status", q.Status).
-		Str("method", q.Method).
-		Str("url", q.URL)
-	if len(q.Headers) > 0 {
-		e.Interface("headers", q.Headers)
-	}
-	if len(q.Form) > 0 {
-		e.Interface("form", q.Form)
-	}
-	if len(q.Payload) > 0 {
-		if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-			e.RawJSON("payload", q.Payload)
-		} else {
-			e.Bytes("payload", q.Payload)
-		}
-	}
-	if len(q.Response) > 0 {
-		if bytes.HasPrefix(q.Response, []byte(`{`)) {
-			e.RawJSON("response", q.Response)
-		} else {
-			e.Bytes("response", q.Response)
-		}
-	}
-	return e
-}
-
-// LogWith adds data to log event
-// if argument is nil creates Info or Error depending on Err
-// add details on Status >= 400 or Debug
-func (q Req) LogWith(e *zerolog.Event) *zerolog.Event {
-	switch {
-	case e == nil && q.Err != nil:
-		e = log.Error()
-	case e == nil && q.Status >= 400:
-		e = log.Warn()
-	case e == nil:
-		e = log.Info()
-	}
-	e.Err(q.Err).
-		Int("status", q.Status).
-		Str("method", q.Method).
-		Str("url", q.URL)
-	if q.Status >= 400 || zerolog.GlobalLevel() <= zerolog.DebugLevel {
-		if len(q.Headers) > 0 {
-			e.Interface("headers", q.Headers)
-		}
-		if len(q.Form) > 0 {
-			e.Interface("form", q.Form)
-		}
-		if len(q.Payload) > 0 {
-			if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-				e.RawJSON("payload", q.Payload)
-			} else {
-				e.Bytes("payload", q.Payload)
-			}
-		}
-		if len(q.Response) > 0 {
-			if bytes.HasPrefix(q.Response, []byte(`{`)) {
-				e.RawJSON("response", q.Response)
-			} else {
-				e.Bytes("response", q.Response)
-			}
-		}
-	}
-	return e
-}
-
 // Send sends request
 func (q *Req) Send() (*Req, error) {
 	return q.SendWithContext(nil)
@@ -209,4 +127,81 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 	q.Response = response
 	q.Status = status
 	return q, err
+}
+
+// LogFields returns fields maps
+func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
+	rawJSON = map[string][]byte{}
+	fields = map[string]interface{}{
+		"status": q.Status,
+		"method": q.Method,
+		"url":    q.URL,
+	}
+	if q.Err != nil {
+		fields["error"] = q.Err
+	}
+	if q.Status >= 400 || IsDebugEnabled() {
+		if len(q.Headers) > 0 {
+			fields["headers"] = q.Headers
+		}
+		if len(q.Form) > 0 {
+			fields["form"] = q.Form
+		}
+		if len(q.Payload) > 0 {
+			if bytes.HasPrefix(q.Payload, []byte(`{`)) {
+				rawJSON["payload"] = q.Payload
+			} else {
+				fields["payload"] = q.Payload
+			}
+		}
+		if len(q.Response) > 0 {
+			if bytes.HasPrefix(q.Response, []byte(`{`)) {
+				rawJSON["response"] = q.Response
+			} else {
+				fields["response"] = q.Response
+			}
+		}
+	}
+	return
+}
+
+func (q Req) Details() ReqDetails {
+	return (ReqDetails)(q)
+}
+
+// ReqDetails defines an alias for logging with forced details
+type ReqDetails Req
+
+// LogFields returns fields maps
+func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
+	rawJSON = map[string][]byte{}
+	fields = map[string]interface{}{
+		"status": q.Status,
+		"method": q.Method,
+		"url":    q.URL,
+	}
+	if q.Err != nil {
+		fields["error"] = q.Err
+	}
+	if len(q.Headers) > 0 {
+		fields["headers"] = q.Headers
+	}
+	if len(q.Form) > 0 {
+		fields["form"] = q.Form
+	}
+	if len(q.Payload) > 0 {
+		if bytes.HasPrefix(q.Payload, []byte(`{`)) {
+			rawJSON["payload"] = q.Payload
+		} else {
+			fields["payload"] = q.Payload
+		}
+	}
+	if len(q.Response) > 0 {
+		if bytes.HasPrefix(q.Response, []byte(`{`)) {
+			rawJSON["response"] = q.Response
+		} else {
+			fields["response"] = q.Response
+		}
+	}
+	return
 }

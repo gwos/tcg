@@ -39,7 +39,8 @@ var (
 )
 
 // StructLogFn defines log function
-// fields arg can be map[string]interface{} or []interface{} or clients.Req
+// fields arg can be of type: map[string]interface{}, []interface{},
+//   interface{LogFields()(map[string]interface{}, map[string][]byte)}
 type StructLogFn func(fields interface{}, format string, v ...interface{})
 
 // SetLogger sets logging options in one call
@@ -62,13 +63,23 @@ func log2stdlog(logger *stdlog.Logger, fields interface{}, format string, v ...i
 		return
 	}
 	buf := &bytes.Buffer{}
-	if ff, ok := fields.(map[string]interface{}); ok {
+	if ff, ok := fields.(interface {
+		LogFields() (map[string]interface{}, map[string][]byte)
+	}); ok {
+		m1, m2 := ff.LogFields()
+		for k, v := range m1 {
+			fmt.Fprintf(buf, `%s:%s `, k, v)
+		}
+		for k, v := range m2 {
+			fmt.Fprintf(buf, `%s:%s `, k, v)
+		}
+	} else if ff, ok := fields.(map[string]interface{}); ok {
 		for k, v := range ff {
-			fmt.Fprintf(buf, `"%s":"%s" `, k, v)
+			fmt.Fprintf(buf, `%s:%s `, k, v)
 		}
 	} else if ff, ok := fields.([]interface{}); ok {
 		for _, v := range ff {
-			fmt.Fprintf(buf, `"%s" `, v)
+			fmt.Fprintf(buf, `%s `, v)
 		}
 	}
 	if format != "" {
