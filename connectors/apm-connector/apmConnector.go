@@ -420,14 +420,14 @@ func pull(resources []Resource) {
 		}).Send()
 
 		if err != nil {
-			req.LogWith(log.Error()).Msg("could not pull data from resource")
+			clients.LogError(req, "could not pull data from resource")
 			continue
 		}
 		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
-			req.LogDetailsWith(log.Error()).Msg("could not pull data from resource")
+			clients.LogError(req.Details(), "could not pull data from resource")
 			continue
 		}
-		req.LogWith(log.Info()).Msg("pull data from resource")
+		clients.LogInfo(req, "pull data from resource")
 		err = processMetrics(req.Response, index, req.Status == 220, false)
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")

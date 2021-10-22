@@ -649,21 +649,40 @@ func (cfg Config) initLogger() {
 
 	clients.SetLogger(
 		func(fields interface{}, format string, v ...interface{}) {
-			log.Error().Fields(fields).Msgf(format, v...)
+			log2zerolog(zerolog.ErrorLevel, fields, format, v...)
 		},
 		func(fields interface{}, format string, v ...interface{}) {
-			log.Warn().Fields(fields).Msgf(format, v...)
+			log2zerolog(zerolog.WarnLevel, fields, format, v...)
 		},
 		func(fields interface{}, format string, v ...interface{}) {
-			log.Info().Fields(fields).Msgf(format, v...)
+			log2zerolog(zerolog.InfoLevel, fields, format, v...)
 		},
 		func(fields interface{}, format string, v ...interface{}) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				log.Debug().Fields(fields).Msgf(format, v...)
+				log2zerolog(zerolog.DebugLevel, fields, format, v...)
 			}
 		},
 		func() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel },
 	)
+}
+
+func log2zerolog(lvl zerolog.Level, fields interface{}, format string, v ...interface{}) {
+	logger := log.Logger.With().CallerWithSkipFrameCount(4).Logger()
+	e := logger.WithLevel(lvl)
+	if ff, ok := fields.(interface {
+		LogFields() (map[string]interface{}, map[string][]byte)
+	}); ok {
+		m1, m2 := ff.LogFields()
+		e.Fields(m1)
+		for k, v := range m2 {
+			e.RawJSON(k, v)
+		}
+	} else if _, ok := fields.(map[string]interface{}); ok {
+		e.Fields(fields)
+	} else if _, ok := fields.([]interface{}); ok {
+		e.Fields(fields)
+	}
+	e.Msgf(format, v...)
 }
 
 // Decrypt decrypts small messages

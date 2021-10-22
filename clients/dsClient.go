@@ -6,8 +6,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-
-	"github.com/rs/zerolog/log"
 )
 
 // Define entrypoints for DSOperations
@@ -58,18 +56,20 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if err == nil {
 		if req.Status == 201 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				req.LogWith(log.Debug()).Msg("validate token")
+				LogDebug(req, "validate token")
 				return nil
 			}
 			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
-			req.LogWith(log.Warn()).Err(eee).Msg("could not validate token")
+			req.Err = eee
+			LogWarn(req, "could not validate token")
 			return eee
 		}
 		eee := fmt.Errorf(string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not validate token")
+		req.Err = eee
+		LogWarn(req.Details(), "could not validate token")
 		return eee
 	}
-	req.LogWith(log.Warn()).Msg("could not validate token")
+	LogWarn(req, "could not validate token")
 	return err
 }
 
@@ -96,17 +96,19 @@ func (client *DSClient) Reload(agentID string) error {
 
 	if err == nil {
 		if req.Status == 201 {
-			req.LogWith(log.Info()).Msg("request for reload")
+			LogInfo(req, "request for reload")
 			return nil
 		}
 		eee := fmt.Errorf(string(req.Response))
 		if req.Status == 404 {
-			req.LogWith(log.Warn()).Err(eee).Msg("could not request for reload: check AgentID")
+			req.Err = eee
+			LogWarn(req, "could not request for reload: check AgentID")
 		}
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not request for reload")
+		req.Err = eee
+		LogWarn(req.Details(), "could not request for reload")
 		return eee
 	}
-	req.LogWith(log.Warn()).Msg("could not request for reload")
+	LogWarn(req, "could not request for reload")
 	return err
 }
 

@@ -12,8 +12,6 @@ import (
 	"sync"
 
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 // Define entrypoints
@@ -143,7 +141,7 @@ func (client *GWClient) connectLocal() (string, error) {
 
 	switch {
 	case err != nil:
-		req.LogWith(log.Error()).Msg("could not connect local groundwork")
+		LogError(req, "could not connect local groundwork")
 		if tcgerr.IsErrorConnection(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -152,25 +150,29 @@ func (client *GWClient) connectLocal() (string, error) {
 	case req.Status == 401 ||
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		req.Err = eee
+		LogWarn(req, "could not connect local groundwork")
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		req.Err = eee
+		LogWarn(req, "could not connect local groundwork")
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		req.Err = eee
+		LogWarn(req, "could not connect local groundwork")
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not connect local groundwork")
+		req.Err = eee
+		LogWarn(req.Details(), "could not connect local groundwork")
 		return "", eee
 	}
-	req.LogWith(log.Info()).Msg("connect local groundwork")
+	LogInfo(req, "connect local groundwork")
 	return string(req.Response), nil
 }
 
@@ -195,7 +197,7 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 
 	switch {
 	case err != nil:
-		req.LogWith(log.Error()).Msg("could not authenticate password")
+		LogError(req, "could not authenticate password")
 		if tcgerr.IsErrorConnection(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -204,22 +206,26 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	case req.Status == 401 ||
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		req.Err = eee
+		LogWarn(req, "could not authenticate password")
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		req.Err = eee
+		LogWarn(req, "could not authenticate password")
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		req.Err = eee
+		LogWarn(req, "could not authenticate password")
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not authenticate password")
+		req.Err = eee
+		LogWarn(req.Details(), "could not authenticate password")
 		return "", eee
 	}
 
@@ -229,19 +235,14 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	}
 	user := UserResponse{AccessToken: ""}
 	if err := json.Unmarshal(req.Response, &user); err != nil {
-		req.LogDetailsWith(log.Warn()).
-			AnErr("parsingError", err).
-			Msg("could not authenticate password")
+		LogWarn(req.Details(), "could not authenticate password: parsingError: %s", err)
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	req.LogWith(log.Info()).
-		Func(func(e *zerolog.Event) {
-			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.Str("userName", user.Name).
-					Str("userToken", user.AccessToken)
-			}
-		}).
-		Msg("authenticate password")
+	if IsDebugEnabled() {
+		LogInfo(req, "authenticate password: userName: %s", user.Name)
+	} else {
+		LogInfo(req, "authenticate password")
+	}
 	return user.AccessToken, nil
 }
 
@@ -265,7 +266,7 @@ func (client *GWClient) Disconnect() error {
 
 	switch {
 	case err != nil:
-		req.LogWith(log.Error()).Msg("could not disconnect groundwork")
+		LogError(req, "could not disconnect groundwork")
 		if tcgerr.IsErrorConnection(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -273,25 +274,29 @@ func (client *GWClient) Disconnect() error {
 
 	case req.Status == 401:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		req.Err = eee
+		LogWarn(req, "could not disconnect groundwork")
 		return eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		req.Err = eee
+		LogWarn(req, "could not disconnect groundwork")
 		return eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		req.Err = eee
+		LogWarn(req, "could not disconnect groundwork")
 		return eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not disconnect groundwork")
+		req.Err = eee
+		LogWarn(req.Details(), "could not disconnect groundwork")
 		return eee
 	}
-	req.LogWith(log.Info()).Msg("disconnect groundwork")
+	LogInfo(req, "disconnect groundwork")
 	return nil
 }
 
@@ -316,19 +321,21 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	if err == nil {
 		if req.Status == 200 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				req.LogWith(log.Debug()).Msg("validate groundwork token")
+				LogDebug(req, "validate groundwork token")
 				return nil
 			}
 			eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
-			req.LogWith(log.Warn()).Err(eee).Msg("could not validate groundwork token")
+			req.Err = eee
+			LogWarn(req, "could not validate groundwork token")
 			return eee
 		}
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not validate groundwork token")
+		req.Err = eee
+		LogWarn(req.Details(), "could not validate groundwork token")
 		return eee
 	}
 
-	req.LogWith(log.Error()).Msg("could not validate groundwork token")
+	LogError(req, "could not validate groundwork token")
 	if tcgerr.IsErrorConnection(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
@@ -539,7 +546,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 
 	switch {
 	case err != nil:
-		req.LogWith(log.Error()).Msg("could not send request")
+		LogError(req, "could not send request")
 		if tcgerr.IsErrorConnection(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -547,25 +554,29 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 
 	case req.Status == 401:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		req.Err = eee
+		LogWarn(req, "could not send request")
 		return nil, eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		req.Err = eee
+		LogWarn(req, "could not send request")
 		return nil, eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
-		req.LogWith(log.Warn()).Err(eee).Msg("could not send request")
+		req.Err = eee
+		LogWarn(req, "could not send request")
 		return nil, eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		req.LogDetailsWith(log.Warn()).Err(eee).Msg("could not send request")
+		req.Err = eee
+		LogWarn(req.Details(), "could not send request")
 		return nil, eee
 	}
-	req.LogWith(log.Info()).Msg("send request")
+	LogInfo(req, "send request")
 	return req.Response, nil
 }
 
