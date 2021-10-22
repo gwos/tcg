@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/gwos/tcg/logper"
 )
 
 // Define entrypoints for DSOperations
@@ -29,7 +31,7 @@ type DSClient struct {
 // ValidateToken calls API
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		LogInfo(nil, "DSClient is not configured")
+		logper.LogInfo(nil, "DSClient is not configured")
 		return nil
 	}
 
@@ -56,27 +58,27 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if err == nil {
 		if req.Status == 201 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				LogDebug(req, "validate token")
+				logper.LogDebug(req, "validate token")
 				return nil
 			}
 			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
-			LogWarn(req, "could not validate token")
+			logper.LogWarn(req, "could not validate token")
 			return eee
 		}
 		eee := fmt.Errorf(string(req.Response))
 		req.Err = eee
-		LogWarn(req.Details(), "could not validate token")
+		logper.LogWarn(req.Details(), "could not validate token")
 		return eee
 	}
-	LogWarn(req, "could not validate token")
+	logper.LogWarn(req, "could not validate token")
 	return err
 }
 
 // Reload calls API
 func (client *DSClient) Reload(agentID string) error {
 	if len(client.HostName) == 0 {
-		LogInfo(nil, "DSClient is not configured")
+		logper.LogInfo(nil, "DSClient is not configured")
 		return nil
 	}
 	headers := map[string]string{
@@ -96,19 +98,19 @@ func (client *DSClient) Reload(agentID string) error {
 
 	if err == nil {
 		if req.Status == 201 {
-			LogInfo(req, "request for reload")
+			logper.LogInfo(req, "request for reload")
 			return nil
 		}
 		eee := fmt.Errorf(string(req.Response))
 		if req.Status == 404 {
 			req.Err = eee
-			LogWarn(req, "could not request for reload: check AgentID")
+			logper.LogWarn(req, "could not request for reload: check AgentID")
 		}
 		req.Err = eee
-		LogWarn(req.Details(), "could not request for reload")
+		logper.LogWarn(req.Details(), "could not request for reload")
 		return eee
 	}
-	LogWarn(req, "could not request for reload")
+	logper.LogWarn(req, "could not request for reload")
 	return err
 }
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/gwos/tcg/logper"
 	"github.com/gwos/tcg/milliseconds"
-	"github.com/rs/zerolog/log"
 )
 
 // VersionString defines type of constant
@@ -576,7 +576,8 @@ func (monitoredService *DynamicMonitoredService) CreateProperties(properties map
 		var typedValue TypedValue
 		err := typedValue.toTypedValue(v)
 		if err != nil {
-			log.Err(err).Msgf("could not create property %s of service %s", k, monitoredService.Name)
+			logper.LogError(nil, "could not create property %s of service %s: %s",
+				k, monitoredService.Name, err)
 		}
 		monitoredService.CreateProperty(k, typedValue)
 	}

@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+
+	"github.com/gwos/tcg/logper"
 )
 
 var httpClient = &http.Client{
@@ -140,7 +142,7 @@ func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]by
 	if q.Err != nil {
 		fields["error"] = q.Err
 	}
-	if q.Status >= 400 || IsDebugEnabled() {
+	if q.Status >= 400 || logper.IsDebugEnabled() {
 		if len(q.Headers) > 0 {
 			fields["headers"] = q.Headers
 		}
