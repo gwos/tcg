@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/logper"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/transit"
@@ -420,14 +421,14 @@ func pull(resources []Resource) {
 		}).Send()
 
 		if err != nil {
-			clients.LogError(req, "could not pull data from resource")
+			logper.LogError(req, "could not pull data from resource")
 			continue
 		}
 		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
-			clients.LogError(req.Details(), "could not pull data from resource")
+			logper.LogError(req.Details(), "could not pull data from resource")
 			continue
 		}
-		clients.LogInfo(req, "pull data from resource")
+		logper.LogInfo(req, "pull data from resource")
 		err = processMetrics(req.Response, index, req.Status == 220, false)
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")

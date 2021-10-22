@@ -1,4 +1,5 @@
-package clients
+// Package logper provides logger wrapper preventing external dependencies in library
+package logper
 
 import (
 	"bytes"
@@ -8,7 +9,7 @@ import (
 	"os"
 )
 
-/* by default there is logging based on stdlog with disabled debug */
+// By default there is logging based on stdlog with disabled debug
 var (
 	flags       = stdlog.Lmsgprefix | stdlog.Lshortfile | stdlog.LUTC
 	stdlogError = stdlog.New(os.Stderr, "ERR:", flags)
@@ -17,19 +18,19 @@ var (
 	stdlogDebug = stdlog.New(os.Stderr, "DBG:", flags)
 
 	// LogError do struct logging with Error level
-	LogError StructLogFn = func(fields interface{}, format string, v ...interface{}) {
+	LogError LogFn = func(fields interface{}, format string, v ...interface{}) {
 		log2stdlog(stdlogError, fields, format, v...)
 	}
 	// LogWarn do struct logging with Warning level
-	LogWarn StructLogFn = func(fields interface{}, format string, v ...interface{}) {
+	LogWarn LogFn = func(fields interface{}, format string, v ...interface{}) {
 		log2stdlog(stdlogWarn, fields, format, v...)
 	}
 	// LogInfo do struct logging with Info level
-	LogInfo StructLogFn = func(fields interface{}, format string, v ...interface{}) {
+	LogInfo LogFn = func(fields interface{}, format string, v ...interface{}) {
 		log2stdlog(stdlogInfo, fields, format, v...)
 	}
 	// LogDebug do struct logging with Debug level
-	LogDebug StructLogFn = func(fields interface{}, format string, v ...interface{}) {
+	LogDebug LogFn = func(fields interface{}, format string, v ...interface{}) {
 		if IsDebugEnabled() {
 			log2stdlog(stdlogDebug, fields, format, v...)
 		}
@@ -38,17 +39,17 @@ var (
 	IsDebugEnabled = func() bool { return false }
 )
 
-// StructLogFn defines log function
+// LogFn defines log function
 // fields arg can be of type: map[string]interface{}, []interface{},
 //   interface{LogFields()(map[string]interface{}, map[string][]byte)}
-type StructLogFn func(fields interface{}, format string, v ...interface{})
+type LogFn func(fields interface{}, format string, v ...interface{})
 
 // SetLogger sets logging options in one call
 func SetLogger(
-	logError StructLogFn,
-	logWarn StructLogFn,
-	logInfo StructLogFn,
-	logDebug StructLogFn,
+	logError LogFn,
+	logWarn LogFn,
+	logInfo LogFn,
+	logDebug LogFn,
 	isDebugEnabled func() bool,
 ) {
 	LogError = logError
@@ -87,6 +88,3 @@ func log2stdlog(logger *stdlog.Logger, fields interface{}, format string, v ...i
 	}
 	logger.Output(2, buf.String())
 }
-
-// obj defines a short alias
-type obj map[string]interface{}

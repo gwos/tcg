@@ -16,6 +16,7 @@ import (
 
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/logper"
 	"github.com/gwos/tcg/transit"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
@@ -647,7 +648,7 @@ func (cfg Config) initLogger() {
 	}
 	logger.SetLogger(opts...)
 
-	clients.SetLogger(
+	logper.SetLogger(
 		func(fields interface{}, format string, v ...interface{}) {
 			log2zerolog(zerolog.ErrorLevel, fields, format, v...)
 		},
