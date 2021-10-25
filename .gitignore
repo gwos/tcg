@@ -7,7 +7,6 @@
 *.dylib
 *.iml
 tcg
-test_libtransit
 connectors/*-connector/*-connector
 examples/apm/pull/go/go
 
@@ -30,24 +29,6 @@ vendor
 # NATS Datastore
 natsstore
 natsstore.test
-
-# Compiled Go-to-C conversion tool
-gotocjson/gotocjson
-
-# Conversion tool built test artifacts
-gotocjson/gotocjson/config.h
-gotocjson/gotocjson/config.c
-gotocjson/gotocjson/milliseconds.h
-gotocjson/gotocjson/milliseconds.c
-gotocjson/gotocjson/transit.h
-gotocjson/gotocjson/transit.c
-gotocjson/gotocjson/enum.h
-gotocjson/gotocjson/enum.c
-gotocjson/gotocjson/unittest
-
-# Source and build artifacts
-*.tar.gz
-jansson-2.12/*
 
 # Old location for build artfacts, ignored just for safety
 local/*
