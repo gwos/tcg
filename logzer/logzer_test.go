@@ -1,4 +1,4 @@
-package logger
+package logzer
 
 import (
 	"bytes"
@@ -17,9 +17,13 @@ func TestLogCondense(t *testing.T) {
 	logFile, _ := ioutil.TempFile("", "log")
 	defer os.Remove(logFile.Name())
 
-	SetLogger(
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	w := NewLoggerWriter(
 		WithCondense(time.Millisecond*2),
 		WithLogFile(&LogFile{FilePath: logFile.Name()}))
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
 	logfun := func(lvl zerolog.Level, msg string) { log.WithLevel(lvl).Msg(msg) }
 	logfun(zerolog.DebugLevel, "message debug")
 	logfun(zerolog.InfoLevel, "message info")
@@ -42,7 +46,11 @@ func TestLogFilter(t *testing.T) {
 	assert.NoError(t, logFile.Close())
 	defer os.Remove(logFile.Name())
 
-	SetLogger(WithLogFile(&LogFile{FilePath: logFile.Name()}))
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	w := NewLoggerWriter(WithLogFile(&LogFile{FilePath: logFile.Name()}))
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
 	payload1, _ := json.Marshal(struct{ Password, Token string }{
 		Password: `PASS
 		WORD`,
@@ -80,11 +88,15 @@ func TestLogRotate(t *testing.T) {
 	defer os.Remove(logFile.Name() + ".2")
 	defer os.Remove(logFile.Name() + ".3")
 
-	SetLogger(WithLogFile(&LogFile{
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	w := NewLoggerWriter(WithLogFile(&LogFile{
 		FilePath: logFile.Name(),
 		MaxSize:  200,
 		Rotate:   3,
 	}))
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
 
 	log.Debug().Msg("message debug1")
 	log.Info().Msg("message info1")

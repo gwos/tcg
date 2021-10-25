@@ -18,7 +18,7 @@ import (
 	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
-	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/taskQueue"
@@ -328,7 +328,7 @@ func (service *AgentService) Stats() AgentStatsExt {
 	return AgentStatsExt{
 		AgentIdentity: service.Connector.AgentIdentity,
 		AgentStats:    *service.agentStats,
-		LastErrors:    logger.LastErrors(),
+		LastErrors:    logzer.LastErrors(),
 	}
 }
 

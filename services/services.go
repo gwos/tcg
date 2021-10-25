@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gwos/tcg/logger"
+	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/transit"
@@ -55,7 +55,7 @@ type AgentStats struct {
 type AgentStatsExt struct {
 	transit.AgentIdentity
 	AgentStats
-	LastErrors []logger.LogRecord `json:"lastErrors"`
+	LastErrors []logzer.LogRecord `json:"lastErrors"`
 }
 
 // AgentStatus defines TCG Agent status

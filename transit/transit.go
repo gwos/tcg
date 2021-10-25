@@ -576,7 +576,7 @@ func (monitoredService *DynamicMonitoredService) CreateProperties(properties map
 		var typedValue TypedValue
 		err := typedValue.toTypedValue(v)
 		if err != nil {
-			logper.LogError(nil, "could not create property %s of service %s: %s",
+			logper.Error(nil, "could not create property %s of service %s: %s",
 				k, monitoredService.Name, err)
 		}
 		monitoredService.CreateProperty(k, typedValue)
