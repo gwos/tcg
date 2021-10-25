@@ -460,12 +460,12 @@ func process_parse_nodes(
 			include_headers = append(include_headers, fmt.Sprintf(`#include "%s.h"`, "time"))
 		}
 		// In general, we need to handle cross-package references in the converted Go application code.
-		// That said, references to the "logger" package we supply do not need any such special handling,
+		// That said, references to the "logper" package we supply do not need any such special handling,
 		// because we won't actually be creating conversion routines for any datatypes in that package.
-		// The special-case handling here of that package prevents a #include "logger.h" directive from
+		// The special-case handling here of that package prevents a #include "logper.h" directive from
 		// being emitted, inasmuch as that header will never be available.
 		special_package := special_package_prefix.FindStringSubmatch(pkg)
-		if special_package != nil && special_package[1] != "logger" {
+		if special_package != nil && special_package[1] != "logper" {
 			include_headers = append(include_headers, fmt.Sprintf(`#include "%s.h"`, special_package[1]))
 		}
 	}

@@ -421,14 +421,14 @@ func pull(resources []Resource) {
 		}).Send()
 
 		if err != nil {
-			logper.LogError(req, "could not pull data from resource")
+			logper.Error(req, "could not pull data from resource")
 			continue
 		}
 		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
-			logper.LogError(req.Details(), "could not pull data from resource")
+			logper.Error(req.Details(), "could not pull data from resource")
 			continue
 		}
-		logper.LogInfo(req, "pull data from resource")
+		logper.Info(req, "pull data from resource")
 		err = processMetrics(req.Response, index, req.Status == 220, false)
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")

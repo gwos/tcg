@@ -1,4 +1,5 @@
-package logger
+// Package logzer provides customized logger based on zerolog
+package logzer
 
 import (
 	"container/ring"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -208,15 +208,11 @@ type LogRecord struct {
 // MarshalJSON implements Marshaller interface
 func (p LogRecord) MarshalJSON() ([]byte, error) { return p.buf, nil }
 
-// Option defines logger option type
+// Option defines writer option type
 type Option func()
 
-// SetLogger sets logger with options
-func SetLogger(opts ...Option) {
-	/* prevent writes */
-	log.Logger = zerolog.Nop()
-	/* reset to defaults */
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+// NewLoggerWriter returns writer
+func NewLoggerWriter(opts ...Option) io.Writer {
 	if logFile != nil {
 		logFile.Close()
 		logFile = nil
@@ -232,10 +228,8 @@ func SetLogger(opts ...Option) {
 	if logFile != nil {
 		formatter.Out = zerolog.MultiLevelWriter(os.Stdout, logFile)
 	}
-	/* set logger */
-	log.Logger = zerolog.New(condenser).
-		With().Timestamp().Caller().
-		Logger()
+	/* return writer */
+	return condenser
 }
 
 // WithLastErrors sets count of buffered writes

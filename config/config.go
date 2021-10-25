@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"path"
@@ -15,8 +14,8 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/logger"
 	"github.com/gwos/tcg/logper"
+	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/transit"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
@@ -39,6 +38,8 @@ var (
 
 	once sync.Once
 	cfg  *Config
+
+	liblogger zerolog.Logger
 )
 
 // BuildInfo describes the build properties
@@ -360,7 +361,7 @@ func defaults() Config {
 func GetConfig() *Config {
 	once.Do(func() {
 		/* buffer the logging while configuring */
-		logBuf := &logger.LogBuffer{
+		logBuf := &logzer.LogBuffer{
 			Level: zerolog.TraceLevel,
 			Size:  16,
 		}
@@ -370,7 +371,7 @@ func GetConfig() *Config {
 
 		c := defaults()
 		cfg = &c
-		if data, err := ioutil.ReadFile(cfg.ConfigPath()); err != nil {
+		if data, err := os.ReadFile(cfg.ConfigPath()); err != nil {
 			log.Warn().Err(err).
 				Str("configPath", cfg.ConfigPath()).
 				Msg("could not read config")
@@ -387,7 +388,7 @@ func GetConfig() *Config {
 				Msg("could not process config environment")
 		}
 		cfg.initLogger()
-		logger.WriteLogBuffer(logBuf)
+		logzer.WriteLogBuffer(logBuf)
 	})
 	return cfg
 }
@@ -478,7 +479,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	c := defaults()
 	newCfg := &c
 	/* load config file */
-	if data, err := ioutil.ReadFile(newCfg.ConfigPath()); err != nil {
+	if data, err := os.ReadFile(newCfg.ConfigPath()); err != nil {
 		log.Warn().Err(err).
 			Str("configPath", cfg.ConfigPath()).
 			Msg("could not read config")
@@ -507,7 +508,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		log.Err(err).
 			Msg("could not prepare config for writing")
 	} else {
-		if err := ioutil.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
+		if err := os.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
 			log.Err(err).
 				Str("configPath", newCfg.ConfigPath()).
 				Msg("could not write config")
@@ -632,21 +633,35 @@ func (cfg Config) initJaegertracing() (*tracesdk.TracerProvider, error) {
 }
 
 func (cfg Config) initLogger() {
-	opts := []logger.Option{
-		logger.WithCondense(cfg.Connector.LogCondense),
-		logger.WithLastErrors(10),
-		logger.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
-		logger.WithNoColor(cfg.Connector.LogNoColor),
-		logger.WithTimeFormat(cfg.Connector.LogTimeFormat),
+	opts := []logzer.Option{
+		logzer.WithCondense(cfg.Connector.LogCondense),
+		logzer.WithLastErrors(10),
+		logzer.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
+		logzer.WithNoColor(cfg.Connector.LogNoColor),
+		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
 	}
 	if cfg.Connector.LogFile != "" {
-		opts = append(opts, logger.WithLogFile(&logger.LogFile{
+		opts = append(opts, logzer.WithLogFile(&logzer.LogFile{
 			FilePath: cfg.Connector.LogFile,
 			MaxSize:  cfg.Connector.LogFileMaxSize,
 			Rotate:   cfg.Connector.LogFileRotate,
 		}))
 	}
-	logger.SetLogger(opts...)
+
+	/* prevent writes in global logger */
+	log.Logger = zerolog.Nop()
+	/* reset to defaults */
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	/* apply options */
+	w := logzer.NewLoggerWriter(opts...)
+	/* set global logger */
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
+	/* set wrapped logger */
+	liblogger = zerolog.New(w).
+		With().Timestamp().CallerWithSkipFrameCount(4).
+		Logger()
 
 	logper.SetLogger(
 		func(fields interface{}, format string, v ...interface{}) {
@@ -668,8 +683,7 @@ func (cfg Config) initLogger() {
 }
 
 func log2zerolog(lvl zerolog.Level, fields interface{}, format string, v ...interface{}) {
-	logger := log.Logger.With().CallerWithSkipFrameCount(4).Logger()
-	e := logger.WithLevel(lvl)
+	e := liblogger.WithLevel(lvl)
 	if ff, ok := fields.(interface {
 		LogFields() (map[string]interface{}, map[string][]byte)
 	}); ok {

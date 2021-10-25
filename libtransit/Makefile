@@ -23,7 +23,7 @@ echo:
 	@echo Build info: ${BUILD_TAG} / ${BUILD_TIME}
 
 # Build shared lib and set build info values with Go linker
-libtransit.h libtransit.so	: libtransit.go ../config/config.go ../milliseconds/milliseconds.go ../transit/*.go ../services/*.go ../logger/*.go
+libtransit.h libtransit.so	: libtransit.go ../config/config.go ../milliseconds/milliseconds.go ../transit/*.go ../services/*.go ../logper/*.go
 	go build \
 		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' -X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" \
 		-buildmode=c-shared -o libtransit.so libtransit.go

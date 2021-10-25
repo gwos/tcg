@@ -155,7 +155,7 @@ dsConnection:
 	assert.Equal(t, expected.DSConnection, cfg.DSConnection)
 	assert.Equal(t, expected.GWConnections, cfg.GWConnections)
 
-	data, err := ioutil.ReadFile(tmpFile.Name())
+	data, err := os.ReadFile(tmpFile.Name())
 	assert.NoError(t, err)
 	assert.Contains(t, string(data), "99998888-7777-6666-a3b0-b14622f7dd39")
 	assert.Contains(t, string(data), "controllerAddr: :8011")

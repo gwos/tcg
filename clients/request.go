@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 
@@ -25,7 +24,7 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 // SendRequest wraps HTTP methods
 func SendRequest(httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
-	return SendRequestWithContext(nil, httpMethod, requestURL, headers, formValues, byteBody)
+	return SendRequestWithContext(context.Background(), httpMethod, requestURL, headers, formValues, byteBody)
 }
 
 // SendRequestWithContext wraps HTTP methods
@@ -51,12 +50,7 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 		body = nil
 	}
 
-	if ctx == nil {
-		request, err = http.NewRequest(httpMethod, requestURL, body)
-	} else {
-		request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
-		_, request = HookRequestContext(ctx, request)
-	}
+	request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -66,14 +60,14 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 		request.Header.Add(key, value)
 	}
 
+	_, request = HookRequestContext(ctx, request)
 	response, err = httpClient.Do(request)
 	if err != nil {
 		return -1, nil, err
 	}
 
 	defer response.Body.Close()
-
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		return -1, nil, err
 	}
@@ -112,7 +106,7 @@ type Req struct {
 
 // Send sends request
 func (q *Req) Send() (*Req, error) {
-	return q.SendWithContext(nil)
+	return q.SendWithContext(context.Background())
 }
 
 // SendWithContext sends request
