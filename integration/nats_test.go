@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -195,6 +196,9 @@ func setupIntegration(t *testing.T, natsAckWait time.Duration) {
 			HostName:        GWValidHost,
 			UserName:        testGroundworkUserName,
 			Password:        testGroundworkPassword,
+
+			IsDynamicInventory: cfg.Connector.IsDynamicInventory,
+			HTTPEncode:         func() bool { return strings.ToLower(cfg.Connector.GWEncode) == "force" }(),
 		},
 	}
 

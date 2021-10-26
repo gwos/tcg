@@ -2,6 +2,7 @@ package clients
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/tls"
 	"io"
@@ -37,17 +38,23 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 
 	urlValues := url.Values{}
 	if formValues != nil {
-		for key, value := range formValues {
-			urlValues.Add(key, value)
+		for k, v := range formValues {
+			urlValues.Add(k, v)
 		}
 		byteBody = []byte(urlValues.Encode())
+	}
+
+	if headers["Content-Encoding"] == "gzip" {
+		buf := &bytes.Buffer{}
+		gw := gzip.NewWriter(buf)
+		gw.Write(byteBody)
+		gw.Close()
+		byteBody = buf.Bytes()
 	}
 
 	var body io.Reader
 	if byteBody != nil {
 		body = bytes.NewBuffer(byteBody)
-	} else {
-		body = nil
 	}
 
 	request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
@@ -56,8 +63,8 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	request.Header.Set("Connection", "close")
-	for key, value := range headers {
-		request.Header.Add(key, value)
+	for k, v := range headers {
+		request.Header.Add(k, v)
 	}
 
 	_, request = HookRequestContext(ctx, request)
