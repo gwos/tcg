@@ -51,6 +51,7 @@ type GWConnection struct {
 	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
 	SendAllInventory    bool   `yaml:"sendAllInventory"`
 	IsDynamicInventory  bool   `yaml:"-"`
+	HTTPEncode          bool   `yaml:"-"`
 }
 
 // GWHostGroups defines collection
@@ -346,42 +347,38 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 // SynchronizeInventory calls API
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
+	headers := []header{}
 	mergeParam := make(map[string]string)
 	mergeHosts := true
 	if client.GWConnection != nil {
+		if client.GWConnection.HTTPEncode {
+			headers = append(headers, header{"Content-Encoding", "gzip"})
+		}
 		mergeHosts = client.GWConnection.MergeHosts
 	}
 	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
 	reqURL := client.uriSynchronizeInventory + BuildQueryParams(mergeParam)
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(ctx, reqURL, payload,
-			header{
-				"HostNamePrefix",
-				client.ResourceNamePrefix,
-			},
-		)
+		headers = append(headers, header{"HostNamePrefix", client.ResourceNamePrefix})
 	}
-	response, err := client.sendData(ctx, reqURL, payload)
-	return response, err
+	return client.sendData(ctx, reqURL, payload, headers...)
 }
 
 // SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
 	client.buildURIs()
-	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		return client.sendData(ctx, client.uriSendResourceWithMetrics, payload,
-			header{
-				"HostNamePrefix",
-				client.ResourceNamePrefix,
-			},
-		)
+	headers := []header{}
+	if client.GWConnection != nil && client.GWConnection.HTTPEncode {
+		headers = append(headers, header{"Content-Encoding", "gzip"})
 	}
-
+	reqURL := client.uriSendResourceWithMetrics
 	if client.IsDynamicInventory {
-		return client.sendData(ctx, client.uriSendResourceWithMetricsDynamic, payload)
+		reqURL = client.uriSendResourceWithMetricsDynamic
 	}
-
-	return client.sendData(ctx, client.uriSendResourceWithMetrics, payload)
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		headers = append(headers, header{"HostNamePrefix", client.ResourceNamePrefix})
+	}
+	return client.sendData(ctx, reqURL, payload, headers...)
 }
 
 // ClearInDowntime calls API

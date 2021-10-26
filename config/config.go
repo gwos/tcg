@@ -111,6 +111,9 @@ type Connector struct {
 	Enabled            bool   `yaml:"enabled"`
 	InstallationMode   string `yaml:"installationMode,omitempty"`
 	IsDynamicInventory bool   `yaml:"-"`
+	// GWEncode defines using HTTPEncode in Groundwork client: child|force|off
+	// enabled for child by default
+	GWEncode string `yaml:"-"`
 
 	// LogCondense accepts time duration for condensing similar records
 	// if 0 turn off condensing
@@ -524,9 +527,12 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if cfg.IsConfiguringPMC() {
 		newCfg.Connector.InstallationMode = InstallationModePMC
 	}
-	/* apply dynamic inventory flag to gwConnections */
+	/* prepare gwConnections */
+	gwEncode := strings.ToLower(newCfg.Connector.GWEncode)
 	for i := range newCfg.GWConnections {
 		newCfg.GWConnections[i].IsDynamicInventory = newCfg.Connector.IsDynamicInventory
+		newCfg.GWConnections[i].HTTPEncode = gwEncode == "force" ||
+			(gwEncode != "off" && newCfg.GWConnections[i].IsChild)
 	}
 	/* update config */
 	*cfg.Connector = *newCfg.Connector
