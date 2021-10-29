@@ -2,7 +2,7 @@
   <a href="http://www.gwos.com/" target="blank"><img src="http://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
 </p>
 
-# Tcg
+# TCG
 
 The Transit Connection Generator (TCG). TCG contains two sub-systems/packages:
 
@@ -73,20 +73,11 @@ The TCG project is built with Go Modules. See `go.mod` for a list of dependencie
 
         github.com/stretchr/testify
 
-7. [Logrus](github.com/sirupsen/logrus)
+7. [Zerolog](github.com/rs/zerolog)
 
-    > Logrus is a structured logger for Go (golang), completely API compatible
-    with the standard library logger.
+    > The zerolog package provides a fast and simple logger dedicated to JSON output.
 
-        github.com/sirupsen/logrus
-    
-    > Log levels:
-       
-        0 - Error; 
-        1 - Warn; 
-        2 - Info; 
-        3 - Debug
-
+        github.com/rs/zerolog
 
 8. [Gopsutil](github.com/shirou/gopsutil)
 
@@ -142,6 +133,12 @@ $ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%
 ## Building Connectors for OS Targets (Cross Compiling)
 ```
 env GOOS=linux GOARCH=386 go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X 'github.com/gwos/tcg/config.buildTag=8.1.0.1'"
+```
+To view supported platforms use commands
+```
+go tool dist list
+go tool dist list -json
+go tool dist list -json | jq '.[] | select(.CgoSupported == true)'
 ```
 
 ## Installing as a service 
