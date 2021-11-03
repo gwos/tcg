@@ -132,7 +132,7 @@ type TraceSpan trace.Span
 type TraceAttrOption func(span TraceSpan)
 
 // StartTraceSpan starts a span
-func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanOption) (context.Context, TraceSpan) {
+func StartTraceSpan(ctx context.Context, tracerName, spanName string, opts ...trace.SpanStartOption) (context.Context, TraceSpan) {
 	return otel.GetTracerProvider().
 		Tracer(tracerName).Start(ctx, spanName, opts...)
 }
@@ -145,19 +145,19 @@ func EndTraceSpan(span TraceSpan, opts ...TraceAttrOption) {
 	span.End()
 }
 
-// TraceAttrArray sets an int attribute
-func TraceAttrArray(k string, v interface{}) TraceAttrOption {
-	return func(span TraceSpan) { span.SetAttributes(attribute.Array(k, v)) }
-}
-
 // TraceAttrInt sets an int attribute
 func TraceAttrInt(k string, v int) TraceAttrOption {
 	return func(span TraceSpan) { span.SetAttributes(attribute.Int(k, v)) }
 }
 
-// TraceAttrString sets a string attribute
-func TraceAttrString(k, v string) TraceAttrOption {
+// TraceAttrStr sets a string attribute
+func TraceAttrStr(k, v string) TraceAttrOption {
 	return func(span TraceSpan) { span.SetAttributes(attribute.String(k, v)) }
+}
+
+// TraceAttrStrs sets an string slice attribute
+func TraceAttrStrs(k string, v []string) TraceAttrOption {
+	return func(span TraceSpan) { span.SetAttributes(attribute.StringSlice(k, v)) }
 }
 
 // TraceAttrEntrypoint sets an entrypoint attribute

@@ -29,7 +29,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -47,7 +47,7 @@ type AgentService struct {
 
 	tracerCache    *cache.Cache
 	tracerToken    []byte                   // gw tracing
-	tracerProvider *sdktrace.TracerProvider // otel tracing
+	tracerProvider *tracesdk.TracerProvider // otel tracing
 
 	configHandler       func([]byte)
 	demandConfigHandler func() bool
@@ -498,7 +498,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 				EndTraceSpan(span,
 					TraceAttrError(err),
 					TraceAttrPayloadLen(b),
-					TraceAttrString("durableName", durableName),
+					TraceAttrStr("durableName", durableName),
 				)
 			}()
 
