@@ -115,7 +115,7 @@ func taskHandler(task ScheduleTask) func() {
 			services.EndTraceSpan(span,
 				services.TraceAttrError(err),
 				services.TraceAttrPayloadLen(res),
-				services.TraceAttrString("task", task.String()),
+				services.TraceAttrStr("task", task.String()),
 			)
 		}()
 
@@ -125,7 +125,7 @@ func taskHandler(task ScheduleTask) func() {
 		services.EndTraceSpan(span2,
 			services.TraceAttrError(err),
 			services.TraceAttrPayloadLen(res),
-			services.TraceAttrArray("command", task.Command),
+			services.TraceAttrStrs("command", task.Command),
 		)
 
 		if err != nil {

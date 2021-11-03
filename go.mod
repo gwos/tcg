@@ -44,11 +44,11 @@ require (
 	github.com/tklauser/go-sysconf v0.3.7 // indirect
 	github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e
 	github.com/ugorji/go v1.2.6 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.20.0
-	go.opentelemetry.io/otel v0.20.0
-	go.opentelemetry.io/otel/exporters/trace/jaeger v0.20.0
-	go.opentelemetry.io/otel/sdk v0.20.0
-	go.opentelemetry.io/otel/trace v0.20.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.26.0
+	go.opentelemetry.io/otel v1.1.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.1.0
+	go.opentelemetry.io/otel/sdk v1.1.0
+	go.opentelemetry.io/otel/trace v1.1.0
 	golang.org/x/crypto v0.0.0-20210711020723-a769d52b0f97
 	golang.org/x/mod v0.4.2 // indirect
 	google.golang.org/appengine v1.6.7 // indirect

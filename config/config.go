@@ -21,10 +21,10 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/trace/jaeger"
+	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/semconv"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
 	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
 )
@@ -545,12 +545,12 @@ func (cfg *Config) IsConfiguringPMC() bool {
 }
 
 // InitTracerProvider inits provider
-func (cfg Config) InitTracerProvider() (*sdktrace.TracerProvider, error) {
+func (cfg Config) InitTracerProvider() (*tracesdk.TracerProvider, error) {
 	return cfg.initJaegertracing()
 }
 
 // initJaegertracing inits tracing provider with Jaeger exporter
-func (cfg Config) initJaegertracing() (*sdktrace.TracerProvider, error) {
+func (cfg Config) initJaegertracing() (*tracesdk.TracerProvider, error) {
 	var errNotConfigured = fmt.Errorf("telemetry is not configured")
 	/* Jaegertracing supports a few options to receive spans
 	[https://github.com/jaegertracing/jaeger/blob/master/ports/ports.go]
@@ -613,16 +613,19 @@ func (cfg Config) initJaegertracing() (*sdktrace.TracerProvider, error) {
 		attrs = append(attrs, attribute.String(k, v))
 	}
 
-	exporter, err := jaeger.NewRawExporter(endpointOption)
+	/* It may be useful to look for modern API state and usage at:
+	https://github.com/open-telemetry/opentelemetry-go/blob/main/example/jaeger/main.go */
+
+	exporter, err := jaeger.New(endpointOption)
 	if err != nil {
 		log.Err(err).Msg("could not create exporter")
 		return nil, err
 	}
-	tp := sdktrace.NewTracerProvider(
+	tp := tracesdk.NewTracerProvider(
 		/* Always be sure to batch in production */
-		sdktrace.WithBatcher(exporter),
+		tracesdk.WithBatcher(exporter),
 		/* Record information about this application in an Resource */
-		sdktrace.WithResource(resource.NewWithAttributes(attrs...)),
+		tracesdk.WithResource(resource.NewWithAttributes(semconv.SchemaURL, attrs...)),
 	)
 	return tp, nil
 }
