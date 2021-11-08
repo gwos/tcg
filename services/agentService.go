@@ -767,4 +767,5 @@ func (service *AgentService) initOTEL() {
 		propagation.TraceContext{}, propagation.Baggage{}))
 
 	clients.HookRequestContext = tracing.HookRequestContext
+	clients.GZIP = tracing.GZIP
 }
