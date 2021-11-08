@@ -22,6 +22,14 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 	return ctx, req
 }
 
+var GZIP = func(ctx context.Context, p []byte) (context.Context, []byte, error) {
+	buf := &bytes.Buffer{}
+	gw := gzip.NewWriter(buf)
+	_, err := gw.Write(p)
+	_ = gw.Close()
+	return ctx, buf.Bytes(), err
+}
+
 // SendRequest wraps HTTP methods
 func SendRequest(httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
@@ -45,11 +53,10 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	if headers["Content-Encoding"] == "gzip" {
-		buf := &bytes.Buffer{}
-		gw := gzip.NewWriter(buf)
-		gw.Write(byteBody)
-		gw.Close()
-		byteBody = buf.Bytes()
+		ctx, byteBody, err = GZIP(ctx, byteBody)
+		if err != nil {
+			return -1, nil, err
+		}
 	}
 
 	var body io.Reader
