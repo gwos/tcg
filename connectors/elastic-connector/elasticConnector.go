@@ -15,6 +15,7 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/tracing"
 	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
@@ -150,14 +151,14 @@ func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 func (connector *ElasticConnector) CollectMetrics() ([]transit.DynamicMonitoredResource, []transit.DynamicInventoryResource, []transit.ResourceGroup) {
 	var err error
 
-	ctx, spanCollectMetrics := services.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
+	ctx, spanCollectMetrics := tracing.StartTraceSpan(context.Background(), "connectors", "CollectMetrics")
 	defer func() {
 		spanCollectMetrics.SetAttributes(
 			attribute.String("error", fmt.Sprint(err)),
 		)
 		spanCollectMetrics.End()
 	}()
-	_, spanMonitoringState := services.StartTraceSpan(ctx, "connectors", "initMonitoringState")
+	_, spanMonitoringState := tracing.StartTraceSpan(ctx, "connectors", "initMonitoringState")
 
 	monitoringState := connector.config.initMonitoringState(connector.monitoringState, &connector.esClient)
 	connector.monitoringState = monitoringState

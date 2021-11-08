@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/errors"
+	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -208,12 +209,12 @@ func (controller *Controller) events(c *gin.Context) {
 		err     error
 		payload []byte
 	)
-	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(payload),
-			TraceAttrEntrypoint(c.FullPath()),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
 		)
 	}()
 
@@ -245,12 +246,12 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 		err     error
 		payload []byte
 	)
-	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(payload),
-			TraceAttrEntrypoint(c.FullPath()),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
 		)
 	}()
 
@@ -282,12 +283,12 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 		err     error
 		payload []byte
 	)
-	ctx, span := StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(payload),
-			TraceAttrEntrypoint(c.FullPath()),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
 		)
 	}()
 

@@ -10,6 +10,7 @@ import (
 	"github.com/gwos/tcg/connectors/nsca-connector/nsca"
 	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/tracing"
 	"github.com/rs/zerolog/log"
 )
 
@@ -31,12 +32,12 @@ func makeEntrypointHandler(dataFormat parser.DataFormat) func(*gin.Context) {
 			err     error
 			payload []byte
 		)
-		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
+		ctx, span := tracing.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
 		defer func() {
-			services.EndTraceSpan(span,
-				services.TraceAttrError(err),
-				services.TraceAttrPayloadLen(payload),
-				services.TraceAttrEntrypoint(c.FullPath()),
+			tracing.EndTraceSpan(span,
+				tracing.TraceAttrError(err),
+				tracing.TraceAttrPayloadLen(payload),
+				tracing.TraceAttrEntrypoint(c.FullPath()),
 			)
 		}()
 
@@ -63,29 +64,29 @@ func makeEntrypointHandler(dataFormat parser.DataFormat) func(*gin.Context) {
 
 func makeNSCAHandler() nsca.DataHandler {
 	return nsca.AdaptHandler(func(p []byte) error {
-		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
+		ctx, span := tracing.StartTraceSpan(context.Background(), "connectors", "EntrypointHandler")
 		err := processData(ctx, p, parser.NSCA)
 		if err != nil {
 			log.Warn().Err(err).
 				Str("entrypoint", "NSCA").
 				Msg("could not process incoming request")
 		}
-		services.EndTraceSpan(span,
-			services.TraceAttrError(err),
-			services.TraceAttrPayloadLen(p),
-			services.TraceAttrEntrypoint("NSCA"),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(p),
+			tracing.TraceAttrEntrypoint("NSCA"),
 		)
 		return err
 	})
 }
 
 func processData(ctx context.Context, payload []byte, dataFormat parser.DataFormat) error {
-	ctxN, span := services.StartTraceSpan(ctx, "connectors", "processData")
+	ctxN, span := tracing.StartTraceSpan(ctx, "connectors", "processData")
 	monitoredResources, err := parser.Parse(payload, dataFormat)
 
-	services.EndTraceSpan(span,
-		services.TraceAttrError(err),
-		services.TraceAttrPayloadLen(payload),
+	tracing.EndTraceSpan(span,
+		tracing.TraceAttrError(err),
+		tracing.TraceAttrPayloadLen(payload),
 	)
 
 	if err != nil {
