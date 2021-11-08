@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -22,11 +21,11 @@ import (
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/taskQueue"
+	"github.com/gwos/tcg/tracing"
 	"github.com/gwos/tcg/transit"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
@@ -493,12 +492,12 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			if err = p.Unmarshal(b); err != nil {
 				log.Warn().Err(err).Msg("could not unmarshal payload")
 			}
-			ctx, span := StartTraceSpan(getCtx(p.SpanContext), "services", subj)
+			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", subj)
 			defer func() {
-				EndTraceSpan(span,
-					TraceAttrError(err),
-					TraceAttrPayloadLen(b),
-					TraceAttrStr("durableName", durableName),
+				tracing.EndTraceSpan(span,
+					tracing.TraceAttrError(err),
+					tracing.TraceAttrPayloadLen(b),
+					tracing.TraceAttrStr("durableName", durableName),
 				)
 			}()
 
@@ -787,9 +786,5 @@ func (service *AgentService) initOTEL() {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{}, propagation.Baggage{}))
 
-	clients.HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
-		ctx, req = otelhttptrace.W3C(ctx, req)
-		otelhttptrace.Inject(ctx, req)
-		return ctx, req
-	}
+	clients.HookRequestContext = tracing.HookRequestContext
 }

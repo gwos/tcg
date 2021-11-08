@@ -15,6 +15,7 @@ import (
 
 	"github.com/gwos/tcg/milliseconds"
 	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/tracing"
 	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
 )
@@ -97,11 +98,11 @@ func SendMetrics(ctx context.Context, resources []transit.DynamicMonitoredResour
 		b   []byte
 		err error
 	)
-	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendMetrics")
+	ctxN, span := tracing.StartTraceSpan(ctx, "connectors", "SendMetrics")
 	defer func() {
-		services.EndTraceSpan(span,
-			services.TraceAttrError(err),
-			services.TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -131,11 +132,11 @@ func SendInventory(ctx context.Context, resources []transit.DynamicInventoryReso
 		b   []byte
 		err error
 	)
-	ctxN, span := services.StartTraceSpan(ctx, "connectors", "SendInventory")
+	ctxN, span := tracing.StartTraceSpan(ctx, "connectors", "SendInventory")
 	defer func() {
-		services.EndTraceSpan(span,
-			services.TraceAttrError(err),
-			services.TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 

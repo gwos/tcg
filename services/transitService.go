@@ -9,6 +9,7 @@ import (
 	"github.com/gwos/tcg/batcher/events"
 	"github.com/gwos/tcg/batcher/metrics"
 	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/tracing"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces
@@ -71,11 +72,11 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "ClearInDowntime")
+	_, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -93,11 +94,11 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SetInDowntime")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -123,11 +124,11 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SendEvents")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -145,11 +146,11 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SendEventsAck")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -167,11 +168,11 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SendEventsUnack")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -197,11 +198,11 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 
@@ -223,11 +224,11 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 		b   []byte
 		err error
 	)
-	_, span := StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	_, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
 	defer func() {
-		EndTraceSpan(span,
-			TraceAttrError(err),
-			TraceAttrPayloadLen(b),
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(b),
 		)
 	}()
 

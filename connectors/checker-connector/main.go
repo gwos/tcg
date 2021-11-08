@@ -8,6 +8,7 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/nsca-connector/parser"
 	"github.com/gwos/tcg/services"
+	"github.com/gwos/tcg/tracing"
 	"github.com/gwos/tcg/transit"
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
@@ -110,22 +111,22 @@ func taskHandler(task ScheduleTask) func() {
 			handler = cmd.Output
 		}
 
-		ctx, span := services.StartTraceSpan(context.Background(), "connectors", "taskHandler")
+		ctx, span := tracing.StartTraceSpan(context.Background(), "connectors", "taskHandler")
 		defer func() {
-			services.EndTraceSpan(span,
-				services.TraceAttrError(err),
-				services.TraceAttrPayloadLen(res),
-				services.TraceAttrStr("task", task.String()),
+			tracing.EndTraceSpan(span,
+				tracing.TraceAttrError(err),
+				tracing.TraceAttrPayloadLen(res),
+				tracing.TraceAttrStr("task", task.String()),
 			)
 		}()
 
-		_, span2 := services.StartTraceSpan(ctx, "connectors", "command")
+		_, span2 := tracing.StartTraceSpan(ctx, "connectors", "command")
 		res, err = handler()
 
-		services.EndTraceSpan(span2,
-			services.TraceAttrError(err),
-			services.TraceAttrPayloadLen(res),
-			services.TraceAttrStrs("command", task.Command),
+		tracing.EndTraceSpan(span2,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(res),
+			tracing.TraceAttrStrs("command", task.Command),
 		)
 
 		if err != nil {
@@ -140,12 +141,12 @@ func taskHandler(task ScheduleTask) func() {
 			Bytes("res", res).
 			Msg("task done")
 
-		_, span3 := services.StartTraceSpan(ctx, "connectors", "parse")
+		_, span3 := tracing.StartTraceSpan(ctx, "connectors", "parse")
 		monitoredResources, err = parser.Parse(res, task.DataFormat)
 
-		services.EndTraceSpan(span3,
-			services.TraceAttrError(err),
-			services.TraceAttrPayloadLen(res),
+		tracing.EndTraceSpan(span3,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(res),
 		)
 
 		if err != nil {
