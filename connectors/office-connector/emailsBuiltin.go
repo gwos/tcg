@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 )
 
@@ -42,7 +41,7 @@ func Emails(service *transit.DynamicMonitoredService, token, outlookEmailAddress
 				float64(definition.CriticalThreshold),
 			)
 			service.Metrics = append(service.Metrics, *metric)
-			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+			service.Status, _ = transit.CalculateServiceStatus(&service.Metrics)
 		}
 	}
 

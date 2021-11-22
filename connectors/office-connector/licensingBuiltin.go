@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 )
 
@@ -54,7 +54,7 @@ func AddonLicenseMetrics(service *transit.DynamicMonitoredService, token string)
 				service.Metrics = append(service.Metrics, *metric)
 			}
 
-			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+			service.Status, _ = transit.CalculateServiceStatus(&service.Metrics)
 		}
 	}
 

@@ -3,12 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -81,7 +80,7 @@ func SharePoint(service *transit.DynamicMonitoredService, token, sharePointSite,
 				service.Metrics = append(service.Metrics, *free)
 			}
 
-			service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+			service.Status, _ = transit.CalculateServiceStatus(&service.Metrics)
 		}
 	}
 

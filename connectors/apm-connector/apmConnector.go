@@ -333,7 +333,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 					if status, ok := m.Tags["status"]; ok {
 						if monitorStatus, err := parseStatus(status); err == nil {
 							delete(m.Tags, "status")
-							if mStatus == nil || connectors.MonitorStatusWeightService[monitorStatus] > connectors.MonitorStatusWeightService[*mStatus] {
+							if mStatus == nil || transit.MonitorStatusWeightService[monitorStatus] > transit.MonitorStatusWeightService[*mStatus] {
 								mStatus = &monitorStatus
 							}
 						}
