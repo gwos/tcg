@@ -1017,3 +1017,147 @@ type AgentIdentity struct {
 	AppName string `json:"appName" yaml:"appName"`
 	AppType string `json:"appType" yaml:"appType"`
 }
+
+func CalculateResourceStatus(services []DynamicMonitoredService) MonitorStatus {
+
+	// TODO: implement logic
+
+	return HostUp
+}
+
+func CalculateServiceStatus(metrics *[]TimeSeries) (MonitorStatus, error) {
+	if metrics == nil || len(*metrics) == 0 {
+		return ServiceUnknown, nil
+	}
+	previousStatus := ServiceOk
+	for _, metric := range *metrics {
+		if metric.Thresholds != nil {
+			var warning, critical ThresholdValue
+			for _, threshold := range *metric.Thresholds {
+				switch threshold.SampleType {
+				case Warning:
+					warning = threshold
+				case Critical:
+					critical = threshold
+				default:
+					return ServiceOk, fmt.Errorf("unsupported threshold Sample type")
+				}
+			}
+
+			status := CalculateStatus(metric.Value, warning.Value, critical.Value)
+			if MonitorStatusWeightService[status] > MonitorStatusWeightService[previousStatus] {
+				previousStatus = status
+			}
+		}
+	}
+	return previousStatus, nil
+}
+
+func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValue) MonitorStatus {
+	if warning == nil && critical == nil {
+		return ServiceOk
+	}
+
+	var warningValue float64
+	var criticalValue float64
+
+	if warning != nil {
+		switch warning.ValueType {
+		case IntegerType:
+			warningValue = float64(warning.IntegerValue)
+		case DoubleType:
+			warningValue = warning.DoubleValue
+		}
+	}
+
+	if critical != nil {
+		switch critical.ValueType {
+		case IntegerType:
+			criticalValue = float64(critical.IntegerValue)
+		case DoubleType:
+			criticalValue = critical.DoubleValue
+		}
+	}
+
+	switch value.ValueType {
+	case IntegerType:
+		if warning == nil && criticalValue == -1 {
+			if float64(value.IntegerValue) >= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			return ServiceOk
+		}
+		if critical == nil && (warning != nil && warningValue == -1) {
+			if float64(value.IntegerValue) >= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		}
+		if (warning != nil && warningValue == -1) && (critical != nil && criticalValue == -1) {
+			return ServiceOk
+		}
+		// is it a reverse comparison (low to high)
+		if (warning != nil && critical != nil) && warningValue > criticalValue {
+			if float64(value.IntegerValue) <= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			if float64(value.IntegerValue) <= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		} else {
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		}
+	case DoubleType:
+		if warning == nil && criticalValue == -1 {
+			if value.DoubleValue >= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			return ServiceOk
+		}
+		if critical == nil && (warning != nil && warningValue == -1) {
+			if value.DoubleValue >= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		}
+		if (warning != nil && critical != nil) && (warningValue == -1 || criticalValue == -1) {
+			return ServiceOk
+		}
+		// is it a reverse comparison (low to high)
+		if warningValue > criticalValue {
+			if value.DoubleValue <= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			if value.DoubleValue <= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		} else {
+			if value.DoubleValue >= criticalValue {
+				return ServiceUnscheduledCritical
+			}
+			if value.DoubleValue >= warningValue {
+				return ServiceWarning
+			}
+			return ServiceOk
+		}
+	}
+	return ServiceOk
+}
+
+// MonitorStatusWeightService defines weight of Monitor Status for multi-state comparison
+var MonitorStatusWeightService = map[MonitorStatus]int{
+	ServiceOk:                  0,
+	ServicePending:             10,
+	ServiceUnknown:             20,
+	ServiceWarning:             30,
+	ServiceScheduledCritical:   50,
+	ServiceUnscheduledCritical: 100,
+}

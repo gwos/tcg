@@ -100,7 +100,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 		if !resFlag {
 			res.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
 			res.NextCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
-			res.Status = connectors.CalculateResourceStatus(res.Services)
+			res.Status = transit.CalculateResourceStatus(res.Services)
 		}
 		monitoredResources = append(monitoredResources, res)
 	}

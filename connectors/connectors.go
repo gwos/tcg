@@ -46,16 +46,6 @@ var statusTextValGetters = map[string]func(service *transit.DynamicMonitoredServ
 
 const noneThresholdText = "-1"
 
-// MonitorStatusWeightService defines weight of Monitor Status for multi-state comparison
-var MonitorStatusWeightService = map[transit.MonitorStatus]int{
-	transit.ServiceOk:                  0,
-	transit.ServicePending:             10,
-	transit.ServiceUnknown:             20,
-	transit.ServiceWarning:             30,
-	transit.ServiceScheduledCritical:   50,
-	transit.ServiceUnscheduledCritical: 100,
-}
-
 // UnmarshalConfig updates args with data
 func UnmarshalConfig(data []byte, metricsProfile *transit.MetricsProfile, monitorConnection *transit.MonitorConnection) error {
 	/* grab CheckInterval from MonitorConnection extensions */
@@ -482,7 +472,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Dyn
 		}
 	}
 	if service.Metrics != nil {
-		service.Status, _ = CalculateServiceStatus(&service.Metrics)
+		service.Status, _ = transit.CalculateServiceStatus(&service.Metrics)
 	} else {
 		service.Status = transit.ServiceUnknown
 	}
@@ -521,146 +511,12 @@ func CreateResource(name string, args ...interface{}) (*transit.DynamicMonitored
 	}
 
 	if resource.Services != nil && len(resource.Services) != 0 {
-		resource.Status = CalculateResourceStatus(resource.Services)
+		resource.Status = transit.CalculateResourceStatus(resource.Services)
 	} else {
 		resource.Status = transit.HostUp
 	}
 
 	return &resource, nil
-}
-
-func CalculateResourceStatus(services []transit.DynamicMonitoredService) transit.MonitorStatus {
-
-	// TODO: implement logic
-
-	return transit.HostUp
-}
-
-func CalculateServiceStatus(metrics *[]transit.TimeSeries) (transit.MonitorStatus, error) {
-	if metrics == nil || len(*metrics) == 0 {
-		return transit.ServiceUnknown, nil
-	}
-	previousStatus := transit.ServiceOk
-	for _, metric := range *metrics {
-		if metric.Thresholds != nil {
-			var warning, critical transit.ThresholdValue
-			for _, threshold := range *metric.Thresholds {
-				switch threshold.SampleType {
-				case transit.Warning:
-					warning = threshold
-				case transit.Critical:
-					critical = threshold
-				default:
-					return transit.ServiceOk, fmt.Errorf("unsupported threshold Sample type")
-				}
-			}
-
-			status := CalculateStatus(metric.Value, warning.Value, critical.Value)
-			if MonitorStatusWeightService[status] > MonitorStatusWeightService[previousStatus] {
-				previousStatus = status
-			}
-		}
-	}
-	return previousStatus, nil
-}
-
-func CalculateStatus(value *transit.TypedValue, warning *transit.TypedValue, critical *transit.TypedValue) transit.MonitorStatus {
-	if warning == nil && critical == nil {
-		return transit.ServiceOk
-	}
-
-	var warningValue float64
-	var criticalValue float64
-
-	if warning != nil {
-		switch warning.ValueType {
-		case transit.IntegerType:
-			warningValue = float64(warning.IntegerValue)
-		case transit.DoubleType:
-			warningValue = warning.DoubleValue
-		}
-	}
-
-	if critical != nil {
-		switch critical.ValueType {
-		case transit.IntegerType:
-			criticalValue = float64(critical.IntegerValue)
-		case transit.DoubleType:
-			criticalValue = critical.DoubleValue
-		}
-	}
-
-	switch value.ValueType {
-	case transit.IntegerType:
-		if warning == nil && criticalValue == -1 {
-			if float64(value.IntegerValue) >= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			return transit.ServiceOk
-		}
-		if critical == nil && (warning != nil && warningValue == -1) {
-			if float64(value.IntegerValue) >= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-		if (warning != nil && warningValue == -1) && (critical != nil && criticalValue == -1) {
-			return transit.ServiceOk
-		}
-		// is it a reverse comparison (low to high)
-		if (warning != nil && critical != nil) && warningValue > criticalValue {
-			if float64(value.IntegerValue) <= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if float64(value.IntegerValue) <= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		} else {
-			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-	case transit.DoubleType:
-		if warning == nil && criticalValue == -1 {
-			if value.DoubleValue >= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			return transit.ServiceOk
-		}
-		if critical == nil && (warning != nil && warningValue == -1) {
-			if value.DoubleValue >= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-		if (warning != nil && critical != nil) && (warningValue == -1 || criticalValue == -1) {
-			return transit.ServiceOk
-		}
-		// is it a reverse comparison (low to high)
-		if warningValue > criticalValue {
-			if value.DoubleValue <= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.DoubleValue <= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		} else {
-			if value.DoubleValue >= criticalValue {
-				return transit.ServiceUnscheduledCritical
-			}
-			if value.DoubleValue >= warningValue {
-				return transit.ServiceWarning
-			}
-			return transit.ServiceOk
-		}
-	}
-	return transit.ServiceOk
 }
 
 // EvaluateExpressions calculates synthetic metrics
@@ -720,7 +576,7 @@ func EvaluateExpressions(services []transit.DynamicMonitoredService) []transit.D
 							},
 						},
 					}
-					status, err := CalculateServiceStatus(&result[i].Metrics)
+					status, err := transit.CalculateServiceStatus(&result[i].Metrics)
 					result[i].Status = status
 					if err != nil {
 						log.Err(err).Msg("could not calculate service status")

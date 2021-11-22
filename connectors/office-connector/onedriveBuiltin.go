@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/transit"
 )
 
@@ -59,6 +58,6 @@ func OneDrive(service *transit.DynamicMonitoredService, token string) (err error
 		service.Metrics = append(service.Metrics, *metric3)
 	}
 
-	service.Status, _ = connectors.CalculateServiceStatus(&service.Metrics)
+	service.Status, _ = transit.CalculateServiceStatus(&service.Metrics)
 	return
 }
