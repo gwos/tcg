@@ -664,25 +664,25 @@ func (cfg Config) initLogger() {
 		Logger()
 
 	logper.SetLogger(
-		func(fields interface{}, format string, v ...interface{}) {
-			log2zerolog(zerolog.ErrorLevel, fields, format, v...)
+		func(fields interface{}, format string, a ...interface{}) {
+			log2zerolog(zerolog.ErrorLevel, fields, format, a...)
 		},
-		func(fields interface{}, format string, v ...interface{}) {
-			log2zerolog(zerolog.WarnLevel, fields, format, v...)
+		func(fields interface{}, format string, a ...interface{}) {
+			log2zerolog(zerolog.WarnLevel, fields, format, a...)
 		},
-		func(fields interface{}, format string, v ...interface{}) {
-			log2zerolog(zerolog.InfoLevel, fields, format, v...)
+		func(fields interface{}, format string, a ...interface{}) {
+			log2zerolog(zerolog.InfoLevel, fields, format, a...)
 		},
-		func(fields interface{}, format string, v ...interface{}) {
+		func(fields interface{}, format string, a ...interface{}) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				log2zerolog(zerolog.DebugLevel, fields, format, v...)
+				log2zerolog(zerolog.DebugLevel, fields, format, a...)
 			}
 		},
 		func() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel },
 	)
 }
 
-func log2zerolog(lvl zerolog.Level, fields interface{}, format string, v ...interface{}) {
+func log2zerolog(lvl zerolog.Level, fields interface{}, format string, a ...interface{}) {
 	e := liblogger.WithLevel(lvl)
 	if ff, ok := fields.(interface {
 		LogFields() (map[string]interface{}, map[string][]byte)
@@ -697,7 +697,7 @@ func log2zerolog(lvl zerolog.Level, fields interface{}, format string, v ...inte
 	} else if _, ok := fields.([]interface{}); ok {
 		e.Fields(fields)
 	}
-	e.Msgf(format, v...)
+	e.Msgf(format, a...)
 }
 
 // Decrypt decrypts small messages

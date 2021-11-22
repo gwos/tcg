@@ -6,35 +6,38 @@ import (
 	"fmt"
 	"io"
 	stdlog "log"
-	"os"
 )
 
 // By default there is logging based on stdlog with disabled debug
 var (
-	flags       = stdlog.Lmsgprefix | stdlog.Lshortfile | stdlog.Ldate | stdlog.Ltime | stdlog.LUTC
-	stdlogError = stdlog.New(os.Stderr, "ERR ", flags)
-	stdlogWarn  = stdlog.New(os.Stderr, "WRN ", flags)
-	stdlogInfo  = stdlog.New(os.Stderr, "INF ", flags)
-	stdlogDebug = stdlog.New(os.Stderr, "DBG ", flags)
+	// Error does struct logging with Error level
+	Error,
+	// Warn does struct logging with Warning level
+	Warn,
+	// Info does struct logging with Info level
+	Info,
+	// Debug does struct logging with Debug level
+	Debug = func(flags int) (LogFn, LogFn, LogFn, LogFn) {
+		loggerErr := stdlog.New(stdlog.Writer(), "ERR ", flags)
+		loggerWrn := stdlog.New(stdlog.Writer(), "WRN ", flags)
+		loggerInf := stdlog.New(stdlog.Writer(), "INF ", flags)
+		loggerDbg := stdlog.New(stdlog.Writer(), "DBG ", flags)
+		return func(fields interface{}, format string, a ...interface{}) {
+				log2stdlog(loggerErr, fields, format, a...)
+			},
+			func(fields interface{}, format string, a ...interface{}) {
+				log2stdlog(loggerWrn, fields, format, a...)
+			},
+			func(fields interface{}, format string, a ...interface{}) {
+				log2stdlog(loggerInf, fields, format, a...)
+			},
+			func(fields interface{}, format string, a ...interface{}) {
+				if IsDebugEnabled() {
+					log2stdlog(loggerDbg, fields, format, a...)
+				}
+			}
+	}(stdlog.Lmsgprefix | stdlog.Lshortfile | stdlog.Ldate | stdlog.Ltime | stdlog.LUTC)
 
-	// Error do struct logging with Error level
-	Error LogFn = func(fields interface{}, format string, v ...interface{}) {
-		log2stdlog(stdlogError, fields, format, v...)
-	}
-	// Warn do struct logging with Warning level
-	Warn LogFn = func(fields interface{}, format string, v ...interface{}) {
-		log2stdlog(stdlogWarn, fields, format, v...)
-	}
-	// Info do struct logging with Info level
-	Info LogFn = func(fields interface{}, format string, v ...interface{}) {
-		log2stdlog(stdlogInfo, fields, format, v...)
-	}
-	// Debug do struct logging with Debug level
-	Debug LogFn = func(fields interface{}, format string, v ...interface{}) {
-		if IsDebugEnabled() {
-			log2stdlog(stdlogDebug, fields, format, v...)
-		}
-	}
 	// IsDebugEnabled defines debugging
 	IsDebugEnabled = func() bool { return false }
 )
@@ -42,7 +45,7 @@ var (
 // LogFn defines log function
 // fields arg can be of type: map[string]interface{}, []interface{},
 //   interface{LogFields()(map[string]interface{}, map[string][]byte)}
-type LogFn func(fields interface{}, format string, v ...interface{})
+type LogFn func(fields interface{}, format string, a ...interface{})
 
 // SetLogger sets logging options in one call
 func SetLogger(
@@ -59,7 +62,7 @@ func SetLogger(
 	IsDebugEnabled = isDebugEnabled
 }
 
-func log2stdlog(logger *stdlog.Logger, fields interface{}, format string, v ...interface{}) {
+func log2stdlog(logger *stdlog.Logger, fields interface{}, format string, a ...interface{}) {
 	if logger == nil || logger.Writer() == io.Discard {
 		return
 	}
@@ -69,22 +72,22 @@ func log2stdlog(logger *stdlog.Logger, fields interface{}, format string, v ...i
 	}); ok {
 		m1, m2 := ff.LogFields()
 		for k, v := range m1 {
-			fmt.Fprint(buf, k, ":", v, " ")
+			fmt.Fprintf(buf, "%s:%v ", k, v)
 		}
 		for k, v := range m2 {
 			fmt.Fprintf(buf, "%s:%s ", k, v)
 		}
 	} else if ff, ok := fields.(map[string]interface{}); ok {
 		for k, v := range ff {
-			fmt.Fprint(buf, k, ":", v, " ")
+			fmt.Fprintf(buf, "%s:%v ", k, v)
 		}
 	} else if ff, ok := fields.([]interface{}); ok {
 		for _, v := range ff {
-			fmt.Fprint(buf, v, " ")
+			fmt.Fprintf(buf, "%v ", v)
 		}
 	}
 	if format != "" {
-		fmt.Fprintf(buf, format, v...)
+		fmt.Fprintf(buf, format, a...)
 	}
 	logger.Output(4, buf.String())
 }
