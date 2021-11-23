@@ -147,14 +147,14 @@ func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]by
 			if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 				rawJSON["payload"] = q.Payload
 			} else {
-				fields["payload"] = q.Payload
+				fields["payload"] = string(q.Payload)
 			}
 		}
 		if len(q.Response) > 0 {
 			if bytes.HasPrefix(q.Response, []byte(`{`)) {
 				rawJSON["response"] = q.Response
 			} else {
-				fields["response"] = q.Response
+				fields["response"] = string(q.Response)
 			}
 		}
 	}
@@ -189,14 +189,14 @@ func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[stri
 		if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 			rawJSON["payload"] = q.Payload
 		} else {
-			fields["payload"] = q.Payload
+			fields["payload"] = string(q.Payload)
 		}
 	}
 	if len(q.Response) > 0 {
 		if bytes.HasPrefix(q.Response, []byte(`{`)) {
 			rawJSON["response"] = q.Response
 		} else {
-			fields["response"] = q.Response
+			fields["response"] = string(q.Response)
 		}
 	}
 	return
