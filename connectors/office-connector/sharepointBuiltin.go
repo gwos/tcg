@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
 

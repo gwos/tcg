@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
-	"github.com/gwos/tcg/logper"
-	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/sdk/logper"
+	"github.com/gwos/tcg/sdk/milliseconds"
 )
 
 // VersionString defines type of constant
@@ -1160,4 +1161,9 @@ var MonitorStatusWeightService = map[MonitorStatus]int{
 	ServiceWarning:             30,
 	ServiceScheduledCritical:   50,
 	ServiceUnscheduledCritical: 100,
+}
+
+// NewTimestamp returns a new timestamp setted to UTC now.
+func NewTimestamp() milliseconds.MillisecondTimestamp {
+	return milliseconds.MillisecondTimestamp{Time: time.Now().UTC()}
 }

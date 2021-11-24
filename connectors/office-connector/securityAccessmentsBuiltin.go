@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 )
 
 const (

@@ -138,11 +138,11 @@ ${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datat
 ${TIME_BUILD_OBJECTS}	: gotocjson/gotocjson time/time.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} time/time.go
 
-${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} milliseconds/milliseconds.go
+${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} sdk/milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} sdk/milliseconds/milliseconds.go
 
-${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson ${MILLISECONDS_BUILD_OBJECTS} transit/transit.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} transit/transit.go
+${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson ${MILLISECONDS_BUILD_OBJECTS} sdk/transit/transit.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} sdk/transit/transit.go
 
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
 	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@

@@ -10,7 +10,7 @@ import (
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 	_ "github.com/stretchr/testify/assert"
 )
 

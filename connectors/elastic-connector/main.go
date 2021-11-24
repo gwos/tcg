@@ -9,8 +9,8 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/elastic-connector/clients"
 	_ "github.com/gwos/tcg/docs"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
 )
 

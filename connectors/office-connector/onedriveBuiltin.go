@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 )
 
 const oneDriveUri = "https://graph.microsoft.com/v1.0/drive"

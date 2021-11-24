@@ -5,11 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	ecClients "github.com/gwos/tcg/connectors/elastic-connector/clients"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/clients"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
 

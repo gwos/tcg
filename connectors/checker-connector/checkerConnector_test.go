@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gwos/tcg/clients"
-	"github.com/gwos/tcg/logper"
 	"github.com/gwos/tcg/logzer"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/clients"
+	"github.com/gwos/tcg/sdk/logper"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"

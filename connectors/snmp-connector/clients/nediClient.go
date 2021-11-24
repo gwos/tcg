@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/rs/zerolog/log"
 )
 

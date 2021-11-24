@@ -16,7 +16,7 @@ import (
 	"github.com/gin-gonic/contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
-	tcgerr "github.com/gwos/tcg/errors"
+	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"

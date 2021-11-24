@@ -7,8 +7,8 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
 )
 

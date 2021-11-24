@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/gwos/tcg/logper"
+	"github.com/gwos/tcg/sdk/logper"
 )
 
 var httpClient = &http.Client{
