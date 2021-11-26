@@ -57,7 +57,7 @@ require (
 	k8s.io/metrics v0.21.3
 )
 
-require github.com/gwos/tcg/sdk v0.0.0-20211125122009-24221bf01623
+require github.com/gwos/tcg/sdk v0.0.0-20211126104958-5206dbbe3426
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
