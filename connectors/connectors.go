@@ -13,10 +13,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/sdk/milliseconds"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/tracing"
-	"github.com/gwos/tcg/transit"
 	"github.com/rs/zerolog/log"
 )
 

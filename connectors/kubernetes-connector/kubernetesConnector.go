@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"errors"
-	"gopkg.in/yaml.v3"
 	"strings"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/milliseconds"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

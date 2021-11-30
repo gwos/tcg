@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 )
 
 const baseGraphUri = "https://graph.microsoft.com/v1.0/users/%s/messages?"

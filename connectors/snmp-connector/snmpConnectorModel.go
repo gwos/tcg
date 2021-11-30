@@ -8,8 +8,8 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/milliseconds"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/milliseconds"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
 )

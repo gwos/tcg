@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/PaesslerAG/jsonpath"
-	"github.com/gwos/tcg/transit"
+	"github.com/gwos/tcg/sdk/transit"
 )
 
 const (

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	tcgerr "github.com/gwos/tcg/errors"
+	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/nats-io/stan.go"
 	"github.com/patrickmn/go-cache"

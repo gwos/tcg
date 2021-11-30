@@ -3,7 +3,6 @@ package milliseconds
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"reflect"
 	"strconv"
 	"testing"
@@ -69,19 +68,19 @@ func TestMillisecondTimestamp_MarshalJSON(t *testing.T) {
 		{
 			name:    "1900-01-01",
 			fields:  fields{time.Date(1900, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("\"-2208988800000\""),
+			want:    ([]byte)(`"-2208988800000"`),
 			wantErr: false,
 		},
 		{
 			name:    "1970-01-01",
 			fields:  fields{time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("\"0\""),
+			want:    ([]byte)(`"0"`),
 			wantErr: false,
 		},
 		{
 			name:    "2020-12-31",
 			fields:  fields{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
-			want:    ([]byte)("\"1609372800000\""),
+			want:    ([]byte)(`"1609372800000"`),
 			wantErr: false,
 		},
 	}
@@ -110,13 +109,17 @@ func TestStructMarshalJSON(t *testing.T) {
 		MillisecondTimestamp{time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC)},
 	}
 	output, err := json.Marshal(value)
-
-	assert.NoError(t, err)
-	assert.Equal(t, "{\"NamedField\":\"1609372800000\"}", string(output))
+	expected := `{"NamedField":"1609372800000"}`
+	if err != nil {
+		t.Errorf("json.Marshal returned an error: %v", err)
+	}
+	if expected != string(output) {
+		t.Errorf("json.Marshal returned %v want %v", string(output), expected)
+	}
 }
 
 func TestStructUnmarshalJSON(t *testing.T) {
-	input := []byte("{\"NamedField\":\"1609372800000\"}")
+	input := []byte(`{"NamedField":"1609372800000"}`)
 	value := struct {
 		NamedField MillisecondTimestamp
 	}{}
@@ -127,8 +130,12 @@ func TestStructUnmarshalJSON(t *testing.T) {
 	}
 
 	err := json.Unmarshal(input, &value)
-	assert.NoError(t, err)
-	assert.Equal(t, expected, value)
+	if err != nil {
+		t.Errorf("json.Unmarshal returned an error: %v", err)
+	}
+	if !reflect.DeepEqual(value, expected) {
+		t.Errorf("json.Unmarshal returned %v, want %v", value, expected)
+	}
 }
 
 // BenchmarkMarshallerSprintf benchmarks Sprintf based marshaller
@@ -136,8 +143,10 @@ func BenchmarkMarshallerSprintf(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		t1 := time.Date(2020, time.December, 31, 0, 0, 0, 0, time.UTC).Add(time.Duration(i) * time.Second)
 		i1 := t1.UnixNano() / int64(time.Millisecond)
-		buf := []byte(fmt.Sprintf("\"%d\"", i1))
-		assert.NotEmpty(b, buf)
+		buf := []byte(fmt.Sprintf(`"%d"`, i1))
+		if len(buf) == 0 {
+			b.Errorf("buf is empty")
+		}
 	}
 }
 
@@ -150,6 +159,8 @@ func BenchmarkMarshallerAppend(b *testing.B) {
 		buf = append(buf, '"')
 		buf = strconv.AppendInt(buf, i1, 10)
 		buf = append(buf, '"')
-		assert.NotEmpty(b, buf)
+		if len(buf) == 0 {
+			b.Errorf("buf is empty")
+		}
 	}
 }

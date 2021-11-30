@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
-	"github.com/gwos/tcg/logper"
-	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/sdk/logper"
+	"github.com/gwos/tcg/sdk/milliseconds"
 )
 
 // VersionString defines type of constant
@@ -574,7 +575,7 @@ func (inventoryResource *DynamicInventoryResource) CreateProperty(name string, v
 func (monitoredService *DynamicMonitoredService) CreateProperties(properties map[string]interface{}) {
 	for k, v := range properties {
 		var typedValue TypedValue
-		err := typedValue.toTypedValue(v)
+		err := typedValue.FromInterface(v)
 		if err != nil {
 			logper.Error(nil, "could not create property %s of service %s: %s",
 				k, monitoredService.Name, err)
@@ -583,7 +584,7 @@ func (monitoredService *DynamicMonitoredService) CreateProperties(properties map
 	}
 }
 
-func (value *TypedValue) toTypedValue(v interface{}) error {
+func (value *TypedValue) FromInterface(v interface{}) error {
 	switch v.(type) {
 	case bool:
 		value.ValueType = BooleanType
@@ -1160,4 +1161,9 @@ var MonitorStatusWeightService = map[MonitorStatus]int{
 	ServiceWarning:             30,
 	ServiceScheduledCritical:   50,
 	ServiceUnscheduledCritical: 100,
+}
+
+// NewTimestamp returns a new timestamp setted to UTC now.
+func NewTimestamp() milliseconds.MillisecondTimestamp {
+	return milliseconds.MillisecondTimestamp{Time: time.Now().UTC()}
 }

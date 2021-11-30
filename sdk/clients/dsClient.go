@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gwos/tcg/logper"
+	"github.com/gwos/tcg/sdk/logper"
 )
 
 // Define entrypoints for DSOperations

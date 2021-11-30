@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gwos/tcg/clients"
 	"github.com/gwos/tcg/config"
-	"github.com/gwos/tcg/milliseconds"
+	"github.com/gwos/tcg/sdk/clients"
+	"github.com/gwos/tcg/sdk/milliseconds"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
-	"github.com/gwos/tcg/transit"
 	"github.com/stretchr/testify/assert"
 )
 

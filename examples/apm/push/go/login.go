@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gwos/tcg/clients"
+	"github.com/gwos/tcg/sdk/clients"
 )
 
 var loginUrl = "/api/auth/login"
