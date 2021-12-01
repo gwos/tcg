@@ -340,7 +340,7 @@ func defaults() Config {
 			NatsAckWait:             time.Second * 30,
 			NatsMaxInflight:         1024,
 			NatsMaxPubAcksInflight:  1024,
-			NatsMaxPayload:          1024 * 1024 * 80, // 80MB
+			NatsMaxPayload:          1024 * 1024 * 64, // 64MB github.com/nats-io/nats-server/releases/tag/v2.3.4
 			NatsMaxPendingBytes:     -1,
 			NatsMaxPendingMsgs:      1024,
 			NatsMonitorPort:         0,
