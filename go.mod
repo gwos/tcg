@@ -32,11 +32,11 @@ require (
 	github.com/swaggo/gin-swagger v1.3.3
 	github.com/swaggo/swag v1.7.6
 	github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e
-	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.26.0
-	go.opentelemetry.io/otel v1.1.0
-	go.opentelemetry.io/otel/exporters/jaeger v1.1.0
-	go.opentelemetry.io/otel/sdk v1.1.0
-	go.opentelemetry.io/otel/trace v1.1.0
+	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.27.0
+	go.opentelemetry.io/otel v1.2.0
+	go.opentelemetry.io/otel/exporters/jaeger v1.2.0
+	go.opentelemetry.io/otel/sdk v1.2.0
+	go.opentelemetry.io/otel/trace v1.2.0
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 	k8s.io/api v0.22.4
