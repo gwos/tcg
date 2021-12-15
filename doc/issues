@@ -1,0 +1,35 @@
+Herewith follows a document describing our need to transfer data between
+Go data structures and C data structures, how we are approaching that
+problem, and the issues I see.
+
+We have apparently decided to not attempt to directly map in-memory
+data-structure content between the two languages.  The reasons are
+somewhat detailed, and I won't go into full depth here.  But they partly
+involve Go's paranoia about sharing pointers with outside code, possible
+difficulties with calculating field alignments in the respective data
+structures, and the lack of automated tools supported by the upstream Go
+community for handling such conversions.  That said, I don't necessarily
+believe the game is completely lost in that regard; I don't necessarily
+think we have explored our options enough.  For instance, we can do
+pointer arithmetic in both languages to find field offsets; also,
+C provides the <stdalign.h> header and the alignof() macro, available
+starting with C11, that could help.  So we might revisit that idea again
+in the future, if we decide we want to optimize the transfer of complex
+data between these two languages.
+
+In the meantime, we have settled on using JSON strings as an intermediate
+data representation for exchanging data in either direction between Go
+and C code.
+
+No matter whether we use direct data-structure mapping or JSON, we have
+something of a maintenance problem.  As the code evolves in one language,
+we need to modify corresponding data structures and transfer mechanisms
+in the other language.  We have decided to attempt the automation of
+that part of code maintenance, by creating tools to take the structure
+definitions in one language as authoritative and derive the structure
+definitions and data-exchange mechanisms in the other language as needed.
+For this purpose, it seems to make sense to use the Go code as the
+authoritative reference platform.  One advantage is that Go is already
+equipped with a package to perform JSON encoding and decoding, and Go
+provides support for struct field tags, a form of metadata, that can
+help define how the data is handling during such operations.

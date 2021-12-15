@@ -1,0 +1,34 @@
+{
+    "AgentConfig": {
+        "ControllerAddr": ":http",
+        "ControllerCertFile": "/path/to/controller/certfile",
+        "ControllerKeyFile": "/path/to/controller/keyfile",
+        "NatsAckWait": 15,
+        "NatsFilestoreDir": "/nats/filestore",
+        "NatsStoreType": "MEMORY",
+        "NatsHost": ":4220",
+        "LogLevel": 2
+    },
+    "GWConfigs": [
+        {
+            "Host": "host_name",
+            "Account": "account_name",
+            "Password": "config_password",
+            "AppName": "config_app_name"
+        }
+    ],
+    "GroundworkActions": {
+        "Connect": {
+            "Entrypoint": "connect_entry_point"
+        },
+        "Disconnect": {
+            "Entrypoint": "disconnect_entry_point"
+        },
+        "SynchronizeInventory": {
+            "Entrypoint": "synchronize_inventory_entry_point"
+        },
+        "SendResourceWithMetrics": {
+            "Entrypoint": "send_resource_with_metrics_entry_point"
+        }
+    }
+}

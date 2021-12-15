@@ -22,7 +22,7 @@ INCLUDES = -I./
 # We use "-g" because it helps with running under gdb when we experience segfaults.
 CFLAGS = ${INCLUDES} -m64 -std=gnu11 -g
 
-all: echo libtransit.h libtransit.so transit.h examples
+all: echo libtransit.h libtransit.so transit.h run_examples
 
 echo:
 	@echo Build info: ${BUILD_TAG} / ${BUILD_TIME}
@@ -37,8 +37,7 @@ examples: libtransit.h libtransit.so transit.h ./examples/c/*.c
 # Build shared lib and set build info values with Go linker
 libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
 	go build \
-		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' \
-			-X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" \
+		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' -X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" \
 		-buildmode=c-shared -o libtransit.so ./
 	chmod +x libtransit.so
 
@@ -48,7 +47,3 @@ transit.h: ../sdk/transit/*.go
 
 clean:
 	rm -rf *.h *.so *.run
-
-distclean: clean
-
-realclean: clean

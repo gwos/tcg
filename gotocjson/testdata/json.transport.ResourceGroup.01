@@ -1,0 +1,10 @@
+{
+    "groupName": "TestGroupName",
+    "resources": [
+        {
+            "name": "TestName",
+            "type": "service",
+            "owner": "TestOwner"
+        }
+    ]
+}

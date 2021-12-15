@@ -1,0 +1,17 @@
+{
+    "successful": 1,
+    "failed": 0,
+    "entityType": "TestEntity",
+    "operation": "Insert",
+    "warning": 0,
+    "count": 1,
+    "results": [
+        {
+            "entity": "TestEntity",
+            "status": "TestStatus",
+            "message": "TestMessage",
+            "location": "TestLocation",
+            "entityID": 173
+        }
+    ]
+}

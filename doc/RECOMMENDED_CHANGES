@@ -1,0 +1,144 @@
+Information in this file may be obsolete.  It has not yet been
+reviewed for current status.
+
+----------------------------------------------------------------
+
+Herewith are the changes that I know we need to make to the Go source
+code to make it possible generate corresponding acceptable clean C code.
+
+----------------------------------------------------------------
+
+config.go
+    It is necessary to apply some naming to this particular const
+    block, in order to provide an enumeration name in the C code for
+    these constants.  The patch shown here is for general reference;
+    the particular enumeration name is not important, and you can choose
+    something else if you want.  Because Go code requires an exact match
+    of types, giving these constants an explicit non-"string" type will
+    probably mean that the Go code that uses these constants will need
+    some adjustment.
+
+% diff -u ~/github/gwos/tcg/config/config.go config.go
+--- /home/gherteg/github/gwos/tcg/config/config.go	2019-11-04 08:35:03.719679462 -0800
++++ config.go	2019-11-04 17:15:44.828507156 -0800
+@@ -9,11 +9,17 @@
+ 	"gopkg.in/yaml.v3"
+ )
+ 
++// We need this type so constants like ConfigEnv are not declared as "string" type,
++// which would interfere with how the C code enumeration for the associated values
++// gets generated.  That said, this will probably mean that any use of these constants
++// will need to be explicitly converted to "string" type in the Go code.
++type ConfigEnvironmentVariables string
++
+ // ConfigEnv defines environment variable for config file path
+ const (
+-	ConfigEnv       = "TCG_CONFIG"
+-	ConfigName      = "tcg_config.yaml"
+-	EnvConfigPrefix = "TCG"
++	ConfigEnv       ConfigEnvironmentVariables = "TCG_CONFIG"
++	ConfigName                                 = "tcg_config.yaml"
++	EnvConfigPrefix                            = "TCG"
+ )
+ 
+ // GroundworkAction defines configurable options for an action
+
+----------------------------------------------------------------
+
+milliseconds.go
+    No changes are needed at this time.
+
+----------------------------------------------------------------
+
+transit.go
+    The const block shown needs a name, just like the one in the config.go
+    file.  In this case, I think the type name I am using here is the
+    obvious one to adopt.
+
+    In two cases, I wonder whether a "Type" field should be changed from
+    "string" to "MonitoredResourceType" instead.  My comments on those
+    fields are for consideration by the other programmers.  In the last
+    case, I'm pretty certain that the "Type" field should have its Go
+    type changed as shown.
+
+    In some cases, we use Go pointers within our defined data structures,
+    instead of directly embedding the pointed-to data structures.  At some
+    point, I would like to review why we chose to use those Go pointers,
+    and discuss whether direct embedding would be a better approach
+    in some cases.  But those are not the most critical adjustments,
+    so I am not going into any further detail on them here.
+
+diff -u ~/github/gwos/tcg/transit/transit.go transit.go
+--- /home/gherteg/github/gwos/tcg/transit/transit.go	2019-11-04 16:04:20.339841462 -0800
++++ transit.go	2019-10-28 14:02:05.357566872 -0700
+@@ -80,11 +80,13 @@
+ 	HostUnreachable                          = "HOST_UNREACHABLE"
+ )
+ 
++type MonitoredResourceType string
++
+ // The resource type uniquely defining the resource type
+ // General Nagios Types are host and service, whereas CloudHub can have richer complexity
+ const (
+-	ServiceResource string = "service"
+-	HostResource           = "host"
++	ServiceResource MonitoredResourceType = "service"
++	HostResource                          = "host"
+ )
+ 
+ // MetricSampleType defines TimeSeries Metric Sample Possible Types
+@@ -292,6 +294,7 @@
+ 	Name string `json:"name,required"`
+ 	// Type: Required. The resource type uniquely defining the resource type
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
++	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
+ 	Type string `json:"type,required"`
+ 	// Owner relationship for associations like host->service
+ 	Owner string `json:"owner,omitempty"`
+@@ -311,6 +314,7 @@
+ 	Name string `json:"name,required"`
+ 	// Type: Required. The resource type uniquely defining the resource type
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
++	// FIX MAJOR:  should this be "Type MonitoredResourceType" instead?
+ 	Type string `json:"type,required"`
+ 	// Owner relationship for associations like host->service
+ 	Owner string `json:"owner,omitempty"`
+@@ -332,7 +336,7 @@
+ 	Name string `json:"name,required"`
+ 	// Type: Required. The resource type uniquely defining the resource type
+ 	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
+-	Type string `json:"type,required"`
++	Type MonitoredResourceType `json:"type,required"`
+ 	// Owner relationship for associations like host->service
+ 	Owner string `json:"owner,omitempty"`
+ }
+
+Also, we have this difference of wording in the transit.go file, that ought to be
+made consistent as regards our spelling for Boolean values and our documentation for
+StringType, IntegerType, and BooleanType values:
+
+    ----------------------------------------------------------------
+    // Data type of the value of a metric
+    const (
+	    IntegerType     ValueType = "IntegerType"
+	    DoubleType                = "DoubleType"
+	    StringType                = "StringType"
+	    BooleanType               = "BooleanType"
+	    TimeType                  = "TimeType"
+	    UnspecifiedType           = "UnspecifiedType"
+    )
+    ----------------------------------------------------------------
+    (within "type TypedValue struct")
+    // BoolValue: A Boolean value: true or false.
+    BoolValue bool `json:"boolValue,omitempty"`
+    ----------------------------------------------------------------
+    (within "type LabelDescriptor struct")
+    // ValueType: The type of data that can be assigned to the label.
+    //
+    // Possible values:
+    //   "STRING" - A variable-length string. This is the default.
+    //   "BOOL" - Boolean; true or false.
+    //   "INT64" - A 64-bit signed integer.
+    ValueType ValueType `json:"valueType,omitempty"`
+    ----------------------------------------------------------------
+

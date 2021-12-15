@@ -9,8 +9,9 @@ COPY . .
 
 RUN apt-get update -qq \
     && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
-    && make clean && make -C libtransit run_examples \
-    && echo "[LIBTRANSIT TEST DONE]"
+        libjansson-dev \
+    && make clean && make \
+    && echo "[GOTOCJSON TEST DONE]"
 
 FROM golang:alpine as build
 ARG TRAVIS_TAG=
