@@ -8,6 +8,7 @@ import "C"
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"runtime/cgo"
 	"time"
 
@@ -546,36 +547,41 @@ func MarshallIndentJSON(
 	return true
 }
 
-// SendInventory sends inventory request
-//export SendInventory
-func SendInventory(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.InventoryRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendInventory")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		SynchronizeInventory(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
+// Send sends request
+//export Send
+func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
+	var sender func(context.Context, []byte) error
 
-// SendMetrics sends metrics request
-//export SendMetrics
-func SendMetrics(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.ResourcesWithServicesRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendMetrics")
+	h := cgo.Handle(req)
+	switch h.Value().(type) {
+	case *transit.Downtimes:
+		sender = services.GetTransitService().ClearInDowntime
+	case *transit.DowntimesRequest:
+		sender = services.GetTransitService().SetInDowntime
+	case *transit.GroundworkEventsRequest:
+		sender = services.GetTransitService().SendEvents
+	case *transit.GroundworkEventsAckRequest:
+		sender = services.GetTransitService().SendEventsAck
+	case *transit.GroundworkEventsUnackRequest:
+		sender = services.GetTransitService().SendEventsUnack
+	case *transit.InventoryRequest:
+		sender = services.GetTransitService().SynchronizeInventory
+	case *transit.ResourcesWithServicesRequest:
+		sender = services.GetTransitService().SendResourceWithMetrics
+	default:
+		msg := fmt.Sprintf("unknown type: %+v", h.Value())
+		bufStr(errBuf, errBufLen, msg)
+		log.Warn().Msg(msg)
+		return false
+	}
+
+	bb, err := json.Marshal(h.Value())
+	log.Debug().Err(err).RawJSON("payload", bb).Msg("Send")
 	if err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
-	if err := services.GetTransitService().
-		SendResourceWithMetrics(context.Background(), bb); err != nil {
+	if err := sender(context.Background(), bb); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}

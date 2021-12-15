@@ -1,8 +1,12 @@
+// Deprecated: Use sdk/transit instead
 package transit
 
 import (
 	"fmt"
 	"strconv"
+	"time"
+
+	"github.com/gwos/tcg/deprecated/milliseconds"
 )
 
 // VersionString defines type of constant
@@ -92,7 +96,6 @@ const (
 	ServiceUnknown             MonitorStatus = "SERVICE_UNKNOWN"
 	HostUp                     MonitorStatus = "HOST_UP"
 	HostUnscheduledDown        MonitorStatus = "HOST_UNSCHEDULED_DOWN"
-	HostWarning                MonitorStatus = "HOST_WARNING"
 	HostPending                MonitorStatus = "HOST_PENDING"
 	HostScheduledDown          MonitorStatus = "HOST_SCHEDULED_DOWN"
 	HostUnreachable            MonitorStatus = "HOST_UNREACHABLE"
@@ -105,19 +108,18 @@ type ResourceType string
 // The resource type uniquely defining the resource type
 // General Nagios Types are host and service, whereas CloudHub can have richer complexity
 const (
-	ResourceTypeHost           ResourceType = "host"
-	ResourceTypeService        ResourceType = "service"
-	ResourceTypeHypervisor     ResourceType = "hypervisor"
-	ResourceTypeInstance       ResourceType = "instance"
-	ResourceTypeVirtualMachine ResourceType = "virtual-machine"
-	ResourceTypeCloudApp       ResourceType = "cloud-app"
-	ResourceTypeCloudFunction  ResourceType = "cloud-function"
-	ResourceTypeLoadBalancer   ResourceType = "load-balancer"
-	ResourceTypeContainer      ResourceType = "container"
-	ResourceTypeStorage        ResourceType = "storage"
-	ResourceTypeNetwork        ResourceType = "network"
-	ResourceTypeNetworkSwitch  ResourceType = "network-switch"
-	ResourceTypeNetworkDevice  ResourceType = "network-device"
+	Host           ResourceType = "host"
+	Hypervisor     ResourceType = "hypervisor"
+	Instance       ResourceType = "instance"
+	VirtualMachine ResourceType = "virtual-machine"
+	CloudApp       ResourceType = "cloud-app"
+	CloudFunction  ResourceType = "cloud-function"
+	LoadBalancer   ResourceType = "load-balancer"
+	Container      ResourceType = "container"
+	Storage        ResourceType = "storage"
+	Network        ResourceType = "network"
+	NetworkSwitch  ResourceType = "network-switch"
+	NetworkDevice  ResourceType = "network-device"
 )
 
 // ServiceType defines the service type
@@ -125,8 +127,8 @@ type ServiceType string
 
 // Possible Types
 const (
-	ServiceTypeProcess ServiceType = "Process"
-	ServiceTypeService ServiceType = "Service"
+	Process ServiceType = "Process"
+	Service             = "Service"
 )
 
 // GroupType defines the foundation group type
@@ -145,10 +147,10 @@ type MetricSampleType string
 // TimeSeries Metric Sample Possible Types
 const (
 	Value    MetricSampleType = "Value"
-	Warning  MetricSampleType = "Warning"
-	Critical MetricSampleType = "Critical"
-	Min      MetricSampleType = "Min"
-	Max      MetricSampleType = "Max"
+	Warning                   = "Warning"
+	Critical                  = "Critical"
+	Min                       = "Min"
+	Max                       = "Max"
 )
 
 // TimeInterval defines a closed time interval. It extends from the start time
@@ -169,19 +171,18 @@ const (
 // start time could overwrite data written at the previous end time.
 type TimeInterval struct {
 	// EndTime: Required. The end of the time interval.
-	EndTime *Timestamp `json:"endTime"`
+	EndTime milliseconds.MillisecondTimestamp `json:"endTime,omitempty"`
 
 	// StartTime: Optional. The beginning of the time interval. The default
 	// value for the start time is the end time. The start time must not be
 	// later than the end time.
-	StartTime *Timestamp `json:"startTime,omitempty"`
+	StartTime milliseconds.MillisecondTimestamp `json:"startTime,omitempty"`
 }
 
-// String implements Stringer interface
 func (value TimeInterval) String() string {
 	return fmt.Sprintf("[%s, %s]",
-		value.EndTime,
-		value.StartTime,
+		value.EndTime.String(),
+		value.StartTime.String(),
 	)
 }
 
@@ -190,173 +191,38 @@ type TypedValue struct {
 	ValueType ValueType `json:"valueType"`
 
 	// BoolValue: A Boolean value: true or false.
-	BoolValue *bool `json:"boolValue,omitempty"`
+	BoolValue bool `json:"boolValue,omitempty"`
 
 	// DoubleValue: A 64-bit double-precision floating-point number. Its
 	// magnitude is approximately &plusmn;10<sup>&plusmn;300</sup> and it
 	// has 16 significant digits of precision.
-	DoubleValue *float64 `json:"doubleValue,omitempty"`
+	DoubleValue float64 `json:"doubleValue"`
 
 	// Int64Value: A 64-bit integer. Its range is approximately
 	// &plusmn;9.2x10<sup>18</sup>.
-	IntegerValue *int64 `json:"integerValue,omitempty"`
+	IntegerValue int64 `json:"integerValue"`
 
 	// StringValue: A variable-length string value.
-	StringValue *string `json:"stringValue,omitempty"`
+	StringValue string `json:"stringValue,omitempty"`
 
 	// a time stored as full timestamp
-	TimeValue *Timestamp `json:"timeValue,omitempty"`
+	TimeValue *milliseconds.MillisecondTimestamp `json:"timeValue,omitempty"`
 }
 
-// String implements Stringer interface
 func (value TypedValue) String() string {
 	switch value.ValueType {
 	case IntegerType:
-		return strconv.FormatInt(*value.IntegerValue, 10)
+		return strconv.FormatInt(value.IntegerValue, 10)
 	case StringType:
-		return *value.StringValue
+		return value.StringValue
 	case DoubleType:
-		return fmt.Sprintf("%f", *value.DoubleValue)
+		return fmt.Sprintf("%f", value.DoubleValue)
 	case BooleanType:
-		return strconv.FormatBool(*value.BoolValue)
+		return strconv.FormatBool(value.BoolValue)
 	case TimeType:
 		return value.TimeValue.String()
 	}
 	return ""
-}
-
-// NewTypedValue returns a reference to TypedValue or nil
-func NewTypedValue(v interface{}) *TypedValue {
-	p := new(TypedValue)
-	switch v := v.(type) {
-	case bool:
-		p.ValueType = BooleanType
-		p.BoolValue = new(bool)
-		*p.BoolValue = v
-	case *bool:
-		p.ValueType = BooleanType
-		p.BoolValue = new(bool)
-		*p.BoolValue = *v
-	case float32:
-		p.ValueType = DoubleType
-		p.DoubleValue = new(float64)
-		*p.DoubleValue = float64(v)
-	case *float32:
-		p.ValueType = DoubleType
-		p.DoubleValue = new(float64)
-		*p.DoubleValue = float64(*v)
-	case float64:
-		p.ValueType = DoubleType
-		p.DoubleValue = new(float64)
-		*p.DoubleValue = v
-	case *float64:
-		p.ValueType = DoubleType
-		p.DoubleValue = new(float64)
-		*p.DoubleValue = *v
-	case int:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *int:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case int8:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *int8:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case int16:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *int16:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case int32:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *int32:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case int64:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = v
-	case *int64:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = *v
-	case uint:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *uint:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case uint8:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *uint8:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case uint16:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *uint16:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case uint32:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *uint32:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case uint64:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(v)
-	case *uint64:
-		p.ValueType = IntegerType
-		p.IntegerValue = new(int64)
-		*p.IntegerValue = int64(*v)
-	case string:
-		p.ValueType = StringType
-		p.StringValue = new(string)
-		*p.StringValue = v
-	case *string:
-		p.ValueType = StringType
-		p.StringValue = new(string)
-		*p.StringValue = *v
-	case Timestamp:
-		p.ValueType = TimeType
-		p.TimeValue = new(Timestamp)
-		*p.TimeValue = v
-	case *Timestamp:
-		p.ValueType = TimeType
-		p.TimeValue = new(Timestamp)
-		*p.TimeValue = *v
-	case TypedValue:
-		*p = v
-	case *TypedValue:
-		*p = *v
-	default:
-		return nil
-	}
-	return p
 }
 
 // ThresholdValue describes threshold
@@ -366,14 +232,9 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
-func (p *ThresholdValue) SetValue(v interface{}) {
-	p.Value = NewTypedValue(v)
-}
-
-// String implements Stringer interface
-func (p ThresholdValue) String() string {
+func (thresholdValue ThresholdValue) String() string {
 	return fmt.Sprintf("[%s, %s, %s]",
-		p.SampleType, p.Label, p.Value.String())
+		thresholdValue.SampleType, thresholdValue.Label, thresholdValue.Value.String())
 }
 
 // TimeSeries defines a single Metric Sample, its time interval, and 0 or more thresholds
@@ -393,57 +254,22 @@ type TimeSeries struct {
 	Value             *TypedValue       `json:"value"`
 	Tags              map[string]string `json:"tags,omitempty"`
 	Unit              UnitType          `json:"unit,omitempty"`
-	Thresholds        []ThresholdValue  `json:"thresholds,omitempty"`
+	Thresholds        *[]ThresholdValue `json:"thresholds,omitempty"`
 	MetricComputeType ComputeType       `json:"-"`
 	MetricExpression  string            `json:"-"`
 }
 
-func (p *TimeSeries) AddThreshold(t ThresholdValue) {
-	p.Thresholds = append(p.Thresholds, t)
-}
-
-func (p *TimeSeries) SetName(s string) {
-	p.MetricName = s
-}
-
-func (p *TimeSeries) SetSampleType(s MetricSampleType) {
-	p.SampleType = s
-}
-
-func (p *TimeSeries) SetIntervalEnd(t *Timestamp) {
-	if p.Interval == nil {
-		p.Interval = new(TimeInterval)
-	}
-	p.Interval.EndTime = t
-}
-
-func (p *TimeSeries) SetIntervalStart(t *Timestamp) {
-	if p.Interval == nil {
-		p.Interval = new(TimeInterval)
-	}
-	p.Interval.StartTime = t
-}
-
-func (p *TimeSeries) SetValue(v interface{}) {
-	p.Value = NewTypedValue(v)
-}
-
-func (p *TimeSeries) SetTag(k string, v string) {
-	if p.Tags == nil {
-		p.Tags = make(map[string]string)
-	}
-	p.Tags[k] = v
-}
-
-func (p *TimeSeries) SetUnit(s UnitType) {
-	p.Unit = s
-}
-
-// String implements Stringer interface
-func (p TimeSeries) String() string {
+func (timeSeries TimeSeries) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s]",
-		p.MetricName, p.SampleType, p.Interval.String(), p.Value.String(),
-		p.Tags, p.Unit, p.Thresholds)
+		timeSeries.MetricName, timeSeries.SampleType, timeSeries.Interval.String(), timeSeries.Value.String(),
+		timeSeries.Tags, timeSeries.Unit, *timeSeries.Thresholds)
+}
+
+func (timeSeries *TimeSeries) CreateTag(name string, value string) {
+	if timeSeries.Tags == nil {
+		timeSeries.Tags = make(map[string]string)
+	}
+	timeSeries.Tags[name] = value
 }
 
 // MetricDescriptor defines a metric type and its schema
@@ -519,7 +345,6 @@ type MetricDescriptor struct {
 	MetricKind MetricKind `json:"metricKind"`
 }
 
-// String implements Stringer interface
 func (metricDescriptor MetricDescriptor) String() string {
 	return fmt.Sprintf("%s - %s", metricDescriptor.Type, metricDescriptor.CustomName)
 }
@@ -541,7 +366,6 @@ type LabelDescriptor struct {
 	ValueType ValueType `json:"valueType,omitempty"`
 }
 
-// String implements Stringer interface
 func (labelDescriptor LabelDescriptor) String() string {
 	return fmt.Sprintf("[%s, %s, %s]", labelDescriptor.Description, labelDescriptor.Key, labelDescriptor.ValueType)
 }
@@ -553,44 +377,163 @@ type ThresholdDescriptor struct {
 	Value int32  `json:"value"`
 }
 
-// String implements Stringer interface
 func (thresholdDescriptor ThresholdDescriptor) String() string {
 	return fmt.Sprintf("[%s, %d]", thresholdDescriptor.Key, thresholdDescriptor.Value)
 }
 
+type InventoryResource struct {
+	// The unique Name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type of the resource
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,required"`
+	// Owner relationship for associations like hypervisor->virtual machine
+	Owner string `json:"owner,omitempty"`
+	// CloudHub Categorization of resources
+	Category string `json:"category,omitempty"`
+	// Optional Description of this resource, such as Nagios notes
+	Description string `json:"description,omitempty"`
+	// Device is needed for detection on Foundation side
+	Device string `json:"device,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+	Services   []InventoryService    `json:"services"`
+}
+
+type InventoryService struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type of the resource
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,required"`
+	// Owner relationship for associations like hypervisor->virtual machine
+	Owner string `json:"owner,omitempty"`
+	// CloudHub Categorization of resources
+	Category string `json:"category,omitempty"`
+	// Optional description of this resource, such as Nagios notes
+	Description string `json:"description,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+}
+
+type MonitoredResource struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type of the resource
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,required"`
+	// Owner relationship for associations like hypervisor->virtual machine
+	Owner string `json:"owner,omitempty"`
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+	Services   []MonitoredService    `json:"services"`
+}
+
+type MonitoredService struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Required. The resource type of the resource
+	// General Nagios Types are hosts, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,required"`
+	// Owner relationship for associations like hypervisor->virtual machine
+	Owner string `json:"owner,omitempty"`
+	// CloudHub Categorization of resources
+	Category string `json:"category,omitempty"`
+	// Optional description of this resource, such as Nagios notes
+	Description string `json:"description,omitempty"`
+	// Foundation Properties
+	Properties map[string]TypedValue `json:"properties,omitempty"`
+	// Restrict to a Groundwork Monitor Status
+	Status MonitorStatus `json:"status,required"`
+	// The last status check time on this resource
+	LastCheckTime milliseconds.MillisecondTimestamp `json:"lastCheckTime,omitempty"`
+	// The next status check time on this resource
+	NextCheckTime milliseconds.MillisecondTimestamp `json:"nextCheckTime,omitempty"`
+	// Nagios plugin output string
+	LastPlugInOutput string `json:"lastPluginOutput,omitempty"`
+	// metrics
+	Metrics []TimeSeries `json:"metrics"`
+}
+
+func (value *TypedValue) FromInterface(v interface{}) error {
+	switch v := v.(type) {
+	case bool:
+		value.ValueType = BooleanType
+		value.BoolValue = v
+	case float32:
+		value.ValueType = DoubleType
+		value.DoubleValue = float64(v)
+	case float64:
+		value.ValueType = DoubleType
+		value.DoubleValue = v
+	case int:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v)
+	case int8:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v)
+	case int16:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v)
+	case int32:
+		value.ValueType = IntegerType
+		value.IntegerValue = int64(v)
+	case int64:
+		value.ValueType = IntegerType
+		value.IntegerValue = v
+	case string:
+		value.ValueType = StringType
+		value.StringValue = v
+	case milliseconds.MillisecondTimestamp:
+		value.ValueType = TimeType
+		value.TimeValue = new(milliseconds.MillisecondTimestamp)
+		*value.TimeValue = v
+	default:
+		return fmt.Errorf("unsupported type: %+v", v)
+	}
+	return nil
+}
+
+// MonitoredResourceRef references a MonitoredResource in a group collection
+type MonitoredResourceRef struct {
+	// The unique name of the resource
+	Name string `json:"name,required"`
+	// Type: Optional. The resource type uniquely defining the resource type
+	// General Nagios Types are host and service, whereas CloudHub can have richer complexity
+	Type ResourceType `json:"type,omitempty"`
+	// Owner relationship for associations like host->service
+	Owner string `json:"owner,omitempty"`
+}
+
+func (monitoredResourceRef MonitoredResourceRef) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		monitoredResourceRef.Name,
+		monitoredResourceRef.Type,
+		monitoredResourceRef.Owner,
+	)
+}
+
 // TracerContext describes a Transit call
 type TracerContext struct {
-	AppType    string        `json:"appType"`
-	AgentID    string        `json:"agentId"`
-	TraceToken string        `json:"traceToken"`
-	TimeStamp  *Timestamp    `json:"timeStamp"`
-	Version    VersionString `json:"version"`
+	AppType    string                            `json:"appType"`
+	AgentID    string                            `json:"agentId"`
+	TraceToken string                            `json:"traceToken"`
+	TimeStamp  milliseconds.MillisecondTimestamp `json:"timeStamp"`
+	Version    VersionString                     `json:"version"`
 }
 
-// SetContext sets values if not empty
-func (p *TracerContext) SetContext(c TracerContext) {
-	if c.AgentID != "" {
-		p.AgentID = c.AgentID
-	}
-	if c.AppType != "" {
-		p.AppType = c.AppType
-	}
-	if c.TraceToken != "" {
-		p.TraceToken = c.TraceToken
-	}
-	if c.Version != "" {
-		p.Version = c.Version
-	}
-	if c.TimeStamp != nil {
-		p.TimeStamp = c.TimeStamp
-	}
-}
-
-// String implements Stringer interface
-func (p TracerContext) String() string {
+func (tracerContext TracerContext) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
-		p.AppType, p.AgentID, p.TraceToken,
-		p.TimeStamp, p.Version,
+		tracerContext.AppType, tracerContext.AgentID, tracerContext.TraceToken,
+		tracerContext.TimeStamp, tracerContext.Version,
 	)
 }
 
@@ -603,7 +546,6 @@ type OperationResult struct {
 	EntityID int    `json:"entityID"`
 }
 
-// String implements Stringer interface
 func (operationResult OperationResult) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %s, %d]",
 		operationResult.Entity, operationResult.Status, operationResult.Message,
@@ -622,7 +564,6 @@ type OperationResults struct {
 	Results          *[]OperationResult `json:"results"`
 }
 
-// String implements Stringer interface
 func (operationResults OperationResults) String() string {
 	return fmt.Sprintf("[%d, %d, %s, %s, %d, %d, %s]",
 		operationResults.ResourcesAdded, operationResults.ResourcesDeleted, operationResults.EntityType,
@@ -630,11 +571,97 @@ func (operationResults OperationResults) String() string {
 	)
 }
 
-type View struct {
-	Name        string                 `json:"name"`
-	DisplayName string                 `json:"displayName"`
-	Enabled     bool                   `json:"enabled"`
-	Extensions  map[string]interface{} `json:"extensions,omitempty"`
+// ResourceGroup defines group entity
+type ResourceGroup struct {
+	GroupName   string                 `json:"groupName,required"`
+	Type        GroupType              `json:"type,required"`
+	Description string                 `json:"description,omitempty"`
+	Resources   []MonitoredResourceRef `json:"resources,required"`
+}
+
+func (resourceGroup ResourceGroup) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s]",
+		resourceGroup.GroupName, resourceGroup.Type, resourceGroup.Description, resourceGroup.Resources,
+	)
+}
+
+type ResourcesWithServicesRequest struct {
+	Context   *TracerContext      `json:"context,omitempty"`
+	Resources []MonitoredResource `json:"resources"`
+	Groups    []ResourceGroup     `json:"groups,omitempty"`
+}
+
+// InventoryRequest defines SynchronizeInventory payload
+type InventoryRequest struct {
+	Context       *TracerContext      `json:"context,omitempty"`
+	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
+	Resources     []InventoryResource `json:"resources"`
+	Groups        []ResourceGroup     `json:"groups,omitempty"`
+}
+
+// IncidentAlert describes alerts received from cloud services
+type IncidentAlert struct {
+	IncidentID    string                            `json:"incidentId"`
+	ResourceName  string                            `json:"resourceName,required"`
+	Status        string                            `json:"status"`
+	StartedAt     milliseconds.MillisecondTimestamp `json:"startedAt"`
+	EndedAt       milliseconds.MillisecondTimestamp `json:"endedAt,omitempty"`
+	ConditionName string                            `json:"conditionName"`
+	URL           string                            `json:"url,omitempty"`
+	Summary       string                            `json:"summary,omitempty"`
+}
+
+func (incidentAlert IncidentAlert) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s]",
+		incidentAlert.IncidentID, incidentAlert.ResourceName, incidentAlert.Status, incidentAlert.StartedAt.String(),
+		incidentAlert.EndedAt.String(), incidentAlert.ConditionName, incidentAlert.URL, incidentAlert.Summary,
+	)
+}
+
+// GroundworkEventsRequest describes request payload
+type GroundworkEventsRequest struct {
+	Events []GroundworkEvent `json:"events"`
+}
+
+func (groundworkEventsRequest GroundworkEventsRequest) String() string {
+	return fmt.Sprintf("[%s]", groundworkEventsRequest.Events)
+}
+
+// GroundworkEvent describes event
+type GroundworkEvent struct {
+	Device              string                            `json:"device,omitempty"`
+	Host                string                            `json:"host,required"`
+	Service             string                            `json:"service,omitempty"`
+	OperationStatus     string                            `json:"operationStatus,omitempty"`
+	MonitorStatus       string                            `json:"monitorStatus,required"`
+	Severity            string                            `json:"severity,omitempty"`
+	ApplicationSeverity string                            `json:"applicationSeverity,omitempty"`
+	Component           string                            `json:"component,omitempty"`
+	SubComponent        string                            `json:"subComponent,omitempty"`
+	Priority            string                            `json:"priority,omitempty"`
+	TypeRule            string                            `json:"typeRule,omitempty"`
+	TextMessage         string                            `json:"textMessage,omitempty"`
+	LastInsertDate      milliseconds.MillisecondTimestamp `json:"lastInsertDate,omitempty"`
+	ReportDate          milliseconds.MillisecondTimestamp `json:"reportDate,required"`
+	AppType             string                            `json:"appType,required"`
+	// Update level attributes (update only)
+	MonitorServer     string `json:"monitorServer,omitempty"`
+	ConsolidationName string `json:"consolidationName,omitempty"`
+	LogType           string `json:"logType,omitempty"`
+	ErrorType         string `json:"errorType,omitempty"`
+	LoggerName        string `json:"loggerName,omitempty"`
+	ApplicationName   string `json:"applicationName,omitempty"`
+}
+
+func (groundworkEvent GroundworkEvent) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s]",
+		groundworkEvent.Device, groundworkEvent.Host, groundworkEvent.Service, groundworkEvent.OperationStatus,
+		groundworkEvent.MonitorStatus, groundworkEvent.Severity, groundworkEvent.ApplicationSeverity,
+		groundworkEvent.Component, groundworkEvent.SubComponent, groundworkEvent.Priority, groundworkEvent.TypeRule,
+		groundworkEvent.TextMessage, groundworkEvent.LastInsertDate.String(), groundworkEvent.ReportDate.String(),
+		groundworkEvent.AppType, groundworkEvent.MonitorServer, groundworkEvent.ConsolidationName,
+		groundworkEvent.LogType, groundworkEvent.ErrorType, groundworkEvent.LoggerName, groundworkEvent.ApplicationName,
+	)
 }
 
 // MonitorConnection describes the connection to the monitored system
@@ -650,12 +677,56 @@ type MonitorConnection struct {
 	ConnectorID int         `json:"connectorId"`
 }
 
-// String implements Stringer interface
+type View struct {
+	Name        string                 `json:"name"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Extensions  map[string]interface{} `json:"extensions,omitempty"`
+}
+
 func (monitorConnection MonitorConnection) String() string {
 	return fmt.Sprintf("[%d, %s, %s, %s, %t, %s, %s, %d]",
 		monitorConnection.ID, monitorConnection.Server, monitorConnection.UserName, monitorConnection.Password,
 		monitorConnection.SslEnabled, monitorConnection.URL, monitorConnection.Extensions, monitorConnection.ConnectorID,
 	)
+}
+
+// GroundworkEventsAckRequest describes request payload
+type GroundworkEventsAckRequest struct {
+	Acks []GroundworkEventAck `json:"acks"`
+}
+
+// GroundworkEventAck describes event ack
+type GroundworkEventAck struct {
+	AppType            string `json:"appType,required"`
+	Host               string `json:"host,required"`
+	Service            string `json:"service,omitempty"`
+	AcknowledgedBy     string `json:"acknowledgedBy,omitempty"`
+	AcknowledgeComment string `json:"acknowledgeComment,omitempty"`
+}
+
+func (groundworkEventAck GroundworkEventAck) String() string {
+	return fmt.Sprintf("[%s, %s, %s, %s, %s]",
+		groundworkEventAck.AppType, groundworkEventAck.Host, groundworkEventAck.Service,
+		groundworkEventAck.AcknowledgedBy, groundworkEventAck.AcknowledgeComment,
+	)
+}
+
+// GroundworkEventsUnackRequest describes request payload
+type GroundworkEventsUnackRequest struct {
+	Unacks []GroundworkEventUnack `json:"unacks"`
+}
+
+// GroundworkEventUnack describes event ack
+type GroundworkEventUnack struct {
+	AppType string `json:"appType,required"`
+	Host    string `json:"host,required"`
+	Service string `json:"service,omitempty"`
+}
+
+func (groundworkEventUnack GroundworkEventUnack) String() string {
+	return fmt.Sprintf("[%s, %s, %s]",
+		groundworkEventUnack.AppType, groundworkEventUnack.Host, groundworkEventUnack.Service)
 }
 
 type MetricsProfile struct {
@@ -665,7 +736,6 @@ type MetricsProfile struct {
 	Metrics     []MetricDefinition `json:"metrics"`
 }
 
-// String implements Stringer interface
 func (metricsProfile MetricsProfile) String() string {
 	return fmt.Sprintf("[%s, %s, %t, %s]",
 		metricsProfile.Name, metricsProfile.ProfileType,
@@ -690,7 +760,6 @@ type MetricDefinition struct {
 	Format            string      `json:"format,omitempty"`
 }
 
-// String implements Stringer interface
 func (metricDefinition MetricDefinition) String() string {
 	return fmt.Sprintf("[%s, %s, %s, %t, %t, %s, %s, %s, %s, %s, %d, %d, %s, %s]",
 		metricDefinition.Name, metricDefinition.CustomName, metricDefinition.Description, metricDefinition.Monitored,
@@ -700,18 +769,35 @@ func (metricDefinition MetricDefinition) String() string {
 	)
 }
 
+// HostServiceInDowntime describes downtime schedule
+type HostServiceInDowntime struct {
+	HostName               string `json:"hostName"`
+	ServiceDescription     string `json:"serviceDescription,omitempty"`
+	ScheduledDowntimeDepth int    `json:"scheduledDowntimeDepth"`
+	EntityType             string `json:"entityType"`
+	EntityName             string `json:"entityName"`
+}
+
+// HostServicesInDowntime defines type used for ClearInDowntime API payload
+type HostServicesInDowntime struct {
+	BizHostServiceInDowntimes []HostServiceInDowntime `json:"bizHostServiceInDowntimes"`
+}
+
+// HostsAndServices defines type used for SetInDowntime API payload
+type HostsAndServices struct {
+	HostNames                 []string `json:"hostNames"`
+	ServiceDescriptions       []string `json:"serviceDescriptions"`
+	HostGroupNames            []string `json:"hostGroupNames"`
+	ServiceGroupCategoryNames []string `json:"serviceGroupCategoryNames"`
+	SetHosts                  bool     `json:"setHosts"`
+	SetServices               bool     `json:"setServices"`
+}
+
 // AgentIdentity defines TCG Agent Identity
 type AgentIdentity struct {
 	AgentID string `json:"agentId" yaml:"agentId"`
 	AppName string `json:"appName" yaml:"appName"`
 	AppType string `json:"appType" yaml:"appType"`
-}
-
-func CalculateResourceStatus(services []MonitoredService) MonitorStatus {
-
-	// TODO: implement logic
-
-	return HostUp
 }
 
 func CalculateServiceStatus(metrics *[]TimeSeries) (MonitorStatus, error) {
@@ -722,7 +808,7 @@ func CalculateServiceStatus(metrics *[]TimeSeries) (MonitorStatus, error) {
 	for _, metric := range *metrics {
 		if metric.Thresholds != nil {
 			var warning, critical ThresholdValue
-			for _, threshold := range metric.Thresholds {
+			for _, threshold := range *metric.Thresholds {
 				switch threshold.SampleType {
 				case Warning:
 					warning = threshold
@@ -753,31 +839,31 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 	if warning != nil {
 		switch warning.ValueType {
 		case IntegerType:
-			warningValue = float64(*warning.IntegerValue)
+			warningValue = float64(warning.IntegerValue)
 		case DoubleType:
-			warningValue = *warning.DoubleValue
+			warningValue = warning.DoubleValue
 		}
 	}
 
 	if critical != nil {
 		switch critical.ValueType {
 		case IntegerType:
-			criticalValue = float64(*critical.IntegerValue)
+			criticalValue = float64(critical.IntegerValue)
 		case DoubleType:
-			criticalValue = *critical.DoubleValue
+			criticalValue = critical.DoubleValue
 		}
 	}
 
 	switch value.ValueType {
 	case IntegerType:
 		if warning == nil && criticalValue == -1 {
-			if float64(*value.IntegerValue) >= criticalValue {
+			if float64(value.IntegerValue) >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
 			return ServiceOk
 		}
 		if critical == nil && (warning != nil && warningValue == -1) {
-			if float64(*value.IntegerValue) >= warningValue {
+			if float64(value.IntegerValue) >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
@@ -787,31 +873,31 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 		}
 		// is it a reverse comparison (low to high)
 		if (warning != nil && critical != nil) && warningValue > criticalValue {
-			if float64(*value.IntegerValue) <= criticalValue {
+			if float64(value.IntegerValue) <= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if float64(*value.IntegerValue) <= warningValue {
+			if float64(value.IntegerValue) <= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		} else {
-			if (warning != nil && critical != nil) && float64(*value.IntegerValue) >= criticalValue {
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if (warning != nil && critical != nil) && float64(*value.IntegerValue) >= warningValue {
+			if (warning != nil && critical != nil) && float64(value.IntegerValue) >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		}
 	case DoubleType:
 		if warning == nil && criticalValue == -1 {
-			if *value.DoubleValue >= criticalValue {
+			if value.DoubleValue >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
 			return ServiceOk
 		}
 		if critical == nil && (warning != nil && warningValue == -1) {
-			if *value.DoubleValue >= warningValue {
+			if value.DoubleValue >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
@@ -821,18 +907,18 @@ func CalculateStatus(value *TypedValue, warning *TypedValue, critical *TypedValu
 		}
 		// is it a reverse comparison (low to high)
 		if warningValue > criticalValue {
-			if *value.DoubleValue <= criticalValue {
+			if value.DoubleValue <= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if *value.DoubleValue <= warningValue {
+			if value.DoubleValue <= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
 		} else {
-			if *value.DoubleValue >= criticalValue {
+			if value.DoubleValue >= criticalValue {
 				return ServiceUnscheduledCritical
 			}
-			if *value.DoubleValue >= warningValue {
+			if value.DoubleValue >= warningValue {
 				return ServiceWarning
 			}
 			return ServiceOk
@@ -849,4 +935,9 @@ var MonitorStatusWeightService = map[MonitorStatus]int{
 	ServiceWarning:             30,
 	ServiceScheduledCritical:   50,
 	ServiceUnscheduledCritical: 100,
+}
+
+// NewTimestamp returns a new timestamp setted to UTC now.
+func NewTimestamp() milliseconds.MillisecondTimestamp {
+	return milliseconds.MillisecondTimestamp{Time: time.Now().UTC()}
 }

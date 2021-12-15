@@ -6,14 +6,10 @@ package main
 */
 import "C"
 import (
-	"context"
-	"encoding/json"
 	"runtime/cgo"
 	"time"
 
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/gwos/tcg/services"
-	"github.com/rs/zerolog/log"
 )
 
 // CreateEvent creates an object used in EventsRequest.
@@ -138,24 +134,6 @@ func AddEvent(target C.uintptr_t, value C.uintptr_t) {
 	}
 }
 
-// SendEvents sends events request.
-//export SendEvents
-func SendEvents(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.GroundworkEventsRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendEvents")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		SendEvents(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
 // CreateEventsAckRequest creates payload for SendEventsAck API.
 // It returns a handle that should be deleted after use with DeleteHandle.
 //export CreateEventsAckRequest
@@ -183,24 +161,6 @@ func AddEventAck(
 	}
 }
 
-// SendEventsAck sends events acknowledge request.
-//export SendEventsAck
-func SendEventsAck(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.GroundworkEventsAckRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendEventsAck")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		SendEventsAck(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
 // CreateEventsUnackRequest creates payload for SendEventsUnack API.
 // It returns a handle that should be deleted after use with DeleteHandle.
 //export CreateEventsUnackRequest
@@ -224,22 +184,4 @@ func AddEventUnack(
 		p.Service = C.GoString(service)
 		hv.Unacks = append(hv.Unacks, *p)
 	}
-}
-
-// SendEventsUnack sends events unacknowledge request.
-//export SendEventsUnack
-func SendEventsUnack(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.GroundworkEventsUnackRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendEventsUnack")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		SendEventsUnack(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
 }

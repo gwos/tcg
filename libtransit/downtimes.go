@@ -6,13 +6,9 @@ package main
 */
 import "C"
 import (
-	"context"
-	"encoding/json"
 	"runtime/cgo"
 
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/gwos/tcg/services"
-	"github.com/rs/zerolog/log"
 )
 
 // CreateDowntimes creates payload for ClearInDowntime API.
@@ -85,40 +81,4 @@ func ExtendDowntimesRequest(target C.uintptr_t,
 			hv.SetServices = true
 		}
 	}
-}
-
-// SendClearInDowntime is a C API for services.GetTransitService().ClearInDowntime.
-//export SendClearInDowntime
-func SendClearInDowntime(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.Downtimes)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendClearInDowntime")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		ClearInDowntime(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
-
-// SendSetInDowntime is a C API for services.GetTransitService().SetInDowntime.
-//export SendSetInDowntime
-func SendSetInDowntime(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	hv := cgo.Handle(req).Value().(*transit.DowntimesRequest)
-	bb, err := json.Marshal(hv)
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("SendSetInDowntime")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().
-		SetInDowntime(context.Background(), bb); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
 }

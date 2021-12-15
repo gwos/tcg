@@ -101,9 +101,7 @@ void (*setValueTime)(uintptr_t target, long long sec, long long nsec) = NULL;
 bool (*marshallIndentJSON)(uintptr_t target, char *prefix, char *indent,
                            char *buf, size_t bufLen, char *errBuf,
                            size_t errBufLen) = NULL;
-bool (*sendInventory)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
-bool (*sendMetrics)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
-bool (*sendEvents)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
+bool (*send)(uintptr_t req, char *errBuf, size_t errBufLen) = NULL;
 
 /* define handlers for general libtransit functions */
 char *(*getAgentId)() = NULL;
@@ -213,9 +211,7 @@ void *example_load_libtransit() {
   setValueStr = find_symbol(lib_handle, "SetValueStr");
   setValueTime = find_symbol(lib_handle, "SetValueTime");
   marshallIndentJSON = find_symbol(lib_handle, "MarshallIndentJSON");
-  sendInventory = find_symbol(lib_handle, "SendInventory");
-  sendMetrics = find_symbol(lib_handle, "SendMetrics");
-  sendEvents = find_symbol(lib_handle, "SendEvents");
+  send = find_symbol(lib_handle, "Send");
 
   getAgentId = find_symbol(lib_handle, "GetAgentId");
   getAppName = find_symbol(lib_handle, "GetAppName");
@@ -478,7 +474,7 @@ void example_send_inventory() {
   addResourceGroup(invReq, resGroup);
 
   char errBuf[ERR_BUF_LEN] = "";
-  bool res = sendInventory(invReq, errBuf, ERR_BUF_LEN);
+  bool res = send(invReq, errBuf, ERR_BUF_LEN);
 
   deleteHandle(invReq);
   deleteHandle(invRes);
@@ -553,7 +549,7 @@ void example_send_metrics() {
   marshallIndentJSON(monReq, "", "  ", msg, 1024 * 100, errBuf, ERR_BUF_LEN);
   printf("%s\n", msg);
 
-  bool res = sendMetrics(monReq, errBuf, ERR_BUF_LEN);
+  bool res = send(monReq, errBuf, ERR_BUF_LEN);
 
   deleteHandle(monReq);
   deleteHandle(monRes);
