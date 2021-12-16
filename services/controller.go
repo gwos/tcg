@@ -28,6 +28,8 @@ import (
 // Controller implements AgentServices, Controllers interface
 type Controller struct {
 	*TransitService
+	muBASIC     sync.Mutex
+	muGWOS      sync.Mutex
 	authCache   *cache.Cache
 	entrypoints []Entrypoint
 	srv         *http.Server
@@ -55,10 +57,9 @@ var controller *Controller
 func GetController() *Controller {
 	onceController.Do(func() {
 		controller = &Controller{
-			GetTransitService(),
-			cache.New(8*time.Hour, time.Hour),
-			[]Entrypoint{},
-			nil,
+			TransitService: GetTransitService(),
+			authCache:      cache.New(8*time.Hour, time.Hour),
+			entrypoints:    []Entrypoint{},
 		}
 	})
 	return controller
@@ -505,15 +506,20 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 		}()
 
 		if !(len(username) > 0 && len(password) > 0 && len(controller.gwClients) > 0) {
-			err = fmt.Errorf("misconfigured basic auth")
+			err = fmt.Errorf("misconfigured BASIC auth")
 			return
 		}
 		ck, err := hashFn(username, password)
 		if err == nil {
 			if _, isCached := controller.authCache.Get(ck); !isCached {
-				if _, err = controller.gwClients[0].AuthenticatePassword(username, password); err == nil {
-					err = controller.authCache.Add(ck, true, time.Hour)
+				/* restrict by mutex for one-thread at one-time */
+				controller.muBASIC.Lock()
+				if _, isCached := controller.authCache.Get(ck); !isCached {
+					if _, err = controller.gwClients[0].AuthenticatePassword(username, password); err == nil {
+						err = controller.authCache.Add(ck, true, time.Hour)
+					}
 				}
+				controller.muBASIC.Unlock()
 			}
 		}
 		return
@@ -538,15 +544,20 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 	}()
 
 	if !(len(gwosAppName) > 0 && len(gwosAPIToken) > 0 && len(controller.dsClient.HostName) > 0) {
-		err = fmt.Errorf("misconfigured gwos auth")
+		err = fmt.Errorf("misconfigured GWOS auth")
 		return
 	}
 	ck, err := hashFn(gwosAppName, gwosAPIToken)
 	if err == nil {
 		if _, isCached := controller.authCache.Get(ck); !isCached {
-			if err = controller.dsClient.ValidateToken(gwosAppName, gwosAPIToken); err == nil {
-				err = controller.authCache.Add(ck, true, time.Hour)
+			/* restrict by mutex for one-thread at one-time */
+			controller.muGWOS.Lock()
+			if _, isCached := controller.authCache.Get(ck); !isCached {
+				if err = controller.dsClient.ValidateToken(gwosAppName, gwosAPIToken); err == nil {
+					err = controller.authCache.Add(ck, true, time.Hour)
+				}
 			}
+			controller.muGWOS.Unlock()
 		}
 	}
 }
