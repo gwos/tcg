@@ -173,7 +173,7 @@ func (client *GWClient) connectLocal() (string, error) {
 		logper.Warn(req.Details(), "could not connect local groundwork")
 		return "", eee
 	}
-	logper.Info(req, "connect local groundwork")
+	logper.Debug(req, "connect local groundwork")
 	return string(req.Response), nil
 }
 
@@ -240,9 +240,9 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
 	if logper.IsDebugEnabled() {
-		logper.Info(req, "authenticate password: userName: %s", user.Name)
+		logper.Debug(req, "authenticate password: userName: %s", user.Name)
 	} else {
-		logper.Info(req, "authenticate password")
+		logper.Debug(req, "authenticate password")
 	}
 	return user.AccessToken, nil
 }
@@ -297,7 +297,7 @@ func (client *GWClient) Disconnect() error {
 		logper.Warn(req.Details(), "could not disconnect groundwork")
 		return eee
 	}
-	logper.Info(req, "disconnect groundwork")
+	logper.Debug(req, "disconnect groundwork")
 	return nil
 }
 
@@ -536,7 +536,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	}).SendWithContext(ctx)
 
 	if err == nil && req.Status == 401 {
-		logper.Info(nil, "could not send request: reconnecting")
+		logper.Debug(nil, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {
 			logper.Error(obj{"error": err}, "could not send request: could not reconnect")
 			return nil, err
@@ -577,7 +577,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 		logper.Warn(req.Details(), "could not send request")
 		return nil, eee
 	}
-	logper.Info(req, "send request")
+	logper.Debug(req, "send request")
 	return req.Response, nil
 }
 

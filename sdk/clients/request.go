@@ -129,9 +129,9 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
 	rawJSON = map[string][]byte{}
 	fields = map[string]interface{}{
-		"status": q.Status,
-		"method": q.Method,
 		"url":    q.URL,
+		"method": q.Method,
+		"status": q.Status,
 	}
 	if q.Err != nil {
 		fields["error"] = q.Err
@@ -172,9 +172,9 @@ type ReqDetails Req
 func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
 	rawJSON = map[string][]byte{}
 	fields = map[string]interface{}{
-		"status": q.Status,
-		"method": q.Method,
 		"url":    q.URL,
+		"method": q.Method,
+		"status": q.Status,
 	}
 	if q.Err != nil {
 		fields["error"] = q.Err
