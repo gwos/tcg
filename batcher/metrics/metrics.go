@@ -85,24 +85,25 @@ func applyTime(
 	svc *transit.MonitoredService,
 	ts *transit.Timestamp,
 ) {
-	if ts == nil || ts.IsZero() {
+	isT := func(ts *transit.Timestamp) bool { return ts != nil && !ts.IsZero() }
+	if !isT(ts) {
 		ts = transit.NewTimestamp()
 	}
 	switch {
-	case res.LastCheckTime.IsZero() && !svc.LastCheckTime.IsZero():
+	case !isT(res.LastCheckTime) && isT(svc.LastCheckTime):
 		res.LastCheckTime = svc.LastCheckTime
-	case !res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+	case isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
 		svc.LastCheckTime = res.LastCheckTime
-	case res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+	case !isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
 		res.LastCheckTime = ts
 		svc.LastCheckTime = ts
 	}
 	switch {
-	case res.NextCheckTime.IsZero() && !svc.NextCheckTime.IsZero():
+	case !isT(res.NextCheckTime) && isT(svc.NextCheckTime):
 		res.NextCheckTime = svc.NextCheckTime
-	case !res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+	case isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
 		svc.NextCheckTime = res.NextCheckTime
-	case res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+	case !isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
 		res.NextCheckTime = ts
 		svc.NextCheckTime = ts
 	}
