@@ -9,7 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 	v1 "k8s.io/api/core/v1"
@@ -93,7 +92,7 @@ type KubernetesResource struct {
 	Status   transit.MonitorStatus
 	Message  string
 	Labels   map[string]string
-	Services map[string]transit.DynamicMonitoredService
+	Services map[string]transit.MonitoredService
 }
 
 func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
@@ -194,7 +193,7 @@ func (connector *KubernetesConnector) Shutdown() {
 }
 
 // Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
+func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 
 	// gather inventory and Metrics
 	metricsPerContainer := true
@@ -210,13 +209,13 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 	}
 
 	// convert to arrays as expected by TCG
-	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
-	monitored := make([]transit.DynamicMonitoredResource, len(monitoredState))
+	inventory := make([]transit.InventoryResource, len(monitoredState))
+	monitored := make([]transit.MonitoredResource, len(monitoredState))
 	hostGroups := make([]transit.ResourceGroup, len(groups))
 	index := 0
 	for _, resource := range monitoredState {
 		// convert inventory
-		services := make([]transit.DynamicInventoryService, len(resource.Services))
+		services := make([]transit.InventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
 			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
@@ -224,24 +223,26 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Dynamic
 		}
 		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
 		// convert monitored state
-		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
+		mServices := make([]transit.MonitoredService, len(resource.Services))
 		serviceIndex = 0
 		for _, service := range resource.Services {
 			mServices[serviceIndex] = service
 			serviceIndex = serviceIndex + 1
 		}
-		monitored[index] = transit.DynamicMonitoredResource{
+		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resource.Name,
 					Type: resource.Type,
 				},
 			},
-			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()}, // TODO: interval
-			LastPlugInOutput: resource.Message,
-			Services:         mServices,
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           resource.Status,
+				LastCheckTime:    transit.NewTimestamp(),
+				NextCheckTime:    transit.NewTimestamp(), // TODO: interval
+				LastPluginOutput: resource.Message,
+			},
+			Services: mServices,
 		}
 		index = index + 1
 	}
@@ -271,7 +272,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 	groups[clusterHostGroupName] = transit.ResourceGroup{
 		GroupName: clusterHostGroupName,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.MonitoredResourceRef, len(nodes.Items)),
+		Resources: make([]transit.ResourceRef, len(nodes.Items)),
 	}
 	index := 0
 	for _, node := range nodes.Items {
@@ -282,11 +283,11 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		monitorStatus, message := connector.calculateNodeStatus(&node)
 		resource := KubernetesResource{
 			Name:     node.Name,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
-			Services: make(map[string]transit.DynamicMonitoredService),
+			Services: make(map[string]transit.MonitoredService),
 		}
 		monitoredState[resource.Name] = resource
 		// process services
@@ -331,10 +332,10 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 		}
 		// add to default Cluster group
-		groups[clusterHostGroupName].Resources[index] = transit.MonitoredResourceRef{
+		groups[clusterHostGroupName].Resources[index] = transit.ResourceRef{
 			Name:  resource.Name,
 			Owner: clusterHostGroupName,
-			Type:  transit.Host,
+			Type:  transit.ResourceTypeHost,
 		}
 		index = index + 1
 	}
@@ -362,11 +363,11 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
 			Name:     podName,
-			Type:     transit.Host,
+			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
-			Services: make(map[string]transit.DynamicMonitoredService),
+			Services: make(map[string]transit.MonitoredService),
 		}
 		monitoredState[resource.Name] = resource
 		// no services to process at this stage
@@ -378,22 +379,22 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		}
 		groupsMap[resource.Name] = true
 		if group, ok := groups[podHostGroup]; ok {
-			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+			group.Resources = append(group.Resources, transit.ResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		} else {
 			group = transit.ResourceGroup{
 				GroupName: podHostGroup,
 				Type:      transit.HostGroup,
-				Resources: make([]transit.MonitoredResourceRef, 0),
+				Resources: make([]transit.ResourceRef, 0),
 			}
-			group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+			group.Resources = append(group.Resources, transit.ResourceRef{
 				Name:  resource.Name,
 				Owner: group.GroupName,
-				Type:  transit.Host,
+				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
 		}
@@ -431,8 +432,8 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 					Warning:  metricDefinition.WarningThreshold,
 					Critical: metricDefinition.CriticalThreshold,
 				}
-				metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
-				metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: node.Timestamp.Time}
+				metricBuilder.StartTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
+				metricBuilder.EndTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 				monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
 				if err != nil {
@@ -487,8 +488,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
-					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.StartTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
+					metricBuilder.EndTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					metricBuilders = append(metricBuilders, metricBuilder)
 					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
 					if err != nil {
@@ -513,7 +514,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 		return
 	}
 	builderMap := make(map[string][]connectors.MetricBuilder)
-	serviceMap := make(map[string]transit.DynamicMonitoredService)
+	serviceMap := make(map[string]transit.MonitoredService)
 	for key, metricDefinition := range cfg.Views[ViewPods] {
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
@@ -551,8 +552,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						Warning:  metricDefinition.WarningThreshold,
 						Critical: metricDefinition.CriticalThreshold,
 					}
-					metricBuilder.StartTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
-					metricBuilder.EndTimestamp = &milliseconds.MillisecondTimestamp{Time: pod.Timestamp.Time}
+					metricBuilder.StartTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
+					metricBuilder.EndTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					var builders []connectors.MetricBuilder
 					if result, found := builderMap[resource.Name]; found {
 						builders = result
@@ -562,7 +563,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					}
 					builders = append(builders, metricBuilder)
 					smKey := key + "-" + resource.Name
-					var monitoredService *transit.DynamicMonitoredService
+					var monitoredService *transit.MonitoredService
 					if result, found := serviceMap[smKey]; found {
 						monitoredService = &result
 						metric, _ := connectors.BuildMetric(metricBuilder)
@@ -606,7 +607,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 				}
 				message.WriteString(condition.Message)
 				if status == transit.HostUp {
-					status = transit.Warning
+					status = transit.HostWarning
 				}
 			}
 		}

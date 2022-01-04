@@ -19,7 +19,6 @@ import (
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/taskQueue"
 	"github.com/gwos/tcg/tracing"
@@ -48,15 +47,14 @@ type AgentService struct {
 	tracerToken    []byte                   // gw tracing
 	tracerProvider *tracesdk.TracerProvider // otel tracing
 
-	configHandler       func([]byte)
-	demandConfigHandler func() bool
-	exitHandler         func()
+	configHandler func([]byte)
+	exitHandler   func()
 }
 
 type statsCounter struct {
 	bytesSent   int
 	payloadType payloadType
-	timestamp   time.Time
+	timestamp   transit.Timestamp
 }
 
 type taskSubject string
@@ -97,7 +95,7 @@ func GetAgentService() *AgentService {
 		agentService = &AgentService{
 			Connector: agentConnector,
 			agentStats: &AgentStats{
-				UpSince: &milliseconds.MillisecondTimestamp{Time: time.Now()},
+				UpSince: transit.NewTimestamp(),
 			},
 			agentStatus: &AgentStatus{
 				Controller: StatusStopped,
@@ -109,9 +107,8 @@ func GetAgentService() *AgentService {
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
 
-			configHandler:       defaultConfigHandler,
-			demandConfigHandler: defaultDemandConfigHandler,
-			exitHandler:         defaultExitHandler,
+			configHandler: defaultConfigHandler,
+			exitHandler:   defaultExitHandler,
 		}
 
 		go agentService.listenStatsChan()
@@ -193,15 +190,13 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 	return &transit.TracerContext{
 		AgentID:    agentID,
 		AppType:    appType,
-		TimeStamp:  milliseconds.MillisecondTimestamp{Time: time.Now()},
+		TimeStamp:  transit.NewTimestamp(),
 		TraceToken: traceToken,
 		Version:    transit.ModelVersion,
 	}
 }
 
 func defaultConfigHandler([]byte) {}
-
-func defaultDemandConfigHandler() bool { return true }
 
 func defaultExitHandler() {}
 
@@ -220,16 +215,6 @@ func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
 // RemoveConfigHandler removes callback
 func (service *AgentService) RemoveConfigHandler() {
 	service.configHandler = defaultConfigHandler
-}
-
-// RegisterDemandConfigHandler sets callback
-func (service *AgentService) RegisterDemandConfigHandler(fn func() bool) {
-	service.demandConfigHandler = fn
-}
-
-// RemoveDemandConfigHandler removes callback
-func (service *AgentService) RemoveDemandConfigHandler() {
-	service.demandConfigHandler = defaultDemandConfigHandler
 }
 
 // RegisterExitHandler sets callback
@@ -393,18 +378,17 @@ func (service *AgentService) handleTasks() {
 func (service *AgentService) listenStatsChan() {
 	for {
 		res := <-service.statsChan
-		ts := milliseconds.MillisecondTimestamp{Time: res.timestamp}
 		service.agentStats.BytesSent += res.bytesSent
 		service.agentStats.MessagesSent++
 		switch res.payloadType {
 		case typeInventory:
-			service.agentStats.LastInventoryRun = &ts
+			service.agentStats.LastInventoryRun = &res.timestamp
 		case typeMetrics:
-			service.agentStats.LastMetricsRun = &ts
+			service.agentStats.LastMetricsRun = &res.timestamp
 			service.agentStats.MetricsSent++
 		case typeEvents:
 			// TODO: handle events acks, unacks
-			service.agentStats.LastAlertRun = &ts
+			service.agentStats.LastAlertRun = &res.timestamp
 		}
 	}
 }
@@ -503,7 +487,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 
 			if err = handler(ctx, p); err == nil {
 				service.updateStats(
-					statsCounter{bytesSent: len(p.Payload), payloadType: p.Type, timestamp: time.Now()})
+					statsCounter{bytesSent: len(p.Payload), payloadType: p.Type, timestamp: *transit.NewTimestamp()})
 			}
 			if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user
@@ -541,10 +525,6 @@ func (service *AgentService) config(data []byte) error {
 	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
-	// notify C-API config change
-	if success := service.demandConfigHandler(); !success {
-		log.Warn().Msg("demandConfigHandler returned 'false'. Continue with previous inventory.")
-	}
 	// TODO: add logic to avoid processing previous inventory in case of callback fails
 	// stop nats processing
 	_ = service.stopTransport()

@@ -14,7 +14,6 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +124,7 @@ func TestNatsPerformance(t *testing.T) {
 	setupIntegration(t, 30*time.Second)
 	m0 := services.GetTransitService().Stats().MessagesSent
 
-	var resources []transit.DynamicMonitoredResource
+	var resources []transit.MonitoredResource
 
 	inventoryRes := inventoryResource()
 
@@ -133,9 +132,9 @@ func TestNatsPerformance(t *testing.T) {
 		inventoryRes.Services = append(inventoryRes.Services, inventoryService(i))
 	}
 
-	request := transit.DynamicInventoryRequest{
+	request := transit.InventoryRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.DynamicInventoryResource{inventoryRes},
+		Resources: []transit.InventoryResource{inventoryRes},
 	}
 	jsonBytes, err := json.Marshal(request)
 	assert.NoError(t, err)
@@ -154,9 +153,9 @@ func TestNatsPerformance(t *testing.T) {
 	time.Sleep(5 * time.Second)
 
 	for _, res := range resources {
-		request := transit.DynamicResourcesWithServicesRequest{
+		request := transit.ResourcesWithServicesRequest{
 			Context:   services.GetTransitService().MakeTracerContext(),
-			Resources: []transit.DynamicMonitoredResource{res},
+			Resources: []transit.MonitoredResource{res},
 		}
 		jsonBytes, err := json.Marshal(request)
 		assert.NoError(t, err)
@@ -229,63 +228,68 @@ func parseJSON(filePath string) ([]byte, error) {
 	return byteValue, nil
 }
 
-func resource() transit.DynamicMonitoredResource {
-	return transit.DynamicMonitoredResource{
+func resource() transit.MonitoredResource {
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
+	return transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
-		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
-		Services:      []transit.DynamicMonitoredService{},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.HostUp,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
+		Services: []transit.MonitoredService{},
 	}
 }
 
-func service(i int) transit.DynamicMonitoredService {
-	return transit.DynamicMonitoredService{
-		BaseTransitData: transit.BaseTransitData{
+func service(i int) transit.MonitoredService {
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
+	return transit.MonitoredService{
+		BaseInfo: transit.BaseInfo{
 			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
-			Type:  transit.Service,
+			Type:  transit.ResourceTypeService,
 			Owner: TestHostName,
 		},
-		Status:        transit.ServiceOk,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 60)},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.ServiceOk,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
 		Metrics: []transit.TimeSeries{
 			{
 				MetricName: "Test",
 				SampleType: transit.Value,
 				Interval: &transit.TimeInterval{
-					EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-					StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+					EndTime:   &lastCheckTime,
+					StartTime: &lastCheckTime,
 				},
-				Value: &transit.TypedValue{
-					ValueType:    transit.IntegerType,
-					IntegerValue: int64(i),
-				},
-				Unit: transit.MB,
+				Value: transit.NewTypedValue(i),
+				Unit:  transit.MB,
 			},
 		},
 	}
 }
 
-func inventoryResource() transit.DynamicInventoryResource {
-	return transit.DynamicInventoryResource{
+func inventoryResource() transit.InventoryResource {
+	return transit.InventoryResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
 	}
 }
 
-func inventoryService(i int) transit.DynamicInventoryService {
-	return transit.DynamicInventoryService{
-		BaseTransitData: transit.BaseTransitData{
+func inventoryService(i int) transit.InventoryService {
+	return transit.InventoryService{
+		BaseInfo: transit.BaseInfo{
 			Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
 			Type:  "network-device",
 			Owner: TestHostName,

@@ -2,7 +2,7 @@ module github.com/gwos/tcg
 
 go 1.17
 
-require github.com/gwos/tcg/sdk v0.0.0-20211130162655-32ad77586ccf
+require github.com/gwos/tcg/sdk v0.0.0-20211223101342-35fbd1ae683c
 
 require (
 	github.com/PaesslerAG/gval v1.1.2
@@ -28,6 +28,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/rs/zerolog v1.26.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.7.0
 	github.com/swaggo/gin-swagger v1.3.3
 	github.com/swaggo/swag v1.7.6

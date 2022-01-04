@@ -432,7 +432,7 @@
         }
     },
     "definitions": {
-        "milliseconds.MillisecondTimestamp": {
+        "transit.Timestamp": {
             "type": "object"
         },
         "services.AgentIdentity": {
@@ -472,7 +472,7 @@
                 },
                 "lastAlertRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "lastErrors": {
                     "type": "array",
@@ -482,11 +482,11 @@
                 },
                 "lastInventoryRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "lastMetricsRun": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 },
                 "messagesSent": {
                     "type": "integer"
@@ -496,7 +496,7 @@
                 },
                 "upSince": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 }
             }
         },
@@ -537,7 +537,7 @@
                 },
                 "time": {
                     "type": "object",
-                    "$ref": "#/definitions/milliseconds.MillisecondTimestamp"
+                    "$ref": "#/definitions/transit.Timestamp"
                 }
             }
         }

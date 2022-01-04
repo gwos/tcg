@@ -91,7 +91,7 @@ func configHandler(data []byte) {
 	)
 	if err != nil || !bytes.Equal(chksum, chk) {
 		log.Info().Msg("sending inventory ...")
-		resources := []transit.DynamicInventoryResource{*Synchronize(metricsProfile.Metrics)}
+		resources := []transit.InventoryResource{*Synchronize(metricsProfile.Metrics)}
 		groups := extConfig.Groups
 		for i, group := range groups {
 			groups[i] = connectors.FillGroupWithResources(group, resources)
@@ -116,7 +116,7 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if len(metricsProfile.Metrics) > 0 {
 		log.Info().Msg("monitoring resources ...")
-		if err := connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{
+		if err := connectors.SendMetrics(context.Background(), []transit.MonitoredResource{
 			*CollectMetrics(metricsProfile.Metrics),
 		}, nil); err != nil {
 			log.Err(err).Msg("could not send metrics")

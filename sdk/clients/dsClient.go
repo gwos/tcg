@@ -98,7 +98,7 @@ func (client *DSClient) Reload(agentID string) error {
 
 	if err == nil {
 		if req.Status == 201 {
-			logper.Info(req, "request for reload")
+			logper.Debug(req, "request for reload")
 			return nil
 		}
 		eee := fmt.Errorf(string(req.Response))

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 )
 
@@ -38,13 +37,13 @@ const (
 )
 
 type MetricsMap map[string][]transit.TimeSeries
-type ServicesMap map[string][]transit.DynamicMonitoredService
+type ServicesMap map[string][]transit.MonitoredService
 
-func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredResource, error) {
+func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource, error) {
 	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
-		monitoredResources        []transit.DynamicMonitoredResource
+		monitoredResources        []transit.MonitoredResource
 		serviceNameToMetricsMap   MetricsMap
 		resourceNameToServicesMap ServicesMap
 		err                       error
@@ -75,21 +74,21 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 	}
 
 	for resName, services := range resourceNameToServicesMap {
-		res := transit.DynamicMonitoredResource{
+		res := transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resName,
-					Type: transit.Host,
+					Type: transit.ResourceTypeHost,
 				},
 			},
-			Services: make([]transit.DynamicMonitoredService, 0, len(services)),
+			Services: make([]transit.MonitoredService, 0, len(services)),
 		}
 		/* filter and apply host-check results */
 		resFlag := false
 		for _, svc := range services {
 			if svc.Name == "" {
 				resFlag = true
-				res.LastPlugInOutput = svc.LastPlugInOutput
+				res.LastPluginOutput = svc.LastPluginOutput
 				res.LastCheckTime = svc.LastCheckTime
 				res.NextCheckTime = svc.NextCheckTime
 				res.Status = svc.Status
@@ -98,8 +97,7 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 			res.Services = append(res.Services, svc)
 		}
 		if !resFlag {
-			res.LastCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now()}
-			res.NextCheckTime = milliseconds.MillisecondTimestamp{Time: time.Now().Add(connectors.CheckInterval)}
+			res.LastCheckTime = transit.NewTimestamp()
 			res.Status = transit.CalculateResourceStatus(res.Services)
 		}
 		monitoredResources = append(monitoredResources, res)
@@ -108,12 +106,12 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.DynamicMonitoredRe
 	return &monitoredResources, nil
 }
 
-func getTime(str string) (*milliseconds.MillisecondTimestamp, error) {
+func getTime(str string) (*transit.Timestamp, error) {
 	i, err := strconv.ParseInt(str, 10, 64)
 	if err != nil {
 		return nil, err
 	}
-	return &milliseconds.MillisecondTimestamp{Time: time.Unix(i, 0)}, nil
+	return &transit.Timestamp{Time: time.Unix(i, 0).UTC()}, nil
 }
 
 func getStatus(str string) (transit.MonitorStatus, error) {
@@ -139,7 +137,7 @@ func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
 		if match == nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
 		}
-		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		timestamp := transit.NewTimestamp()
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
 			if t, err := getTime(ts); err == nil {
 				timestamp = t
@@ -213,7 +211,7 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		if match == nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
 		}
-		timestamp := &milliseconds.MillisecondTimestamp{Time: time.Now()}
+		timestamp := transit.NewTimestamp()
 		if ts := match[re.SubexpIndex("ts")]; ts != "" {
 			if t, err := getTime(ts); err == nil {
 				timestamp = t
@@ -226,17 +224,18 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
-		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
-			BaseTransitData: transit.BaseTransitData{
+		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
+			BaseInfo: transit.BaseInfo{
 				Name:  svcName,
-				Type:  transit.Service,
+				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
-			Status:           status,
-			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
-			LastPlugInOutput: msg,
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           status,
+				LastCheckTime:    timestamp,
+				LastPluginOutput: msg,
+			},
+			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
 	return removeDuplicateServices(servicesMap), nil
@@ -333,17 +332,18 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 		resName := match[re.SubexpIndex("resName")]
 		svcName := match[re.SubexpIndex("svcName")]
 		msg := match[re.SubexpIndex("msg")]
-		servicesMap[resName] = append(servicesMap[resName], transit.DynamicMonitoredService{
-			BaseTransitData: transit.BaseTransitData{
+		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
+			BaseInfo: transit.BaseInfo{
 				Name:  svcName,
-				Type:  transit.Service,
+				Type:  transit.ResourceTypeService,
 				Owner: resName,
 			},
-			Status:           status,
-			LastCheckTime:    *timestamp,
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
-			LastPlugInOutput: msg,
-			Metrics:          metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           status,
+				LastCheckTime:    timestamp,
+				LastPluginOutput: msg,
+			},
+			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
 		})
 	}
 	return removeDuplicateServices(servicesMap), nil
@@ -352,7 +352,7 @@ func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap
 func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
 	for key, value := range servicesMap {
 		keys := make(map[string]bool)
-		var list []transit.DynamicMonitoredService
+		var list []transit.MonitoredService
 		for _, entry := range value {
 			if _, value := keys[entry.Name]; !value {
 				keys[entry.Name] = true

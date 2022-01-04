@@ -135,14 +135,14 @@ gotocjson/gotocjson	: gotocjson/gotocjson.go
 ${GENERIC_DATATYPES_BUILD_OBJECTS}	: gotocjson/gotocjson gotocjson/generic_datatypes/generic_datatypes.go | ${BUILD_TARGET_DIRECTORY}
 	gotocjson/gotocjson -g -o ${BUILD_TARGET_DIRECTORY} gotocjson/generic_datatypes/generic_datatypes.go
 
-${TIME_BUILD_OBJECTS}	: gotocjson/gotocjson time/time.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} time/time.go
+${TIME_BUILD_OBJECTS}	: gotocjson/gotocjson deprecated/time/time.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} deprecated/time/time.go
 
-${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} sdk/milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} sdk/milliseconds/milliseconds.go
+${MILLISECONDS_BUILD_OBJECTS}	: gotocjson/gotocjson ${TIME_BUILD_OBJECTS} deprecated/milliseconds/milliseconds.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} deprecated/milliseconds/milliseconds.go
 
-${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson ${MILLISECONDS_BUILD_OBJECTS} sdk/transit/transit.go | ${BUILD_TARGET_DIRECTORY}
-	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} sdk/transit/transit.go
+${TRANSIT_BUILD_OBJECTS}	: gotocjson/gotocjson ${MILLISECONDS_BUILD_OBJECTS} deprecated/transit/transit.go | ${BUILD_TARGET_DIRECTORY}
+	gotocjson/gotocjson -o ${BUILD_TARGET_DIRECTORY} deprecated/transit/transit.go
 
 ${BUILD_TARGET_DIRECTORY}/convert_go_to_c.o	: ${CONVERT_GO_TO_C_BUILD_OBJECTS} | ${BUILD_TARGET_DIRECTORY}
 	${CC} -c gotocjson/_c_code/convert_go_to_c.c -o $@

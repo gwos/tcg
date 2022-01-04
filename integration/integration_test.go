@@ -13,7 +13,6 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
@@ -73,27 +72,27 @@ func TestIntegration(t *testing.T) {
 }
 
 func buildInventoryRequest(t *testing.T) []byte {
-	inventoryResource := transit.DynamicInventoryResource{
+	inventoryResource := transit.InventoryResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
-		Services: []transit.DynamicInventoryService{
+		Services: []transit.InventoryService{
 			{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name:  "test",
-					Type:  transit.Hypervisor,
+					Type:  transit.ResourceTypeHypervisor,
 					Owner: TestHostName,
 				},
 			},
 		},
 	}
 
-	inventoryRequest := transit.DynamicInventoryRequest{
+	inventoryRequest := transit.InventoryRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.DynamicInventoryResource{inventoryResource},
+		Resources: []transit.InventoryResource{inventoryResource},
 		Groups:    nil,
 	}
 
@@ -104,48 +103,51 @@ func buildInventoryRequest(t *testing.T) []byte {
 }
 
 func buildResourceWithMetricsRequest(t *testing.T) []byte {
-	monitoredResource := transit.DynamicMonitoredResource{
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
+	monitoredResource := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: TestHostName,
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 			},
 		},
-		Status:        transit.HostUp,
-		LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-		Services: []transit.DynamicMonitoredService{
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:        transit.HostUp,
+			LastCheckTime: &lastCheckTime,
+			NextCheckTime: &nextCheckTime,
+		},
+		Services: []transit.MonitoredService{
 			{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name:  "test",
-					Type:  transit.Service,
+					Type:  transit.ResourceTypeService,
 					Owner: TestHostName,
 				},
-				Status:        transit.ServiceOk,
-				LastCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
-				NextCheckTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+				MonitoredInfo: transit.MonitoredInfo{
+					Status:        transit.ServiceOk,
+					LastCheckTime: &lastCheckTime,
+					NextCheckTime: &nextCheckTime,
+				},
 				Metrics: []transit.TimeSeries{
 					{
 						MetricName: "testMetric",
 						SampleType: transit.Value,
 						Interval: &transit.TimeInterval{
-							EndTime:   milliseconds.MillisecondTimestamp{Time: time.Now()},
-							StartTime: milliseconds.MillisecondTimestamp{Time: time.Now()},
+							EndTime:   &lastCheckTime,
+							StartTime: &lastCheckTime,
 						},
-						Value: &transit.TypedValue{
-							ValueType:    transit.IntegerType,
-							IntegerValue: 1000,
-						},
-						Unit: transit.MB,
+						Value: transit.NewTypedValue(1000),
+						Unit:  transit.MB,
 					},
 				},
 			},
 		},
 	}
 
-	request := transit.DynamicResourcesWithServicesRequest{
+	request := transit.ResourcesWithServicesRequest{
 		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.DynamicMonitoredResource{monitoredResource},
+		Resources: []transit.MonitoredResource{monitoredResource},
 	}
 
 	b, err := json.Marshal(request)

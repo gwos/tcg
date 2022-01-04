@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 )
 
@@ -37,7 +36,7 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
-	var iServices []transit.DynamicInventoryService
+	var iServices []transit.InventoryService
 	is1 := connectors.CreateInventoryService(Service1, Resource1)
 	is2 := connectors.CreateInventoryService(Service2, Resource1)
 	iServices = append(iServices, is1, is2)
@@ -55,22 +54,22 @@ func main() {
 	metric1, _ := connectors.CreateMetric(CpuMetric, 75)
 	warning1, _ := connectors.CreateWarningThreshold(CpuMetricWarning, 60)
 	critical1, _ := connectors.CreateCriticalThreshold(CpuMetricCritical, 90)
-	metric1.Thresholds = &[]transit.ThresholdValue{*warning1, *critical1}
+	metric1.Thresholds = []transit.ThresholdValue{*warning1, *critical1}
 	// Create Double Metric with Thresholds and Unit Type
 	metric2, _ := connectors.CreateMetric(PercentFreeMetric, 99.82, transit.PercentCPU)
 	warning2, _ := connectors.CreateWarningThreshold(PercentFreeMetricWarning, 80.5)
 	critical2, _ := connectors.CreateCriticalThreshold(PercentFreeMetricCritical, 90.8)
-	metric2.Thresholds = &[]transit.ThresholdValue{*warning2, *critical2}
+	metric2.Thresholds = []transit.ThresholdValue{*warning2, *critical2}
 	// create with interval
-	now := time.Now()
+	timestamp := transit.NewTimestamp()
 	interval := &transit.TimeInterval{
-		EndTime:   milliseconds.MillisecondTimestamp{Time: now},
-		StartTime: milliseconds.MillisecondTimestamp{Time: now},
+		EndTime:   timestamp,
+		StartTime: timestamp,
 	}
 	metric3, _ := connectors.CreateMetric(DiskUsed, 65.82, transit.GB, interval)
 	// add tags
-	metric3.CreateTag("myTag1", "myTagValue1")
-	metric3.CreateTag("myTag2", "myTagValue2")
+	metric3.SetTag("myTag1", "myTagValue1")
+	metric3.SetTag("myTag2", "myTagValue2")
 
 	// display ...
 	fmt.Printf("metric 1 created with thresholds: %+v\n", metric1)
@@ -84,13 +83,13 @@ func main() {
 	fmt.Printf("service 1 created with metrics: %+v\n", service2)
 
 	// Create a Monitored Resource and Add Service
-	resource1, _ := connectors.CreateResource(Resource1, []transit.DynamicMonitoredService{*service1})
+	resource1, _ := connectors.CreateResource(Resource1, []transit.MonitoredService{*service1})
 	fmt.Printf("resource 1 created with services: %+v\n", resource1)
-	resource2, _ := connectors.CreateResource(Resource2, []transit.DynamicMonitoredService{*service2})
+	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	if enableTransit {
-		connectors.SendMetrics(context.Background(), []transit.DynamicMonitoredResource{*resource1, *resource2}, nil)
+		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
 	}
 }
 
@@ -102,67 +101,72 @@ func LowLevelExamples() {
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
 		Label:      "local_load_5_wn",
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: 70.0}}
+		Value:      transit.NewTypedValue(70.0),
+	}
 	errorThreshold := transit.ThresholdValue{
 		SampleType: transit.Critical,
 		Label:      "local_load_5_cr",
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: 85.0}}
+		Value:      transit.NewTypedValue(85.0),
+	}
 	random := rand.Float64() * 100.0
-	now := milliseconds.MillisecondTimestamp{Time: time.Now()}
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(time.Minute * 5)
 	sampleValue := transit.TimeSeries{
 		MetricName: "local_load_5",
 		SampleType: transit.Value,
-		Interval:   &transit.TimeInterval{EndTime: now, StartTime: now},
-		Value:      &transit.TypedValue{ValueType: transit.DoubleType, DoubleValue: random},
-		Thresholds: &[]transit.ThresholdValue{warningThreshold, errorThreshold},
+		Interval:   &transit.TimeInterval{EndTime: &lastCheckTime, StartTime: &lastCheckTime},
+		Value:      transit.NewTypedValue(random),
+		Thresholds: []transit.ThresholdValue{warningThreshold, errorThreshold},
 		Unit:       "%{cpu}",
 	}
 
 	// Example Service
-	var localLoadService = transit.DynamicMonitoredService{
-		BaseTransitData: transit.BaseTransitData{
+	var localLoadService = transit.MonitoredService{
+		BaseInfo: transit.BaseInfo{
 			Name: "local_load",
-			Type: transit.Service,
+			Type: transit.ResourceTypeService,
 			Properties: map[string]transit.TypedValue{
-				"stateType":       {StringValue: "SOFT"},
-				"checkType":       {StringValue: "ACTIVE"},
-				"PerformanceData": {StringValue: "007-321 RAD"},
-				"ExecutionTime":   {DoubleValue: 3.0},
-				"CurrentAttempt":  {IntegerValue: 2},
-				"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+				"stateType":       *transit.NewTypedValue("SOFT"),
+				"checkType":       *transit.NewTypedValue("ACTIVE"),
+				"PerformanceData": *transit.NewTypedValue("007-321 RAD"),
+				"ExecutionTime":   *transit.NewTypedValue(3.0),
+				"CurrentAttempt":  *transit.NewTypedValue(2),
+				"InceptionTime":   *transit.NewTypedValue(lastCheckTime),
 			},
 		},
-		Status:           transit.ServiceOk,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-		LastPlugInOutput: "foo | bar",
-		Metrics:          []transit.TimeSeries{sampleValue},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:           transit.ServiceOk,
+			LastCheckTime:    &lastCheckTime,
+			NextCheckTime:    &nextCheckTime,
+			LastPluginOutput: "foo | bar",
+		}, Metrics: []transit.TimeSeries{sampleValue},
 	}
 
-	geneva := transit.DynamicMonitoredResource{
+	geneva := transit.MonitoredResource{
 		BaseResource: transit.BaseResource{
-			BaseTransitData: transit.BaseTransitData{
+			BaseInfo: transit.BaseInfo{
 				Name: "geneva",
-				Type: transit.Host,
+				Type: transit.ResourceTypeHost,
 				Properties: map[string]transit.TypedValue{
-					"stateType":       {StringValue: "SOFT"},
-					"checkType":       {StringValue: "ACTIVE"},
-					"PerformanceData": {StringValue: "007-321 RAD"},
-					"ExecutionTime":   {DoubleValue: 3.0},
-					"CurrentAttempt":  {IntegerValue: 2},
-					"InceptionTime":   {TimeValue: &milliseconds.MillisecondTimestamp{Time: time.Now()}},
+					"stateType":       *transit.NewTypedValue("SOFT"),
+					"checkType":       *transit.NewTypedValue("ACTIVE"),
+					"PerformanceData": *transit.NewTypedValue("007-321 RAD"),
+					"ExecutionTime":   *transit.NewTypedValue(3.0),
+					"CurrentAttempt":  *transit.NewTypedValue(2),
+					"InceptionTime":   *transit.NewTypedValue(lastCheckTime),
 				},
 			},
 		},
-		Status:           transit.HostUp,
-		LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-		NextCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now().Add(time.Minute * 5)},
-		LastPlugInOutput: "44/55/888 QA00005-BC",
-		Services:         []transit.DynamicMonitoredService{localLoadService},
+		MonitoredInfo: transit.MonitoredInfo{
+			Status:           transit.HostUp,
+			LastCheckTime:    &lastCheckTime,
+			NextCheckTime:    &nextCheckTime,
+			LastPluginOutput: "44/55/888 QA00005-BC",
+		}, Services: []transit.MonitoredService{localLoadService},
 	}
 
 	// Build Monitored Resources
-	resources := []transit.DynamicMonitoredResource{geneva}
+	resources := []transit.MonitoredResource{geneva}
 
 	// TODO: call into API
 

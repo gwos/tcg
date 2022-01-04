@@ -8,7 +8,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/snmp-connector/clients"
 	"github.com/gwos/tcg/connectors/snmp-connector/utils"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
@@ -48,8 +47,8 @@ func (state *MonitoringState) Init() {
 	state.devices = make(map[string]DeviceExt)
 }
 
-func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[string]transit.MetricDefinition) []transit.DynamicMonitoredResource {
-	mResources := make([]transit.DynamicMonitoredResource, len(state.devices))
+func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredResource {
+	mResources := make([]transit.MonitoredResource, len(state.devices))
 	i := 0
 	for _, device := range state.devices {
 		mServices := device.retrieveMonitoredServices(metricDefinitions)
@@ -66,14 +65,14 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 	return mResources
 }
 
-func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]transit.MetricDefinition) []transit.DynamicMonitoredService {
-	mServices := make([]transit.DynamicMonitoredService, len(device.Interfaces))
+func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredService {
+	mServices := make([]transit.MonitoredService, len(device.Interfaces))
 
 	if metricDefinitions == nil {
 		return mServices
 	}
 
-	interval := time.Now()
+	timestamp := transit.NewTimestamp()
 	i := 0
 	for _, iFace := range device.Interfaces {
 		var metricsBuilder []connectors.MetricBuilder
@@ -106,8 +105,8 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					UnitType:       unitType,
 					Warning:        metricDefinition.WarningThreshold,
 					Critical:       metricDefinition.CriticalThreshold,
-					StartTimestamp: &milliseconds.MillisecondTimestamp{Time: interval},
-					EndTimestamp:   &milliseconds.MillisecondTimestamp{Time: interval},
+					StartTimestamp: timestamp,
+					EndTimestamp:   timestamp,
 					Graphed:        metricDefinition.Graphed,
 
 					Value: nil,
@@ -131,16 +130,16 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 			switch iFace.Status {
 			case 0:
 				mService.Status = transit.ServiceWarning
-				mService.LastPlugInOutput = "Interface Operational State is DOWN, Administrative state is DOWN"
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is DOWN"
 			case 1:
 				mService.Status = transit.ServiceUnscheduledCritical
-				mService.LastPlugInOutput = "Interface Operational State is DOWN, Administrative state is UP"
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is UP"
 			case 2:
 				mService.Status = transit.ServiceWarning
-				mService.LastPlugInOutput = "Interface Operational State is UP, Administrative state is DOWN"
+				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is DOWN"
 			case 3:
 				mService.Status = transit.ServiceOk
-				mService.LastPlugInOutput = "Interface Operational State is UP, Administrative state is UP"
+				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP"
 			case -1:
 			}
 			mServices[i] = *mService

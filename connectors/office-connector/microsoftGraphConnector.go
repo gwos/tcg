@@ -5,14 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gwos/tcg/services"
-
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
+	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
 )
 
@@ -53,7 +50,7 @@ type MicrosoftGraphResource struct {
 	Status   transit.MonitorStatus
 	Message  string
 	Labels   map[string]string
-	Services map[string]*transit.DynamicMonitoredService
+	Services map[string]*transit.MonitoredService
 }
 
 type ODataServicePayload struct {
@@ -148,7 +145,7 @@ func (connector *MicrosoftGraphConnector) Shutdown() {
 }
 
 // Collect inventory and metrics for all graph resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.DynamicInventoryResource, []transit.DynamicMonitoredResource, []transit.ResourceGroup) {
+func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 	log.Info().Msg("Starting collection...")
 	_ = Initialize()
 	log.Info().Msg("After init...")
@@ -158,20 +155,20 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 	msGroup := transit.ResourceGroup{
 		GroupName: microsoftGroup,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.MonitoredResourceRef, 0),
+		Resources: make([]transit.ResourceRef, 0),
 	}
 	_ = connector.collectInventory(monitoredState, &msGroup)
 	_ = connector.collectStatus(monitoredState[office365App].Services)
 	_ = connector.collectBuiltins(monitoredState, &msGroup)
 	groups[microsoftGroup] = msGroup
 	log.Info().Msg("inventory and metrics gathered....")
-	inventory := make([]transit.DynamicInventoryResource, len(monitoredState))
-	monitored := make([]transit.DynamicMonitoredResource, len(monitoredState))
+	inventory := make([]transit.InventoryResource, len(monitoredState))
+	monitored := make([]transit.MonitoredResource, len(monitoredState))
 	hostGroups := make([]transit.ResourceGroup, len(groups))
 	index := 0
 	for _, resource := range monitoredState {
 		// convert inventory
-		srvs := make([]transit.DynamicInventoryService, len(resource.Services))
+		srvs := make([]transit.InventoryService, len(resource.Services))
 		serviceIndex := 0
 		for _, service := range resource.Services {
 			srvs[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
@@ -179,25 +176,28 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Dyn
 		}
 		inventory[index] = connectors.CreateInventoryResource(resource.Name, srvs)
 		// convert monitored state
-		mServices := make([]transit.DynamicMonitoredService, len(resource.Services))
+		mServices := make([]transit.MonitoredService, len(resource.Services))
 		serviceIndex = 0
 		for _, service := range resource.Services {
 			mServices[serviceIndex] = *service
 			serviceIndex = serviceIndex + 1
 		}
-		var timestamp = &milliseconds.MillisecondTimestamp{Time: time.Now()}
-		monitored[index] = transit.DynamicMonitoredResource{
+		lastCheckTime := *transit.NewTimestamp()
+		nextCheckTime := lastCheckTime.Add(connectors.CheckInterval)
+		monitored[index] = transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
-				BaseTransitData: transit.BaseTransitData{
+				BaseInfo: transit.BaseInfo{
 					Name: resource.Name,
 					Type: resource.Type,
 				},
 			},
-			Status:           resource.Status,
-			LastCheckTime:    milliseconds.MillisecondTimestamp{Time: time.Now()},
-			NextCheckTime:    milliseconds.MillisecondTimestamp{Time: timestamp.Add(connectors.CheckInterval)},
-			LastPlugInOutput: resource.Message,
-			Services:         mServices,
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           resource.Status,
+				LastCheckTime:    &lastCheckTime,
+				NextCheckTime:    &nextCheckTime,
+				LastPluginOutput: resource.Message,
+			},
+			Services: mServices,
 		}
 		index = index + 1
 	}
@@ -214,17 +214,17 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 
 	hostResource := MicrosoftGraphResource{
 		Name:    interacApp,
-		Type:    transit.Host,
+		Type:    transit.ResourceTypeHost,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]*transit.DynamicMonitoredService),
+		Services: make(map[string]*transit.MonitoredService),
 	}
 	monitoredState[interacApp] = hostResource
-	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+	group.Resources = append(group.Resources, transit.ResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.Host,
+		Type:  transit.ResourceTypeHost,
 	})
 
 	// create one Drive metrics
@@ -239,9 +239,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No OneDrive metrics available"
+				monitoredService.LastPluginOutput = "No OneDrive metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -261,9 +261,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 			// monitoredService.LastPlugInOutput = fmt.Sprintf("Using %.1f licenses of %.1f", monitoredService.Metrics[0].Value.DoubleValue, monitoredService.Metrics[1].Value.DoubleValue)
 		} else {
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No licensing metrics available"
+				monitoredService.LastPluginOutput = "No licensing metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -283,9 +283,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No SharePoint metrics available"
+				monitoredService.LastPluginOutput = "No SharePoint metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -305,9 +305,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 		} else {
 			monitoredService.Status = transit.ServiceUnknown
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No EMAIL metrics available"
+				monitoredService.LastPluginOutput = "No EMAIL metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -326,9 +326,9 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 			// monitoredService.LastPlugInOutput = fmt.Sprintf("%.1f Emails unread", monitoredService.Metrics[0].Value.DoubleValue)
 		} else {
 			if err != nil {
-				monitoredService.LastPlugInOutput = err.Error()
+				monitoredService.LastPluginOutput = err.Error()
 			} else {
-				monitoredService.LastPlugInOutput = "No Security metrics available"
+				monitoredService.LastPluginOutput = "No Security metrics available"
 			}
 		}
 		if monitoredService != nil {
@@ -357,17 +357,17 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	}
 	hostResource := MicrosoftGraphResource{
 		Name:    office365App,
-		Type:    transit.Host,
+		Type:    transit.ResourceTypeHost,
 		Status:  transit.HostUp,
 		Message: "UP - Healthy",
 		// Labels:   labels,
-		Services: make(map[string]*transit.DynamicMonitoredService),
+		Services: make(map[string]*transit.MonitoredService),
 	}
 	monitoredState[office365App] = hostResource
-	group.Resources = append(group.Resources, transit.MonitoredResourceRef{
+	group.Resources = append(group.Resources, transit.ResourceRef{
 		Name:  hostResource.Name,
 		Owner: group.GroupName,
-		Type:  transit.Host,
+		Type:  transit.ResourceTypeHost,
 	})
 	odata := ODataServicePayload{}
 	//randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
@@ -385,7 +385,7 @@ func (connector *MicrosoftGraphConnector) collectInventory(
 	return nil
 }
 
-func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]*transit.DynamicMonitoredService) error {
+func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[string]*transit.MonitoredService) error {
 	body, err := ExecuteRequest(officeEndPoint+tenantID+currentStatusPath, officeToken)
 	if err != nil {
 		return err
@@ -394,7 +394,7 @@ func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[st
 	_ = json.Unmarshal(body, &odata)
 	for _, ods := range odata.Services {
 		if monitoredService, ok := monitoredServices[ods.WorkloadDisplayName]; ok {
-			monitoredService.Status, monitoredService.LastPlugInOutput = connector.translateServiceStatus(ods.Status)
+			monitoredService.Status, monitoredService.LastPluginOutput = connector.translateServiceStatus(ods.Status)
 			monitoredServices[ods.WorkloadDisplayName] = monitoredService
 			var upCount float64 = 0
 			var totalCount float64 = 0

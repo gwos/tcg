@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
-	"time"
 
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
@@ -14,12 +12,12 @@ import (
 type mapItem struct {
 	contexts []transit.TracerContext
 	groups   []transit.ResourceGroup
-	res      []transit.DynamicMonitoredResource
+	res      []transit.MonitoredResource
 }
 
-// Add adds single transit.DynamicResourcesWithServicesRequest to batch
+// Add adds single transit.ResourcesWithServicesRequest to batch
 func add(byGroups map[string]mapItem, p []byte) {
-	r := transit.DynamicResourcesWithServicesRequest{}
+	r := transit.ResourcesWithServicesRequest{}
 	if err := json.Unmarshal(p, &r); err != nil {
 		log.Err(err).
 			RawJSON("payload", p).
@@ -31,7 +29,7 @@ func add(byGroups map[string]mapItem, p []byte) {
 		for j := range r.Resources[i].Services {
 			applyTime(&r.Resources[i], &r.Resources[i].Services[j], r.Context.TimeStamp)
 		}
-		applyTime(&r.Resources[i], &transit.DynamicMonitoredService{}, r.Context.TimeStamp)
+		applyTime(&r.Resources[i], &transit.MonitoredService{}, r.Context.TimeStamp)
 	}
 
 	k := makeGKey(r.Groups)
@@ -60,7 +58,7 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
 
 	pp := make([][]byte, len(byGroups))
 	for _, item := range byGroups {
-		r := transit.DynamicResourcesWithServicesRequest{}
+		r := transit.ResourcesWithServicesRequest{}
 		if len(item.contexts) > 0 {
 			r.Context = &item.contexts[0]
 		}
@@ -83,28 +81,29 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
 }
 
 func applyTime(
-	res *transit.DynamicMonitoredResource,
-	svc *transit.DynamicMonitoredService,
-	ts milliseconds.MillisecondTimestamp,
+	res *transit.MonitoredResource,
+	svc *transit.MonitoredService,
+	ts *transit.Timestamp,
 ) {
-	if ts.IsZero() {
-		ts = milliseconds.MillisecondTimestamp{Time: time.Now()}
+	isT := func(ts *transit.Timestamp) bool { return ts != nil && !ts.IsZero() }
+	if !isT(ts) {
+		ts = transit.NewTimestamp()
 	}
 	switch {
-	case res.LastCheckTime.IsZero() && !svc.LastCheckTime.IsZero():
+	case !isT(res.LastCheckTime) && isT(svc.LastCheckTime):
 		res.LastCheckTime = svc.LastCheckTime
-	case !res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+	case isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
 		svc.LastCheckTime = res.LastCheckTime
-	case res.LastCheckTime.IsZero() && svc.LastCheckTime.IsZero():
+	case !isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
 		res.LastCheckTime = ts
 		svc.LastCheckTime = ts
 	}
 	switch {
-	case res.NextCheckTime.IsZero() && !svc.NextCheckTime.IsZero():
+	case !isT(res.NextCheckTime) && isT(svc.NextCheckTime):
 		res.NextCheckTime = svc.NextCheckTime
-	case !res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+	case isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
 		svc.NextCheckTime = res.NextCheckTime
-	case res.NextCheckTime.IsZero() && svc.NextCheckTime.IsZero():
+	case !isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
 		res.NextCheckTime = ts
 		svc.NextCheckTime = ts
 	}

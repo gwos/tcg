@@ -17,17 +17,38 @@ ifeq ($(BUILD_TIME),)
     BUILD_TIME      := $$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 endif
 
-all	: echo libtransit.h libtransit.so
+INCLUDES = -I./
+
+# We use "-g" because it helps with running under gdb when we experience segfaults.
+CFLAGS = ${INCLUDES} -m64 -std=gnu11 -g
+
+all: echo libtransit.h libtransit.so transit.h examples
 
 echo:
 	@echo Build info: ${BUILD_TAG} / ${BUILD_TIME}
 
+run_examples: examples
+	@echo Running examples
+	LIBTRANSIT=./libtransit.so ./example_dl.run
+
+examples: libtransit.h libtransit.so transit.h ./examples/c/*.c
+	${CC} ${CFLAGS} -o example_dl.run ./examples/c/example_dl.c -ldl
+
 # Build shared lib and set build info values with Go linker
 libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
 	go build \
-		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' -X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" \
-		-buildmode=c-shared -o libtransit.so libtransit.go
+		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' \
+			-X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" \
+		-buildmode=c-shared -o libtransit.so ./
 	chmod +x libtransit.so
 
-clean	:
-	rm -rf _obj libtransit.h libtransit.so
+# Build additional header
+transit.h: ../sdk/transit/*.go
+	go run ./tools/hgen/ --folders ../sdk/transit
+
+clean:
+	rm -rf *.h *.so *.run
+
+distclean: clean
+
+realclean: clean

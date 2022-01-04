@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gwos/tcg/sdk/milliseconds"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
@@ -240,8 +239,8 @@ func (timeFilter *KTimeFilter) ToTimeInterval() *transit.TimeInterval {
 		log.Err(err).Msg("could not parse time filter's 'to'")
 	}
 	timeInterval := &transit.TimeInterval{
-		StartTime: milliseconds.MillisecondTimestamp{Time: startTime},
-		EndTime:   milliseconds.MillisecondTimestamp{Time: endTime},
+		StartTime: &transit.Timestamp{Time: startTime},
+		EndTime:   &transit.Timestamp{Time: endTime},
 	}
 	return timeInterval
 }
