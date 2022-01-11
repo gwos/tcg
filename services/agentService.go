@@ -323,6 +323,11 @@ func (service *AgentService) Status() AgentStatus {
 
 // handleTasks handles task queue
 func (service *AgentService) handleTasks() {
+	hDebug := func(tt []taskQueue.Task) {
+		log.Error().
+			Interface("lastTasks", tt).
+			Msgf("taskQueue")
+	}
 	hAlarm := func(task *taskQueue.Task) error {
 		log.Error().Msgf("taskQueue timed over: %s", task.Subject)
 		return nil
@@ -372,6 +377,7 @@ func (service *AgentService) handleTasks() {
 			taskStartTransport:  hTask,
 			taskStopTransport:   hTask,
 		}),
+		taskQueue.WithDebugger(hDebug),
 	)
 }
 
