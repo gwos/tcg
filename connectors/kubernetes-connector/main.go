@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -59,15 +60,36 @@ func configHandler(data []byte) {
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 
-	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
+	err := connectors.UnmarshalConfig(data, tMetProf, tMonConn)
+	if err != nil {
 		log.Err(err).Msg("Could not parse config")
 		return
 	}
 
-	if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
-		if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
-			log.Err(err).Msg("Could not write to file")
+	var yamlData []byte
+	switch tMonConn.Extensions.(*ExtConfig).AuthType {
+	case ConfigFile:
+		yamlData = []byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)
+	default:
+		yamlData, err = yaml.Marshal(struct {
+			Auth                   AuthType `yaml:"auth"`
+			EndPoint               string   `yaml:"host"`
+			KubernetesBearerToken  string   `yaml:"token,omitempty"`
+			KubernetesUserName     string   `yaml:"username,omitempty"`
+			KubernetesUserPassword string   `yaml:"password,omitempty"`
+		}{
+			tMonConn.Extensions.(*ExtConfig).AuthType,
+			tMonConn.Extensions.(*ExtConfig).EndPoint,
+			tMonConn.Extensions.(*ExtConfig).KubernetesUserName,
+			tMonConn.Extensions.(*ExtConfig).KubernetesUserPassword,
+			tMonConn.Extensions.(*ExtConfig).KubernetesBearerToken,
+		})
+		if err != nil {
+			log.Err(err).Msg("Could not marshal struct to yaml")
 		}
+	}
+	if err := writeDataToFile(yamlData); err != nil {
+		log.Err(err).Msg("Could not write to file")
 	}
 
 	/* Update config with received values */
