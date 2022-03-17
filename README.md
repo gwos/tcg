@@ -105,6 +105,10 @@ The TCG project is built with Go Modules. See `go.mod` for a list of dependencie
 ```
 $ cd tcg
 $ go build .
+
+# Updating modules
+$ go get -u
+$ go mod tidy
 ```
 
 
