@@ -20,7 +20,7 @@ WORKDIR /go/src/
 COPY . .
 
 RUN apk add --no-cache \
-        bash build-base \
+        bash build-base git \
         libmcrypt libmcrypt-dev \
     && echo "[CHECKER NSCA DEPS DONE]"
 
