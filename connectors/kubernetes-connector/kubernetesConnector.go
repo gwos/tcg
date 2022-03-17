@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -132,8 +133,12 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		kConfig.BearerToken = extConfig.KubernetesBearerToken
 		log.Info().Msg("using Bearer Token auth")
 	case ConfigFile:
+		data, err := os.ReadFile(config.KubernetesConfigFile)
+		if err != nil {
+			return err
+		}
 		fConfig := KubernetesYaml{}
-		err := yaml.Unmarshal([]byte(config.KubernetesConfigFile), &fConfig)
+		err = yaml.Unmarshal(data, &fConfig)
 		if err != nil {
 			return err
 		}

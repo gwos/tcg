@@ -1,0 +1,43 @@
+connector:
+  agentId: 691b60f0-7188-409f-a519-22887e8b307d
+  appName: KUBERNETES
+  appType: KUBERNETES
+  batchEvents: 0s
+  batchMetrics: 0s
+  batchMaxBytes: 1048576
+  controllerAddr: 0.0.0.0:8099
+  controllerCertFile: ""
+  controllerKeyFile: ""
+  enabled: true
+  logCondense: 0s
+  logFile: ""
+  logFileMaxSize: 10485760
+  logFileRotate: 5
+  logLevel: 0
+  logNoColor: false
+  logTimeFormat: 2006-01-02T15:04:05Z07:00
+  natsFilestoreDir: natsstore
+  natsStoreType: FILE
+  natsStoreMaxAge: 240h0m0s
+  natsStoreMaxBytes: 53687091200
+  natsStoreMaxMsgs: 1000000
+dsConnection:
+  hostName: dalekservices:3001
+gwConnections:
+  - id: 1
+    hostName: http://foundation:8080/api
+    userName: RESTAPIACCESS
+    password: 5v7ffCadekMk3y7FAaJ6NoTxqBJPrxn3UFjhxjy1p5UQxaoDcXVVdnb
+    enabled: true
+    isChild: false
+    displayName: Local Groundwork
+    mergeHosts: false
+    localConnection: true
+    deferOwnership: Yield
+    prefixResourceNames: false
+    resourceNamePrefix: ""
+    sendAllInventory: true
+jaegertracing:
+  agent: ""
+  collector: ""
+  tags: {}

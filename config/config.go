@@ -408,7 +408,7 @@ func (cfg Config) ConfigPath() string {
 	return configPath
 }
 
-func (cfg *Config) loadConnector(data []byte) (*ConnectorDTO, error) {
+func (cfg *Config) LoadConnector(data []byte) (*ConnectorDTO, error) {
 	var dto ConnectorDTO
 	if err := json.Unmarshal(data, &dto); err != nil {
 		log.Err(err).Msg("could not parse connector")
@@ -494,7 +494,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		}
 	}
 	/* load as ConnectorDTO */
-	dto, err := newCfg.loadConnector(data)
+	dto, err := newCfg.LoadConnector(data)
 	if err != nil {
 		return nil, err
 	}

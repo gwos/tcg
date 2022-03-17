@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ var (
 	}
 )
 
-func main() {
+func mainOld() {
 	transitService := services.GetTransitService()
 	transitService.RegisterConfigHandler(configHandler)
 	transitService.RegisterExitHandler(cancel)
@@ -47,6 +48,23 @@ func main() {
 	<-transitService.Quit()
 }
 
+const (
+	JsonConfigName = "tcg_config.json"
+)
+
+func main() {
+	if data, err := os.ReadFile(JsonConfigName); err != nil {
+		log.Err(err).
+			Str("configFile", JsonConfigName).
+			Msg("could not read json config")
+		return
+	} else {
+		configHandler(data)
+	}
+	inventory, monitored, groups := connector.Collect(extConfig)
+	println(len(inventory), len(monitored), len(groups))
+}
+
 func configHandler(data []byte) {
 	log.Info().Msg("Configuration received")
 	/* Init config with default values */
@@ -64,11 +82,11 @@ func configHandler(data []byte) {
 		return
 	}
 
-	if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
-		if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
-			log.Err(err).Msg("Could not write to file")
-		}
-	}
+	//if tMonConn.Extensions.(*ExtConfig).AuthType == ConfigFile {
+	//	if err := writeDataToFile([]byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)); err != nil {
+	//		log.Err(err).Msg("Could not write to file")
+	//	}
+	//}
 
 	/* Update config with received values */
 	tExt.Views[ViewNodes] = buildNodeMetricsMap(tMetProf.Metrics)
