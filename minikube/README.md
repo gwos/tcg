@@ -59,8 +59,8 @@ kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket delete -n raw -o i
 Deployment is built around kustomize. Stand up and Tear down as much as needed.
 Kustomize can be re-applied to take new settings at any point without wiping data.
 
-# Build
+#### Build
 `kustomize build . | kubectl apply -f -`
 
-# Tear Down (Wipes all data)
+#### Tear Down (Wipes all data)
 `kubectl delete namespace picasa-local`
