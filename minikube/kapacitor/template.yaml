@@ -1,0 +1,139 @@
+---
+# Source: kapacitor/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: picasa-kapacitor
+  namespace: picasa-local
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+---
+# Source: kapacitor/templates/pvc.yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: picasa-kapacitor
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  resources:
+    requests:
+      storage: "8Gi"
+---
+# Source: kapacitor/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: picasa-kapacitor-clusterrole
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+rules: []
+---
+# Source: kapacitor/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: picasa-kapacitor-clusterrolebinding
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+subjects:
+  - kind: ServiceAccount
+    name: picasa-kapacitor
+    namespace: picasa-local
+roleRef:
+  kind: ClusterRole
+  name: picasa-kapacitor-clusterrole
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: kapacitor/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: picasa-kapacitor
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: api
+  selector:
+    app: picasa-kapacitor
+---
+# Source: kapacitor/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: picasa-kapacitor
+  namespace: picasa-local
+  labels:
+    chart: "kapacitor-1.4.5"
+    release: "picasa"
+    heritage: "Helm"
+    app: picasa-kapacitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: picasa-kapacitor
+  template:
+    metadata:
+      labels:
+        app: picasa-kapacitor
+    spec:
+      serviceAccountName: picasa-kapacitor
+      containers:
+      - name: kapacitor
+        image: "kapacitor:1.6.3-alpine"
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: KAPACITOR_HOSTNAME
+          value: picasa-kapacitor.picasa-local
+        - name: KAPACITOR_INFLUXDB_0_URLS_0
+          value: http://picasa-influxdb2
+        - name: KAPACITOR_INFLUXDB_0_DISABLE_SUBSCRIPTIONS
+          value: "true"
+        - name: KAPACITOR_INFLUXDB_0_USERNAME
+          valueFrom:
+            secretKeyRef:
+              key: influxdb-user
+              name: kapacitor-auth
+        - name: KAPACITOR_INFLUXDB_0_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: influxdb-password
+              name: kapacitor-auth
+        ports:
+        - containerPort: 9092
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/kapacitor
+        resources:
+            limits:
+              cpu: 2
+              memory: 2Gi
+            requests:
+              cpu: 0.1
+              memory: 256Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: picasa-kapacitor
