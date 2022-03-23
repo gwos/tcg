@@ -1,7 +1,9 @@
 # Local Development Infra
 
-  This directory structure has the tools and scripts to run the necessary 
-  development infrastructure locally in a minikube environment.
+This directory structure has the tools and scripts to run the necessary 
+development infrastructure locally in a minikube environment. The scripts
+and manifests in here will setup a `picasa-local` namespace with all the 
+infra and services used for development and debugging.
   
 ## Prerequisites
 * virtualbox (https://www.virtualbox.org/)
@@ -11,6 +13,7 @@
 * kustomize (https://kustomize.io/)
 * jq (https://stedolan.github.io/jq/)
 * yq (https://github.com/mikefarah/yq)
+* helm 3 (Only needed if you want to edit/generate manifests)
 
 
 Many of these are available through homebrew on both OSX and Linux.  
