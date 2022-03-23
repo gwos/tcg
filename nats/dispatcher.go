@@ -54,7 +54,9 @@ func getDispatcher() *natsDispatcher {
 			msgsDone: cache.New(time.Minute*10, time.Minute*10),
 			retryes:  cache.New(time.Minute*30, time.Minute*30),
 		}
+		// provide buffer to handle corner case: a few targets anavailable on startup
 		dispatcher.taskQueue = taskQueue.NewTaskQueue(
+			taskQueue.WithCapacity(64),
 			taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
 				taskRetry: dispatcher.taskRetryHandler,
 			}),
@@ -90,20 +92,18 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 		if retry.Retry < len(retryDelays) {
 			logEvent.Int("retry", retry.Retry).
 				Msg("dispatcher could not deliver: will retry")
+
+			d.Lock()
+			_ = subscription.Close()
+			d.durables.Delete(opt.DurableName)
 			d.retryes.Set(opt.DurableName, retry, 0)
+			d.Unlock()
+
 			delay := retryDelays[retry.Retry]
-
-			go func() {
-				d.Lock()
-				_ = subscription.Close()
-				d.durables.Delete(opt.DurableName)
-				d.Unlock()
-
-				time.AfterFunc(delay, func() { _ = d.retryDurable(opt) })
-			}()
+			_ = time.AfterFunc(delay, func() { _ = d.retryDurable(opt) })
 		} else {
-			d.retryes.Delete(opt.DurableName)
 			logEvent.Msg("dispatcher could not deliver: stop retrying")
+			d.retryes.Delete(opt.DurableName)
 		}
 
 	} else {
