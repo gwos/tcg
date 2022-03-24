@@ -44,15 +44,18 @@ making assumptions about a developers custom hosts file is bad. (:
 Any shell scripts or local development configs will reference these endpoints as needed.
 
 ## Bucket Management
-Buckets can be created/deleted with the following commands
+Buckets can be created/deleted with the following commands: (make sure you're in the picasa-local namespace)
 ```
+# Picasa Namespace...
+kns picasa-local
+
 # Create (24h data TTL) 
 kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket create -n raw -o influxdata -r 24h'
-kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket create -n raw -o influxdata -r 24h'
+kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket create -n monitored -o influxdata -r 24h'
 
 # Delete
 kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket delete -n raw -o influxdata'
-kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket delete -n raw -o influxdata'
+kubectl exec -it picasa-influxdb2-0 -- bash -c 'influx bucket delete -n monitored -o influxdata'
 ```
 
 ## Deployment
