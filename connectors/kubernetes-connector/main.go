@@ -74,9 +74,9 @@ func configHandler(data []byte) {
 		yamlData, err = yaml.Marshal(struct {
 			Auth                   AuthType `yaml:"auth"`
 			EndPoint               string   `yaml:"host"`
-			KubernetesBearerToken  string   `yaml:"token,omitempty"`
 			KubernetesUserName     string   `yaml:"username,omitempty"`
 			KubernetesUserPassword string   `yaml:"password,omitempty"`
+			KubernetesBearerToken  string   `yaml:"token,omitempty"`
 		}{
 			tMonConn.Extensions.(*ExtConfig).AuthType,
 			tMonConn.Extensions.(*ExtConfig).EndPoint,
