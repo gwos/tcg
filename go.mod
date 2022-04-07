@@ -2,7 +2,7 @@ module github.com/gwos/tcg
 
 go 1.17
 
-require github.com/gwos/tcg/sdk v0.0.0-20220105034227-31ee888a9351
+require github.com/gwos/tcg/sdk v0.0.0-20220401140956-e0dd07a139ca
 
 require (
 	github.com/PaesslerAG/gval v1.1.2
