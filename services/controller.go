@@ -12,8 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/contrib/cors"
-	"github.com/gin-gonic/contrib/sessions"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
@@ -96,9 +97,10 @@ func (controller *Controller) startController() error {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	corsConfig := cors.DefaultConfig()
-	corsConfig.AllowedHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
+	corsConfig.AllowAllOrigins = true
+	corsConfig.AllowHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
-	router.Use(sessions.Sessions("tcg-session", sessions.NewCookieStore([]byte("secret"))))
+  	router.Use(sessions.Sessions("tcg-session", cookie.NewStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
 	/* set a short timer to wait for http.Server starting */
