@@ -11,7 +11,7 @@ import (
 
 	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/gwos/tcg/taskQueue"
+	"github.com/gwos/tcg/taskqueue"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -57,7 +57,7 @@ type AgentStatsExt struct {
 
 // AgentStatus defines TCG Agent status
 type AgentStatus struct {
-	task       *taskQueue.Task
+	task       *taskqueue.Task
 	Controller Status
 	Nats       Status
 	Transport  Status
@@ -83,14 +83,14 @@ type AgentServices interface {
 	Stats() AgentStats
 	Status() AgentStatus
 
-	ExitAsync() (*taskQueue.Task, error)
-	ResetNatsAsync() (*taskQueue.Task, error)
-	StartControllerAsync() (*taskQueue.Task, error)
-	StopControllerAsync() (*taskQueue.Task, error)
-	StartNatsAsync() (*taskQueue.Task, error)
-	StopNatsAsync() (*taskQueue.Task, error)
-	StartTransportAsync() (*taskQueue.Task, error)
-	StopTransportAsync() (*taskQueue.Task, error)
+	ExitAsync() (*taskqueue.Task, error)
+	ResetNatsAsync() (*taskqueue.Task, error)
+	StartControllerAsync() (*taskqueue.Task, error)
+	StopControllerAsync() (*taskqueue.Task, error)
+	StartNatsAsync() (*taskqueue.Task, error)
+	StopNatsAsync() (*taskqueue.Task, error)
+	StartTransportAsync() (*taskqueue.Task, error)
+	StopTransportAsync() (*taskqueue.Task, error)
 
 	Exit() error
 	ResetNats() error

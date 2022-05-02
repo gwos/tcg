@@ -20,7 +20,7 @@ import (
 	"github.com/gwos/tcg/sdk/clients"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/gwos/tcg/taskQueue"
+	"github.com/gwos/tcg/taskqueue"
 	"github.com/gwos/tcg/tracing"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
@@ -41,7 +41,7 @@ type AgentService struct {
 	gwClients   []*clients.GWClient
 	quitChan    chan struct{}
 	statsChan   chan statsCounter
-	taskQueue   *taskQueue.TaskQueue
+	taskQueue   *taskqueue.TaskQueue
 
 	tracerCache    *cache.Cache
 	tracerToken    []byte                   // gw tracing
@@ -228,42 +228,42 @@ func (service *AgentService) RemoveExitHandler() {
 }
 
 // ExitAsync implements AgentServices.ExitAsync interface
-func (service *AgentService) ExitAsync() (*taskQueue.Task, error) {
+func (service *AgentService) ExitAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskExit)
 }
 
 // ResetNatsAsync implements AgentServices.ResetNatsAsync interface
-func (service *AgentService) ResetNatsAsync() (*taskQueue.Task, error) {
+func (service *AgentService) ResetNatsAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskResetNats)
 }
 
 // StartControllerAsync implements AgentServices.StartControllerAsync interface
-func (service *AgentService) StartControllerAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StartControllerAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStartController)
 }
 
 // StopControllerAsync implements AgentServices.StopControllerAsync interface
-func (service *AgentService) StopControllerAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StopControllerAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStopController)
 }
 
 // StartNatsAsync implements AgentServices.StartNatsAsync interface
-func (service *AgentService) StartNatsAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StartNatsAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStartNats)
 }
 
 // StopNatsAsync implements AgentServices.StopNatsAsync interface
-func (service *AgentService) StopNatsAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StopNatsAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStopNats)
 }
 
 // StartTransportAsync implements AgentServices.StartTransportAsync interface.
-func (service *AgentService) StartTransportAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StartTransportAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStartTransport)
 }
 
 // StopTransportAsync implements AgentServices.StopTransportAsync interface
-func (service *AgentService) StopTransportAsync() (*taskQueue.Task, error) {
+func (service *AgentService) StopTransportAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskStopTransport)
 }
 
@@ -323,20 +323,20 @@ func (service *AgentService) Status() AgentStatus {
 
 // handleTasks handles task queue
 func (service *AgentService) handleTasks() {
-	hDebug := func(tt []taskQueue.Task) {
+	hDebug := func(tt []taskqueue.Task) {
 		log.Error().
 			Interface("lastTasks", tt).
-			Msgf("taskQueue")
+			Msgf("task queue")
 	}
-	hAlarm := func(task *taskQueue.Task) error {
-		log.Error().Msgf("taskQueue timed over: %s", task.Subject)
+	hAlarm := func(task *taskqueue.Task) error {
+		log.Error().Msgf("task queue timed over: %s", task.Subject)
 		return nil
 	}
-	hTask := func(task *taskQueue.Task) error {
+	hTask := func(task *taskqueue.Task) error {
 		log.Debug().
 			Interface("Subject", task.Subject).
 			Uint8("Idx", task.Idx).
-			Msg("taskQueue")
+			Msg("task queue")
 		service.agentStatus.task = task
 		var err error
 		switch task.Subject {
@@ -363,10 +363,10 @@ func (service *AgentService) handleTasks() {
 		return err
 	}
 
-	service.taskQueue = taskQueue.NewTaskQueue(
-		taskQueue.WithAlarm(taskQueueAlarm, hAlarm),
-		taskQueue.WithCapacity(taskQueueCapacity),
-		taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
+	service.taskQueue = taskqueue.NewTaskQueue(
+		taskqueue.WithAlarm(taskQueueAlarm, hAlarm),
+		taskqueue.WithCapacity(taskQueueCapacity),
+		taskqueue.WithHandlers(map[taskqueue.Subject]taskqueue.Handler{
 			taskConfig:          hTask,
 			taskExit:            hTask,
 			taskResetNats:       hTask,
@@ -377,7 +377,7 @@ func (service *AgentService) handleTasks() {
 			taskStartTransport:  hTask,
 			taskStopTransport:   hTask,
 		}),
-		taskQueue.WithDebugger(hDebug),
+		taskqueue.WithDebugger(hDebug),
 	)
 }
 

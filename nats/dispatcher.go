@@ -7,7 +7,7 @@ import (
 	"time"
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
-	"github.com/gwos/tcg/taskQueue"
+	"github.com/gwos/tcg/taskqueue"
 	"github.com/nats-io/stan.go"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
@@ -42,7 +42,7 @@ type natsDispatcher struct {
 	msgsDone *cache.Cache
 	retryes  *cache.Cache
 
-	taskQueue *taskQueue.TaskQueue
+	taskQueue *taskqueue.TaskQueue
 }
 
 func getDispatcher() *natsDispatcher {
@@ -55,9 +55,9 @@ func getDispatcher() *natsDispatcher {
 			retryes:  cache.New(time.Minute*30, time.Minute*30),
 		}
 		// provide buffer to handle corner case: a few targets anavailable on startup
-		dispatcher.taskQueue = taskQueue.NewTaskQueue(
-			taskQueue.WithCapacity(64),
-			taskQueue.WithHandlers(map[taskQueue.Subject]taskQueue.Handler{
+		dispatcher.taskQueue = taskqueue.NewTaskQueue(
+			taskqueue.WithCapacity(64),
+			taskqueue.WithHandlers(map[taskqueue.Subject]taskqueue.Handler{
 				taskRetry: dispatcher.taskRetryHandler,
 			}),
 		)
@@ -169,7 +169,7 @@ func (d *natsDispatcher) retryDurable(opt DispatcherOption) error {
 	return err
 }
 
-func (d *natsDispatcher) taskRetryHandler(task *taskQueue.Task) error {
+func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 	opt := task.Args[0].(DispatcherOption)
 
 	d.Lock()
