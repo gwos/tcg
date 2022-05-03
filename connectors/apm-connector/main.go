@@ -15,6 +15,7 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
+	metricsProfile    = &transit.MetricsProfile{}
 	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
@@ -63,7 +64,7 @@ func configHandler(data []byte) {
 	if len(gwConnections) > 0 {
 		tExt.Ownership = transit.HostOwnershipType(gwConnections[0].DeferOwnership)
 	}
-	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	/* Restart periodic loop */
 	cancel()

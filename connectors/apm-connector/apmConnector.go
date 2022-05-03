@@ -25,6 +25,7 @@ import (
 
 var (
 	inventoryGroupsStorage = make(map[string]map[string][]transit.ResourceRef)
+	availableMetrics       = make([]string, 0)
 )
 
 // Resource defines APM Source
@@ -90,10 +91,10 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf, withFilters bool) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	var textParser expfmt.TextParser
 	var promParser PromParser
-	var prometheusServices map[string]*dto.MetricFamily
+	prometheusServices := make(map[string]*dto.MetricFamily, 0)
 	if isProtobuf {
 		// reader := bytes.NewReader(body)
 		dest := make([]byte, len(body))
@@ -101,13 +102,20 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusServices, err = promParser.Parse(dst)
+		prometheusServices, err = promParser.Parse(dst, withFilters)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		var err error
-		prometheusServices, err = textParser.TextToMetricFamilies(strings.NewReader(string(body)))
+		ps, err := textParser.TextToMetricFamilies(strings.NewReader(string(body)))
+		prometheusServices = make(map[string]*dto.MetricFamily, 0)
+		availableMetrics = nil
+		for key, service := range ps {
+			availableMetrics = append(availableMetrics, *service.Name)
+			if (withFilters && profileContainsMetric(metricsProfile, *service.Name)) || !withFilters {
+				prometheusServices[key] = service
+			}
+		}
 		if err != nil {
 			return nil, nil, err
 		}
@@ -121,8 +129,8 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf bool) (*[]tr
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(body []byte, resourceIndex int, statusDown bool, isProtobuf bool) error {
-	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf); err == nil {
+func processMetrics(body []byte, resourceIndex int, statusDown, isProtobuf, withFilters bool) error {
+	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf, withFilters); err == nil {
 		if statusDown {
 			for i := 0; i < len(*monitoredResources); i++ {
 				(*monitoredResources)[i].Status = transit.HostUnscheduledDown
@@ -316,7 +324,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
 	}
 	for hostName, host := range hostsMap {
-		services := make([]transit.MonitoredService, 0, len(host))
+		ss := make([]transit.MonitoredService, 0, len(host))
 		/* sort names for hashSum consistency */
 		serviceNames := make([]string, 0, len(host))
 		for s := range host {
@@ -344,10 +352,10 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 				if mStatus != nil {
 					service.Status = *mStatus
 				}
-				services = append(services, *service)
+				ss = append(ss, *service)
 			}
 		}
-		monitoredResource, err := connectors.CreateResource(hostName, hostToDeviceMap[hostName], services)
+		monitoredResource, err := connectors.CreateResource(hostName, hostToDeviceMap[hostName], ss)
 		if err != nil {
 			return nil, err
 		}
@@ -378,11 +386,20 @@ func parseStatus(str string) (transit.MonitorStatus, error) {
 // initializeEntrypoints - function for setting entrypoints,
 // that will be available through the Connector API
 func initializeEntrypoints() []services.Entrypoint {
-	return []services.Entrypoint{{
-		URL:     "/metrics/job/:name",
-		Method:  http.MethodPost,
-		Handler: receiverHandler,
-	}}
+	return []services.Entrypoint{
+		{
+			URL:     "/metrics/job/:name",
+			Method:  http.MethodPost,
+			Handler: receiverHandler,
+		},
+		{
+			URL:    "/metrics/available",
+			Method: http.MethodGet,
+			Handler: func(c *gin.Context) {
+				c.JSON(http.StatusOK, availableMetrics)
+			},
+		},
+	}
 }
 
 func receiverHandler(c *gin.Context) {
@@ -400,7 +417,7 @@ func receiverHandler(c *gin.Context) {
 		return
 	}
 	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
-	err = processMetrics(body, -1, false, isProtobuf)
+	err = processMetrics(body, -1, false, isProtobuf, false)
 	if err != nil {
 		logEvt.Discard() // recreate log event with error level
 		log.Err(err).
@@ -411,6 +428,7 @@ func receiverHandler(c *gin.Context) {
 }
 
 func pull(resources []Resource) {
+	fmt.Println(resources[0].URL)
 	for index, resource := range resources {
 		req, err := (&clients.Req{
 			URL:     resource.URL,
@@ -427,7 +445,8 @@ func pull(resources []Resource) {
 			continue
 		}
 		logper.Info(req, "pull data from resource")
-		err = processMetrics(req.Response, index, req.Status == 220, false)
+		fmt.Println(string(req.Response))
+		err = processMetrics(req.Response, index, req.Status == 220, false, true)
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")
 		}

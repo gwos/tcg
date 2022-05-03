@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
@@ -18,7 +19,7 @@ type PromParser struct {
 	DefaultTags map[string]string
 }
 
-func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
+func (p *PromParser) Parse(buf []byte, withFilters bool) (map[string]*dto.MetricFamily, error) {
 	var err error
 	var metrics = map[string]*dto.MetricFamily{}
 	var req prompb.WriteRequest
@@ -29,6 +30,7 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 
 	now := time.Now()
 
+	availableMetrics = []string{}
 	for _, ts := range req.Timeseries {
 
 		tags := map[string]string{}
@@ -47,9 +49,11 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 			return nil, fmt.Errorf("metric name %q not found in tag-set or empty", model.MetricNameLabel)
 		}
 		delete(tags, model.MetricNameLabel)
+		availableMetrics = append(availableMetrics, metricName)
 
 		mf, ok := metrics[metricName]
-		if !ok {
+
+		if !ok && (withFilters && profileContainsMetric(metricsProfile, metricName) || !withFilters) {
 			mf = &dto.MetricFamily{
 				Name:   &metricName,
 				Type:   dto.MetricType_COUNTER.Enum(),
@@ -76,6 +80,7 @@ func (p *PromParser) Parse(buf []byte) (map[string]*dto.MetricFamily, error) {
 			mf.Metric = append(mf.Metric, &m)
 		}
 	}
+
 	return metrics, err
 }
 
@@ -104,4 +109,14 @@ func (p *PromParser) parseDebug(buf []byte) (interface{}, error) {
 			Msg("time series")
 	})
 	return nil, errors.New("testing")
+}
+
+func profileContainsMetric(profile *transit.MetricsProfile, metric string) bool {
+	for _, value := range profile.Metrics {
+		if value.Name == metric {
+			return true
+		}
+	}
+
+	return false
 }
