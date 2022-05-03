@@ -126,7 +126,7 @@ func (t Timestamp) UTC() Timestamp {
 // MarshalJSON implements json.Marshaler.
 // Overrides nested time.Time MarshalJSON.
 func (t Timestamp) MarshalJSON() ([]byte, error) {
-	i := t.UnixNano() / int64(time.Millisecond)
+	i := t.UnixMilli()
 	buf := make([]byte, 0, 16)
 	buf = append(buf, '"')
 	buf = strconv.AppendInt(buf, i, 10)
@@ -137,7 +137,7 @@ func (t Timestamp) MarshalJSON() ([]byte, error) {
 // String implements fmt.Stringer.
 // Overrides nested time.Time String.
 func (t Timestamp) String() string {
-	i := t.UnixNano() / int64(time.Millisecond)
+	i := t.UnixMilli()
 	buf := make([]byte, 0, 16)
 	buf = strconv.AppendInt(buf, i, 10)
 	return string(buf)
@@ -153,7 +153,6 @@ func (t *Timestamp) UnmarshalJSON(input []byte) error {
 		return err
 	}
 
-	i *= int64(time.Millisecond)
-	*t = Timestamp{time.Unix(0, i).UTC()}
+	*t = Timestamp{time.UnixMilli(i).UTC()}
 	return nil
 }
