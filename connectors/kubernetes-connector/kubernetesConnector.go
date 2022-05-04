@@ -29,6 +29,7 @@ type ExtConfig struct {
 	CheckInterval time.Duration                                          `json:"checkIntervalMinutes"`
 	Ownership     transit.HostOwnershipType                              `json:"ownership,omitempty"`
 	AuthType      AuthType                                               `json:"authType"`
+	Insecure      bool                                                   `json:"insecure"`
 
 	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
 	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
@@ -109,16 +110,18 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		AuthProvider:        nil,
 		AuthConfigPersister: nil,
 		ExecProvider:        nil,
-		TLSClientConfig:     rest.TLSClientConfig{},
-		UserAgent:           "",
-		DisableCompression:  false,
-		Transport:           nil,
-		WrapTransport:       nil,
-		QPS:                 0,
-		Burst:               0,
-		RateLimiter:         nil,
-		Timeout:             0,
-		Dial:                nil,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: config.Insecure,
+		},
+		UserAgent:          "",
+		DisableCompression: false,
+		Transport:          nil,
+		WrapTransport:      nil,
+		QPS:                0,
+		Burst:              0,
+		RateLimiter:        nil,
+		Timeout:            0,
+		Dial:               nil,
 	}
 
 	switch config.AuthType {
@@ -140,13 +143,13 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 
 		if len(fConfig.Clusters) != 1 || len(fConfig.Users) != 1 ||
 			fConfig.Clusters[0].Cl.Server == "" || fConfig.Users[0].User.Token == "" || fConfig.Kind != "Config" {
-			return errors.New("Invalid configuration file!")
+			return errors.New("invalid configuration file")
 		}
 
 		kConfig.BearerToken = fConfig.Users[0].User.Token
 		kConfig.Host = fConfig.Clusters[0].Cl.Server
 
-		log.Info().Msg("using YAML File auth")
+		log.Info().Msg("using YAML file auth")
 	}
 
 	x, err := kubernetes.NewForConfig(&kConfig)
