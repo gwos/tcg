@@ -91,28 +91,28 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf, withFilters bool) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+func parsePrometheusBody(mi *metricsInfo) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	var textParser expfmt.TextParser
 	var promParser PromParser
 	prometheusServices := make(map[string]*dto.MetricFamily, 0)
-	if isProtobuf {
-		// reader := bytes.NewReader(body)
-		dest := make([]byte, len(body))
-		dst, err := snappy.Decode(dest, body)
+	if mi.isProtobuf {
+		dest := make([]byte, len(mi.data))
+		dst, err := snappy.Decode(dest, mi.data)
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusServices, err = promParser.Parse(dst, withFilters)
+		prometheusServices, err = promParser.Parse(dst, mi.withFilters)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
-		ps, err := textParser.TextToMetricFamilies(strings.NewReader(string(body)))
+		ps, err := textParser.TextToMetricFamilies(strings.NewReader(string(mi.data)))
 		prometheusServices = make(map[string]*dto.MetricFamily, 0)
 		availableMetrics = nil
 		for key, service := range ps {
 			availableMetrics = append(availableMetrics, *service.Name)
-			if (withFilters && profileContainsMetric(metricsProfile, *service.Name)) || !withFilters {
+			if (mi.withFilters && profileContainsMetric(metricsProfile, *service.Name)) ||
+				!mi.withFilters {
 				prometheusServices[key] = service
 			}
 		}
@@ -121,7 +121,7 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf, withFilters
 		}
 	}
 	groups := make(map[string][]transit.ResourceRef)
-	monitoredResources, err := parsePrometheusServices(prometheusServices, groups, resourceIndex)
+	monitoredResources, err := parsePrometheusServices(prometheusServices, groups, mi.resource, mi.resourceIndex)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -129,9 +129,9 @@ func parsePrometheusBody(body []byte, resourceIndex int, isProtobuf, withFilters
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(body []byte, resourceIndex int, statusDown, isProtobuf, withFilters bool) error {
-	if monitoredResources, resourceGroups, err := parsePrometheusBody(body, resourceIndex, isProtobuf, withFilters); err == nil {
-		if statusDown {
+func processMetrics(mi *metricsInfo) error {
+	if monitoredResources, resourceGroups, err := parsePrometheusBody(mi); err == nil {
+		if mi.isStatusDown {
 			for i := 0; i < len(*monitoredResources); i++ {
 				(*monitoredResources)[i].Status = transit.HostUnscheduledDown
 			}
@@ -180,8 +180,8 @@ func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metri
 // extracts from Prometheus format to intermediate Host Maps format
 // modifies hostsMap parameter
 func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
-	groups map[string][]transit.ResourceRef,
-	hostsMap map[string]map[string][]connectors.MetricBuilder, resourceIndex int, hostToDeviceMap map[string]string) {
+	groups map[string][]transit.ResourceRef, hostsMap map[string]map[string][]connectors.MetricBuilder,
+	resource string, resourceIndex int, hostToDeviceMap map[string]string) {
 	var groupName, hostName, serviceName, device string
 
 	for _, metric := range prometheusService.GetMetric() {
@@ -235,6 +235,18 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				}
 			}
 
+			// process mappings
+			if ok, hostOverride := applyResourceMapping(resource); ok {
+				hostName = hostOverride
+			}
+			// applyLabelMapping for hosts overrides applyResourceMapping results
+			if ok, hostOverride := applyLabelMapping(mappings.HostLabel, metricBuilder.Tags); ok {
+				hostName = hostOverride
+			}
+			if ok, serviceOverride := applyLabelMapping(mappings.ServiceLabel, metricBuilder.Tags); ok {
+				serviceName = serviceOverride
+			}
+
 			// process defaults
 			if groupName == "" {
 				if resourceIndex == -1 || extConfig.Resources[resourceIndex].DefaultHostGroup == "" {
@@ -254,6 +266,10 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				serviceName = name
 			}
 			hostToDeviceMap[hostName] = device
+
+			// Sanitize host and service names to exclude special characters
+			hostName = connectors.SanitizeString(hostName)
+			serviceName = connectors.SanitizeString(serviceName)
 
 			// build the host->service->metric tree
 			host, hostFound := hostsMap[hostName]
@@ -308,8 +324,12 @@ func constructResourceGroups(groups map[string][]transit.ResourceRef) []transit.
 	return resourceGroups
 }
 
-func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
-	groups map[string][]transit.ResourceRef, resourceIndex int) (*[]transit.MonitoredResource, error) {
+func parsePrometheusServices(
+	prometheusServices map[string]*dto.MetricFamily,
+	groups map[string][]transit.ResourceRef,
+	resource string,
+	resourceIndex int,
+) (*[]transit.MonitoredResource, error) {
 	var monitoredResources []transit.MonitoredResource
 	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
 	hostToDeviceMap := make(map[string]string)
@@ -321,7 +341,7 @@ func parsePrometheusServices(prometheusServices map[string]*dto.MetricFamily,
 			log.Err(err).Msg("could not validate prometheus service")
 			continue
 		}
-		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resourceIndex, hostToDeviceMap)
+		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resource, resourceIndex, hostToDeviceMap)
 	}
 	for hostName, host := range hostsMap {
 		ss := make([]transit.MonitoredService, 0, len(host))
@@ -417,8 +437,14 @@ func receiverHandler(c *gin.Context) {
 		return
 	}
 	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
-	err = processMetrics(body, -1, false, isProtobuf, false)
-	if err != nil {
+	if err = processMetrics(&metricsInfo{
+		resource:      "",
+		resourceIndex: -1,
+		data:          body,
+		isStatusDown:  false,
+		isProtobuf:    isProtobuf,
+		withFilters:   false,
+	}); err != nil {
 		logEvt.Discard() // recreate log event with error level
 		log.Err(err).
 			Str("content-type", c.GetHeader("Content-Type")).
@@ -427,8 +453,16 @@ func receiverHandler(c *gin.Context) {
 	}
 }
 
+type metricsInfo struct {
+	resource      string
+	resourceIndex int
+	data          []byte
+	isStatusDown  bool
+	isProtobuf    bool
+	withFilters   bool
+}
+
 func pull(resources []Resource) {
-	fmt.Println(resources[0].URL)
 	for index, resource := range resources {
 		req, err := (&clients.Req{
 			URL:     resource.URL,
@@ -445,8 +479,14 @@ func pull(resources []Resource) {
 			continue
 		}
 		logper.Info(req, "pull data from resource")
-		fmt.Println(string(req.Response))
-		err = processMetrics(req.Response, index, req.Status == 220, false, true)
+		err = processMetrics(&metricsInfo{
+			resource:      resource.URL,
+			resourceIndex: index,
+			data:          req.Response,
+			isStatusDown:  req.Status == 220,
+			isProtobuf:    false,
+			withFilters:   true,
+		})
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")
 		}

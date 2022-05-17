@@ -16,6 +16,7 @@ var (
 		Extensions: extConfig,
 	}
 	metricsProfile    = &transit.MetricsProfile{}
+	mappings          = &transit.Mappings{}
 	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
@@ -55,7 +56,8 @@ func configHandler(data []byte) {
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
-	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {
+	err := connectors.UnmarshalConfig(data, tMetProf, tMonConn)
+	if err != nil {
 		log.Err(err).Msg("could not parse config")
 		return
 	}
@@ -66,6 +68,7 @@ func configHandler(data []byte) {
 	}
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
+	mappings, err = unmarshalMappings(data)
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

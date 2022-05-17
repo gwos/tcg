@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"reflect"
-	regexp2 "regexp"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -670,12 +670,40 @@ func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) str
 	return fmt.Sprintf("%.0f second(s)", s)
 }
 
+var sanitizeRegexp = regexp.MustCompile(`[^\w-_.:]`)
+
+// SanitizeString replaces all special characters with '_'
+func SanitizeString(str string) string {
+	str = sanitizeRegexp.ReplaceAllString(str, "_")
+	str = removeDuplicates(str)
+
+	if str[len(str)-1:] == "_" {
+		str = str[0 : len(str)-1]
+	}
+
+	return str
+}
+
+func removeDuplicates(s string) string {
+	var (
+		buf  strings.Builder
+		last rune
+	)
+	for i, r := range s {
+		if r != last || i == 0 {
+			buf.WriteRune(r)
+			last = r
+		}
+	}
+	return buf.String()
+}
+
 func addServiceStatusText(patternMessage string, service *transit.MonitoredService) {
 	if service == nil {
 		log.Error().Msg("service is nil")
 		return
 	}
-	re := regexp2.MustCompile(statusTextPattern)
+	re := regexp.MustCompile(statusTextPattern)
 	patterns := re.FindAllString(patternMessage, -1)
 	for _, pattern := range patterns {
 		if fn, has := statusTextValGetters[pattern]; has {
