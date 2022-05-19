@@ -91,7 +91,16 @@ func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
 const defaultHostName = "APM-Host"
 const defaultHostGroupName = "Servers"
 
-func parsePrometheusBody(mi *metricsInfo) (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
+type promMetricsData struct {
+	resource      string
+	resourceIndex int
+	data          []byte
+	isStatusDown  bool
+	isProtobuf    bool
+	withFilters   bool
+}
+
+func (mi *promMetricsData) parse() (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	var textParser expfmt.TextParser
 	var promParser PromParser
 	prometheusServices := make(map[string]*dto.MetricFamily, 0)
@@ -129,17 +138,19 @@ func parsePrometheusBody(mi *metricsInfo) (*[]transit.MonitoredResource, *[]tran
 	return monitoredResources, &resourceGroups, nil
 }
 
-func processMetrics(mi *metricsInfo) error {
-	if monitoredResources, resourceGroups, err := parsePrometheusBody(mi); err == nil {
-		if mi.isStatusDown {
-			for i := 0; i < len(*monitoredResources); i++ {
-				(*monitoredResources)[i].Status = transit.HostUnscheduledDown
-			}
+func (mi *promMetricsData) process() error {
+	monitoredResources, resourceGroups, err := mi.parse()
+	if err != nil {
+		return err
+	}
+
+	if mi.isStatusDown {
+		for i := 0; i < len(*monitoredResources); i++ {
+			(*monitoredResources)[i].Status = transit.HostUnscheduledDown
 		}
-		if err := connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups); err != nil {
-			return err
-		}
-	} else {
+	}
+
+	if err = connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups); err != nil {
 		return err
 	}
 
@@ -277,20 +288,18 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				host = make(map[string][]connectors.MetricBuilder)
 				hostsMap[hostName] = host
 			}
-			metrics, metricsFound := host[serviceName]
+			_, metricsFound := host[serviceName]
 			if !metricsFound {
-				metrics = []connectors.MetricBuilder{}
-				host[serviceName] = metrics
+				host[serviceName] = []connectors.MetricBuilder{}
 			}
 			host[serviceName] = append(host[serviceName], metricBuilder)
 
 			// add or update the groups collection
-			refs, groupFound := groups[groupName]
+			_, groupFound := groups[groupName]
 			if !groupFound {
-				refs = []transit.ResourceRef{}
-				refs = groups[groupName]
+				groups[groupName] = []transit.ResourceRef{}
 			}
-			if !containsRef(refs, hostName) {
+			if !containsRef(groups[groupName], hostName) {
 				groups[groupName] = append(groups[groupName], transit.ResourceRef{
 					Name: hostName,
 					Type: transit.ResourceTypeHost,
@@ -437,29 +446,21 @@ func receiverHandler(c *gin.Context) {
 		return
 	}
 	isProtobuf := c.GetHeader("Content-Type") == "application/x-protobuf"
-	if err = processMetrics(&metricsInfo{
+	pmd := promMetricsData{
 		resource:      "",
 		resourceIndex: -1,
 		data:          body,
 		isStatusDown:  false,
 		isProtobuf:    isProtobuf,
 		withFilters:   false,
-	}); err != nil {
+	}
+	if err = pmd.process(); err != nil {
 		logEvt.Discard() // recreate log event with error level
 		log.Err(err).
 			Str("content-type", c.GetHeader("Content-Type")).
 			Msg("could not process Prometheus Push")
 		c.JSON(http.StatusBadRequest, err.Error())
 	}
-}
-
-type metricsInfo struct {
-	resource      string
-	resourceIndex int
-	data          []byte
-	isStatusDown  bool
-	isProtobuf    bool
-	withFilters   bool
 }
 
 func pull(resources []Resource) {
@@ -478,16 +479,16 @@ func pull(resources []Resource) {
 			logper.Error(req.Details(), "could not pull data from resource")
 			continue
 		}
-		logper.Info(req, "pull data from resource")
-		err = processMetrics(&metricsInfo{
+
+		pmd := promMetricsData{
 			resource:      resource.URL,
 			resourceIndex: index,
 			data:          req.Response,
 			isStatusDown:  req.Status == 220,
 			isProtobuf:    false,
 			withFilters:   true,
-		})
-		if err != nil {
+		}
+		if err = pmd.process(); err != nil {
 			log.Err(err).Msg("could not process metrics")
 		}
 	}

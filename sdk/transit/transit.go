@@ -674,6 +674,19 @@ func (metricsProfile MetricsProfile) String() string {
 	)
 }
 
+type Mappings struct {
+	Resource     []Mapping `json:"resource"`
+	HostLabel    []Mapping `json:"hostLabel"`
+	ServiceLabel []Mapping `json:"serviceLabel"`
+}
+
+type Mapping struct {
+	Enabled     bool           `json:"enabled"`
+	Source      string         `json:"source"`
+	Destination string         `json:"destination"`
+	Regexp      *regexp.Regexp `json:"-"`
+}
+
 type MetricDefinition struct {
 	Name              string      `json:"name"`
 	CustomName        string      `json:"customName,omitempty"`
@@ -689,19 +702,6 @@ type MetricDefinition struct {
 	CriticalThreshold int         `json:"criticalThreshold"`
 	Expression        string      `json:"expression,omitempty"`
 	Format            string      `json:"format,omitempty"`
-}
-
-type Mappings struct {
-	Resource     []Mapping `json:"resource"`
-	HostLabel    []Mapping `json:"hostLabel"`
-	ServiceLabel []Mapping `json:"serviceLabel"`
-}
-
-type Mapping struct {
-	Enabled     bool           `json:"enabled"`
-	Source      string         `json:"source"`
-	Destination string         `json:"destination"`
-	Regexp      *regexp.Regexp `json:"-"`
 }
 
 // String implements Stringer interface
