@@ -24,7 +24,7 @@ func (p *PromParser) Parse(buf []byte, withFilters bool) (map[string]*dto.Metric
 	var metrics = map[string]*dto.MetricFamily{}
 	var req prompb.WriteRequest
 
-	if err := proto.Unmarshal(buf, &req); err != nil {
+	if err = proto.Unmarshal(buf, &req); err != nil {
 		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
 	}
 

@@ -25,10 +25,12 @@ response_time{critical="2.8",group="PrometheusDemo",resource="FinanceServicesGo"
 response_time{critical="2.8",group="PrometheusDemo",resource="FinanceServicesGo",service="sales",warning="2.5"} 1.1
 `)
 
-	monitoredResources, resourceGroups, err := parsePrometheusBody(&metricsInfo{
+	pmd := promMetricsData{
 		data:          input,
 		resourceIndex: -1,
-	})
+	}
+
+	monitoredResources, resourceGroups, err := pmd.parse()
 	assert.NoError(t, err)
 
 	rr, err := json.Marshal(monitoredResources)
