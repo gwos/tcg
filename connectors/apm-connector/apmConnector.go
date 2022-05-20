@@ -446,7 +446,7 @@ func pull(resources []Resource) {
 		}
 		logper.Info(req, "pull data from resource")
 		fmt.Println(string(req.Response))
-		err = processMetrics(req.Response, index, req.Status == 220, false, true)
+		err = processMetrics(req.Response, index, req.Status == 220, false, false)
 		if err != nil {
 			log.Err(err).Msg("could not process metrics")
 		}
