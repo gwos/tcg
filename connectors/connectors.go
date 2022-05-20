@@ -675,7 +675,7 @@ var sanitizeRegexp = regexp.MustCompile(`[^\w-_.:]`)
 // SanitizeString replaces all special characters with '_'
 func SanitizeString(str string) string {
 	str = sanitizeRegexp.ReplaceAllString(str, "_")
-	str = removeDuplicates(str)
+	str = removeUnderscoreDuplicates(str)
 
 	if str[len(str)-1:] == "_" {
 		str = str[0 : len(str)-1]
@@ -684,13 +684,13 @@ func SanitizeString(str string) string {
 	return str
 }
 
-func removeDuplicates(s string) string {
+func removeUnderscoreDuplicates(s string) string {
 	var (
 		buf  strings.Builder
 		last rune
 	)
 	for i, r := range s {
-		if r != last || i == 0 {
+		if (r != last || string(r) != "_") || i == 0 {
 			buf.WriteRune(r)
 			last = r
 		}
