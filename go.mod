@@ -2,8 +2,6 @@ module github.com/gwos/tcg
 
 go 1.18
 
-require github.com/gwos/tcg/sdk v0.0.0-20220503113949-10fc9754aaf7
-
 require (
 	github.com/PaesslerAG/gval v1.1.2
 	github.com/PaesslerAG/jsonpath v0.1.1
@@ -118,3 +116,7 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+require github.com/gwos/tcg/sdk v0.0.0 // add sdk sub-module
+
+replace github.com/gwos/tcg/sdk => ./sdk // wrap sdk sub-module
