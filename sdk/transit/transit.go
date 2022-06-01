@@ -675,9 +675,9 @@ func (metricsProfile MetricsProfile) String() string {
 }
 
 type Mappings struct {
-	Resource     []Mapping `json:"resource"`
-	HostLabel    []Mapping `json:"hostLabel"`
-	ServiceLabel []Mapping `json:"serviceLabel"`
+	Resource     []Mapping `json:"resourceMappings"`
+	HostLabel    []Mapping `json:"hostLabelMappings"`
+	ServiceLabel []Mapping `json:"serviceLabelMappings"`
 }
 
 type Mapping struct {
