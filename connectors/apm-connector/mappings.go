@@ -20,11 +20,11 @@ func unmarshalMappings(input []byte) (*transit.Mappings, error) {
 		return nil, err
 	}
 
-	for _, mapping := range connector.Mappings.HostLabel {
-		mapping.Regexp = regexp.MustCompile(mapping.Source)
+	for i, mapping := range connector.Mappings.HostLabel {
+		connector.Mappings.HostLabel[i].Regexp = regexp.MustCompile(mapping.Source)
 	}
-	for _, mapping := range connector.Mappings.ServiceLabel {
-		mapping.Regexp = regexp.MustCompile(mapping.Source)
+	for i, mapping := range connector.Mappings.ServiceLabel {
+		connector.Mappings.ServiceLabel[i].Regexp = regexp.MustCompile(mapping.Source)
 	}
 
 	return &connector.Mappings, nil
