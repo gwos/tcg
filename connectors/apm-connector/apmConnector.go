@@ -233,7 +233,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					if value, err := strconv.ParseFloat(*label.Value, 64); err == nil {
 						metricBuilder.Critical = value
 					} else {
-						metricBuilder.Warning = -1
+						metricBuilder.Critical = -1
 					}
 				case "service":
 					serviceName = *label.Value
@@ -244,6 +244,21 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				default:
 					metricBuilder.Tags[*label.Name] = *label.Value
 				}
+			}
+
+			// process overrides
+			ok, graphed, customName, warning, critical := getOverrides(name)
+			if ok {
+				if customName != "" {
+					metricBuilder.Name = customName
+				}
+				if warning != -1 {
+					metricBuilder.Warning = warning
+				}
+				if critical != -1 {
+					metricBuilder.Critical = critical
+				}
+				metricBuilder.Graphed = graphed
 			}
 
 			// process mappings
@@ -410,6 +425,15 @@ func parseStatus(str string) (transit.MonitorStatus, error) {
 	default:
 		return transit.ServiceUnknown, errors.New("unknown status provided")
 	}
+}
+
+func getOverrides(metricName string) (bool, bool, string, int, int) {
+	for _, override := range metricsProfile.Metrics {
+		if override.Name == metricName {
+			return true, override.Graphed, override.CustomName, override.WarningThreshold, override.CriticalThreshold
+		}
+	}
+	return false, false, "", -1, -1
 }
 
 // initializeEntrypoints - function for setting entrypoints,
