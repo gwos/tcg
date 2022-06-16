@@ -25,7 +25,7 @@ import (
 
 var (
 	inventoryGroupsStorage = make(map[string]map[string][]transit.ResourceRef)
-	availableMetrics       = make([]string, 0)
+	availableMetrics       = make(map[string][]string)
 )
 
 // Resource defines APM Source
@@ -110,16 +110,16 @@ func (mi *promMetricsData) parse() (*[]transit.MonitoredResource, *[]transit.Res
 		if err != nil {
 			return nil, nil, err
 		}
-		prometheusServices, err = promParser.Parse(dst, mi.withFilters)
+		prometheusServices, err = promParser.Parse(dst, mi.withFilters, mi.resource)
 		if err != nil {
 			return nil, nil, err
 		}
 	} else {
 		ps, err := textParser.TextToMetricFamilies(strings.NewReader(string(mi.data)))
 		prometheusServices = make(map[string]*dto.MetricFamily, 0)
-		availableMetrics = nil
+		availableMetrics[mi.resource] = []string{}
 		for key, service := range ps {
-			availableMetrics = append(availableMetrics, *service.Name)
+			availableMetrics[mi.resource] = append(availableMetrics[mi.resource], *service.Name)
 			if (mi.withFilters && profileContainsMetric(metricsProfile, *service.Name)) ||
 				!mi.withFilters {
 				prometheusServices[key] = service
@@ -233,7 +233,7 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 					if value, err := strconv.ParseFloat(*label.Value, 64); err == nil {
 						metricBuilder.Critical = value
 					} else {
-						metricBuilder.Warning = -1
+						metricBuilder.Critical = -1
 					}
 				case "service":
 					serviceName = *label.Value
@@ -244,6 +244,21 @@ func extractIntoMetricBuilders(prometheusService *dto.MetricFamily,
 				default:
 					metricBuilder.Tags[*label.Name] = *label.Value
 				}
+			}
+
+			// process overrides
+			ok, graphed, customName, warning, critical := getOverrides(name)
+			if ok {
+				if customName != "" {
+					metricBuilder.Name = customName
+				}
+				if warning != -1 {
+					metricBuilder.Warning = warning
+				}
+				if critical != -1 {
+					metricBuilder.Critical = critical
+				}
+				metricBuilder.Graphed = graphed
 			}
 
 			// process mappings
@@ -412,6 +427,15 @@ func parseStatus(str string) (transit.MonitorStatus, error) {
 	}
 }
 
+func getOverrides(metricName string) (bool, bool, string, int, int) {
+	for _, override := range metricsProfile.Metrics {
+		if override.Name == metricName {
+			return true, override.Graphed, override.CustomName, override.WarningThreshold, override.CriticalThreshold
+		}
+	}
+	return false, false, "", -1, -1
+}
+
 // initializeEntrypoints - function for setting entrypoints,
 // that will be available through the Connector API
 func initializeEntrypoints() []services.Entrypoint {
@@ -425,7 +449,11 @@ func initializeEntrypoints() []services.Entrypoint {
 			URL:    "/metrics/available",
 			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
-				c.JSON(http.StatusOK, availableMetrics)
+				resultSet := make([]string, 0)
+				for _, arr := range availableMetrics {
+					resultSet = append(resultSet, arr...)
+				}
+				c.JSON(http.StatusOK, resultSet)
 			},
 		},
 	}

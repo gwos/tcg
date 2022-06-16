@@ -19,7 +19,7 @@ type PromParser struct {
 	DefaultTags map[string]string
 }
 
-func (p *PromParser) Parse(buf []byte, withFilters bool) (map[string]*dto.MetricFamily, error) {
+func (p *PromParser) Parse(buf []byte, withFilters bool, resource string) (map[string]*dto.MetricFamily, error) {
 	var err error
 	var metrics = map[string]*dto.MetricFamily{}
 	var req prompb.WriteRequest
@@ -30,7 +30,7 @@ func (p *PromParser) Parse(buf []byte, withFilters bool) (map[string]*dto.Metric
 
 	now := time.Now()
 
-	availableMetrics = []string{}
+	availableMetrics[resource] = []string{}
 	for _, ts := range req.Timeseries {
 
 		tags := map[string]string{}
@@ -49,7 +49,7 @@ func (p *PromParser) Parse(buf []byte, withFilters bool) (map[string]*dto.Metric
 			return nil, fmt.Errorf("metric name %q not found in tag-set or empty", model.MetricNameLabel)
 		}
 		delete(tags, model.MetricNameLabel)
-		availableMetrics = append(availableMetrics, metricName)
+		availableMetrics[resource] = append(availableMetrics[resource], metricName)
 
 		mf, ok := metrics[metricName]
 
