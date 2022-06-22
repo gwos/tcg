@@ -1,0 +1,65 @@
+run:
+  skip-dirs:
+    - vendor
+    - bin
+    - var
+    - tmp
+  skip-files:
+    - \.pb\.go$
+
+govet:
+  enable:
+    - fieldalignment
+
+linters:
+  disable-all: false
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - gocognit
+    - goconst
+    - gocyclo
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - prealloc
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+  disable:
+    - gochecknoglobals
+    - gochecknoinits
+    - godox
+    - lll
+    - nakedret
+    - wsl
+    - gosimple
+    - gosec
+    - funlen
+
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - scopelint
+        - dupl
+        - gocognit
+  exclude:
+    - "not declared by package utf8"
+    - "unicode/utf8/utf8.go"
+    - "DecodeRuneInString not declared by package utf8"
+    - ".*and that stutters.*"
