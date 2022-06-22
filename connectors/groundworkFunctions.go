@@ -15,8 +15,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// ProcessesCache
-// TODO: move into Server Connector
+// ProcessesCache | TODO: move into Server Connector
 var ProcessesCache = cache.New(5*time.Minute, 5*time.Minute)
 
 const (

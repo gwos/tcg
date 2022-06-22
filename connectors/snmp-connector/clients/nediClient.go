@@ -20,8 +20,8 @@ const (
 
 	colName     = "name"
 	colDevice   = "device"
-	colDevIp    = "devip"
-	colMonIp    = "monip"
+	colDevIP    = "devip"
+	colMonIP    = "monip"
 	colReadComm = "readcomm"
 	colIfName   = "ifname"
 	colIfIndex  = "ifidx"
@@ -35,14 +35,14 @@ type NediClient struct {
 
 type Device struct {
 	Name      string
-	Ip        string
+	IP        string
 	Community string
 	LastOK    float64
 }
 
 type Monitoring struct {
 	Name   string
-	Ip     string
+	IP     string
 	Device string
 	LastOK float64
 }
@@ -145,7 +145,7 @@ func (client *NediClient) getConnectionString(table string, query string, order 
 }
 
 func parseDevices(client *NediClient, response []interface{}) ([]Device, error) {
-	var devices []Device
+	var devices = make([]Device, 0)
 	monitoredDevices, err := getMonitoredDevices(client)
 	if err != nil {
 		return devices, err
@@ -154,7 +154,7 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 		var device Device
 
 		name := d[colDevice]
-		ip := d[colDevIp]
+		ip := d[colDevIP]
 		community := d[colReadComm]
 
 		switch nameVal := name.(type) {
@@ -175,10 +175,10 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 		ipVal, err := getInt(ip)
 		if err != nil {
 			log.Warn().Msgf("skipping device '%s:%s:%d' of unsupported type",
-				device.Name, colDevIp, ipVal)
+				device.Name, colDevIP, ipVal)
 			continue
 		}
-		device.Ip = int2ip(ipVal)
+		device.IP = int2ip(ipVal)
 
 		switch commVal := community.(type) {
 		case string:
@@ -195,7 +195,7 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 }
 
 func parseInterfaces(response []interface{}) []Interface {
-	var interfaces []Interface
+	var interfaces = make([]Interface, 0)
 	for _, i := range parseResponse(response) {
 		var iFace Interface
 
@@ -347,14 +347,14 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		monitor.Device = fields[colDevice].(string)
 		monitor.LastOK = fields[colLastOK].(float64)
 
-		ip := fields[colMonIp]
+		ip := fields[colMonIP]
 		ipVal, err := getInt(ip)
 		if err != nil {
 			log.Warn().Msgf("skipping monitoring '%s:%s:%d' of unsupported type",
-				monitor.Name, colMonIp, ipVal)
+				monitor.Name, colMonIP, ipVal)
 			continue
 		}
-		monitor.Ip = int2ip(ipVal)
+		monitor.IP = int2ip(ipVal)
 		monitors[monitor.Device] = monitor
 	}
 	return monitors, nil

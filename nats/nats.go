@@ -159,7 +159,7 @@ func StartDispatcher(options []DispatcherOption) error {
 				_ = c.Close()
 				d.connDispatcher = nil
 				d.Unlock()
-				StartDispatcher(options)
+				_ = StartDispatcher(options)
 			}),
 		); err != nil {
 			log.Warn().Err(err).Msg("nats dispatcher failed to connect")

@@ -26,23 +26,23 @@ func AdaptHandler(h func([]byte) error) DataHandler {
 	// contains a lot of noise and looks like protocol defined structure.
 	// So, here we try to reconstruct plain metrics payload and process it with own parser.
 	return func(p *DataPacketExt) error {
-		s := strings.Replace(p.PluginOutput, `\n`, "\n", -1)
-		buf := make([]byte, 0, 4+len(p.HostName)+len(p.Service)+len(s))
-		buf = append(buf, p.HostName...)
+		s := strings.Replace(p.DataPacket.PluginOutput, `\n`, "\n", -1)
+		buf := make([]byte, 0, 4+len(p.DataPacket.HostName)+len(p.DataPacket.Service)+len(s))
+		buf = append(buf, p.DataPacket.HostName...)
 		buf = append(buf, ';')
-		buf = append(buf, p.Service...)
+		buf = append(buf, p.DataPacket.Service...)
 		buf = append(buf, ';')
-		buf = strconv.AppendInt(buf, int64(p.State), 10)
+		buf = strconv.AppendInt(buf, int64(p.DataPacket.State), 10)
 		buf = append(buf, ';')
 		buf = append(buf, s...)
 		log.Debug().
-			Int16("version", p.Version).
-			Uint32("crc", p.Crc).
-			Uint32("timestamp", p.Timestamp).
-			Int16("state", p.State).
-			Str("hostname", p.HostName).
-			Str("service", p.Service).
-			Str("pluginOutput", p.PluginOutput).
+			Int16("version", p.DataPacket.Version).
+			Uint32("crc", p.DataPacket.Crc).
+			Uint32("timestamp", p.DataPacket.Timestamp).
+			Int16("state", p.DataPacket.State).
+			Str("hostname", p.DataPacket.HostName).
+			Str("service", p.DataPacket.Service).
+			Str("pluginOutput", p.DataPacket.PluginOutput).
 			Bytes("buf", buf).
 			Func(func(e *zerolog.Event) {
 				println("# NSCA plain packet #")
@@ -91,7 +91,7 @@ func Start(ctx context.Context, handler DataHandler) {
 }
 
 func StartServerWithContext(ctx context.Context, conf *ConfigExt) error {
-	service := fmt.Sprint(conf.Host, ":", conf.Port)
+	service := fmt.Sprint(conf.Config.Host, ":", conf.Config.Port)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
 	if err != nil {
 		return fmt.Errorf("unable to resolve address: %w", err)
@@ -124,7 +124,9 @@ func StartServerWithContext(ctx context.Context, conf *ConfigExt) error {
 			defer conn.Close()
 
 			// run as a goroutine
-			go HandleClientExt(conf, conn)
+			go func() {
+				_ = HandleClientExt(conf, conn)
+			}()
 		}
 	}
 }
@@ -145,7 +147,7 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 	}
 
 	// Retrieves the data from the client
-	data := nscatools.NewDataPacket(conf.EncryptionMethod, []byte(conf.Password), ipacket)
+	data := nscatools.NewDataPacket(conf.Config.EncryptionMethod, []byte(conf.Config.Password), ipacket)
 	dp := &DataPacketExt{*data}
 	if err = dp.Read(conn); err != nil {
 		log.Err(err).Msg("unable to read the data packet")
@@ -185,7 +187,7 @@ func (p *DataPacketExt) Read(conn io.Reader) error {
 	// 	return fmt.Errorf("Dropping packet with invalid size: %d", len(fullPacket))
 	// }
 
-	if err := p.Decrypt(fullPacket); err != nil {
+	if err := p.DataPacket.Decrypt(fullPacket); err != nil {
 		return err
 	}
 
@@ -194,12 +196,12 @@ func (p *DataPacketExt) Read(conn io.Reader) error {
 		println(string(fullPacket))
 	}).Send()
 
-	p.Crc = binary.BigEndian.Uint32(fullPacket[4:8])
-	if crc32 := p.CalculateCrc(fullPacket); p.Crc != crc32 {
+	p.DataPacket.Crc = binary.BigEndian.Uint32(fullPacket[4:8])
+	if crc32 := p.DataPacket.CalculateCrc(fullPacket); p.DataPacket.Crc != crc32 {
 		return fmt.Errorf("invalid CRC32: possibly due to mismatch password or crypto algorithm")
 	}
 
-	p.Timestamp = binary.BigEndian.Uint32(fullPacket[8:12])
+	p.DataPacket.Timestamp = binary.BigEndian.Uint32(fullPacket[8:12])
 	// MaxPacketAge <= 0 means that we don't check it
 	// if MaxPacketAge > 0 {
 	// 	if p.Timestamp > (p.Ipkt.Timestamp+MaxPacketAge) || p.Timestamp < (p.Ipkt.Timestamp-MaxPacketAge) {
@@ -208,11 +210,11 @@ func (p *DataPacketExt) Read(conn io.Reader) error {
 	// }
 
 	sep := []byte("\x00") // sep is used to extract only the useful string
-	p.Version = int16(binary.BigEndian.Uint16(fullPacket[0:2]))
-	p.State = int16(binary.BigEndian.Uint16(fullPacket[12:14]))
-	p.HostName = string(bytes.Split(fullPacket[14:78], sep)[0])
-	p.Service = string(bytes.Split(fullPacket[78:206], sep)[0])
-	p.PluginOutput = string(bytes.Split(fullPacket[206:], sep)[0])
+	p.DataPacket.Version = int16(binary.BigEndian.Uint16(fullPacket[0:2]))
+	p.DataPacket.State = int16(binary.BigEndian.Uint16(fullPacket[12:14]))
+	p.DataPacket.HostName = string(bytes.Split(fullPacket[14:78], sep)[0])
+	p.DataPacket.Service = string(bytes.Split(fullPacket[78:206], sep)[0])
+	p.DataPacket.PluginOutput = string(bytes.Split(fullPacket[206:], sep)[0])
 
 	return nil
 }

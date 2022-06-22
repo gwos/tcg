@@ -73,7 +73,6 @@ const (
 
 const (
 	ckTracerToken        = "ckTraceToken"
-	statsLastErrorsLim   = 10
 	taskQueueAlarm       = time.Second * 9
 	taskQueueCapacity    = 8
 	traceOnDemandAgentID = "#traceOnDemandAgentID#"
@@ -201,13 +200,13 @@ func defaultConfigHandler([]byte) {}
 func defaultExitHandler() {}
 
 // Quit returns channel
-// usefull for main loop
+// useful for main loop
 func (service *AgentService) Quit() <-chan struct{} {
 	return service.quitChan
 }
 
 // RegisterConfigHandler sets callback
-// usefull for process extensions
+// useful for process extensions
 func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
 	service.configHandler = fn
 }
@@ -404,7 +403,7 @@ func (service *AgentService) updateStats(c statsCounter) {
 }
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
-	var dispatcherOptions []nats.DispatcherOption
+	var dispatcherOptions = make([]nats.DispatcherOption, 0, len(service.gwClients))
 	for _, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
 		gwClient := gwClient /* hold loop var copy */

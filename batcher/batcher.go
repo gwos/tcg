@@ -110,7 +110,7 @@ func (bt *Batcher) Batch() {
 			if len(payloads) > 0 {
 				for _, p := range payloads {
 					if len(p) > 0 {
-						bt.handler(ctx, p)
+						_ = bt.handler(ctx, p)
 					}
 				}
 			}

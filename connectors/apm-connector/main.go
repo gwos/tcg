@@ -69,6 +69,10 @@ func configHandler(data []byte) {
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	mappings, err = unmarshalMappings(data)
+	if err != nil {
+		log.Err(err).Msg("could not parse config")
+		return
+	}
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

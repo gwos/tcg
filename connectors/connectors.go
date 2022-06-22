@@ -188,7 +188,7 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 }
 
 func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
-	var monitoredResourceRefs []transit.ResourceRef
+	var monitoredResourceRefs = make([]transit.ResourceRef, 0, len(resources))
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
 			transit.ResourceRef{
@@ -396,7 +396,7 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 }
 
 func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
-	var timeSeries []transit.TimeSeries
+	var timeSeries = make([]transit.TimeSeries, 0)
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
@@ -495,8 +495,10 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 
 // EvaluateExpressions calculates synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
-	var result []transit.MonitoredService
-	vars := make(map[string]interface{})
+	var (
+		vars   = make(map[string]interface{})
+		result = make([]transit.MonitoredService, 0, len(services))
+	)
 
 	for _, service := range services {
 		for _, metric := range service.Metrics {

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	securityUri = "https://graph.microsoft.com/beta/security/tiIndicators"
+	securityURI = "https://graph.microsoft.com/beta/security/tiIndicators"
 )
 
 func SecurityAssessments(service *transit.MonitoredService, token string) (err error) {
@@ -17,7 +17,7 @@ func SecurityAssessments(service *transit.MonitoredService, token string) (err e
 		body []byte
 	)
 
-	if body, err = ExecuteRequest(securityUri, token); err == nil {
+	if body, err = ExecuteRequest(securityURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
 		return

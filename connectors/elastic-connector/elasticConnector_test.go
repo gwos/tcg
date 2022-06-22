@@ -139,7 +139,7 @@ func TestInitFullConfig(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -177,7 +177,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 	data := []byte(`{}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -221,7 +221,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -265,7 +265,7 @@ func TestHandleEmptyConfig(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {

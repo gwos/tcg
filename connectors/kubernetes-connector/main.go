@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"

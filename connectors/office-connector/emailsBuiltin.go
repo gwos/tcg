@@ -8,7 +8,7 @@ import (
 	"github.com/gwos/tcg/sdk/transit"
 )
 
-const baseGraphUri = "https://graph.microsoft.com/v1.0/users/%s/messages?"
+const baseGraphURI = "https://graph.microsoft.com/v1.0/users/%s/messages?"
 
 // Emails built in
 func Emails(service *transit.MonitoredService, token, outlookEmailAddress string) (err error) {
@@ -23,9 +23,9 @@ func Emails(service *transit.MonitoredService, token, outlookEmailAddress string
 		"$select": []string{"receivedDateTime"},
 	}
 
-	graphUri := fmt.Sprintf(baseGraphUri, outlookEmailAddress) + params.Encode()
+	graphURI := fmt.Sprintf(baseGraphURI, outlookEmailAddress) + params.Encode()
 
-	if body, err = ExecuteRequest(graphUri, token); err == nil {
+	if body, err = ExecuteRequest(graphURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
 		return

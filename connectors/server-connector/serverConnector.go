@@ -90,7 +90,7 @@ func Synchronize(processes []transit.MetricDefinition) *transit.InventoryResourc
 		hostName = hostStat.Hostname
 	}
 
-	var srvs []transit.InventoryService
+	srvs := make([]transit.InventoryService, 0, len(processes))
 	for _, pr := range processes {
 		if !pr.Monitored {
 			continue

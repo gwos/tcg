@@ -1,11 +1,16 @@
 run:
+  go: '1.18'
   skip-dirs:
     - vendor
     - bin
     - var
     - tmp
+    - gotocjson
+    - libtransit
+    - deprecated
   skip-files:
     - \.pb\.go$
+  modules-download-mode: readonly
 
 govet:
   enable:
@@ -20,9 +25,7 @@ linters:
     - dogsled
     - dupl
     - errcheck
-    - gocognit
     - goconst
-    - gocyclo
     - gofmt
     - goimports
     - govet
@@ -37,6 +40,8 @@ linters:
     - unused
     - varcheck
     - whitespace
+# TODO:    - gocognit
+# TODO:    - gocyclo
   disable:
     - gochecknoglobals
     - gochecknoinits

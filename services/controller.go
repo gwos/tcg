@@ -100,7 +100,7 @@ func (controller *Controller) startController() error {
 	corsConfig.AllowAllOrigins = true
 	corsConfig.AllowHeaders = []string{"GWOS-APP-NAME", "GWOS-API-TOKEN", "Content-Type"}
 	router.Use(cors.New(corsConfig))
-  	router.Use(sessions.Sessions("tcg-session", cookie.NewStore([]byte("secret"))))
+	router.Use(sessions.Sessions("tcg-session", cookie.NewStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
 	/* set a short timer to wait for http.Server starting */

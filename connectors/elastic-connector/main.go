@@ -16,7 +16,6 @@ import (
 
 var (
 	extConfig         = &ExtConfig{}
-	metricsProfile    = &transit.MetricsProfile{}
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
@@ -130,7 +129,7 @@ func configHandler(data []byte) {
 		}
 	}
 	tExt.replaceIntervalTemplates()
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	/* Process checksums */
 	chk, err := connectors.Hashsum(extConfig)

@@ -255,3 +255,7 @@ The path to config file and any config option can be overridden with env vars:
     $ export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
 
 For more info see package `config` and tests.
+
+## Run golangci-lint locally:
+
+    $ golangci-lint --config ./.golangci.yaml run ./... --deadline=2m

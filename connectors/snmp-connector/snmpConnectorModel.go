@@ -55,11 +55,10 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 		mResource, err := connectors.CreateResource(device.Name, mServices)
 		if err != nil {
 			log.Err(err).Msgf("could not create monitored resource '%s'", device.Name)
+			continue
 		}
 		mResource.Status = calculateHostStatus(device.LastOK)
-		if mResource != nil {
-			mResources[i] = *mResource
-		}
+		mResources[i] = *mResource
 		i++
 	}
 	return mResources

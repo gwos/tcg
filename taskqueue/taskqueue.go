@@ -100,7 +100,7 @@ func (q *TaskQueue) runQueue() {
 			as loop var can be updated in time between timer trigger and handler call */
 			func(task *Task) {
 				alarmTimer = time.AfterFunc(q.alarm, func() {
-					q.alarmHandler(task)
+					_ = q.alarmHandler(task)
 				})
 			}(task)
 		}

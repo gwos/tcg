@@ -36,7 +36,7 @@ var kibanaHeaders = map[string]string{
 }
 
 type KibanaClient struct {
-	ApiRoot  string
+	APIRoot  string
 	Username string
 	Password string
 }
@@ -49,11 +49,13 @@ func (client *KibanaClient) RetrieveStoredQueries(titles []string) []KSavedObjec
 	return client.findSavedObjects(&savedObjectType, &savedObjectSearchField, titles)
 }
 
-// Extracts index patterns titles associated with provided stored query
+// RetrieveIndexTitles extracts index patterns titles associated with provided stored query
 func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []string {
-	var indexes []string
+	var (
+		indexPatterns []KSavedObject
+		indexes       = make([]string, 0)
+	)
 
-	var indexPatterns []KSavedObject
 	savedObjectType := IndexPattern
 	ids := storedQuery.ExtractIndexIds()
 	if ids == nil {
@@ -135,11 +137,11 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 		return nil
 	}
 
-	var requestBody []KBulkGetRequest
+	var requestBody = make([]KBulkGetRequest, 0, len(ids))
 	for _, id := range ids {
 		requestBody = append(requestBody, KBulkGetRequest{
 			Type: string(*savedObjectType),
-			Id:   id,
+			ID:   id,
 		})
 	}
 
@@ -203,9 +205,9 @@ func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, s
 		}
 		params["search"] = searchValue
 	}
-	return client.ApiRoot + apiPath + savedObjectsPath + findPath + clients.BuildQueryParams(params)
+	return client.APIRoot + apiPath + savedObjectsPath + findPath + clients.BuildQueryParams(params)
 }
 
 func (client *KibanaClient) buildBulkGetSavedObjectsPath() string {
-	return client.ApiRoot + apiPath + savedObjectsPath + bulkGetPath
+	return client.APIRoot + apiPath + savedObjectsPath + bulkGetPath
 }
