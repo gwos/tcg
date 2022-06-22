@@ -105,7 +105,6 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 			logEvent.Msg("dispatcher could not deliver: stop retrying")
 			d.retryes.Delete(opt.DurableName)
 		}
-
 	} else {
 		logEvent.Msg("dispatcher could not deliver: will not retry")
 	}

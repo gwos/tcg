@@ -4,6 +4,11 @@
 
 # TCG
 
+[![License](https://img.shields.io/github/license/gwos/tcg)](LICENSE)
+[![Build](https://app.travis-ci.com/gwos/tcg.svg?branch=master)](https://app.travis-ci.com/gwos/tcg.svg?branch=master)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gwos/tcg)](https://goreportcard.com/report/github.com/gwos/tcg)
+[![GoDoc](https://godoc.org/github.com/gwos/tcg?status.svg)](https://godoc.org/github.com/gwos/tcg)
+
 The Transit Connection Generator (TCG). TCG contains two sub-systems/packages:
 
 1. Transit agent - connects and sends metrics to Groundwork Monitor
@@ -250,3 +255,7 @@ The path to config file and any config option can be overridden with env vars:
     $ export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
 
 For more info see package `config` and tests.
+
+## Run golangci-lint locally:
+
+    $ golangci-lint --config ./.golangci.yaml run ./... --deadline=2m

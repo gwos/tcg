@@ -151,7 +151,7 @@ type Connector struct {
 	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
 	// Zero is not allowed. Any negative value means that the given metric is not limited.
 	NatsMaxPendingMsgs int `yaml:"-"`
-	// NatsMonitorPort enables monitoring on http port usefull for debug
+	// NatsMonitorPort enables monitoring on http port useful for debug
 	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
 	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
 	NatsMonitorPort int    `yaml:"-"`
@@ -710,7 +710,7 @@ func log2zerolog(lvl zerolog.Level, fields interface{}, format string, a ...inte
 // golang.org/x/crypto/nacl/secretbox
 func Decrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
-	var secretKey [32]byte = sha256.Sum256(secret)
+	var secretKey = sha256.Sum256(secret)
 	copy(nonce[:], message[:24])
 	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
 	if !ok {
@@ -723,7 +723,7 @@ func Decrypt(message, secret []byte) ([]byte, error) {
 // golang.org/x/crypto/nacl/secretbox
 func Encrypt(message, secret []byte) ([]byte, error) {
 	var nonce [24]byte
-	var secretKey [32]byte = sha256.Sum256(secret)
+	var secretKey = sha256.Sum256(secret)
 	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
 		return nil, err
 	}

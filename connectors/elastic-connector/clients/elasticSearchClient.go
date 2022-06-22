@@ -57,7 +57,6 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
 			log.Error().Msg("could not get hosts: response is nil")
-			afterKey = nil
 			break
 		}
 		if searchResponse.Aggregations.Aggregation.Buckets != nil {
@@ -101,7 +100,6 @@ func (esClient EsClient) CountHits(hostField string, indexes []string, query *Es
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
 			log.Error().Msg("could not count hits: response is nil")
-			afterKey = nil
 			break
 		}
 		if searchResponse.Aggregations.Aggregation.Buckets != nil {

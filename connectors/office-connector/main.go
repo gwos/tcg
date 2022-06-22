@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"time"
 
@@ -13,13 +12,9 @@ import (
 )
 
 var (
+	connector         MicrosoftGraphConnector
 	extConfig         = &ExtConfig{}
 	metricsProfile    = &transit.MetricsProfile{}
-	monitorConnection = &transit.MonitorConnection{
-		Extensions: extConfig,
-	}
-	chksum            []byte
-	connector         MicrosoftGraphConnector
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	count             = 0
 )
@@ -93,23 +88,20 @@ func configHandler(data []byte) {
 			}
 		}
 	}
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
+	extConfig, metricsProfile, _ = tExt, tMetProf, tMonConn
 
-	for k, _ := range viewStateMap {
+	for k := range viewStateMap {
 		viewStateMap[k] = containsView(metricsProfile.Metrics, k)
 	}
 
 	// monitorConnection.Extensions = extConfig
 	/* Process checksums */
-	chk, err := connectors.Hashsum(extConfig)
-	if err != nil || !bytes.Equal(chksum, chk) {
-		// TODO: process inventory
-	}
-	if err == nil {
-		chksum = chk
-	}
+	// chk, err := connectors.Hashsum(extConfig)
+	// TODO: process inventory
+	// if err != nil || !bytes.Equal(chksum, chk) {
+	// }
 
-	connector.SetCredentials(extConfig.TenantId, extConfig.ClientId, extConfig.ClientSecret)
+	connector.SetCredentials(extConfig.TenantID, extConfig.ClientID, extConfig.ClientSecret)
 	connector.SetOptions(extConfig.SharePointSite, extConfig.SharePointSubsite, extConfig.OutlookEmail)
 	/* Restart periodic loop */
 	cancel()

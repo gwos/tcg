@@ -7,11 +7,9 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/pkg/errors"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/model"
 	"github.com/prometheus/prometheus/prompb"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,7 +30,6 @@ func (p *PromParser) Parse(buf []byte, withFilters bool, resource string) (map[s
 
 	availableMetrics[resource] = []string{}
 	for _, ts := range req.Timeseries {
-
 		tags := map[string]string{}
 		for key, value := range p.DefaultTags {
 			tags[key] = value
@@ -82,33 +79,6 @@ func (p *PromParser) Parse(buf []byte, withFilters bool, resource string) (map[s
 	}
 
 	return metrics, err
-}
-
-func (p *PromParser) parseDebug(buf []byte) (interface{}, error) {
-	var req prompb.WriteRequest
-	if err := proto.Unmarshal(buf, &req); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal request body: %s", err)
-	}
-	log.Debug().Func(func(e *zerolog.Event) {
-		type TS struct {
-			Labels  []string `json:"labels"`
-			Samples []string `json:"samples"`
-		}
-		vv := zerolog.Arr()
-		for _, ts := range req.Timeseries {
-			v := TS{make([]string, len(ts.Labels)), make([]string, len(ts.Samples))}
-			for i, l := range ts.Labels {
-				v.Labels[i] = fmt.Sprintf("\t%s = %s\n", l.GetName(), l.GetValue())
-			}
-			for i, s := range ts.Samples {
-				v.Samples[i] = fmt.Sprintf("\t %f, %d\n", s.GetValue(), s.GetTimestamp())
-			}
-			vv.Interface(v)
-		}
-		e.Array("timeSeries", vv).
-			Msg("time series")
-	})
-	return nil, errors.New("testing")
 }
 
 func profileContainsMetric(profile *transit.MetricsProfile, metric string) bool {

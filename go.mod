@@ -19,7 +19,6 @@ require (
 	github.com/nats-io/nats-streaming-server v0.24.5
 	github.com/nats-io/stan.go v0.10.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.34.0
@@ -31,7 +30,6 @@ require (
 	github.com/stretchr/testify v1.7.1
 	github.com/swaggo/gin-swagger v1.4.3
 	github.com/swaggo/swag v1.8.1
-	github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.32.0
 	go.opentelemetry.io/otel v1.7.0
 	go.opentelemetry.io/otel/exporters/jaeger v1.7.0

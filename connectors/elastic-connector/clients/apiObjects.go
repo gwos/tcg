@@ -16,7 +16,7 @@ const (
 
 type KBulkGetRequest struct {
 	Type string `json:"type"`
-	Id   string `json:"id"`
+	ID   string `json:"id"`
 }
 
 type KSavedObjectsResponse struct {
@@ -154,11 +154,11 @@ func (storedQuery *KSavedObject) ExtractIndexIds() []string {
 			indexIdsSet[*filter.Meta.Index] = struct{}{}
 		}
 	}
-	var indexIds []string
-	for indexId := range indexIdsSet {
-		indexIds = append(indexIds, indexId)
+	var indexIDs = make([]string, 0, len(indexIdsSet))
+	for indexID := range indexIdsSet {
+		indexIDs = append(indexIDs, indexID)
 	}
-	return indexIds
+	return indexIDs
 }
 
 func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupField *string) *EsAggs {

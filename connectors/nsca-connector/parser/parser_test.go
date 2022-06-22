@@ -8,15 +8,14 @@ import (
 
 func TestNscaParser(t *testing.T) {
 	data := []byte(
-		`Server1;Disks1;0;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0;
-Server2;Disks2;1;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0; load15=2.220;0.000;0.000;0;
-Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0;
-awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :: 1628524058) | result=147ms;;;0;`,
+		`1655996626;Server1;Disks1;0;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0;
+1655996626;Server2;Disks2;1;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0; load15=2.220;0.000;0.000;0;
+1655996626;Server3;Disks3;2;CRITICAL - load average: 2.45, 2.32, 2.22|load1=2.450;0.000;0.000;0; load5=2.320;0.000;0.000;0;
+1655996626;awips-demo-4;example-service-10;0;OK - example-service-10 (2021-08-09 15:47:38 :: 1628524058) | result=147ms;;;0;`,
 	)
 
 	monitoredResources, err := Parse(data, NSCA)
 	assert.NoError(t, err)
-
 	assert.Equal(t, 4, len(*monitoredResources), "invalid count of monitored resources")
 
 	for _, res := range *monitoredResources {
@@ -85,7 +84,7 @@ S;1628530909;awips-demo-2;example-service-7;0;OK - example-service-7 (2021-08-09
 
 func TestBronxParser2(t *testing.T) {
 	data := []byte(
-`H;1628546296;awips-demo-2;0;UP - awips-demo-2 (2021-08-09 21:58:16 :: 1628546296) | result=21ms;;;0;
+		`H;1628546296;awips-demo-2;0;UP - awips-demo-2 (2021-08-09 21:58:16 :: 1628546296) | result=21ms;;;0;
 S;1628546296;awips-demo-2;example-service;0;OK - example-service (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
 S;1628546296;awips-demo-2;example-service-1;0;OK - example-service-1 (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
 S;1628546296;awips-demo-2;example-service-2;0;OK - example-service-2 (2021-08-09 21:58:16 :: 1628546296) | result=84ms;;;0;

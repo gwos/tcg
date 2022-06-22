@@ -213,7 +213,7 @@ func parse_args() {
 // and os.Stderr is directed to the terminal, also spill to os.Stderr so the user can see the message even
 // if we are not printing full diagnostics, but in no case printing a duplicate message to the same file.
 // So far this attempt fails, because we cannot find the file descriptor of the io.Writer argument.
-func emit_diagnostic(w io.Writer, format string, args... interface{}) {
+func emit_diagnostic(w io.Writer, format string, args ...interface{}) {
 	fmt.Fprintf(w, format, args...)
 	//
 	// "terminal" package:
@@ -222,8 +222,8 @@ func emit_diagnostic(w io.Writer, format string, args... interface{}) {
 	// diagInfo, _ := w.Stat();
 	// errInfo, _ := os.Stderr.Stat()
 	// if (diagInfo.Mode() & os.ModeCharDevice) == 0 && (errInfo.Mode() & os.ModeCharDevice) != 0 {
-		// // w is not directed to a terminal, but stderr is a terminal
-		// fmt.Fprintf(os.Stderr, format, args...)
+	// // w is not directed to a terminal, but stderr is a terminal
+	// fmt.Fprintf(os.Stderr, format, args...)
 	// }
 }
 
@@ -1242,19 +1242,19 @@ node_loop:
 									const_value = spec.(*ast.ValueSpec).Values[i].(*ast.BasicLit).Value
 									precomputed_const_values[name.Name], _ = strconv.ParseInt(const_value, 0, 64)
 									/*
-									r, err := eval_numeric_expr(spec.(*ast.ValueSpec).Values[i].(*ast.BasicLit), &iota_value, precomputed_const_values)
-									if err != nil {
-										if print_diagnostics {
-											fmt.Fprintln(diag_file, err)
+										r, err := eval_numeric_expr(spec.(*ast.ValueSpec).Values[i].(*ast.BasicLit), &iota_value, precomputed_const_values)
+										if err != nil {
+											if print_diagnostics {
+												fmt.Fprintln(diag_file, err)
+											}
+											if print_errors {
+												fmt.Println(err)
+											}
+											panic_message = "cannot evaluate BasicLit value"
+											break node_loop
 										}
-										if print_errors {
-											fmt.Println(err)
-										}
-										panic_message = "cannot evaluate BasicLit value"
-										break node_loop
-									}
-									const_value = fmt.Sprintf("%d", r)
-									precomputed_const_values[name.Name] = r
+										const_value = fmt.Sprintf("%d", r)
+										precomputed_const_values[name.Name] = r
 									*/
 									previous_constant = const_value
 								// case token.FLOAT:
@@ -1509,7 +1509,7 @@ func eval_numeric_expr(tree ast.Expr, iota *int, precomputed_const_values map[st
 			*iota++
 			return int64(*iota), nil
 		} else {
-		    // Here we have a reference to some other named constant, which we must evaluate by further walking the AST tree.
+			// Here we have a reference to some other named constant, which we must evaluate by further walking the AST tree.
 			// Fortunately, it seems that the Go compiler has rearranged forward references so any definition we need at this
 			// point will be immediately accessible.  (Either that, or it has already been defined earlier in the AST tree,
 			// and we will somehow need to go fetch that definition.)
@@ -1607,27 +1607,27 @@ func eval_numeric_expr(tree ast.Expr, iota *int, precomputed_const_values map[st
 		}
 		switch n.Op {
 		case token.ADD:
-			return + x, nil
+			return +x, nil
 		case token.SUB:
-			return - x, nil
+			return -x, nil
 		case token.XOR:
-			return ^ x, nil
+			return ^x, nil
 
 		// The following logical operator cannot be applied to integers,
 		// so we reject it here.
 		/*
-		case token.NOT:
-			return ! x, nil
+			case token.NOT:
+				return ! x, nil
 		*/
 
 		// The following unary operators are probably not useful in our context here.
 		/*
-		case token.MUL:
-			return * x, nil
-		case token.AND:
-			return & x, nil
-		case token.ARROW:
-			return <- x, nil
+			case token.MUL:
+				return * x, nil
+			case token.AND:
+				return & x, nil
+			case token.ARROW:
+				return <- x, nil
 		*/
 
 		default:
@@ -2060,24 +2060,24 @@ var C_code_boilerplate = `//
 // We may decide in a future version to abandon use of most of these, and instead
 // use the names in the C typedefs that we supply to make Go types acceptable in C.
 var C_type_of_Go_type = map[string]string{
-//  Go type   : C type
-	"bool"    : "bool",
-	"byte"    : "uint8_t",
-	"rune"    : "int32_t",
-	"int"     : "int",
-	"uint"    : "unsigned int",
-	"int8"    : "int8_t",
-	"uint8"   : "uint8_t",
-	"int16"   : "int16_t",
-	"uint16"  : "uint16_t",
-	"int32"   : "int32_t",
-	"uint32"  : "uint32_t",
-	"int64"   : "int64_t",
-	"uint64"  : "uint64_t",
-	"float32" : "float",
-	"float64" : "double",
-	"string"  : "string",
-	"struct"  : "struct",
+	//  Go type   : C type
+	"bool":    "bool",
+	"byte":    "uint8_t",
+	"rune":    "int32_t",
+	"int":     "int",
+	"uint":    "unsigned int",
+	"int8":    "int8_t",
+	"uint8":   "uint8_t",
+	"int16":   "int16_t",
+	"uint16":  "uint16_t",
+	"int32":   "int32_t",
+	"uint32":  "uint32_t",
+	"int64":   "int64_t",
+	"uint64":  "uint64_t",
+	"float32": "float",
+	"float64": "double",
+	"string":  "string",
+	"struct":  "struct",
 }
 
 // At least for now, we list here only C types that can be generated from Go types, per
@@ -2091,22 +2091,22 @@ var C_type_of_Go_type = map[string]string{
 // are able to analyze the Go code.
 //
 var C_type_category = map[string]string{
-//  C type         : type category
-	"bool"         : "boolean",
-	"int"          : "integral",
-	"unsigned int" : "integral",
-	"int8_t"       : "integral",
-	"uint8_t"      : "integral",
-	"int16_t"      : "integral",
-	"uint16_t"     : "integral",
-	"int32_t"      : "integral",
-	"uint32_t"     : "integral",
-	"int64_t"      : "integral",
-	"uint64_t"     : "integral",
-	"float"        : "real",
-	"double"       : "real",
-	"string"       : "string",
-	"struct"       : "structure",
+	//  C type         : type category
+	"bool":         "boolean",
+	"int":          "integral",
+	"unsigned int": "integral",
+	"int8_t":       "integral",
+	"uint8_t":      "integral",
+	"int16_t":      "integral",
+	"uint16_t":     "integral",
+	"int32_t":      "integral",
+	"uint32_t":     "integral",
+	"int64_t":      "integral",
+	"uint64_t":     "integral",
+	"float":        "real",
+	"double":       "real",
+	"string":       "string",
+	"struct":       "structure",
 }
 
 // I would rather that this cache variable be local to the foreign_type_C_type()
@@ -2135,12 +2135,12 @@ func foreign_type_C_type(field_package string, field_type_name string) (base_C_t
 
 	foreign_package_header_file_path := output_directory + "/" + field_package + ".h"
 
-    header_file, err := os.Open(foreign_package_header_file_path)
-    if err != nil {
+	header_file, err := os.Open(foreign_package_header_file_path)
+	if err != nil {
 		err = fmt.Errorf("Cannot open the %s file for reading (%v)", foreign_package_header_file_path, err)
 		return base_C_type, err
-    }
-    defer header_file.Close()
+	}
+	defer header_file.Close()
 
 	simple_typedef_pattern, err := regexp.Compile(fmt.Sprintf(`^typedef\s([_\pL][_\pL\p{Nd}]*)\s%s_%s;$`, field_package, field_type_name))
 	if err != nil {
@@ -2152,8 +2152,8 @@ func foreign_type_C_type(field_package string, field_type_name string) (base_C_t
 	}
 
 	var line string
-    scanner := bufio.NewScanner(header_file)
-    for scanner.Scan() {
+	scanner := bufio.NewScanner(header_file)
+	for scanner.Scan() {
 		line = scanner.Text()
 
 		// $line =~ m<typedef int64 time_Duration;>;
@@ -2207,12 +2207,12 @@ func foreign_type_C_type(field_package string, field_type_name string) (base_C_t
 			base_C_type = "struct"
 			break
 		}
-    }
+	}
 
-    if err := scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil {
 		err = fmt.Errorf("Cannot read the %s file (%v)", foreign_package_header_file_path, err)
 		return base_C_type, err
-    }
+	}
 
 	if base_C_type == "" {
 		err = fmt.Errorf("Could not find the base-type category for the %s.%s type in the %s file.",
@@ -2321,9 +2321,9 @@ func print_type_declarations(
 	//
 	// or that all these files declare themselves to be "package time":
 	//
-    //     /usr/local/go/src/time/format.go
-    //     /usr/local/go/src/time/time.go
-    //     /usr/local/go/src/time/zoneinfo.go
+	//     /usr/local/go/src/time/format.go
+	//     /usr/local/go/src/time/time.go
+	//     /usr/local/go/src/time/zoneinfo.go
 	//
 	// Such a circumstance argues for a more-sophisticated analysis of how the path and the package name should
 	// be combined to form a hopefully-unique header_symbol.
@@ -2336,7 +2336,7 @@ func print_type_declarations(
 		// there is no sense in duplicating the inclusion of that header.
 		generic_header = ""
 	} else {
-		generic_header = `#include "generic_datatypes.h"`;
+		generic_header = `#include "generic_datatypes.h"`
 	}
 	type C_header_boilerplate_fields struct {
 		Year           int
@@ -2347,11 +2347,11 @@ func print_type_declarations(
 	}
 
 	boilerplate_variables := C_header_boilerplate_fields{
-		Year:             current_year,
-		OtherHeaders:     other_headers,
-		HeaderFilename:   header_filename,
-		HeaderSymbol:     header_symbol,
-		GenericHeader:    generic_header,
+		Year:           current_year,
+		OtherHeaders:   other_headers,
+		HeaderFilename: header_filename,
+		HeaderSymbol:   header_symbol,
+		GenericHeader:  generic_header,
 	}
 
 	header_file, err := os.Create(header_filepath)
@@ -2370,8 +2370,8 @@ func print_type_declarations(
 	}
 
 	trailing_Ptr_List := regexp.MustCompile(`(.+)_Ptr_List$`)
-	trailing_List     := regexp.MustCompile(`(.+)_List$`)
-	trailing_Ptr      := regexp.MustCompile(`(.+)_[Pp]tr$`)
+	trailing_List := regexp.MustCompile(`(.+)_List$`)
+	trailing_Ptr := regexp.MustCompile(`(.+)_[Pp]tr$`)
 
 	for _, decl_kind := range final_type_order {
 		if print_diagnostics {
@@ -2402,7 +2402,7 @@ func print_type_declarations(
 				list_type = array_base_type + "_List"
 				if !have_list_struct[list_type] {
 					have_list_struct[list_type] = true
-					have_new_Ptr_List = true;
+					have_new_Ptr_List = true
 					fmt.Fprintf(header_file, "typedef struct _%s_ {\n", list_type)
 					fmt.Fprintf(header_file, "    size_t count;\n")
 					fmt.Fprintf(header_file, "    %s *items;\n", array_base_type)
@@ -2443,7 +2443,7 @@ func print_type_declarations(
 					list_base_types = append(list_base_types, array_base_type)
 				}
 			} else if matches := trailing_Ptr.FindStringSubmatch(type_name); matches != nil {
-			    // FIX LATER:  fill this in
+				// FIX LATER:  fill this in
 				panic(fmt.Sprintf("found unprocessed type declaration '%s'", type_name))
 			}
 			// If type_name is defined as a struct in this package, (that is, if we are defining a direct alias of the
@@ -2551,7 +2551,7 @@ func print_type_declarations(
 				for _, spec := range decl_node.Specs {
 					for _, name := range spec.(*ast.ValueSpec).Names {
 						name_len := utf8.RuneCountInString(name.Name)
-						if name_len > max_name_len{
+						if name_len > max_name_len {
 							max_name_len = name_len
 						}
 					}
@@ -3239,11 +3239,11 @@ func generate_all_encode_tree_routines(
 	//
 	var base_type_ptrs []string
 	for base_type_ptr := range pointer_base_types {
-	    base_type_ptrs = append(base_type_ptrs, base_type_ptr)
+		base_type_ptrs = append(base_type_ptrs, base_type_ptr)
 	}
 	sort.Strings(base_type_ptrs)
 	for _, base_type_ptr := range base_type_ptrs {
-		base_type := pointer_base_types[base_type_ptr];
+		base_type := pointer_base_types[base_type_ptr]
 		pointer_type_zero_value_code += fmt.Sprintf(`
 bool is_%[1]s_ptr_zero_value(const %[1]s *%[1]s_ptr) {
     return
@@ -4046,25 +4046,25 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 	}`
 
 	/*
-	    var encode_routine_struct_timespec_body_format = `
-		json_error_t error;
-		size_t flags = 0;
-		// We special-case the field packing in this routine, based on the "struct_timespec" field type.
-		// The "I" conversion is used to handle a 64-bit number.
-		json = json_pack_ex(&error, flags, "I"
-		     // struct_timespec Time_;  // go: time.Time
-		     , (json_int_t) (
-			 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
-			 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
-		     )
-		);
-		if (json == NULL) {
-		    // (*external_logging_function)(external_logging_first_arg,
-			// FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
-			// error.text, error.source, error.line, error.column, error.position);
-		    failure = error.text;
-		    break;
-		}`
+		    var encode_routine_struct_timespec_body_format = `
+			json_error_t error;
+			size_t flags = 0;
+			// We special-case the field packing in this routine, based on the "struct_timespec" field type.
+			// The "I" conversion is used to handle a 64-bit number.
+			json = json_pack_ex(&error, flags, "I"
+			     // struct_timespec Time_;  // go: time.Time
+			     , (json_int_t) (
+				 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_sec  * MILLISECONDS_PER_SECOND) +
+				 (milliseconds_MillisecondTimestamp_ptr->Time_.tv_nsec / NANOSECONDS_PER_MILLISECOND)
+			     )
+			);
+			if (json == NULL) {
+			    // (*external_logging_function)(external_logging_first_arg,
+				// FILE_LINE "ERROR:  text '%s', source '%s', line %d, column %d, position %d\n",
+				// error.text, error.source, error.line, error.column, error.position);
+			    failure = error.text;
+			    break;
+			}`
 	*/
 
 	var encode_routine_struct_timespec_body_format = `
@@ -4149,19 +4149,19 @@ json_t *{{.StructName}}_ptr_as_JSON_ptr(const {{.StructName}} *{{.StructName}}_p
 		}
 	}
 
-	error_object_comment := "// ";
+	error_object_comment := "// "
 	// This is an awkward special case needed to get around the C compiler generating complaints
 	// about unused variables.  We're okay with having those warnings in place where we don't
 	// actually expect to have unused variables, but not in this situation where we might have
 	// them by design if we're not careful to only specify them when they are in fact used.
 	for _, field_name := range fields {
 		if struct_field_C_types[struct_name][field_name] == "struct_timespec" {
-			error_object_comment = "";
+			error_object_comment = ""
 			break
 		}
 	}
 	boilerplate_variables := encode_routine_boilerplate_fields{
-		StructName: package_name + "_" + struct_name,
+		StructName:         package_name + "_" + struct_name,
 		ErrorObjectComment: error_object_comment,
 	}
 
@@ -4987,25 +4987,25 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					// FIX MAJOR:  Here we are making the assumption that Go's "int" type has the same size
 					// as C's "int" type, without doing any sort of checking to verify that assumption.
 					field_C_type = "int"
-				case "uint",    "unsigned int":
+				case "uint", "unsigned int":
 					// FIX MAJOR:  Here we are making the assumption that Go's "int" type has the same size
 					// as C's "int" type, without doing any sort of checking to verify that assumption.
 					field_C_type = "int"
-				case "int8",    "int8_t":
+				case "int8", "int8_t":
 					field_C_type = "unsupported"
-				case "uint8",   "uint8_t":
+				case "uint8", "uint8_t":
 					field_C_type = "unsupported"
-				case "int16",   "int16_t":
+				case "int16", "int16_t":
 					field_C_type = "unsupported"
-				case "uint16",  "uint16_t":
+				case "uint16", "uint16_t":
 					field_C_type = "unsupported"
-				case "int32",   "int32_t":
+				case "int32", "int32_t":
 					field_C_type = "int32"
-				case "uint32",  "uint32_t":
+				case "uint32", "uint32_t":
 					field_C_type = "int32"
-				case "int64",   "int64_t":
+				case "int64", "int64_t":
 					field_C_type = "int64"
-				case "uint64",  "uint64_t":
+				case "uint64", "uint64_t":
 					field_C_type = "int64"
 				case "float32", "float":
 					field_C_type = "unsupported"
@@ -5023,7 +5023,7 @@ func generate_decode_PackageName_StructTypeName_ptr_tree(
 					// there will be foreign-package conversion routines supplied elsewhere, as part of
 					// the data transformations created for the foreign package.  But at least for the
 					// time being with this validation, we'll find out if anything else shows up here, to
-					// know that we need such an extension, by a fatal error message printed just below. 
+					// know that we need such an extension, by a fatal error message printed just below.
 					field_C_type = struct_field_C_types[struct_name][field_name]
 					if field_C_type != "milliseconds_MillisecondTimestamp" && field_C_type != "transit_AgentIdentity" {
 						// We might extend this case in the future, to do something sensible with it.
@@ -5830,7 +5830,7 @@ func generate_destroy_PackageName_StructTypeName_ptr_tree(
 			if true {
 				function_code += fmt.Sprintf("%sif (%s_%s%s%s != NULL) {\n", line_prefix, package_name, item_prefix, member_op, item_name)
 			} else {
-				function_code += fmt.Sprintf("%sif (1) {\n", line_prefix)  // ...}
+				function_code += fmt.Sprintf("%sif (1) {\n", line_prefix) // ...}
 			}
 			process_item(line_prefix+indent, base_type, item_prefix+member_op+item_name, "->", "")
 			function_code += fmt.Sprintf("%sfree(%s_%s%s%s);\n", line_prefix+indent, package_name, item_prefix, member_op, item_name)

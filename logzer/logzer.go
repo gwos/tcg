@@ -223,7 +223,7 @@ func NewLoggerWriter(opts ...Option) io.Writer {
 		opt()
 	}
 	for _, p := range lastErrors {
-		errBuffer.WriteLevel(p.lvl, p.buf)
+		_, _ = errBuffer.WriteLevel(p.lvl, p.buf)
 	}
 	if logFile != nil {
 		formatter.Out = zerolog.MultiLevelWriter(os.Stdout, logFile)
@@ -282,7 +282,7 @@ func WriteLogBuffer(lb *LogBuffer) {
 	lvl := zerolog.GlobalLevel()
 	for _, p := range lb.Records() {
 		if p.lvl >= lvl {
-			filter.WriteLevel(p.lvl, p.buf)
+			_, _ = filter.WriteLevel(p.lvl, p.buf)
 		}
 	}
 }

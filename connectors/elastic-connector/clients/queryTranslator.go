@@ -32,12 +32,12 @@ func buildQueryFromFilters(filters []KFilter) EsQueryBool {
 	var esQueryBool EsQueryBool
 
 	// remove disabled filters
-	var enabledFilters []KFilter
-	for _, filter := range filters {
-		if !isFilterDisabled(filter) {
-			enabledFilters = append(enabledFilters, filter)
-		}
-	}
+	// var enabledFilters []KFilter
+	// for _, filter := range filters {
+	// 	 if !isFilterDisabled(filter) {
+	//	 	 enabledFilters = append(enabledFilters, filter)
+	//	 }
+	// }
 
 	esQueryBool.Filter = filtersToESQueries(filters, false)
 	esQueryBool.MustNot = filtersToESQueries(filters, true)
@@ -57,33 +57,24 @@ func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
 	// no need to filter by index
 
 	// migrate filters
-	var migratedFilters []KFilter
+	var migratedFilters = make([]KFilter, 0, len(negateFilters))
 	for _, filter := range negateFilters {
 		migratedFilters = append(migratedFilters, migrateDeprecatedPhraseFilter(filter))
 	}
-	negateFilters = nil
 
 	// TODO nested filters are not supported
 
-	var translatedFilters []interface{}
+	var translatedFilters = make([]interface{}, 0, len(migratedFilters))
 	for _, filter := range migratedFilters {
 		translatedFilters = append(translatedFilters, translateToQuery(filter))
 	}
-	migratedFilters = nil
 
-	var cleanedFilters []interface{}
+	var cleanedFilters = make([]interface{}, 0, len(translatedFilters))
 	for _, filter := range translatedFilters {
 		cleanedFilters = append(cleanedFilters, cleanFilter(filter))
 	}
 
 	return cleanedFilters
-}
-
-func isFilterDisabled(filter KFilter) bool {
-	if filter.Meta != nil && filter.Meta.Disabled != nil {
-		return *filter.Meta.Disabled
-	}
-	return false
 }
 
 func filterNegate(filter KFilter, reverse bool) bool {

@@ -7,7 +7,7 @@ import (
 	"github.com/gwos/tcg/sdk/transit"
 )
 
-const oneDriveUri = "https://graph.microsoft.com/v1.0/drive"
+const oneDriveURI = "https://graph.microsoft.com/v1.0/drive"
 
 // OneDrive built-in. Potentially not a built-in, could be data driven
 func OneDrive(service *transit.MonitoredService, token string) (err error) {
@@ -15,7 +15,7 @@ func OneDrive(service *transit.MonitoredService, token string) (err error) {
 		body []byte
 		v    interface{}
 	)
-	if body, err = ExecuteRequest(oneDriveUri, token); err == nil {
+	if body, err = ExecuteRequest(oneDriveURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
 		return
