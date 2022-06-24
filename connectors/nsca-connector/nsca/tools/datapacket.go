@@ -1,5 +1,11 @@
 package tools
 
+/*
+#cgo LDFLAGS: -lmcrypt
+#include <stdlib.h>
+#include <string.h>
+#include <mcrypt.h>
+*/
 import "C"
 import (
 	"fmt"
