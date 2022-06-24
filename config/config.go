@@ -1,12 +1,8 @@
 package config
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net"
 	"os"
 	"path"
 	"strings"
@@ -17,57 +13,27 @@ import (
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/logper"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/jaeger"
-	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
-	"golang.org/x/crypto/nacl/secretbox"
 	"gopkg.in/yaml.v3"
 )
 
-// Variables to control the build info
-// can be overridden by Go linker during the build step:
-// go build -ldflags "-X 'github.com/gwos/tcg/config.buildTag=<TAG>' -X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`'"
 var (
-	buildTag  = "8.x.x"
-	buildTime = "Build time not provided"
-
 	once sync.Once
 	cfg  *Config
 
 	liblogger zerolog.Logger
 )
 
-// BuildInfo describes the build properties
-type BuildInfo struct {
-	Tag  string `json:"tag"`
-	Time string `json:"time"`
-}
-
-// GetBuildInfo returns the build properties
-func GetBuildInfo() BuildInfo {
-	return BuildInfo{buildTag, buildTime}
-}
-
-// ConfigEnv defines environment variable for config file path, overrides the ConfigName
-// ConfigName defines default filename for look in work directory if ConfigEnv is empty
-// EnvConfigPrefix defines name prefix for environment variables
-// for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
-	ConfigEnv           = "TCG_CONFIG"
-	ConfigName          = "tcg_config.yaml"
-	EnvConfigPrefix     = "TCG"
-	SecKeyEnv           = "TCG_SECKEY"
-	SecVerPrefix        = "_v1_"
 	InstallationModeEnv = "INSTALLATION_MODE"
 	InstallationModeCMC = "CHILD_MANAGED_CHILD"
 	InstallationModePMC = "PARENT_MANAGED_CHILD"
 	InstallationModeP   = "PARENT"
 	InstallationModeS   = "STANDALONE"
+
+	SecVerPrefix = "_v1_"
 )
 
 // LogLevel defines levels in logrus-style
@@ -187,6 +153,9 @@ type ConnectorDTO struct {
 	// MetricsProfile    MetricsProfileDto
 }
 
+// DSConnection defines DalekServices Connection configuration
+type DSConnection clients.DSConnection
+
 // GWConnection defines Groundwork Connection configuration
 type GWConnection clients.GWConnection
 
@@ -228,104 +197,37 @@ func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error 
 	return nil
 }
 
-// Decode implements envconfig.Decoder interface
-// merges incoming value with existed structure
-func (con *GWConnection) Decode(value string) error {
-	var overrides GWConnection
-	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
-		return err
-	}
-	if overrides.HostName != "" {
-		con.HostName = overrides.HostName
-	}
-	if overrides.UserName != "" {
-		con.UserName = overrides.UserName
-	}
-	if overrides.Password != "" {
-		con.Password = overrides.Password
-	}
-	if overrides.DisplayName != "" {
-		con.DisplayName = overrides.DisplayName
-	}
-	if overrides.DeferOwnership != "" {
-		con.DeferOwnership = overrides.DeferOwnership
-	}
-	if overrides.ResourceNamePrefix != "" {
-		con.ResourceNamePrefix = overrides.ResourceNamePrefix
-	}
-	return nil
-}
-
 // GWConnections defines a set of configurations
 type GWConnections []*GWConnection
 
-// Decode implements envconfig.Decoder interface
-// merges incoming value with existing structure
-func (cons *GWConnections) Decode(value string) error {
-	var overrides GWConnections
-	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
-		return err
-	}
-	if len(overrides) > len(*cons) {
-		buf := GWConnections(make([]*GWConnection, len(overrides)))
-		copy(buf, overrides)
-		copy(buf, *cons)
-		*cons = buf
-	}
-	for i, v := range overrides {
-		if v.HostName != "" {
-			(*cons)[i].HostName = v.HostName
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+// Applies decode to items in collection for setting only fields present in yaml.
+// Note (as for gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b):
+//
+//	if yaml defines an empty set this method is not called but target is truncated.
+func (cc *GWConnections) UnmarshalYAML(value *yaml.Node) error {
+	for i, node := range value.Content {
+		if len(*cc) < i+1 {
+			*cc = append(*cc, GWConnections{{}}...)
 		}
-		if v.UserName != "" {
-			(*cons)[i].UserName = v.UserName
-		}
-		if v.Password != "" {
-			(*cons)[i].Password = v.Password
+		if err := node.Decode((*cc)[i]); err != nil {
+			return err
 		}
 	}
 	return nil
-}
-
-// DSConnection defines DalekServices Connection configuration
-type DSConnection clients.DSConnection
-
-// Decode implements envconfig.Decoder interface
-// merges incoming value with existed structure
-func (con *DSConnection) Decode(value string) error {
-	var overrides DSConnection
-	if err := yaml.Unmarshal([]byte(value), &overrides); err != nil {
-		return err
-	}
-	if overrides.HostName != "" {
-		con.HostName = overrides.HostName
-	}
-	return nil
-}
-
-// Jaegertracing defines the configuration of telemetry provider
-type Jaegertracing struct {
-	// Agent defines address for communicating with AgentJaegerThriftCompactUDP,
-	// hostport, like jaeger-agent:6831
-	Agent string `yaml:"agent"`
-	// Collector defines traces endpoint,
-	// in case the client should connect directly to the CollectorHTTP,
-	// endpoint, like http://jaeger-collector:14268/api/traces
-	Collector string `yaml:"collector"`
-	// Tags defines tracer-level tags, which get added to all reported spans
-	Tags map[string]string `yaml:"tags"`
 }
 
 // Config defines TCG Agent configuration
 type Config struct {
-	Connector     *Connector     `yaml:"connector"`
-	DSConnection  *DSConnection  `yaml:"dsConnection"`
-	GWConnections GWConnections  `yaml:"gwConnections"`
-	Jaegertracing *Jaegertracing `yaml:"jaegertracing"`
+	Connector     Connector     `yaml:"connector"`
+	DSConnection  DSConnection  `yaml:"dsConnection"`
+	GWConnections GWConnections `yaml:"gwConnections"`
+	Jaegertracing Jaegertracing `yaml:"jaegertracing"`
 }
 
 func defaults() Config {
 	return Config{
-		Connector: &Connector{
+		Connector: Connector{
 			BatchEvents:             0,
 			BatchMetrics:            0,
 			BatchMaxBytes:           1024 * 1024, // 1MB
@@ -355,8 +257,11 @@ func defaults() Config {
 			NatsStoreBufferSize:     1024 * 1024 * 2,         // 2MB
 			NatsStoreReadBufferSize: 1024 * 1024 * 2,         // 2MB
 		},
-		DSConnection:  &DSConnection{},
-		Jaegertracing: &Jaegertracing{},
+		// create disabled connections to support partial setting with struct-path
+		// 4 items should be enough
+		GWConnections: GWConnections{{}, {}, {}, {}},
+		DSConnection:  DSConnection{},
+		Jaegertracing: Jaegertracing{},
 	}
 }
 
@@ -372,8 +277,10 @@ func GetConfig() *Config {
 			With().Timestamp().Caller().Logger()
 		log.Info().Msgf("Build info: %s / %s", buildTag, buildTime)
 
-		c := defaults()
-		cfg = &c
+		/* merge defaults, file, and env */
+		applyFlags()
+		cfg = new(Config)
+		*cfg = defaults()
 		if data, err := os.ReadFile(cfg.ConfigPath()); err != nil {
 			log.Warn().Err(err).
 				Str("configPath", cfg.ConfigPath()).
@@ -381,15 +288,25 @@ func GetConfig() *Config {
 		} else {
 			if err := yaml.Unmarshal(data, cfg); err != nil {
 				log.Err(err).
+					Str("configData", string(data)).
 					Str("configPath", cfg.ConfigPath()).
 					Msg("could not parse config")
 			}
+
+			if data, err := yaml.Marshal(cfg); err == nil {
+				data = applyEnv(data)
+				if err := yaml.Unmarshal(data, cfg); err != nil {
+					log.Err(err).
+						Str("configData", string(data)).
+						Msg("could not apply env vars")
+				}
+			} else {
+				log.Warn().Err(err).
+					Msg("could not apply env vars")
+			}
 		}
-		if err := envconfig.Process(EnvConfigPrefix, cfg); err != nil {
-			log.Err(err).
-				Str("EnvConfigPrefix", EnvConfigPrefix).
-				Msg("could not process config environment")
-		}
+
+		/* init logger and flush buffer */
 		cfg.initLogger()
 		logzer.WriteLogBuffer(logBuf)
 	})
@@ -479,16 +396,17 @@ func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
 
 // LoadConnectorDTO loads ConnectorDTO into Config
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
-	c := defaults()
-	newCfg := &c
+	newCfg := new(Config)
+	*newCfg = defaults()
 	/* load config file */
 	if data, err := os.ReadFile(newCfg.ConfigPath()); err != nil {
 		log.Warn().Err(err).
-			Str("configPath", cfg.ConfigPath()).
+			Str("configPath", newCfg.ConfigPath()).
 			Msg("could not read config")
 	} else {
 		if err := yaml.Unmarshal(data, newCfg); err != nil {
 			log.Warn().Err(err).
+				Str("configData", string(data)).
 				Str("configPath", newCfg.ConfigPath()).
 				Msg("could not parse config")
 		}
@@ -506,23 +424,28 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	if err := newCfg.loadDynamicInventoryFlag(data); err != nil {
 		return nil, err
 	}
-	/* override config file */
+
 	if output, err := yaml.Marshal(newCfg); err != nil {
 		log.Err(err).
+			Str("configData", string(output)).
 			Msg("could not prepare config for writing")
 	} else {
+		/* override config file */
 		if err := os.WriteFile(newCfg.ConfigPath(), output, 0644); err != nil {
 			log.Err(err).
+				Str("configData", string(output)).
 				Str("configPath", newCfg.ConfigPath()).
 				Msg("could not write config")
 		}
+		/* load environment */
+		output = applyEnv(output)
+		if err := yaml.Unmarshal(output, newCfg); err != nil {
+			log.Err(err).
+				Str("configData", string(output)).
+				Msg("could not apply env vars")
+		}
 	}
-	/* load environment */
-	if err := envconfig.Process(EnvConfigPrefix, newCfg); err != nil {
-		log.Err(err).
-			Str("EnvConfigPrefix", EnvConfigPrefix).
-			Msg("could not process config environment")
-	}
+
 	/* process PMC */
 	if cfg.IsConfiguringPMC() {
 		newCfg.Connector.InstallationMode = InstallationModePMC
@@ -535,9 +458,9 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 			(gwEncode != "off" && newCfg.GWConnections[i].IsChild)
 	}
 	/* update config */
-	*cfg.Connector = *newCfg.Connector
-	*cfg.DSConnection = *newCfg.DSConnection
-	*cfg.Jaegertracing = *newCfg.Jaegertracing
+	cfg.Connector = newCfg.Connector
+	cfg.DSConnection = newCfg.DSConnection
+	cfg.Jaegertracing = newCfg.Jaegertracing
 	cfg.GWConnections = newCfg.GWConnections
 
 	/* update logger */
@@ -554,88 +477,8 @@ func (cfg *Config) IsConfiguringPMC() bool {
 
 // InitTracerProvider inits provider
 func (cfg Config) InitTracerProvider() (*tracesdk.TracerProvider, error) {
-	return cfg.initJaegertracing()
-}
-
-// initJaegertracing inits tracing provider with Jaeger exporter
-func (cfg Config) initJaegertracing() (*tracesdk.TracerProvider, error) {
-	var errNotConfigured = fmt.Errorf("telemetry is not configured")
-	/* Jaegertracing supports a few options to receive spans
-	[https://github.com/jaegertracing/jaeger/blob/master/ports/ports.go]
-	// AgentJaegerThriftCompactUDP is the default port for receiving Jaeger Thrift over UDP in compact encoding
-	AgentJaegerThriftCompactUDP = 6831
-	// AgentJaegerThriftBinaryUDP is the default port for receiving Jaeger Thrift over UDP in binary encoding
-	AgentJaegerThriftBinaryUDP = 6832
-	// AgentZipkinThriftCompactUDP is the default port for receiving Zipkin Thrift over UDP in binary encoding
-	AgentZipkinThriftCompactUDP = 5775
-	// CollectorGRPC is the default port for gRPC server for sending spans
-	CollectorGRPC = 14250
-	// CollectorHTTP is the default port for HTTP server for sending spans (e.g. /api/traces endpoint)
-	CollectorHTTP = 14268
-
-	The otel jaeger exporter supports AgentJaegerThriftCompactUDP and CollectorHTTP protocols.
-	otel-v0.20.0 Note the possible mistakes in defaults:
-		* "6832" for jaeger.WithAgentPort()
-		* "http://localhost:14250" for jaeger.WithCollectorEndpoint()
-
-	Checking configuration to prevent exporter run with internal defaults in environment without receiver.
-	The OTEL_EXPORTER_ env vars take precedence on the TCG config (with TCG_JAEGERTRACING_ env vars).
-	And the Agent entrypoint setting takes precedence on the Collector entrypoint. */
-	otelExporterJaegerAgentHost := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_HOST")
-	otelExporterJaegerAgentPort := os.Getenv("OTEL_EXPORTER_JAEGER_AGENT_PORT")
-	otelExporterJaegerEndpoint := os.Getenv("OTEL_EXPORTER_JAEGER_ENDPOINT")
-	otelExporterJaegerPassword := os.Getenv("OTEL_EXPORTER_JAEGER_PASSWORD")
-	otelExporterJaegerUser := os.Getenv("OTEL_EXPORTER_JAEGER_USER")
-	tcgJaegerAgent := cfg.Jaegertracing.Agent
-	tcgJaegerCollector := cfg.Jaegertracing.Collector
-
-	var endpointOption jaeger.EndpointOption
-	switch {
-	case len(otelExporterJaegerAgentHost)+len(otelExporterJaegerAgentPort) != 0:
-		endpointOption = jaeger.WithAgentEndpoint()
-	case len(otelExporterJaegerEndpoint)+len(otelExporterJaegerPassword)+len(otelExporterJaegerUser) != 0:
-		endpointOption = jaeger.WithCollectorEndpoint()
-	case len(tcgJaegerAgent) != 0:
-		if host, port, err := net.SplitHostPort(tcgJaegerAgent); err == nil {
-			endpointOption = jaeger.WithAgentEndpoint(
-				jaeger.WithAgentHost(host),
-				jaeger.WithAgentPort(port),
-			)
-		} else {
-			log.Err(err).Msg("could not parse the JaegerAgent")
-			return nil, err
-		}
-	case len(tcgJaegerCollector) != 0:
-		endpointOption = jaeger.WithCollectorEndpoint(jaeger.WithEndpoint(tcgJaegerCollector))
-	default:
-		log.Debug().Msg(errNotConfigured.Error())
-		return nil, errNotConfigured
-	}
-
-	attrs := []attribute.KeyValue{
-		semconv.ServiceNameKey.String(fmt.Sprintf("%s:%s:%s",
-			cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID)),
-		attribute.String("runtime", "golang"),
-	}
-	for k, v := range cfg.Jaegertracing.Tags {
-		attrs = append(attrs, attribute.String(k, v))
-	}
-
-	/* It may be useful to look for modern API state and usage at:
-	https://github.com/open-telemetry/opentelemetry-go/blob/main/example/jaeger/main.go */
-
-	exporter, err := jaeger.New(endpointOption)
-	if err != nil {
-		log.Err(err).Msg("could not create exporter")
-		return nil, err
-	}
-	tp := tracesdk.NewTracerProvider(
-		/* Always be sure to batch in production */
-		tracesdk.WithBatcher(exporter),
-		/* Record information about this application in an Resource */
-		tracesdk.WithResource(resource.NewWithAttributes(semconv.SchemaURL, attrs...)),
-	)
-	return tp, nil
+	return initJaegertracing(cfg.Jaegertracing, fmt.Sprintf("%s:%s:%s",
+		cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID))
 }
 
 func (cfg Config) initLogger() {
@@ -704,28 +547,4 @@ func log2zerolog(lvl zerolog.Level, fields interface{}, format string, a ...inte
 		e.Fields(fields)
 	}
 	e.Msgf(format, a...)
-}
-
-// Decrypt decrypts small messages
-// golang.org/x/crypto/nacl/secretbox
-func Decrypt(message, secret []byte) ([]byte, error) {
-	var nonce [24]byte
-	var secretKey = sha256.Sum256(secret)
-	copy(nonce[:], message[:24])
-	decrypted, ok := secretbox.Open(nil, message[24:], &nonce, &secretKey)
-	if !ok {
-		return nil, fmt.Errorf("decryption error")
-	}
-	return decrypted, nil
-}
-
-// Encrypt encrypts small messages
-// golang.org/x/crypto/nacl/secretbox
-func Encrypt(message, secret []byte) ([]byte, error) {
-	var nonce [24]byte
-	var secretKey = sha256.Sum256(secret)
-	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
-		return nil, err
-	}
-	return secretbox.Seal(nonce[:], message, &nonce, &secretKey), nil
 }

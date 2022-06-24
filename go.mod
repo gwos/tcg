@@ -14,7 +14,6 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/gosnmp/gosnmp v1.35.0
 	github.com/hashicorp/go-uuid v1.0.3
-	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/nats-io/nats-server/v2 v2.8.4
 	github.com/nats-io/nats-streaming-server v0.24.6
 	github.com/nats-io/stan.go v0.10.3

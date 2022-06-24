@@ -30,10 +30,12 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/services"
 )
 
 func init() {
+	config.AllowFlags = false
 	services.AllowSignalHandlers = false
 }
 

@@ -90,7 +90,7 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		agentConnector := config.GetConfig().Connector
+		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
 			agentStats: &AgentStats{
@@ -101,7 +101,7 @@ func GetAgentService() *AgentService {
 				Nats:       StatusStopped,
 				Transport:  StatusStopped,
 			},
-			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(config.GetConfig().DSConnection)},
+			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
