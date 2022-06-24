@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gwos/tcg/connectors/nsca-connector/nsca/tools"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/tubemogul/nscatools"
 )
 
 func AdaptHandler(h func([]byte) error) DataHandler {
@@ -63,7 +63,7 @@ func AdaptHandler(h func([]byte) error) DataHandler {
 func Start(ctx context.Context, handler DataHandler) {
 	nscaHost := "0.0.0.0"
 	nscaPort := uint16(5667)
-	nscaEncrypt := nscatools.EncryptNone
+	nscaEncrypt := tools.EncryptNone
 	nscaPassword := ""
 	nscaEnvHost := os.Getenv("NSCA_HOST")
 	nscaEnvPort := os.Getenv("NSCA_PORT")
@@ -136,7 +136,7 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 	defer conn.Close()
 
 	// sends the initialization packet
-	ipacket, err := nscatools.NewInitPacket()
+	ipacket, err := tools.NewInitPacket()
 	if err != nil {
 		log.Err(err).Msg("unable to create the init packet")
 		return err
@@ -147,7 +147,7 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 	}
 
 	// Retrieves the data from the client
-	data := nscatools.NewDataPacket(conf.Config.EncryptionMethod, []byte(conf.Config.Password), ipacket)
+	data := tools.NewDataPacket(conf.Config.EncryptionMethod, []byte(conf.Config.Password), ipacket)
 	dp := &DataPacketExt{*data}
 	if err = dp.Read(conn); err != nil {
 		log.Err(err).Msg("unable to read the data packet")
@@ -162,18 +162,18 @@ func HandleClientExt(conf *ConfigExt, conn net.Conn) error {
 type DataHandler func(*DataPacketExt) error
 
 type ConfigExt struct {
-	nscatools.Config
+	tools.Config
 	PacketHandler DataHandler
 }
 
 func NewConfigExt(host string, port uint16, encryption int, password string, handler DataHandler) *ConfigExt {
-	c := nscatools.NewConfig(host, port, encryption, password, nil)
+	c := tools.NewConfig(host, port, encryption, password, nil)
 	cfg := ConfigExt{*c, handler}
 	return &cfg
 }
 
 type DataPacketExt struct {
-	nscatools.DataPacket
+	tools.DataPacket
 }
 
 func (p *DataPacketExt) Read(conn io.Reader) error {

@@ -50,9 +50,9 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 
 	switch dataFormat {
 	case Bronx:
-		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines)
+		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines, bronxRegexp)
 	case NSCA, NSCAAlt:
-		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines)
+		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines, nscaRegexp)
 	default:
 		return nil, ErrUnknownMetricFormat
 	}
@@ -219,20 +219,21 @@ func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
 	return servicesMap
 }
 
-func parseMetricsLines(metricsLines []string) (MetricsMap, error) {
+func parseMetricsLines(metricsLines []string, re *regexp.Regexp) (MetricsMap, error) {
 	metricsMap := make(MetricsMap)
+
 	for _, metric := range metricsLines {
-		match := bronxRegexp.FindStringSubmatch(metric)
+		match := re.FindStringSubmatch(metric)
 		if match == nil {
 			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
 		}
-		timestamp, err := getTime(match[bronxRegexp.SubexpIndex("ts")])
+		timestamp, err := getTime(match[re.SubexpIndex("ts")])
 		if err != nil {
 			return nil, err
 		}
-		resName := match[bronxRegexp.SubexpIndex("resName")]
-		svcName := match[bronxRegexp.SubexpIndex("svcName")]
-		perfData := match[bronxRegexp.SubexpIndex("perf")]
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		perfData := match[re.SubexpIndex("perf")]
 		for _, metric := range strings.Split(strings.TrimSpace(perfData), " ") {
 			var (
 				match                    []string

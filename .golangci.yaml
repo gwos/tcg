@@ -8,6 +8,7 @@ run:
     - gotocjson
     - libtransit
     - deprecated
+    - connectors/nsca-connector/nsca
   skip-files:
     - \.pb\.go$
   modules-download-mode: readonly
