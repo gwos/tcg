@@ -1,8 +1,6 @@
-<p align="center">
-  <a href="http://www.gwos.com/" target="blank"><img src="http://www.gwos.com/wp-content/themes/groundwork/img/gwos_black_orange.png" width="390" alt="GWOS Logo" align="right"/></a>
+<p>
+  <a href="http://www.gwos.com/" target="blank"><img src=".github/img/readme_image.png" alt="GWOS Logo"/></a>
 </p>
-
-# TCG
 
 [![License](https://img.shields.io/github/license/gwos/tcg)](LICENSE)
 [![Build](https://app.travis-ci.com/gwos/tcg.svg?branch=master)](https://app.travis-ci.com/gwos/tcg.svg?branch=master)
