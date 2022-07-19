@@ -31,6 +31,7 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 func buildQueryFromFilters(filters []KFilter) EsQueryBool {
 	var esQueryBool EsQueryBool
 
+	// TODO: check if it's needed
 	// remove disabled filters
 	// var enabledFilters []KFilter
 	// for _, filter := range filters {

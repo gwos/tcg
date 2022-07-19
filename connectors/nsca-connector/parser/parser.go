@@ -43,16 +43,17 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 	metricsLines := strings.Split(string(bytes.Trim(payload, " \n\r")), "\n")
 
 	var (
-		err                       error
+		monitoredResources        []transit.MonitoredResource
 		serviceNameToMetricsMap   MetricsMap
 		resourceNameToServicesMap ServicesMap
+		err                       error
 	)
 
 	switch dataFormat {
 	case Bronx:
-		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines, bronxRegexp)
+		serviceNameToMetricsMap, err = getBronxMetrics(metricsLines)
 	case NSCA, NSCAAlt:
-		serviceNameToMetricsMap, err = parseMetricsLines(metricsLines, nscaRegexp)
+		serviceNameToMetricsMap, err = getNscaMetrics(metricsLines)
 	default:
 		return nil, ErrUnknownMetricFormat
 	}
@@ -71,8 +72,6 @@ func Parse(payload []byte, dataFormat DataFormat) (*[]transit.MonitoredResource,
 	if err != nil {
 		return nil, err
 	}
-
-	monitoredResources := make([]transit.MonitoredResource, 0, len(resourceNameToServicesMap))
 
 	for resName, services := range resourceNameToServicesMap {
 		res := transit.MonitoredResource{
@@ -130,6 +129,80 @@ func getStatus(str string) (transit.MonitorStatus, error) {
 	}
 }
 
+func getNscaMetrics(metricsLines []string) (MetricsMap, error) {
+	metricsMap := make(MetricsMap)
+	re := nscaRegexp
+	for _, metric := range metricsLines {
+		match := re.FindStringSubmatch(metric)
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "resource")
+		}
+		timestamp := transit.NewTimestamp()
+		if ts := match[re.SubexpIndex("ts")]; ts != "" {
+			if t, err := getTime(ts); err == nil {
+				timestamp = t
+			}
+		}
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		perfData := match[re.SubexpIndex("perf")]
+		for _, metric := range strings.Split(strings.TrimSpace(perfData), " ") {
+			var (
+				match                    []string
+				label, val, warn, crit   string
+				value, warning, critical float64
+			)
+			match = perfDataRegexp.FindStringSubmatch(metric)
+			if match == nil {
+				return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "perf data")
+			}
+			label = match[perfDataRegexp.SubexpIndex("label")]
+			val = match[perfDataRegexp.SubexpIndex("val")]
+			warn = match[perfDataRegexp.SubexpIndex("warn")]
+			crit = match[perfDataRegexp.SubexpIndex("crit")]
+
+			if len(val) > 0 {
+				if v, err := strconv.ParseFloat(val, 64); err == nil {
+					value = v
+				} else {
+					return nil, err
+				}
+			}
+			if len(warn) > 0 {
+				if w, err := strconv.ParseFloat(warn, 64); err == nil {
+					warning = w
+				} else {
+					return nil, err
+				}
+			}
+			if len(crit) > 0 {
+				if c, err := strconv.ParseFloat(crit, 64); err == nil {
+					critical = c
+				} else {
+					return nil, err
+				}
+			}
+
+			timeSeries, err := connectors.BuildMetric(connectors.MetricBuilder{
+				Name:           label,
+				ComputeType:    transit.Query,
+				Value:          value,
+				UnitType:       transit.MB,
+				Warning:        warning,
+				Critical:       critical,
+				StartTimestamp: timestamp,
+				EndTimestamp:   timestamp,
+			})
+			if err != nil {
+				return nil, err
+			}
+			metricsMap[fmt.Sprintf("%s:%s", resName, svcName)] =
+				append(metricsMap[fmt.Sprintf("%s:%s", resName, svcName)], *timeSeries)
+		}
+	}
+	return metricsMap, nil
+}
+
 func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap, error) {
 	servicesMap := make(ServicesMap)
 	re := nscaRegexp
@@ -168,60 +241,9 @@ func getNscaServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap,
 	return removeDuplicateServices(servicesMap), nil
 }
 
-func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap, error) {
-	servicesMap := make(ServicesMap)
-	re := bronxRegexp
-	for _, metric := range metricsLines {
-		match := re.FindStringSubmatch(metric)
-		if match == nil {
-			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
-		}
-		timestamp, err := getTime(match[re.SubexpIndex("ts")])
-		if err != nil {
-			return nil, err
-		}
-		status, err := getStatus(match[re.SubexpIndex("status")])
-		if err != nil {
-			return nil, err
-		}
-		resName := match[re.SubexpIndex("resName")]
-		svcName := match[re.SubexpIndex("svcName")]
-		msg := match[re.SubexpIndex("msg")]
-		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
-			BaseInfo: transit.BaseInfo{
-				Name:  svcName,
-				Type:  transit.ResourceTypeService,
-				Owner: resName,
-			},
-			MonitoredInfo: transit.MonitoredInfo{
-				Status:           status,
-				LastCheckTime:    timestamp,
-				LastPluginOutput: msg,
-			},
-			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
-		})
-	}
-	return removeDuplicateServices(servicesMap), nil
-}
-
-func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
-	for key, value := range servicesMap {
-		keys := make(map[string]bool)
-		var list []transit.MonitoredService
-		for _, entry := range value {
-			if _, value := keys[entry.Name]; !value {
-				keys[entry.Name] = true
-				list = append(list, entry)
-			}
-		}
-		servicesMap[key] = list
-	}
-	return servicesMap
-}
-
-func parseMetricsLines(metricsLines []string, re *regexp.Regexp) (MetricsMap, error) {
+func getBronxMetrics(metricsLines []string) (MetricsMap, error) {
 	metricsMap := make(MetricsMap)
-
+	re := bronxRegexp
 	for _, metric := range metricsLines {
 		match := re.FindStringSubmatch(metric)
 		if match == nil {
@@ -289,4 +311,55 @@ func parseMetricsLines(metricsLines []string, re *regexp.Regexp) (MetricsMap, er
 		}
 	}
 	return metricsMap, nil
+}
+
+func getBronxServices(metricsMap MetricsMap, metricsLines []string) (ServicesMap, error) {
+	servicesMap := make(ServicesMap)
+	re := bronxRegexp
+	for _, metric := range metricsLines {
+		match := re.FindStringSubmatch(metric)
+		if match == nil {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidMetricFormat, "service")
+		}
+		timestamp, err := getTime(match[re.SubexpIndex("ts")])
+		if err != nil {
+			return nil, err
+		}
+		status, err := getStatus(match[re.SubexpIndex("status")])
+		if err != nil {
+			return nil, err
+		}
+		resName := match[re.SubexpIndex("resName")]
+		svcName := match[re.SubexpIndex("svcName")]
+		msg := match[re.SubexpIndex("msg")]
+		servicesMap[resName] = append(servicesMap[resName], transit.MonitoredService{
+			BaseInfo: transit.BaseInfo{
+				Name:  svcName,
+				Type:  transit.ResourceTypeService,
+				Owner: resName,
+			},
+			MonitoredInfo: transit.MonitoredInfo{
+				Status:           status,
+				LastCheckTime:    timestamp,
+				LastPluginOutput: msg,
+			},
+			Metrics: metricsMap[fmt.Sprintf("%s:%s", resName, svcName)],
+		})
+	}
+	return removeDuplicateServices(servicesMap), nil
+}
+
+func removeDuplicateServices(servicesMap ServicesMap) ServicesMap {
+	for key, value := range servicesMap {
+		keys := make(map[string]bool)
+		var list []transit.MonitoredService
+		for _, entry := range value {
+			if _, value := keys[entry.Name]; !value {
+				keys[entry.Name] = true
+				list = append(list, entry)
+			}
+		}
+		servicesMap[key] = list
+	}
+	return servicesMap
 }

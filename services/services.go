@@ -125,7 +125,8 @@ type Controllers interface {
 type payloadType byte
 
 const (
-	typeEvents payloadType = iota
+	_ payloadType = iota
+	typeEvents
 	typeEventsAck
 	typeEventsUnack
 	typeInventory

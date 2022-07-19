@@ -63,8 +63,8 @@ func TestLogFilter(t *testing.T) {
 	log.Info().
 		Str("password", "PASSword").
 		Dict("dict", zerolog.Dict().Str("token", "TOKen")).
-		RawJSON("payload1", (payload1)).
-		RawJSON("payload2", (payload2)).
+		RawJSON("payload1", payload1).
+		RawJSON("payload2", payload2).
 		RawJSON("payload3", []byte(`{"password": "PASSWORD", "token": "TOKEN"}`)).
 		RawJSON("payload4", []byte(`{"somePassword":"PASS\"\"\nWORD","Token":"TOK\\EN"}`)).
 		Msg("message")
