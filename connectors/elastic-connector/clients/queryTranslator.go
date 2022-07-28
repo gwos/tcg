@@ -78,6 +78,13 @@ func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
 	return cleanedFilters
 }
 
+// func isFilterDisabled(filter KFilter) bool {
+// 	if filter.Meta != nil && filter.Meta.Disabled != nil {
+// 		return *filter.Meta.Disabled
+// 	}
+// 	return false
+// }
+
 func filterNegate(filter KFilter, reverse bool) bool {
 	if filter.Meta == nil || filter.Meta.Negate == nil {
 		return !reverse
@@ -131,9 +138,9 @@ func translateToQuery(filter KFilter) interface{} {
 
 // = cleanFilter in /kibana/src/plugins/data/common/es_query/filters/index.ts
 func cleanFilter(filter interface{}) interface{} {
-	switch filter.(type) {
+	switch filter := filter.(type) {
 	case KFilter:
-		cleanedFilter := filter.(KFilter)
+		cleanedFilter := filter
 		cleanedFilter.Meta = nil
 		return cleanedFilter
 	}

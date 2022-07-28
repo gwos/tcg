@@ -300,9 +300,9 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 						case map[string]interface{}:
 							fieldCap := v.(map[string]interface{})
 							if aggregatable, exists := fieldCap["aggregatable"]; exists {
-								switch aggregatable.(type) {
+								switch aggregatable := aggregatable.(type) {
 								case bool:
-									if aggregatable.(bool) {
+									if aggregatable {
 										result[fieldName] = true
 										break
 									}
