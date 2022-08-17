@@ -39,7 +39,7 @@ func main() {
 	iResource1 := connectors.CreateInventoryResource(Resource1, iServices)
 	println(iResource1.Services[0].Description)
 	println(iResource1.Description)
-	//if (enableTransit) {
+	//if enableTransit {
 	//	connectors.SendInventory()
 	//}
 
@@ -83,6 +83,10 @@ func main() {
 	fmt.Printf("resource 1 created with services: %+v\n", resource1)
 	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
+
+	//if enableTransit {
+	//	connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
+	//}
 }
 
 //////////////////////////////////////////////////////////
