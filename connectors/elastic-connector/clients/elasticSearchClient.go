@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
@@ -205,7 +205,7 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 		return nil
 	}
 
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Err(err).Msg("could not read ES Search response")
 		return nil
@@ -274,7 +274,7 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		return result, nil
 	}
 
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Err(err).Msg("could not read ES FieldCaps response")
 		return result, nil

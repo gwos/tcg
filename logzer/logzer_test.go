@@ -3,7 +3,6 @@ package logzer
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -14,7 +13,7 @@ import (
 )
 
 func TestLogCondense(t *testing.T) {
-	logFile, _ := ioutil.TempFile("", "log")
+	logFile, _ := os.CreateTemp("", "log")
 	defer os.Remove(logFile.Name())
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
@@ -30,19 +29,19 @@ func TestLogCondense(t *testing.T) {
 	logfun(zerolog.InfoLevel, "message info") // expect condense
 	logfun(zerolog.InfoLevel, "message info") // expect condense
 
-	content, err := ioutil.ReadFile(logFile.Name())
+	content, err := os.ReadFile(logFile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, 2, bytes.Count(content, []byte("\n")))
 
 	time.Sleep(time.Millisecond * 400) // expect condense output
-	content, err = ioutil.ReadFile(logFile.Name())
+	content, err = os.ReadFile(logFile.Name())
 	assert.NoError(t, err)
 	assert.Equal(t, 3, bytes.Count(content, []byte("\n")))
 	assert.Contains(t, string(content), `condense`)
 }
 
 func TestLogFilter(t *testing.T) {
-	logFile, _ := ioutil.TempFile("", "log")
+	logFile, _ := os.CreateTemp("", "log")
 	assert.NoError(t, logFile.Close())
 	defer os.Remove(logFile.Name())
 
@@ -69,7 +68,7 @@ func TestLogFilter(t *testing.T) {
 		RawJSON("payload4", []byte(`{"somePassword":"PASS\"\"\nWORD","Token":"TOK\\EN"}`)).
 		Msg("message")
 
-	content, err := ioutil.ReadFile(logFile.Name())
+	content, err := os.ReadFile(logFile.Name())
 	assert.NoError(t, err)
 	assert.NotContains(t, string(content), "PASS")
 	assert.NotContains(t, string(content), "TOK")
@@ -82,7 +81,7 @@ func TestLogFilter(t *testing.T) {
 }
 
 func TestLogRotate(t *testing.T) {
-	logFile, _ := ioutil.TempFile("", "log")
+	logFile, _ := os.CreateTemp("", "log")
 	defer os.Remove(logFile.Name())
 	defer os.Remove(logFile.Name() + ".1")
 	defer os.Remove(logFile.Name() + ".2")
@@ -102,8 +101,8 @@ func TestLogRotate(t *testing.T) {
 	log.Info().Msg("message info1")
 	log.Warn().Msg("message warn1") // expect rotation by maxSize
 
-	log0, err0 := ioutil.ReadFile(logFile.Name())
-	log1, err1 := ioutil.ReadFile(logFile.Name() + ".1")
+	log0, err0 := os.ReadFile(logFile.Name())
+	log1, err1 := os.ReadFile(logFile.Name() + ".1")
 	assert.NoError(t, err0)
 	assert.NoError(t, err1)
 	assert.Contains(t, string(log1), "debug1")
@@ -117,10 +116,10 @@ func TestLogRotate(t *testing.T) {
 	log.Warn().Msg("message info3")
 	log.Warn().Msg("message warn3") // expect rotation by maxSize
 
-	log0, err0 = ioutil.ReadFile(logFile.Name())
-	log1, err1 = ioutil.ReadFile(logFile.Name() + ".1")
-	log2, err2 := ioutil.ReadFile(logFile.Name() + ".2")
-	log3, err3 := ioutil.ReadFile(logFile.Name() + ".3")
+	log0, err0 = os.ReadFile(logFile.Name())
+	log1, err1 = os.ReadFile(logFile.Name() + ".1")
+	log2, err2 := os.ReadFile(logFile.Name() + ".2")
+	log3, err3 := os.ReadFile(logFile.Name() + ".3")
 
 	// println("\n#log0\n", string(log0))
 	// println("\n#log1\n", string(log1))

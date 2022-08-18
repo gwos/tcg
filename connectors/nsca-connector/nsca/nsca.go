@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -176,7 +175,7 @@ type DataPacketExt struct {
 
 func (p *DataPacketExt) Read(conn io.Reader) error {
 	// We need to read the full packet 1st to check the crc and decrypt it too
-	fullPacket, err := ioutil.ReadAll(conn)
+	fullPacket, err := io.ReadAll(conn)
 	if err != nil {
 		return err
 	}

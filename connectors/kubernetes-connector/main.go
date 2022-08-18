@@ -3,7 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
 
@@ -195,5 +195,5 @@ func writeDataToFile(data []byte) error {
 		finalPath += strArray[i] + "/"
 	}
 	finalPath += "kubernetes_config.yaml"
-	return ioutil.WriteFile(finalPath, data, 0644)
+	return os.WriteFile(finalPath, data, 0644)
 }

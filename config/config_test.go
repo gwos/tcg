@@ -1,7 +1,6 @@
 package config
 
 import (
-	"io/ioutil"
 	"os"
 	"sync"
 	"testing"
@@ -30,7 +29,7 @@ gwConnections:
     password: ""
 `)
 
-	tmpFile, err := ioutil.TempFile("", "config")
+	tmpFile, err := os.CreateTemp("", "config")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 	_, err = tmpFile.Write(configYAML)
@@ -81,7 +80,7 @@ dsConnection:
   hostName: "localhost"
 `)
 
-	tmpFile, err := ioutil.TempFile("", "config")
+	tmpFile, err := os.CreateTemp("", "config")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
 	_, err = tmpFile.Write(configYAML)
