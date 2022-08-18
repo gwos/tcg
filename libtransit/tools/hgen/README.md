@@ -12,8 +12,8 @@ Based on scanned sources it creates `<packagename>.h` files with definitions for
 
 Just build and run with `--folders` option.
 ```
-$ go build . && ./hgen --folders ../../../transit && head transit.h
-7:24PM INF main.go:55 > starting cfg={"Folders":["../../../transit"],"NoPrefix":false,"Verbose":2}
+$ go build . && ./hgen --folders ../../../sdk/transit && head transit.h
+7:24PM INF main.go:55 > starting cfg={"Folders":["../../../sdk/transit"],"NoPrefix":false,"Verbose":2}
 7:24PM INF main.go:76 > create file fname=transit.h
 #ifndef TRANSIT_H
 #define TRANSIT_H
@@ -39,7 +39,7 @@ pflag: help requested
 
 Omit build step with `go run`
 ```
-$ go run ./libtransit/tools/hgen/ --folders ./transit
-12:14PM INF libtransit/tools/hgen/main.go:55 > starting cfg={"Folders":["./transit"],"NoPrefix":false,"Verbose":2}
+$ go run ./libtransit/tools/hgen/ --folders ./sdk/transit
+12:14PM INF libtransit/tools/hgen/main.go:55 > starting cfg={"Folders":["./sdk/transit"],"NoPrefix":false,"Verbose":2}
 12:14PM INF libtransit/tools/hgen/main.go:76 > create file fname=transit.h
 ```

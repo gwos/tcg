@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func test_SetEventAttrs(t *testing.T) {
+func testSetEventAttrs(t *testing.T) {
 	ptr := func(s string) *C.char {
 		if s == "" {
 			return (*C.char)(nil)
@@ -73,7 +73,7 @@ func test_SetEventAttrs(t *testing.T) {
 	}
 }
 
-func test_SetEventDates(t *testing.T) {
+func testSetEventDates(t *testing.T) {
 	ptr := func(i int64) *C.longlong { return (*C.longlong)(&i) }
 	tests := []struct {
 		name     string

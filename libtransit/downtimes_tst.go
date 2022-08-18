@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func test_AddDowntime(t *testing.T) {
+func testAddDowntime(t *testing.T) {
 	ptr := func(s string) *C.char { return C.CString(s) }
 	tests := []struct {
 		name     string
@@ -67,7 +67,7 @@ func test_AddDowntime(t *testing.T) {
 	}
 }
 
-func test_ExtendDowntimesRequest(t *testing.T) {
+func testExtendDowntimesRequest(t *testing.T) {
 	ptr := func(s string) *C.char {
 		if s == "" {
 			return (*C.char)(nil)

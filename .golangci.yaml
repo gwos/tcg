@@ -6,7 +6,7 @@ run:
     - var
     - tmp
     - gotocjson
-    - libtransit
+    # - libtransit
     - deprecated
     - connectors/nsca-connector
   skip-files:
@@ -64,6 +64,11 @@ issues:
         - scopelint
         - dupl
         - gocognit
+    - path: _tst\.go
+      linters:
+        - dupl
+        - goconst
+        - govet
   exclude:
     - "not declared by package utf8"
     - "unicode/utf8/utf8.go"

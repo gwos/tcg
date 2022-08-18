@@ -13,6 +13,7 @@ import (
 
 // CreateDowntimes creates payload for ClearInDowntime API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateDowntimes
 func CreateDowntimes() C.uintptr_t {
 	p := new(transit.Downtimes)
@@ -21,6 +22,7 @@ func CreateDowntimes() C.uintptr_t {
 }
 
 // AddDowntime appends HostServiceInDowntime value to target.
+//
 //export AddDowntime
 func AddDowntime(target C.uintptr_t,
 	entityType *C.char,
@@ -44,6 +46,7 @@ func AddDowntime(target C.uintptr_t,
 
 // CreateDowntimesRequest creates payload for SetInDowntime API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateDowntimesRequest
 func CreateDowntimesRequest() C.uintptr_t {
 	p := new(transit.DowntimesRequest)
@@ -56,6 +59,7 @@ func CreateDowntimesRequest() C.uintptr_t {
 
 // ExtendDowntimesRequest extends target.
 // It skips NULL params.
+//
 //export ExtendDowntimesRequest
 func ExtendDowntimesRequest(target C.uintptr_t,
 	hostName,
