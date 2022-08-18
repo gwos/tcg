@@ -56,7 +56,7 @@ func GetBuildInfo() BuildInfo {
 // ConfigEnv defines environment variable for config file path, overrides the ConfigName
 // ConfigName defines default filename for look in work directory if ConfigEnv is empty
 // EnvConfigPrefix defines name prefix for environment variables
-//   for example: TCG_CONNECTOR_NATSSTORETYPE
+// for example: TCG_CONNECTOR_NATSSTORETYPE
 const (
 	ConfigEnv           = "TCG_CONFIG"
 	ConfigName          = "tcg_config.yaml"

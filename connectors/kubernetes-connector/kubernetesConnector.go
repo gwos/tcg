@@ -267,12 +267,13 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 
 // Node Inventory also retrieves status, capacity, and allocations
 // inventory also contains status, pod counts, capacity and allocation metrics
-// Capacity:
-//  (v1.ResourceName) (len=6) memory: (resource.Quantity) 3977916Ki,
+//
+//	Capacity:
+//	(v1.ResourceName) (len=6) memory: (resource.Quantity) 3977916Ki,
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 2, // 2 cores
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 20959212Ki,
-// Allocatable:
+//	Allocatable:
 //	(v1.ResourceName) (len=6) memory: (resource.Quantity) 3422908Ki,
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 1930m

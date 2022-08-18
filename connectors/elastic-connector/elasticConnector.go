@@ -177,10 +177,8 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 		case string(StoredQueries):
 			queries := retrieveMonitoredServiceNames(StoredQueries, metrics)
 			err = connector.collectStoredQueriesMetrics(queries)
-			break
 		default:
 			log.Warn().Str("view", view).Msg("not supported view")
-			break
 		}
 		if err != nil {
 			log.Err(err).Msg("collection interrupted")
@@ -208,10 +206,8 @@ func (connector *ElasticConnector) ListSuggestions(view string, name string) []s
 				suggestions = append(suggestions, query.Attributes.Title)
 			}
 		}
-		break
 	default:
 		log.Warn().Str("view", view).Msg("not supported view")
-		break
 	}
 	return suggestions
 }

@@ -47,10 +47,12 @@ func TestController_StartStopNats(t *testing.T) {
 
 	res, err := http.DefaultClient.Do(startReq)
 	assert.NoError(t, err)
+	defer res.Body.Close()
 	assert.Equal(t, http.StatusOK, res.StatusCode, "status code should match the expected response")
 
 	res, err = http.DefaultClient.Do(stopReq)
 	assert.NoError(t, err)
+	defer res.Body.Close()
 	assert.Equal(t, http.StatusOK, res.StatusCode, "status code should match the expected response")
 }
 
@@ -80,9 +82,11 @@ func TestController_StartStopTransport(t *testing.T) {
 
 	res, err := http.DefaultClient.Do(startReq)
 	assert.NoError(t, err)
+	defer res.Body.Close()
 	assert.Equal(t, http.StatusOK, res.StatusCode, "status code should match the expected response")
 
 	res, err = http.DefaultClient.Do(stopReq)
 	assert.NoError(t, err)
+	defer res.Body.Close()
 	assert.Equal(t, http.StatusOK, res.StatusCode, "status code should match the expected response")
 }

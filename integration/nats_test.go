@@ -119,7 +119,7 @@ func TestNatsQueue_2(t *testing.T) {
 	}
 }
 
-//Test NATS performance
+// Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 30*time.Second)

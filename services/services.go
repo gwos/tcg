@@ -234,11 +234,11 @@ func (p *natsPayload) unmarshalV1(input []byte) error {
 	return nil
 }
 
-/* natsPayload2 used for json encoding
-takes only simple fields from SpanContext because of
-trace.SpanContextConfig doesn't support unmarshaling (otel-v.0.20.0)
-trace.SpanIDFromHex and trace.TraceIDFromHex don't support zero values
-suitable in case of NoopTracerProvider */
+// natsPayload2 used for json encoding
+// takes only simple fields from SpanContext because of
+// trace.SpanContextConfig doesn't support unmarshaling (otel-v.0.20.0)
+// trace.SpanIDFromHex and trace.TraceIDFromHex doesn't support zero values
+// suitable in case of NoopTracerProvider
 type natsPayload2 struct {
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`

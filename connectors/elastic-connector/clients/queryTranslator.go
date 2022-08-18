@@ -93,7 +93,7 @@ func filterNegate(filter KFilter, reverse bool) bool {
 }
 
 // combined migrateFilter and isDeprecatedPhraseFilter in
-//    /kibana/src/plugins/data/common/es_query/es_query/migrate_filter.ts
+// /kibana/src/plugins/data/common/es_query/es_query/migrate_filter.ts
 func migrateDeprecatedPhraseFilter(filter KFilter) KFilter {
 	if filter.Query != nil {
 		switch filter.Query.(type) {

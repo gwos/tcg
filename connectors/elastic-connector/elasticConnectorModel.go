@@ -17,7 +17,7 @@ var doOnce sync.Once
 
 // status message templates for different statuses
 // if template for service's status not listed service's status text will be only thresholds if they exist,
-//     otherwise empty
+// otherwise empty
 var initStatusMessages = map[transit.MonitorStatus]string{
 	transit.ServiceOk:                  "Query matched {value} messages in the last {interval}.",
 	transit.ServiceWarning:             "Query matched {value} messages in the last {interval}.",

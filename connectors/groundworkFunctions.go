@@ -99,7 +99,6 @@ var expressionToArgsCountMap = map[string]int{
    1 Terabyte = 1,099,511,627,776 Bytes
 */
 
-//
 // Converts byte value to Megabyte value
 //
 // @param bytes - value in bytes
@@ -109,7 +108,6 @@ func MB(values ...float64) float64 {
 	return bytes / 1048576
 }
 
-//
 // Converts byte value to Kilobyte value
 //
 // @param bytes - value in bytes
@@ -120,7 +118,6 @@ func KB(values ...float64) float64 {
 	return bytes / 1024
 }
 
-//
 // Converts byte value to Gigabyte value
 //
 // @param bytes - value in bytes
@@ -131,7 +128,6 @@ func GB(values ...float64) float64 {
 	return bytes / 1073741824
 }
 
-//
 // Converts byte value to Terabyte value
 //
 // @param bytes - value in bytes
@@ -215,7 +211,6 @@ func TB2(values ...float64) float64 {
 	return bytes / 1000000000000
 }
 
-//
 // Turns a number such as .87 into an integer percentage (87). Also handles rounding of percentages
 //
 // @param value - the value to be rounded to a full integer percentage
@@ -236,7 +231,6 @@ func ToPercentageLimit(values ...float64) float64 {
 	return result + 0.49
 }
 
-//
 // Given two metrics, <code>dividend</code> and <code>divisor</code> divides them and returns a percentage ratio
 //
 // Example:
@@ -256,13 +250,12 @@ func DivideToPercentage(values ...float64) float64 {
 	return ToPercentage(dividend / divisor)
 }
 
-//
 // This Function provides percentage usage synthetic values.
 // Calculates the usage percentage for a given <code>used</code> metric and a corresponding <code>available</code> metric.
 //
 // Example:
 //
-// 		PercentageUsed(summary.quickStats.overallMemoryUsage, summary.hardware.memorySize)
+//	PercentageUsed(summary.quickStats.overallMemoryUsage, summary.hardware.memorySize)
 //
 // @param - used Represents a 'used' metric value of how much of this resource has been used such as 'overallMemoryUsage'
 // @param - available Represents the totality of a resource, such as all memory available
@@ -274,14 +267,13 @@ func PercentageUsed(values ...float64) float64 {
 	return ScalePercentageUsed(used, available, 1.0, 0)
 }
 
-//
 // This Function provides percentage unused/free synthetic values.
 // Calculates the unused(free) percentage for a given <code>unused</code> metric and a corresponding <code>available</code> metric.
 // Both the unused metric and available metric can be scaled by corresponding scale factor parameters.
 //
 // Example:
 //
-// 		PercentageUnused(summary.freeSpace, summary.capacity)
+//	PercentageUnused(summary.freeSpace, summary.capacity)
 //
 // @param unused - Represents a metric reference value of how much of this resource has not be used (free)
 // @param available - Represents the totality of a resource, such as all disk space available
@@ -292,14 +284,13 @@ func PercentageUnused(values ...float64) float64 {
 	return ScalePercentageUnused(demand, usage, 1.0, 0)
 }
 
-//
 // This Function provides percentage unused/free synthetic values.
 // Calculates the unused(free) percentage for a given <code>unused</code> metric and a corresponding <code>available</code> metric.
 // Both the unused metric and available metric can be scaled by corresponding scale factor parameters.
 //
 // Example:
 //
-// 		scalePercentageUnused(summary.freeSpace,summary.capacity, 1.0, null, true)
+//	scalePercentageUnused(summary.freeSpace,summary.capacity, 1.0, null, true)
 //
 // @param unused  Represents a metric reference value of how much of this resource has not be used (free)
 // @param available Represents the totality of a resource, such as all disk space available
@@ -339,14 +330,13 @@ func ScalePercentageUnused(values ...float64) float64 {
 	return ToPercentage(usage)
 }
 
-//
 // This Function provides percentage usage synthetic values.
 // Calculates the usage percentage for a given <code>used</code> metric and a corresponding <code>available</code> metric.
 // Both the used metric and available metric can be scaled by corresponding scale factor parameters.
 //
 // Example:
 //
-// 		scalePercentageUsed(summary.quickStats.overallMemoryUsage,summary.hardware.memorySize, 1.0, 1.0)
+//	scalePercentageUsed(summary.quickStats.overallMemoryUsage,summary.hardware.memorySize, 1.0, 1.0)
 //
 // @param used Represents a 'used' metric value of how much of this resource has been used such as 'overallMemoryUsage'
 // @param available Represents the totality of a resource, such as all memory available

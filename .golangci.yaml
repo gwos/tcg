@@ -37,7 +37,7 @@ linters:
     - structcheck
     - stylecheck
     - unconvert
-    - unparam
+# TODO:    - unparam
     - unused
     - varcheck
     - whitespace

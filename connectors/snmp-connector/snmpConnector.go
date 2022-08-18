@@ -201,10 +201,8 @@ func (connector *SnmpConnector) listSuggestions(view string, name string) []stri
 				suggestions = append(suggestions, k)
 			}
 		}
-		break
 	default:
 		log.Warn().Msgf("not supported view: %s", view)
-		break
 	}
 	return suggestions
 }

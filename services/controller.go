@@ -21,8 +21,8 @@ import (
 	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog/log"
-	ginSwagger "github.com/swaggo/gin-swagger"
 	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -165,7 +165,6 @@ func (controller *Controller) stopController() error {
 	return nil
 }
 
-//
 // @Description The following API endpoint can be used to Agent configure.
 // @Tags    agent, connector
 // @Accept  json
@@ -197,7 +196,6 @@ func (controller *Controller) config(c *gin.Context) {
 	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
-//
 // @Description The following API endpoint can be used to send Alerts to Foundation.
 // @Tags    alert, event
 // @Accept  json
@@ -234,7 +232,6 @@ func (controller *Controller) events(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-//
 // @Description The following API endpoint can be used to send Alerts to Foundation.
 // @Tags    alert, event
 // @Accept  json
@@ -271,7 +268,6 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-//
 // @Description The following API endpoint can be used to send Alerts to Foundation.
 // @Tags    alert, event
 // @Accept  json
@@ -308,7 +304,6 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 	c.JSON(http.StatusOK, nil)
 }
 
-//
 // @Description The following API endpoint can be used to get list of metrics from the server.
 // @Tags    metric
 // @Accept  json
@@ -328,7 +323,6 @@ func (controller *Controller) listMetrics(c *gin.Context) {
 	c.Data(http.StatusOK, gin.MIMEJSON, metrics)
 }
 
-//
 // @Description The following API endpoint can be used to reset NATS queues.
 // @Tags    agent, connector
 // @Accept  json
@@ -348,7 +342,6 @@ func (controller *Controller) resetNats(c *gin.Context) {
 	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
-//
 // @Description The following API endpoint can be used to start NATS dispatcher.
 // @Tags    agent, connector
 // @Accept  json
@@ -373,7 +366,6 @@ func (controller *Controller) start(c *gin.Context) {
 	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
-//
 // @Description The following API endpoint can be used to stop NATS dispatcher.
 // @Tags    agent, connector
 // @Accept  json
@@ -398,7 +390,6 @@ func (controller *Controller) stop(c *gin.Context) {
 	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
-//
 // @Description The following API endpoint can be used to get TCG statistics.
 // @Tags    agent, connector
 // @Accept  json
@@ -412,7 +403,6 @@ func (controller *Controller) stats(c *gin.Context) {
 	c.JSON(http.StatusOK, controller.Stats())
 }
 
-//
 // @Description The following API endpoint can be used to get a TCG agent id
 // @Tags    agent, connector
 // @Accept  json
@@ -423,7 +413,6 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
 }
 
-//
 // @Description The following API endpoint can be used to get TCG status.
 // @Tags    agent, connector
 // @Accept  json
@@ -442,7 +431,6 @@ func (controller *Controller) status(c *gin.Context) {
 	c.JSON(http.StatusOK, statusDTO)
 }
 
-//
 // @Description The following API endpoint can be used to return actual TCG connector version.
 // @Tags    agent, connector
 // @Accept  json
