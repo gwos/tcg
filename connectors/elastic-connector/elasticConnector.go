@@ -95,7 +95,7 @@ const (
 
 func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) {
 	kibanaClient := clients.KibanaClient{
-		ApiRoot:  cfg.Kibana.ServerName,
+		APIRoot:  cfg.Kibana.ServerName,
 		Username: cfg.Kibana.Username,
 		Password: cfg.Kibana.Password,
 	}
@@ -177,16 +177,13 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 		case string(StoredQueries):
 			queries := retrieveMonitoredServiceNames(StoredQueries, metrics)
 			err = connector.collectStoredQueriesMetrics(queries)
-			break
 		default:
 			log.Warn().Str("view", view).Msg("not supported view")
-			break
 		}
 		if err != nil {
 			log.Err(err).Msg("collection interrupted")
 			break
 		}
-
 	}
 
 	monitoredResources, inventoryResources := monitoringState.toTransitResources()
@@ -197,7 +194,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 // ListSuggestions provides suggestions by view
 func (connector *ElasticConnector) ListSuggestions(view string, name string) []string {
 	var suggestions []string
-	if connector.kibanaClient.ApiRoot == "" {
+	if connector.kibanaClient.APIRoot == "" {
 		// client is not configured yet
 		return suggestions
 	}
@@ -209,18 +206,17 @@ func (connector *ElasticConnector) ListSuggestions(view string, name string) []s
 				suggestions = append(suggestions, query.Attributes.Title)
 			}
 		}
-		break
 	default:
 		log.Warn().Str("view", view).Msg("not supported view")
-		break
 	}
 	return suggestions
 }
 
 func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
-	var hosts []string
-	var metrics []string
-	hostGroups := make(map[string]map[string]struct{})
+	var (
+		hosts   []string
+		metrics []string
+	)
 	monitoringState := connector.monitoringState
 	if monitoringState.Hosts != nil {
 		for hostName := range monitoringState.Hosts {
@@ -236,7 +232,7 @@ func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
 	sort.Strings(hosts)
 	sort.Strings(metrics)
 
-	hostGroups = monitoringState.HostGroups
+	hostGroups := monitoringState.HostGroups
 	groupNames := make([]string, 0, len(hostGroups))
 	for groupName := range hostGroups {
 		groupNames = append(groupNames, groupName)

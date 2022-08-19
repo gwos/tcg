@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -119,7 +119,7 @@ func TestNatsQueue_2(t *testing.T) {
 	}
 }
 
-//Test NATS performance
+// Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 30*time.Second)
@@ -224,7 +224,7 @@ func parseJSON(filePath string) ([]byte, error) {
 	}
 	defer jsonFile.Close()
 
-	byteValue, err := ioutil.ReadAll(jsonFile)
+	byteValue, err := io.ReadAll(jsonFile)
 	if err != nil {
 		return nil, err
 	}

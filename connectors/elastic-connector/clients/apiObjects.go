@@ -16,7 +16,7 @@ const (
 
 type KBulkGetRequest struct {
 	Type string `json:"type"`
-	Id   string `json:"id"`
+	ID   string `json:"id"`
 }
 
 type KSavedObjectsResponse struct {
@@ -154,11 +154,11 @@ func (storedQuery *KSavedObject) ExtractIndexIds() []string {
 			indexIdsSet[*filter.Meta.Index] = struct{}{}
 		}
 	}
-	var indexIds []string
-	for indexId := range indexIdsSet {
-		indexIds = append(indexIds, indexId)
+	var indexIDs = make([]string, 0, len(indexIdsSet))
+	for indexID := range indexIdsSet {
+		indexIDs = append(indexIDs, indexID)
 	}
-	return indexIds
+	return indexIDs
 }
 
 func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupField *string) *EsAggs {
@@ -291,7 +291,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 				result = result.Add(-1 * time.Millisecond)
 			}
 		}
-		break
 	case "M":
 		result = timeNow.AddDate(0, i, 0)
 		if rounded {
@@ -302,7 +301,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 				result = result.Add(-1 * time.Millisecond)
 			}
 		}
-		break
 	case "w":
 		dayOfDesiredWeek := timeNow.AddDate(0, 0, 7*i)
 		if rounded {
@@ -313,31 +311,24 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 			case time.Monday:
 				offsetFromSunday = 1
 				offsetToSaturday = 5
-				break
 			case time.Tuesday:
 				offsetFromSunday = 2
 				offsetToSaturday = 4
-				break
 			case time.Wednesday:
 				offsetFromSunday = 3
 				offsetToSaturday = 3
-				break
 			case time.Thursday:
 				offsetFromSunday = 4
 				offsetToSaturday = 2
-				break
 			case time.Friday:
 				offsetFromSunday = 5
 				offsetToSaturday = 1
-				break
 			case time.Saturday:
 				offsetFromSunday = 6
 				offsetToSaturday = 0
-				break
 			case time.Sunday:
 				offsetFromSunday = 0
 				offsetToSaturday = 6
-				break
 			}
 			if isStartTime {
 				result = time.Date(dayOfDesiredWeek.Year(), dayOfDesiredWeek.Month(), dayOfDesiredWeek.Day()-offsetFromSunday, 0, 0, 0, 0, location)
@@ -348,7 +339,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 		} else {
 			result = dayOfDesiredWeek
 		}
-		break
 	case "d":
 		result = timeNow.AddDate(0, 0, i)
 		if rounded {
@@ -369,7 +359,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 				result = result.Add(-1 * time.Millisecond)
 			}
 		}
-		break
 	case "m":
 		result = timeNow.Add(time.Duration(i) * time.Minute)
 		if rounded {
@@ -380,7 +369,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 				result = result.Add(-1 * time.Millisecond)
 			}
 		}
-		break
 	case "s":
 		result = timeNow.Add(time.Duration(i) * time.Second)
 		if rounded {
@@ -391,7 +379,6 @@ func toAbsoluteTime(expression string, isStartTime bool) (time.Time, error) {
 				result = result.Add(-1 * time.Millisecond)
 			}
 		}
-		break
 	default:
 		log.Error().Msgf("could not parse time filterClause expression: unknown period format '%s'", period)
 	}

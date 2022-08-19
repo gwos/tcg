@@ -1,0 +1,76 @@
+run:
+  go: '1.19'
+  skip-dirs:
+    - vendor
+    - bin
+    - var
+    - tmp
+    - gotocjson
+    # - libtransit
+    - deprecated
+    - connectors/nsca-connector
+  skip-files:
+    - \.pb\.go$
+  modules-download-mode: readonly
+
+govet:
+  enable:
+    - fieldalignment
+
+linters:
+  disable-all: false
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - goconst
+    - gofmt
+    - goimports
+    - govet
+    - ineffassign
+    - misspell
+    - prealloc
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - unconvert
+# TODO:    - unparam
+    - unused
+    - varcheck
+    - whitespace
+# TODO:    - gocognit
+# TODO:    - gocyclo
+  disable:
+    - gochecknoglobals
+    - gochecknoinits
+    - godox
+    - lll
+    - nakedret
+    - wsl
+    - gosimple
+    - gosec
+    - funlen
+
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gomnd
+        - funlen
+        - scopelint
+        - dupl
+        - gocognit
+    - path: _tst\.go
+      linters:
+        - dupl
+        - goconst
+        - govet
+  exclude:
+    - "not declared by package utf8"
+    - "unicode/utf8/utf8.go"
+    - "DecodeRuneInString not declared by package utf8"
+    - ".*and that stutters.*"

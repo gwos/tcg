@@ -31,13 +31,14 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 func buildQueryFromFilters(filters []KFilter) EsQueryBool {
 	var esQueryBool EsQueryBool
 
+	// TODO: check if it's needed
 	// remove disabled filters
-	var enabledFilters []KFilter
-	for _, filter := range filters {
-		if !isFilterDisabled(filter) {
-			enabledFilters = append(enabledFilters, filter)
-		}
-	}
+	// var enabledFilters []KFilter
+	// for _, filter := range filters {
+	// 	 if !isFilterDisabled(filter) {
+	//	 	 enabledFilters = append(enabledFilters, filter)
+	//	 }
+	// }
 
 	esQueryBool.Filter = filtersToESQueries(filters, false)
 	esQueryBool.MustNot = filtersToESQueries(filters, true)
@@ -57,21 +58,19 @@ func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
 	// no need to filter by index
 
 	// migrate filters
-	var migratedFilters []KFilter
+	var migratedFilters = make([]KFilter, 0, len(negateFilters))
 	for _, filter := range negateFilters {
 		migratedFilters = append(migratedFilters, migrateDeprecatedPhraseFilter(filter))
 	}
-	negateFilters = nil
 
 	// TODO nested filters are not supported
 
-	var translatedFilters []interface{}
+	var translatedFilters = make([]interface{}, 0, len(migratedFilters))
 	for _, filter := range migratedFilters {
 		translatedFilters = append(translatedFilters, translateToQuery(filter))
 	}
-	migratedFilters = nil
 
-	var cleanedFilters []interface{}
+	var cleanedFilters = make([]interface{}, 0, len(translatedFilters))
 	for _, filter := range translatedFilters {
 		cleanedFilters = append(cleanedFilters, cleanFilter(filter))
 	}
@@ -79,12 +78,12 @@ func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
 	return cleanedFilters
 }
 
-func isFilterDisabled(filter KFilter) bool {
-	if filter.Meta != nil && filter.Meta.Disabled != nil {
-		return *filter.Meta.Disabled
-	}
-	return false
-}
+// func isFilterDisabled(filter KFilter) bool {
+// 	if filter.Meta != nil && filter.Meta.Disabled != nil {
+// 		return *filter.Meta.Disabled
+// 	}
+// 	return false
+// }
 
 func filterNegate(filter KFilter, reverse bool) bool {
 	if filter.Meta == nil || filter.Meta.Negate == nil {
@@ -94,7 +93,7 @@ func filterNegate(filter KFilter, reverse bool) bool {
 }
 
 // combined migrateFilter and isDeprecatedPhraseFilter in
-//    /kibana/src/plugins/data/common/es_query/es_query/migrate_filter.ts
+// /kibana/src/plugins/data/common/es_query/es_query/migrate_filter.ts
 func migrateDeprecatedPhraseFilter(filter KFilter) KFilter {
 	if filter.Query != nil {
 		switch filter.Query.(type) {
@@ -139,9 +138,9 @@ func translateToQuery(filter KFilter) interface{} {
 
 // = cleanFilter in /kibana/src/plugins/data/common/es_query/filters/index.ts
 func cleanFilter(filter interface{}) interface{} {
-	switch filter.(type) {
+	switch filter := filter.(type) {
 	case KFilter:
-		cleanedFilter := filter.(KFilter)
+		cleanedFilter := filter
 		cleanedFilter.Meta = nil
 		return cleanedFilter
 	}

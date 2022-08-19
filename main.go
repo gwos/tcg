@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -15,16 +14,14 @@ import (
 //         Examples of High Level API functions         //
 //////////////////////////////////////////////////////////
 
-var enableTransit = false
-
 const (
 	Resource1                 = "tcg-host-1"
 	Resource2                 = "tcg-host-1"
 	Service1                  = "tcg-server-1"
 	Service2                  = "tcg-server-2"
-	CpuMetric                 = "tcg-cpu"
-	CpuMetricWarning          = "tcg-cpu-warning"
-	CpuMetricCritical         = "tcg-cpu-critical"
+	CPUMetric                 = "tcg-cpu"
+	CPUMetricWarning          = "tcg-cpu-warning"
+	CPUMetricCritical         = "tcg-cpu-critical"
 	PercentFreeMetric         = "tcg-percent-free"
 	PercentFreeMetricWarning  = "tcg-percent-free-warning"
 	PercentFreeMetricCritical = "tcg-percent-free-critical"
@@ -32,7 +29,6 @@ const (
 )
 
 func main() {
-
 	//////////////////////////////////////////////////////////////////////////////////////////
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
@@ -43,7 +39,7 @@ func main() {
 	iResource1 := connectors.CreateInventoryResource(Resource1, iServices)
 	println(iResource1.Services[0].Description)
 	println(iResource1.Description)
-	//if (enableTransit) {
+	//if enableTransit {
 	//	connectors.SendInventory()
 	//}
 
@@ -51,9 +47,9 @@ func main() {
 	//                                  Metrics Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
 	// Create Integer Metric with Thresholds
-	metric1, _ := connectors.CreateMetric(CpuMetric, 75)
-	warning1, _ := connectors.CreateWarningThreshold(CpuMetricWarning, 60)
-	critical1, _ := connectors.CreateCriticalThreshold(CpuMetricCritical, 90)
+	metric1, _ := connectors.CreateMetric(CPUMetric, 75)
+	warning1, _ := connectors.CreateWarningThreshold(CPUMetricWarning, 60)
+	critical1, _ := connectors.CreateCriticalThreshold(CPUMetricCritical, 90)
 	metric1.Thresholds = []transit.ThresholdValue{*warning1, *critical1}
 	// Create Double Metric with Thresholds and Unit Type
 	metric2, _ := connectors.CreateMetric(PercentFreeMetric, 99.82, transit.PercentCPU)
@@ -88,16 +84,16 @@ func main() {
 	resource2, _ := connectors.CreateResource(Resource2, []transit.MonitoredService{*service2})
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
-	if enableTransit {
-		connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
-	}
+	//if enableTransit {
+	//	connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
+	//}
 }
 
 //////////////////////////////////////////////////////////
 //         Examples of Low Level API functions          //
 //////////////////////////////////////////////////////////
 
-func LowLevelExamples() {
+func LowLevelExamples() { //nolint
 	warningThreshold := transit.ThresholdValue{
 		SampleType: transit.Warning,
 		Label:      "local_load_5_wn",

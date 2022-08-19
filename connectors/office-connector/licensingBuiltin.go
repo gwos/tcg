@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	licenseUri = "https://graph.microsoft.com/v1.0/subscribedSkus"
+	licenseURI = "https://graph.microsoft.com/v1.0/subscribedSkus"
 )
 
 // AddonLicenseMetrics licensing built-in - could be data driven.
@@ -20,7 +20,7 @@ func AddonLicenseMetrics(service *transit.MonitoredService, token string) (err e
 		v    interface{}
 	)
 
-	if body, err = ExecuteRequest(licenseUri, token); err == nil {
+	if body, err = ExecuteRequest(licenseURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
 		return

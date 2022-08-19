@@ -73,7 +73,6 @@ const (
 
 const (
 	ckTracerToken        = "ckTraceToken"
-	statsLastErrorsLim   = 10
 	taskQueueAlarm       = time.Second * 9
 	taskQueueCapacity    = 8
 	traceOnDemandAgentID = "#traceOnDemandAgentID#"
@@ -91,7 +90,7 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		agentConnector := config.GetConfig().Connector
+		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
 			agentStats: &AgentStats{
@@ -102,7 +101,7 @@ func GetAgentService() *AgentService {
 				Nats:       StatusStopped,
 				Transport:  StatusStopped,
 			},
-			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(config.GetConfig().DSConnection)},
+			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
 			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
@@ -201,13 +200,13 @@ func defaultConfigHandler([]byte) {}
 func defaultExitHandler() {}
 
 // Quit returns channel
-// usefull for main loop
+// useful for main loop
 func (service *AgentService) Quit() <-chan struct{} {
 	return service.quitChan
 }
 
 // RegisterConfigHandler sets callback
-// usefull for process extensions
+// useful for process extensions
 func (service *AgentService) RegisterConfigHandler(fn func([]byte)) {
 	service.configHandler = fn
 }
@@ -404,7 +403,7 @@ func (service *AgentService) updateStats(c statsCounter) {
 }
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
-	var dispatcherOptions []nats.DispatcherOption
+	var dispatcherOptions = make([]nats.DispatcherOption, 0, len(service.gwClients))
 	for _, gwClient := range service.gwClients {
 		// TODO: filter the message by rules per gwClient
 		gwClient := gwClient /* hold loop var copy */

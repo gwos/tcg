@@ -3,10 +3,11 @@ package main
 import (
 	"bytes"
 	"context"
-	"gopkg.in/yaml.v3"
-	"io/ioutil"
+	"os"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -194,5 +195,5 @@ func writeDataToFile(data []byte) error {
 		finalPath += strArray[i] + "/"
 	}
 	finalPath += "kubernetes_config.yaml"
-	return ioutil.WriteFile(finalPath, data, 0644)
+	return os.WriteFile(finalPath, data, 0644)
 }

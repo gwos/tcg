@@ -14,6 +14,7 @@ import (
 
 // CreateEvent creates an object used in EventsRequest.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateEvent
 func CreateEvent(
 	appType, host, monStatus *C.char,
@@ -30,6 +31,7 @@ func CreateEvent(
 
 // SetEventAttrs sets attributes on target.
 // It skips NULL params.
+//
 //export SetEventAttrs
 func SetEventAttrs(target C.uintptr_t,
 	appType,
@@ -87,6 +89,7 @@ func SetEventAttrs(target C.uintptr_t,
 
 // SetEventDates sets date attributes on target.
 // It skips NULL params.
+//
 //export SetEventDates
 func SetEventDates(target C.uintptr_t,
 	reportDateSec, reportDateNsec,
@@ -116,6 +119,7 @@ func SetEventDates(target C.uintptr_t,
 
 // CreateEventsRequest creates payload for SendEvents API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateEventsRequest
 func CreateEventsRequest() C.uintptr_t {
 	p := new(transit.GroundworkEventsRequest)
@@ -124,6 +128,7 @@ func CreateEventsRequest() C.uintptr_t {
 }
 
 // AddEvent appends Event value to target.
+//
 //export AddEvent
 func AddEvent(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -136,6 +141,7 @@ func AddEvent(target C.uintptr_t, value C.uintptr_t) {
 
 // CreateEventsAckRequest creates payload for SendEventsAck API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateEventsAckRequest
 func CreateEventsAckRequest() C.uintptr_t {
 	p := new(transit.GroundworkEventsAckRequest)
@@ -144,6 +150,7 @@ func CreateEventsAckRequest() C.uintptr_t {
 }
 
 // AddEventAck appends EventAck value to target.
+//
 //export AddEventAck
 func AddEventAck(
 	target C.uintptr_t,
@@ -163,6 +170,7 @@ func AddEventAck(
 
 // CreateEventsUnackRequest creates payload for SendEventsUnack API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateEventsUnackRequest
 func CreateEventsUnackRequest() C.uintptr_t {
 	p := new(transit.GroundworkEventsUnackRequest)
@@ -171,6 +179,7 @@ func CreateEventsUnackRequest() C.uintptr_t {
 }
 
 // AddEventUnack appends EventUnack value to target.
+//
 //export AddEventUnack
 func AddEventUnack(
 	target C.uintptr_t,

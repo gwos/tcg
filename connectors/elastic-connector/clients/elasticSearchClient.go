@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
@@ -57,7 +57,6 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
 			log.Error().Msg("could not get hosts: response is nil")
-			afterKey = nil
 			break
 		}
 		if searchResponse.Aggregations.Aggregation.Buckets != nil {
@@ -101,7 +100,6 @@ func (esClient EsClient) CountHits(hostField string, indexes []string, query *Es
 		searchResponse := parseSearchResponse(response)
 		if searchResponse == nil {
 			log.Error().Msg("could not count hits: response is nil")
-			afterKey = nil
 			break
 		}
 		if searchResponse.Aggregations.Aggregation.Buckets != nil {
@@ -207,7 +205,7 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 		return nil
 	}
 
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Err(err).Msg("could not read ES Search response")
 		return nil
@@ -276,7 +274,7 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		return result, nil
 	}
 
-	responseBody, err := ioutil.ReadAll(response.Body)
+	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Err(err).Msg("could not read ES FieldCaps response")
 		return result, nil
@@ -302,9 +300,9 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 						case map[string]interface{}:
 							fieldCap := v.(map[string]interface{})
 							if aggregatable, exists := fieldCap["aggregatable"]; exists {
-								switch aggregatable.(type) {
+								switch aggregatable := aggregatable.(type) {
 								case bool:
-									if aggregatable.(bool) {
+									if aggregatable {
 										result[fieldName] = true
 										break
 									}

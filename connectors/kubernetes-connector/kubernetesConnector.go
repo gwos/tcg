@@ -57,8 +57,17 @@ const (
 	ClusterHostGroup                 = "cluster-"
 	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
 	PodsHostGroup                    = "pods-"
-	NamespaceDefault                 = "default"
 	defaultKubernetesClusterEndpoint = ""
+)
+
+const (
+	cpu             = "cpu"
+	pods            = "pods"
+	memory          = "memory"
+	cpuCores        = "cpu.cores"
+	cpuAllocated    = "cpu.allocated"
+	memoryCapacity  = "memory.capacity"
+	memoryAllocated = "memory.allocated"
 )
 
 type KubernetesConnector struct {
@@ -197,7 +206,6 @@ func (connector *KubernetesConnector) Shutdown() {
 
 // Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
 func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
-
 	// gather inventory and Metrics
 	metricsPerContainer := true
 	monitoredState := make(map[string]KubernetesResource)
@@ -259,12 +267,13 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 
 // Node Inventory also retrieves status, capacity, and allocations
 // inventory also contains status, pod counts, capacity and allocation metrics
-// Capacity:
-//  (v1.ResourceName) (len=6) memory: (resource.Quantity) 3977916Ki,
+//
+//	Capacity:
+//	(v1.ResourceName) (len=6) memory: (resource.Quantity) 3977916Ki,
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 2, // 2 cores
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 20959212Ki,
-// Allocatable:
+//	Allocatable:
 //	(v1.ResourceName) (len=6) memory: (resource.Quantity) 3422908Ki,
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 1930m
@@ -295,17 +304,17 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		monitoredState[resource.Name] = resource
 		// process services
 		for key, metricDefinition := range cfg.Views[ViewNodes] {
-			var value interface{} = 0
+			var value interface{}
 			switch key {
-			case "cpu.cores":
+			case cpuCores:
 				value = node.Status.Capacity.Cpu().Value()
-			case "cpu.allocated":
+			case cpuAllocated:
 				value = toPercentage(node.Status.Capacity.Cpu().MilliValue(), node.Status.Allocatable.Cpu().MilliValue())
-			case "memory.capacity":
+			case memoryCapacity:
 				value = node.Status.Capacity.Memory().Value()
-			case "memory.allocated":
+			case memoryAllocated:
 				value = toPercentage(node.Status.Capacity.Memory().MilliValue(), node.Status.Allocatable.Memory().MilliValue())
-			case "pods":
+			case pods:
 				value = node.Status.Capacity.Pods().Value()
 			default:
 				continue
@@ -332,7 +341,6 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			if monitoredService != nil {
 				resource.Services[metricBuilder.Name] = *monitoredService
 			}
-
 		}
 		// add to default Cluster group
 		groups[clusterHostGroupName].Resources[index] = transit.ResourceRef{
@@ -402,7 +410,6 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			groups[podHostGroup] = group
 		}
 	}
-
 }
 
 func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
@@ -415,11 +422,11 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 	for _, node := range nodes.Items {
 		if resource, ok := monitoredState[node.Name]; ok {
 			for key, metricDefinition := range cfg.Views[ViewNodes] {
-				var value interface{} = 0
+				var value interface{}
 				switch key {
-				case "cpu":
+				case cpu:
 					value = node.Usage.Cpu().MilliValue()
-				case "memory":
+				case memory:
 					value = node.Usage.Memory().MilliValue()
 				default:
 					continue
@@ -463,19 +470,19 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 			for index, container := range pod.Containers {
 				metricBuilders := make([]connectors.MetricBuilder, 0)
 				for key, metricDefinition := range cfg.Views[ViewPods] {
-					var value interface{} = 0
+					var value interface{}
 					switch key {
-					case "cpu.cores":
+					case cpuCores:
 						value = container.Usage.Cpu().Value()
-					case "cpu.allocated":
+					case cpuAllocated:
 						value = container.Usage.Cpu().MilliValue()
-					case "memory.capacity":
+					case memoryCapacity:
 						value = container.Usage.Memory().Value()
-					case "memory.allocated":
+					case memoryAllocated:
 						value = container.Usage.Memory().Value()
-					case "cpu":
+					case cpu:
 						value = pod.Containers[index].Usage.Cpu().MilliValue()
-					case "memory":
+					case memory:
 						value = pod.Containers[index].Usage.Memory().Value()
 					default:
 						continue
@@ -522,19 +529,19 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
 				if resource, ok := monitoredState[container.Name]; ok {
-					var value interface{} = 0
+					var value interface{}
 					switch key {
-					case "cpu.cores":
+					case cpuCores:
 						value = container.Usage.Cpu().Value()
-					case "cpu.allocated":
+					case cpuAllocated:
 						value = container.Usage.Cpu().MilliValue()
-					case "memory.capacity":
+					case memoryCapacity:
 						value = container.Usage.Memory().Value()
-					case "memory.allocated":
+					case memoryAllocated:
 						value = container.Usage.Memory().Value()
-					case "cpu":
+					case cpu:
 						value = container.Usage.Cpu().MilliValue()
-					case "memory":
+					case memory:
 						value = container.Usage.Memory().Value()
 					default:
 						continue
@@ -586,11 +593,11 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 	}
 }
 
-// Calculate Node Status based on Conditions, PID Pressure, Memory Pressure, Disk Pressure all treated as default
+// Calculate Node Status based on Conditions, PID Pressure, memory Pressure, Disk Pressure all treated as default
 func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transit.MonitorStatus, string) {
 	var message strings.Builder
 	var upMessage string
-	var status transit.MonitorStatus = transit.HostUp
+	var status = transit.HostUp
 	for _, condition := range node.Status.Conditions {
 		switch condition.Type {
 		case v1.NodeReady:
@@ -614,7 +621,6 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 				}
 			}
 		}
-
 	}
 	if status == transit.HostUp {
 		message.WriteString(upMessage)
@@ -625,7 +631,7 @@ func (connector *KubernetesConnector) calculateNodeStatus(node *v1.Node) (transi
 func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.MonitorStatus, string) {
 	var message strings.Builder
 	var upMessage = "Pod is healthy"
-	var status transit.MonitorStatus = transit.HostUp
+	var status = transit.HostUp
 	for _, condition := range pod.Status.Conditions {
 		if condition.Status != v1.ConditionTrue {
 			if message.Len() > 0 {

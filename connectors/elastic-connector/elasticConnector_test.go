@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
@@ -15,7 +14,7 @@ import (
 )
 
 func TestInitFullConfig(t *testing.T) {
-	tmpFile, _ := ioutil.TempFile("", "config")
+	tmpFile, _ := os.CreateTemp("", "config")
 	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
@@ -139,7 +138,7 @@ func TestInitFullConfig(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -148,7 +147,7 @@ func TestInitFullConfig(t *testing.T) {
 }
 
 func TestInitConfigWithNotPresentedValues(t *testing.T) {
-	tmpFile, _ := ioutil.TempFile("", "config")
+	tmpFile, _ := os.CreateTemp("", "config")
 	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
@@ -177,7 +176,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 	data := []byte(`{}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -186,7 +185,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 }
 
 func TestInitConfigWithPartialPresentedValues(t *testing.T) {
-	tmpFile, _ := ioutil.TempFile("", "config")
+	tmpFile, _ := os.CreateTemp("", "config")
 	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
@@ -221,7 +220,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {
@@ -230,7 +229,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 }
 
 func TestHandleEmptyConfig(t *testing.T) {
-	tmpFile, _ := ioutil.TempFile("", "config")
+	tmpFile, _ := os.CreateTemp("", "config")
 	_ = os.Setenv(config.ConfigEnv, tmpFile.Name())
 	defer os.Remove(tmpFile.Name())
 
@@ -265,7 +264,7 @@ func TestHandleEmptyConfig(t *testing.T) {
 	}`)
 
 	cfgChksum, _ = connectors.Hashsum(expected)
-	config.GetConfig().LoadConnectorDTO(data)
+	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
 	if !reflect.DeepEqual(*extConfig, expected) {

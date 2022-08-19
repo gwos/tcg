@@ -1,3 +1,3 @@
 module github.com/gwos/tcg/sdk
 
-go 1.18
+go 1.19

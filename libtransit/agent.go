@@ -30,10 +30,12 @@ import (
 	"os"
 	"unsafe"
 
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/services"
 )
 
 func init() {
+	config.AllowFlags = false
 	services.AllowSignalHandlers = false
 }
 
@@ -75,6 +77,7 @@ func msgfBufTooSmall(n int) string {
 // the initial config for the services managed by libtransit, calls to GoSetenv() must be
 // made *before* any call to one of the routines that might probe for or attempt to start,
 // stop, or otherwise interact with one of the services.
+//
 //export GoSetenv
 func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) C.bool {
 	err := os.Setenv(C.GoString(key), C.GoString(value))
@@ -86,6 +89,7 @@ func GoSetenv(key, value, errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StartController is a C API for services.GetTransitService().StartController
+//
 //export StartController
 func StartController(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StartController(); err != nil {
@@ -96,6 +100,7 @@ func StartController(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StopController is a C API for services.GetTransitService().StopController
+//
 //export StopController
 func StopController(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StopController(); err != nil {
@@ -106,6 +111,7 @@ func StopController(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StartNats is a C API for services.GetTransitService().StartNats
+//
 //export StartNats
 func StartNats(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StartNats(); err != nil {
@@ -116,6 +122,7 @@ func StartNats(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StopNats is a C API for services.GetTransitService().StopNats
+//
 //export StopNats
 func StopNats(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StopNats(); err != nil {
@@ -126,6 +133,7 @@ func StopNats(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StartTransport is a C API for services.GetTransitService().StartTransport
+//
 //export StartTransport
 func StartTransport(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StartTransport(); err != nil {
@@ -136,6 +144,7 @@ func StartTransport(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // StopTransport is a C API for services.GetTransitService().StopTransport
+//
 //export StopTransport
 func StopTransport(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().StopTransport(); err != nil {
@@ -146,6 +155,7 @@ func StopTransport(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // DemandConfig is a C API for services.GetTransitService().DemandConfig
+//
 //export DemandConfig
 func DemandConfig(errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().DemandConfig(); err != nil {
@@ -156,24 +166,28 @@ func DemandConfig(errBuf *C.char, errBufLen C.size_t) C.bool {
 }
 
 // IsControllerRunning is a C API for services.GetTransitService().Status().Controller
+//
 //export IsControllerRunning
 func IsControllerRunning() C.bool {
 	return services.GetTransitService().Status().Controller == services.StatusRunning
 }
 
 // IsNatsRunning is a C API for services.GetTransitService().Status().Nats
+//
 //export IsNatsRunning
 func IsNatsRunning() C.bool {
 	return services.GetTransitService().Status().Nats == services.StatusRunning
 }
 
 // IsTransportRunning is a C API for services.GetTransitService().Status().Transport
+//
 //export IsTransportRunning
 func IsTransportRunning() C.bool {
 	return services.GetTransitService().Status().Transport == services.StatusRunning
 }
 
 // RegisterListMetricsHandler is a C API for services.GetTransitService().RegisterListMetricsHandler
+//
 //export RegisterListMetricsHandler
 func RegisterListMetricsHandler(fn C.textGetterType) {
 	/* See notes on textGetterType and invokeTextGetter */
@@ -186,12 +200,14 @@ func RegisterListMetricsHandler(fn C.textGetterType) {
 }
 
 // RemoveListMetricsHandler is a C API for services.GetTransitService().RemoveListMetricsHandler
+//
 //export RemoveListMetricsHandler
 func RemoveListMetricsHandler() {
 	services.GetTransitService().RemoveListMetricsHandler()
 }
 
 // RegisterConfigHandler is a C API for services.GetTransitService().RegisterConfigHandler
+//
 //export RegisterConfigHandler
 func RegisterConfigHandler(fn C.textSetterType) {
 	services.GetTransitService().RegisterConfigHandler(func(p []byte) {
@@ -202,6 +218,7 @@ func RegisterConfigHandler(fn C.textSetterType) {
 }
 
 // RemoveConfigHandler is a C API for services.GetTransitService().RemoveConfigHandler()
+//
 //export RemoveConfigHandler
 func RemoveConfigHandler() {
 	services.GetTransitService().RemoveConfigHandler()
@@ -210,6 +227,7 @@ func RemoveConfigHandler() {
 // GetAgentId returns AgentID
 // The C string is allocated in the C heap using malloc.
 // It should be freed after use with stdlib free().
+//
 //export GetAgentId
 func GetAgentId() *C.char {
 	return C.CString(services.GetTransitService().AgentID)
@@ -218,6 +236,7 @@ func GetAgentId() *C.char {
 // GetAppName returns AppName
 // The C string is allocated in the C heap using malloc.
 // It should be freed after use with stdlib free().
+//
 //export GetAppName
 func GetAppName() *C.char {
 	return C.CString(services.GetTransitService().AppName)
@@ -226,6 +245,7 @@ func GetAppName() *C.char {
 // GetAppType returns AppType
 // The C string is allocated in the C heap using malloc.
 // It should be freed after use with stdlib free().
+//
 //export GetAppType
 func GetAppType() *C.char {
 	return C.CString(services.GetTransitService().AppType)

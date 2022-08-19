@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -131,13 +132,13 @@ func processRequest() (float64, float64, float64) {
 func requestsGenerator() {
 	for ; ; {
 		resp, _ := http.Get("http://localhost:2222/analytics")
-		_, _ = ioutil.ReadAll(resp.Body)
+		_, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		resp, _ = http.Get("http://localhost:2222/distribution")
-		_, _ = ioutil.ReadAll(resp.Body)
+		_, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		resp, _ = http.Get("http://localhost:2222/sales")
-		_, _ = ioutil.ReadAll(resp.Body)
+		_, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 		time.Sleep(time.Second * 30)
 	}

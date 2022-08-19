@@ -11,56 +11,56 @@ These wrappers are here for gotest to find.
 https://stackoverflow.com/questions/27930737/import-c-is-unsupported-in-test-looking-for-alternatives
 */
 
-func Test_SetCategory(t *testing.T) { test_SetCategory(t) }
+func TestSetCategory(t *testing.T) { testSetCategory(t) }
 
-func Test_SetContextTimestamp(t *testing.T) { test_SetContextTimestamp(t) }
+func TestSetContextTimestamp(t *testing.T) { testSetContextTimestamp(t) }
 
-func Test_SetContextToken(t *testing.T) { test_SetContextToken(t) }
+func TestSetContextToken(t *testing.T) { testSetContextToken(t) }
 
-func Test_SetDescription(t *testing.T) { test_SetDescription(t) }
+func TestSetDescription(t *testing.T) { testSetDescription(t) }
 
-func Test_SetDevice(t *testing.T) { test_SetDevice(t) }
+func TestSetDevice(t *testing.T) { testSetDevice(t) }
 
-func Test_SetIntervalEnd(t *testing.T) { test_SetIntervalEnd(t) }
+func TestSetIntervalEnd(t *testing.T) { testSetIntervalEnd(t) }
 
-func Test_SetIntervalStart(t *testing.T) { test_SetIntervalStart(t) }
+func TestSetIntervalStart(t *testing.T) { testSetIntervalStart(t) }
 
-func Test_SetLastPluginOutput(t *testing.T) { test_SetLastPluginOutput(t) }
+func TestSetLastPluginOutput(t *testing.T) { testSetLastPluginOutput(t) }
 
-func Test_SetLastCheckTime(t *testing.T) { test_SetLastCheckTime(t) }
+func TestSetLastCheckTime(t *testing.T) { testSetLastCheckTime(t) }
 
-func Test_SetNextCheckTime(t *testing.T) { test_SetNextCheckTime(t) }
+func TestSetNextCheckTime(t *testing.T) { testSetNextCheckTime(t) }
 
-func Test_SetName(t *testing.T) { test_SetName(t) }
+func TestSetName(t *testing.T) { testSetName(t) }
 
-func Test_SetOwner(t *testing.T) { test_SetOwner(t) }
+func TestSetOwner(t *testing.T) { testSetOwner(t) }
 
-func Test_SetPropertyBool(t *testing.T) { test_SetPropertyBool(t) }
+func TestSetPropertyBool(t *testing.T) { testSetPropertyBool(t) }
 
-func Test_SetPropertyDouble(t *testing.T) { test_SetPropertyDouble(t) }
+func TestSetPropertyDouble(t *testing.T) { testSetPropertyDouble(t) }
 
-func Test_SetPropertyInt(t *testing.T) { test_SetPropertyInt(t) }
+func TestSetPropertyInt(t *testing.T) { testSetPropertyInt(t) }
 
-func Test_SetPropertyStr(t *testing.T) { test_SetPropertyStr(t) }
+func TestSetPropertyStr(t *testing.T) { testSetPropertyStr(t) }
 
-func Test_SetPropertyTime(t *testing.T) { test_SetPropertyTime(t) }
+func TestSetPropertyTime(t *testing.T) { testSetPropertyTime(t) }
 
-func Test_SetSampleType(t *testing.T) { test_SetSampleType(t) }
+func TestSetSampleType(t *testing.T) { testSetSampleType(t) }
 
-func Test_SetStatus(t *testing.T) { test_SetStatus(t) }
+func TestSetStatus(t *testing.T) { testSetStatus(t) }
 
-func Test_SetTag(t *testing.T) { test_SetTag(t) }
+func TestSetTag(t *testing.T) { testSetTag(t) }
 
-func Test_SetType(t *testing.T) { test_SetType(t) }
+func TestSetType(t *testing.T) { testSetType(t) }
 
-func Test_SetUnit(t *testing.T) { test_SetUnit(t) }
+func TestSetUnit(t *testing.T) { testSetUnit(t) }
 
-func Test_SetValueBool(t *testing.T) { test_SetValueBool(t) }
+func TestSetValueBool(t *testing.T) { testSetValueBool(t) }
 
-func Test_SetValueDouble(t *testing.T) { test_SetValueDouble(t) }
+func TestSetValueDouble(t *testing.T) { testSetValueDouble(t) }
 
-func Test_SetValueInt(t *testing.T) { test_SetValueInt(t) }
+func TestSetValueInt(t *testing.T) { testSetValueInt(t) }
 
-func Test_SetValueStr(t *testing.T) { test_SetValueStr(t) }
+func TestSetValueStr(t *testing.T) { testSetValueStr(t) }
 
-func Test_SetValueTime(t *testing.T) { test_SetValueTime(t) }
+func TestSetValueTime(t *testing.T) { testSetValueTime(t) }

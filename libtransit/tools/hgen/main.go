@@ -39,21 +39,21 @@ var (
 		loggerInf := log.New(log.Writer(), "INF ", flags)
 		loggerDbg := log.New(log.Writer(), "DBG ", flags)
 		return func(format string, a ...interface{}) {
-				loggerErr.Output(calldepth, fmt.Sprintf(format, a...))
+				_ = loggerErr.Output(calldepth, fmt.Sprintf(format, a...))
 			},
 			func(format string, a ...interface{}) {
 				if *level > 0 {
-					loggerWrn.Output(calldepth, fmt.Sprintf(format, a...))
+					_ = loggerWrn.Output(calldepth, fmt.Sprintf(format, a...))
 				}
 			},
 			func(format string, a ...interface{}) {
 				if *level > 1 {
-					loggerInf.Output(calldepth, fmt.Sprintf(format, a...))
+					_ = loggerInf.Output(calldepth, fmt.Sprintf(format, a...))
 				}
 			},
 			func(format string, a ...interface{}) {
 				if *level > 2 {
-					loggerDbg.Output(calldepth, fmt.Sprintf(format, a...))
+					_ = loggerDbg.Output(calldepth, fmt.Sprintf(format, a...))
 				}
 			}
 	}(log.Lmsgprefix|log.Lshortfile|log.Ldate|log.Ltime|log.LUTC, 2, &(cfg.Verbose))
@@ -66,7 +66,9 @@ func getCfg() *Cfg {
 		folders := flags.StringSlice("folders", nil, "Folder pathes")
 		noPrefix := flags.Bool("no-prefix", false, "Omit prefixing constant name")
 		verbose := flags.Int8("verbose", 2, "Verbose level 0..3")
-		flags.Parse(os.Args[1:])
+		if err := flags.Parse(os.Args[1:]); err != nil {
+			logError("could not parse options: %s", err)
+		}
 		cfg.Folders = *folders
 		cfg.NoPrefix = *noPrefix
 		if *verbose < 0 {
@@ -151,11 +153,15 @@ func main() {
 	_ = getCfg()
 
 	/* inspired by headscan
-	https://cs.opensource.google/go/go/+/refs/tags/go1.17.1:src/go/doc/headscan.go */
+	https://cs.opensource.google/go/go/+/refs/tags/go1.16:src/go/doc/headscan.go */
 	for _, root := range cfg.Folders {
 		fset := token.NewFileSet()
-		err := filepath.WalkDir(root, func(path string, info fs.DirEntry, err error) error {
-			if !info.IsDir() {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, e error) error {
+			if e != nil {
+				logError("could not parse dir: %s: %s", root, e)
+				return nil
+			}
+			if !d.IsDir() {
 				return nil
 			}
 			pkgs, err := parser.ParseDir(fset, path, isGoFile, parser.ParseComments)

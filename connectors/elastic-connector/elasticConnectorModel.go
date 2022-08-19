@@ -17,7 +17,7 @@ var doOnce sync.Once
 
 // status message templates for different statuses
 // if template for service's status not listed service's status text will be only thresholds if they exist,
-//     otherwise empty
+// otherwise empty
 var initStatusMessages = map[transit.MonitorStatus]string{
 	transit.ServiceOk:                  "Query matched {value} messages in the last {interval}.",
 	transit.ServiceWarning:             "Query matched {value} messages in the last {interval}.",
@@ -46,13 +46,13 @@ type monitoringHost struct {
 	hostGroups []string
 }
 
-func (connectorConfig *ExtConfig) initMonitoringState(previousState MonitoringState, esClient *ecClients.EsClient) MonitoringState {
+func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClient *ecClients.EsClient) MonitoringState {
 	currentState := MonitoringState{
 		Metrics: make(map[string]transit.MetricDefinition),
 		Hosts:   make(map[string]monitoringHost),
 	}
 
-	for _, metrics := range connectorConfig.Views {
+	for _, metrics := range cfg.Views {
 		for metricName, metric := range metrics {
 			if metric.Monitored {
 				currentState.Metrics[metricName] = metric
@@ -61,12 +61,12 @@ func (connectorConfig *ExtConfig) initMonitoringState(previousState MonitoringSt
 	}
 
 	doOnce.Do(func() {
-		log.Info().Msgf("initializing state with GW hosts for agent %s", connectorConfig.AgentID)
+		log.Info().Msgf("initializing state with GW hosts for agent %s", cfg.AgentID)
 		// add hosts form GW to current state
-		if connectorConfig.GWConnections == nil || len(connectorConfig.GWConnections) == 0 {
+		if cfg.GWConnections == nil || len(cfg.GWConnections) == 0 {
 			log.Error().Msg("could not get GW hosts to initialize state: GW connections are not set")
 		} else {
-			gwHosts := initGwHosts(connectorConfig.AppType, connectorConfig.AgentID, connectorConfig.GWConnections)
+			gwHosts := initGwHosts(cfg.AppType, cfg.AgentID, cfg.GWConnections)
 			if gwHosts != nil {
 				currentState.Hosts = gwHosts
 			} else {
@@ -81,7 +81,7 @@ func (connectorConfig *ExtConfig) initMonitoringState(previousState MonitoringSt
 	}
 
 	// update with hosts extracted from ES right now
-	esHosts := connectorConfig.initEsHosts(esClient)
+	esHosts := cfg.initEsHosts(esClient)
 	for _, host := range esHosts {
 		currentState.Hosts[host.name] = host
 	}
@@ -299,12 +299,12 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 	return gwHosts
 }
 
-func (connectorConfig *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[string]monitoringHost {
+func (cfg *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[string]monitoringHost {
 	esHosts := make(map[string]monitoringHost)
 
-	hostNameField := connectorConfig.HostNameField
-	hostGroupField := &connectorConfig.HostGroupField
-	groupNameByUser := connectorConfig.GroupNameByUser
+	hostNameField := cfg.HostNameField
+	hostGroupField := &cfg.HostGroupField
+	groupNameByUser := cfg.GroupNameByUser
 
 	if groupNameByUser {
 		hostGroupField = nil
@@ -337,7 +337,7 @@ func (connectorConfig *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[
 		if hostGroupField != nil {
 			fieldNames = append(fieldNames, *hostGroupField)
 		}
-		isAggregatable, err = esClient.IsAggregatable(fieldNames, nil)
+		isAggregatable, _ = esClient.IsAggregatable(fieldNames, nil)
 		if isAggregatable[hostNameField] && (hostGroupField == nil || isAggregatable[*hostGroupField]) {
 			allAggregatable = true
 		}
@@ -350,12 +350,12 @@ func (connectorConfig *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[
 		return esHosts
 	}
 
-	connectorConfig.HostNameField = hostNameField
+	cfg.HostNameField = hostNameField
 	if !groupNameByUser && hostGroupField != nil {
-		connectorConfig.HostGroupField = *hostGroupField
+		cfg.HostGroupField = *hostGroupField
 	}
 
-	keys, err := esClient.GetHosts(connectorConfig.HostNameField, hostGroupField)
+	keys, _ := esClient.GetHosts(cfg.HostNameField, hostGroupField)
 
 	for _, key := range keys {
 		hostNameKey := key.Host
@@ -370,7 +370,7 @@ func (connectorConfig *ExtConfig) initEsHosts(esClient *ecClients.EsClient) map[
 		} else {
 			var hostGroups []string
 			if groupNameByUser {
-				hostGroups = []string{connectorConfig.HostGroupField}
+				hostGroups = []string{cfg.HostGroupField}
 			} else {
 				if hostGroupKey != nil {
 					hostGroups = []string{*hostGroupKey}

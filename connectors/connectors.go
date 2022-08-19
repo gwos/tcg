@@ -29,13 +29,14 @@ const DefaultCheckInterval = time.Minute * 2
 var CheckInterval = DefaultCheckInterval
 
 // statusTextPattern is a pattern to be found in status message template and replaced by the value extracted with appropriate method stored in statusTextValGetters
-// For example: status message template is "The value is {value}"
-//    pattern "{value}" will be extracted by statusTextPattern expression
-//    getter stored in statusTextValGetters with key="{value}" will be used to build text to replace such pattern,
-//       for example it returned "100"
-//    pattern "{value}" will be replaced in status message template with the value returned by appropriate method,
-//       in this example status text will be "The value is 100"
-// if no method for pattern found template won't be modified and will be left containing "{value}" text: "The value is {value}"
+//
+//	For example: status message template is "The value is {value}"
+//		pattern "{value}" will be extracted by statusTextPattern expression
+//		getter stored in statusTextValGetters with key="{value}" will be used to build text to replace such pattern,
+//			for example it returned "100"
+//		pattern "{value}" will be replaced in status message template with the value returned by appropriate method,
+//			in this example status text will be "The value is 100"
+//	if no method for pattern found template won't be modified and will be left containing "{value}" text: "The value is {value}"
 const statusTextPattern = `\{(.*?)\}`
 
 var statusTextValGetters = map[string]func(service *transit.MonitoredService) (string, error){
@@ -188,7 +189,7 @@ func CreateResourceGroup(name string, description string, groupType transit.Grou
 }
 
 func FillGroupWithResources(group transit.ResourceGroup, resources []transit.InventoryResource) transit.ResourceGroup {
-	var monitoredResourceRefs []transit.ResourceRef
+	var monitoredResourceRefs = make([]transit.ResourceRef, 0, len(resources))
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
 			transit.ResourceRef{
@@ -273,17 +274,18 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 }
 
 // CreateMetric
+//
 //	required parameters: name, value
-//  optional parameters: interval, UnitType
-// CreateMetric("cpu", 30)  			// integer value
+//	optional parameters: interval, UnitType
+//
+// CreateMetric("cpu", 30)              // integer value
 // CreateMetric("percentFree", 30.59)   // double value
 // CreateMetric("cpu", 30.59, transit.PercentCPU) // with optional Unit
-// CreateMetric("cpu", 30.59, interval) // with optional interval
+// CreateMetric("cpu", 30.59, interval)           // with optional interval
 // CreateMetric("cpu", 30.59, transit.PercentCPU, interval) // with optional Unit and optional interval
 // with optional Unit and optional Interval and optional UnitType
 // CreateMetric("cpu", 30.59, interval, transit.PercentCPU)
 // Thresholds must be set separately
-//
 func CreateMetric(name string, value interface{}, args ...interface{}) (*transit.TimeSeries, error) {
 	// set the value based on variable type
 	typedValue := transit.NewTypedValue(value)
@@ -396,7 +398,7 @@ func BuildServiceForMultiMetric(hostName string, serviceName string, customName 
 }
 
 func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders []MetricBuilder) (*transit.MonitoredService, error) {
-	var timeSeries []transit.TimeSeries
+	var timeSeries = make([]transit.TimeSeries, 0)
 	for _, metricBuilder := range metricBuilders {
 		metric, err := BuildMetric(metricBuilder)
 		if err != nil {
@@ -470,15 +472,15 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		},
 	}
 	for _, arg := range args {
-		switch arg.(type) {
+		switch arg := arg.(type) {
 		case []transit.MonitoredService:
-			resource.Services = arg.([]transit.MonitoredService)
+			resource.Services = arg
 			if len(resource.Services) > 0 {
 				resource.LastCheckTime = resource.Services[0].LastCheckTime
 				resource.NextCheckTime = resource.Services[0].NextCheckTime
 			}
 		case string:
-			resource.Device = arg.(string)
+			resource.Device = arg
 		default:
 			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
 		}
@@ -495,8 +497,10 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 
 // EvaluateExpressions calculates synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
-	var result []transit.MonitoredService
-	vars := make(map[string]interface{})
+	var (
+		vars   = make(map[string]interface{})
+		result = make([]transit.MonitoredService, 0, len(services))
+	)
 
 	for _, service := range services {
 		for _, metric := range service.Metrics {
@@ -636,15 +640,16 @@ func StartPeriodic(ctx context.Context, t time.Duration, fn func()) {
 }
 
 // Returns duration provided as a "human-readable" string, like: "N second(s)/minute(s)/hour(s)/day(s)"
-// Following formatting rules are being applied by default (not considering minRound):
-//    if the value is less than 3 minutes it will be formatted to seconds
-//    if the value is between 3 minutes and 3 hours it will be formatted to minutes
-//    if the value is between 3 hours and 3 days (<73 hours) it will be formatted to hours
-//    values higher than 72 hours (3 days) will be formatted to days
-// minRound arg determines time unit "limit" lower than that formatting is not allowed
-// i.e. if the value is for example 120 seconds which is gonna be returned as "120 second(s)" by default rules
-//  will be returned as "2 minute(s)" if minRound="minute" (i.e. formatting to lower than minute is not allowed)
-//  or "0 hour(s)" if minRound="hour" (i.e. formatting to lower than hour is not allowed)
+//
+//	Following formatting rules are being applied by default (not considering minRound):
+//		if the value is less than 3 minutes it will be formatted to seconds
+//		if the value is between 3 minutes and 3 hours it will be formatted to minutes
+//		if the value is between 3 hours and 3 days (<73 hours) it will be formatted to hours
+//		values higher than 72 hours (3 days) will be formatted to days
+//	minRound arg determines time unit "limit" lower than that formatting is not allowed
+//	i.e. if the value is for example 120 seconds which is gonna be returned as "120 second(s)" by default rules
+//		will be returned as "2 minute(s)" if minRound="minute" (i.e. formatting to lower than minute is not allowed)
+//		or "0 hour(s)" if minRound="hour" (i.e. formatting to lower than hour is not allowed)
 func FormatTimeForStatusMessage(value time.Duration, minRound time.Duration) string {
 	h := value.Hours()
 	m := value.Minutes()
@@ -808,17 +813,13 @@ func buildHostStatusText(services []transit.MonitoredService) string {
 		switch service.Status {
 		case transit.ServiceOk:
 			ok = ok + 1
-			break
 		case transit.ServiceWarning:
 			warn = warn + 1
-			break
-		case transit.ServiceScheduledCritical:
-		case transit.ServiceUnscheduledCritical:
+		case transit.ServiceScheduledCritical,
+			transit.ServiceUnscheduledCritical:
 			critical = critical + 1
-			break
 		default:
 			other = other + 1
-			break
 		}
 	}
 	return fmt.Sprintf("Host has %d OK, %d WARNING, %d CRITICAL and %d other services.",

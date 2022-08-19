@@ -118,8 +118,10 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 	}
 
 	mrs := connector.mState.retrieveMonitoredResources(metricDefinitions)
-	var irs []transit.InventoryResource
-	var refs []transit.ResourceRef
+	var (
+		irs  = make([]transit.InventoryResource, 0, len(mrs))
+		refs = make([]transit.ResourceRef, 0, len(mrs))
+	)
 	for _, mr := range mrs {
 		irs = append(irs, mr.ToInventoryResource())
 		refs = append(refs, mr.ToResourceRef())
@@ -157,7 +159,7 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 			continue
 		}
 
-		snmpData, err := connector.snmpClient.GetSnmpData(mibs, device.Ip, device.SecData)
+		snmpData, err := connector.snmpClient.GetSnmpData(mibs, device.IP, device.SecData)
 		if err != nil {
 			log.Err(err).Msgf("could not get SNMP data for device '%s'", deviceName)
 			continue
@@ -199,17 +201,17 @@ func (connector *SnmpConnector) listSuggestions(view string, name string) []stri
 				suggestions = append(suggestions, k)
 			}
 		}
-		break
 	default:
 		log.Warn().Msgf("not supported view: %s", view)
-		break
 	}
 	return suggestions
 }
 
 func (connector *SnmpConnector) getInventoryHashSum() ([]byte, error) {
-	var hostsServices []string
-	var devices []string
+	var (
+		hostsServices []string
+		devices       = make([]string, 0, len(connector.mState.devices))
+	)
 	for deviceName := range connector.mState.devices {
 		devices = append(devices, deviceName)
 	}

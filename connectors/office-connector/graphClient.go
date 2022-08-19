@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
@@ -68,7 +67,7 @@ func login(tenantID, clientID, clientSecret, resource string) (str string, err e
 		_ = response.Body.Close()
 	}()
 
-	if responseBody, err = ioutil.ReadAll(response.Body); err == nil {
+	if responseBody, err = io.ReadAll(response.Body); err == nil {
 		_ = json.Unmarshal(responseBody, &v)
 		if token, err = jsonpath.Get("$.access_token", v); err == nil {
 			str = token.(string)
@@ -96,8 +95,8 @@ func Initialize() error {
 	return nil
 }
 
-func ExecuteRequest(graphUri, token string) ([]byte, error) {
-	request, _ := http.NewRequest("GET", graphUri, nil)
+func ExecuteRequest(graphURI, token string) ([]byte, error) {
+	request, _ := http.NewRequest("GET", graphURI, nil)
 	request.Header.Set("accept", "application/json; odata.metadata=full")
 	request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	response, err := httpClient.Do(request)
@@ -124,16 +123,16 @@ func ExecuteRequest(graphUri, token string) ([]byte, error) {
 			return nil, err
 		}
 		if response.StatusCode != 200 {
-			b, _ := ioutil.ReadAll(response.Body)
-			log.Debug().Msg(fmt.Sprintf("[url=%s][response=%s]", graphUri, string(b)))
+			b, _ := io.ReadAll(response.Body)
+			log.Debug().Msg(fmt.Sprintf("[url=%s][response=%s]", graphURI, string(b)))
 			_ = response.Body.Close()
-			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphUri, response.StatusCode))
+			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphURI, response.StatusCode))
 		}
 	}
 	defer func() {
 		_ = response.Body.Close()
 	}()
-	return ioutil.ReadAll(response.Body)
+	return io.ReadAll(response.Body)
 }
 
 func Do(request *http.Request) (*http.Response, error) {
@@ -162,10 +161,6 @@ func parseError(v interface{}) error {
 		return errors.New(msg.(string))
 	}
 	return nil
-}
-
-func createMetric(name, suffix string, value interface{}) *transit.TimeSeries {
-	return createMetricWithThresholds(name, suffix, value, -1, -1)
 }
 
 func createMetricWithThresholds(name string, suffix string, value interface{}, warning float64, critical float64) *transit.TimeSeries {

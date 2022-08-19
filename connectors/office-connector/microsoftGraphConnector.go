@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -16,20 +15,18 @@ import (
 type MicrosoftGraphView string
 
 const (
-	ViewServices   MicrosoftGraphView = "Services"
 	ViewOneDrive   MicrosoftGraphView = "OneDrive"
 	ViewLicensing  MicrosoftGraphView = "Licensing"
 	ViewSharePoint MicrosoftGraphView = "SharePoint"
 	ViewEmail      MicrosoftGraphView = "Email"
 	ViewSecurity   MicrosoftGraphView = "Security"
-	ViewCustom     MicrosoftGraphView = "Custom"
 )
 
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	TenantId          string                                                     `json:"officeTenantId"`
-	ClientId          string                                                     `json:"officeClientId"`
+	TenantID          string                                                     `json:"officeTenantId"`
+	ClientID          string                                                     `json:"officeClientId"`
 	ClientSecret      string                                                     `json:"officeClientSecret"`
 	SharePointSite    string                                                     `json:"officeSharePointSite"`
 	SharePointSubsite string                                                     `json:"officeSharePointSubSite"`
@@ -40,8 +37,6 @@ type ExtConfig struct {
 }
 
 type MicrosoftGraphConnector struct {
-	config ExtConfig
-	ctx    context.Context
 }
 
 type MicrosoftGraphResource struct {
@@ -60,8 +55,7 @@ type ODataServicePayload struct {
 
 type ODataService struct {
 	DisplayName string
-	Id          string
-	// Features []Feature
+	ID          string
 }
 
 type ODataStatus struct {
@@ -75,7 +69,7 @@ type ODataFeatureStatus struct {
 }
 
 type ServiceStatus struct {
-	Id                  string
+	ID                  string
 	WorkloadDisplayName string
 	Status              string
 	StatusDisplayName   string
@@ -211,7 +205,6 @@ func (connector *MicrosoftGraphConnector) Collect(cfg *ExtConfig) ([]transit.Inv
 
 func (connector *MicrosoftGraphConnector) collectBuiltins(
 	monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
-
 	hostResource := MicrosoftGraphResource{
 		Name:    interacApp,
 		Type:    transit.ResourceTypeHost,
@@ -350,7 +343,6 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 
 func (connector *MicrosoftGraphConnector) collectInventory(
 	monitoredState map[string]MicrosoftGraphResource, group *transit.ResourceGroup) error {
-
 	body, err := ExecuteRequest(officeEndPoint+tenantID+servicesPath, officeToken)
 	if err != nil {
 		return err
@@ -418,7 +410,7 @@ func (connector *MicrosoftGraphConnector) collectStatus(monitoredServices map[st
 
 func (connector *MicrosoftGraphConnector) translateServiceStatus(odStatus string) (transit.MonitorStatus, string) {
 	var message = "Service Status is Unknown"
-	var status transit.MonitorStatus = transit.ServiceUnknown
+	var status = transit.ServiceUnknown
 	switch odStatus {
 	case "ServiceRestored", "ServiceOperational":
 		status = transit.ServiceOk

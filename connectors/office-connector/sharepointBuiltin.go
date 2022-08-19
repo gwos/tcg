@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	siteGraphUri    = "https://graph.microsoft.com/v1.0/sites/%s:/drives"
-	subSiteGraphUri = "https://graph.microsoft.com/v1.0/sites/%s:/sites/%s:/drives"
+	siteGraphURI    = "https://graph.microsoft.com/v1.0/sites/%s:/drives"
+	subSiteGraphURI = "https://graph.microsoft.com/v1.0/sites/%s:/sites/%s:/drives"
 )
 
 // SharePoint Drives built-in. Requires Parameters:
@@ -23,17 +23,17 @@ func SharePoint(service *transit.MonitoredService, token, sharePointSite, shareP
 	var (
 		c       int
 		body    []byte
-		baseUri string
+		baseURI string
 		v       interface{}
 	)
 	if len(sharePointSubSite) > 0 {
-		baseUri = subSiteGraphUri
+		baseURI = subSiteGraphURI
 	} else {
-		baseUri = siteGraphUri
+		baseURI = siteGraphURI
 	}
-	graphUri := fmt.Sprintf(baseUri, sharePointSite, sharePointSubSite)
+	graphURI := fmt.Sprintf(baseURI, sharePointSite, sharePointSubSite)
 
-	if body, err = ExecuteRequest(graphUri, token); err == nil {
+	if body, err = ExecuteRequest(graphURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)
 	} else {
 		log.Error().Msgf("%v", err)

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -46,7 +45,7 @@ func TestAgentService_StartStopTransport(t *testing.T) {
 }
 
 func TestAgentService_DemandConfig(t *testing.T) {
-	tmpfile, err := ioutil.TempFile("", "config")
+	tmpfile, err := os.CreateTemp("", "config")
 	assert.NoError(t, err)
 	err = tmpfile.Close()
 	assert.NoError(t, err)

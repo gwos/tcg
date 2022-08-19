@@ -19,6 +19,7 @@ import (
 
 // CreateInventoryRequest creates payload for SendInventory API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateInventoryRequest
 func CreateInventoryRequest() C.uintptr_t {
 	p := new(transit.InventoryRequest)
@@ -29,6 +30,7 @@ func CreateInventoryRequest() C.uintptr_t {
 
 // CreateInventoryResource creates an object used in InventoryRequest.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateInventoryResource
 func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
 	p := new(transit.InventoryResource)
@@ -40,6 +42,7 @@ func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
 
 // CreateInventoryService creates an object used in InventoryResource.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateInventoryService
 func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
 	p := new(transit.InventoryService)
@@ -50,6 +53,7 @@ func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
 
 // CreateMonitoredResource creates an object used in ResourcesWithServicesRequest.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateMonitoredResource
 func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
 	p := new(transit.MonitoredResource)
@@ -61,6 +65,7 @@ func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
 
 // CreateMonitoredService creates an object used in MonitoredResource.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateMonitoredService
 func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
 	p := new(transit.MonitoredService)
@@ -72,6 +77,7 @@ func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
 
 // CreateResourceGroup creates an object used in InventoryRequest and ResourcesWithServicesRequest.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateResourceGroup
 func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
 	p := new(transit.ResourceGroup)
@@ -83,6 +89,7 @@ func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
 
 // CreateResourcesWithServicesRequest creates payload for SendMetrics API.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateResourcesWithServicesRequest
 func CreateResourcesWithServicesRequest() C.uintptr_t {
 	p := new(transit.ResourcesWithServicesRequest)
@@ -93,6 +100,7 @@ func CreateResourcesWithServicesRequest() C.uintptr_t {
 
 // CreateThresholdValue creates an object used in TimeSeries.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateThresholdValue
 func CreateThresholdValue(
 	lbl *C.char,
@@ -106,6 +114,7 @@ func CreateThresholdValue(
 
 // CreateTimeSeries creates an object used in MonitoredResource.
 // It returns a handle that should be deleted after use with DeleteHandle.
+//
 //export CreateTimeSeries
 func CreateTimeSeries(
 	name *C.char,
@@ -117,12 +126,14 @@ func CreateTimeSeries(
 
 // DeleteHandle invalidates a handle.
 // This method should only be called once the C code no longer has a copy of the handle value.
+//
 //export DeleteHandle
 func DeleteHandle(target C.uintptr_t) {
 	cgo.Handle(target).Delete()
 }
 
 // AddMetric appends metric value to target
+//
 //export AddMetric
 func AddMetric(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -134,6 +145,7 @@ func AddMetric(target C.uintptr_t, value C.uintptr_t) {
 }
 
 // AddResource appends resource value to target
+//
 //export AddResource
 func AddResource(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -166,6 +178,7 @@ func AddResource(target C.uintptr_t, value C.uintptr_t) {
 }
 
 // AddResourceGroup appends resource group value to target
+//
 //export AddResourceGroup
 func AddResourceGroup(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -178,6 +191,7 @@ func AddResourceGroup(target C.uintptr_t, value C.uintptr_t) {
 }
 
 // AddService appends service value to target
+//
 //export AddService
 func AddService(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -200,6 +214,7 @@ func AddService(target C.uintptr_t, value C.uintptr_t) {
 }
 
 // AddThreshold appends threshold value to target
+//
 //export AddThreshold
 func AddThreshold(target C.uintptr_t, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
@@ -211,6 +226,7 @@ func AddThreshold(target C.uintptr_t, value C.uintptr_t) {
 }
 
 // AddThresholdDouble appends threshold to target
+//
 //export AddThresholdDouble
 func AddThresholdDouble(target C.uintptr_t, lbl, sType *C.char, value C.double) {
 	h := cgo.Handle(target)
@@ -224,6 +240,7 @@ func AddThresholdDouble(target C.uintptr_t, lbl, sType *C.char, value C.double) 
 }
 
 // AddThresholdInt appends threshold to target
+//
 //export AddThresholdInt
 func AddThresholdInt(target C.uintptr_t, lbl, sType *C.char, value C.longlong) {
 	h := cgo.Handle(target)
@@ -239,6 +256,7 @@ func AddThresholdInt(target C.uintptr_t, lbl, sType *C.char, value C.longlong) {
 // CalcStatus calculates status depending on handle:
 // status of resource and services
 // status of service
+//
 //export CalcStatus
 func CalcStatus(target C.uintptr_t) {
 	h := cgo.Handle(target)
@@ -260,6 +278,7 @@ func CalcStatus(target C.uintptr_t) {
 }
 
 // SetCategory sets category value on target
+//
 //export SetCategory
 func SetCategory(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -269,6 +288,7 @@ func SetCategory(target C.uintptr_t, value *C.char) {
 }
 
 // SetContextTimestamp sets context timestamp value on target
+//
 //export SetContextTimestamp
 func SetContextTimestamp(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -280,6 +300,7 @@ func SetContextTimestamp(target C.uintptr_t, sec, nsec C.longlong) {
 }
 
 // SetContextToken sets context token value on target
+//
 //export SetContextToken
 func SetContextToken(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -289,6 +310,7 @@ func SetContextToken(target C.uintptr_t, value *C.char) {
 }
 
 // SetDescription sets description value on target
+//
 //export SetDescription
 func SetDescription(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -298,6 +320,7 @@ func SetDescription(target C.uintptr_t, value *C.char) {
 }
 
 // SetDevice sets device value on target
+//
 //export SetDevice
 func SetDevice(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -307,6 +330,7 @@ func SetDevice(target C.uintptr_t, value *C.char) {
 }
 
 // SetIntervalEnd sets interval on target
+//
 //export SetIntervalEnd
 func SetIntervalEnd(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -318,6 +342,7 @@ func SetIntervalEnd(target C.uintptr_t, sec, nsec C.longlong) {
 }
 
 // SetIntervalStart sets interval on target
+//
 //export SetIntervalStart
 func SetIntervalStart(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -329,6 +354,7 @@ func SetIntervalStart(target C.uintptr_t, sec, nsec C.longlong) {
 }
 
 // SetLastPluginOutput sets LastPluginOutput value on target
+//
 //export SetLastPluginOutput
 func SetLastPluginOutput(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -338,6 +364,7 @@ func SetLastPluginOutput(target C.uintptr_t, value *C.char) {
 }
 
 // SetLastCheckTime sets LastCheckTime on target
+//
 //export SetLastCheckTime
 func SetLastCheckTime(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -349,6 +376,7 @@ func SetLastCheckTime(target C.uintptr_t, sec, nsec C.longlong) {
 }
 
 // SetNextCheckTime sets NextCheckTime on target
+//
 //export SetNextCheckTime
 func SetNextCheckTime(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -360,6 +388,7 @@ func SetNextCheckTime(target C.uintptr_t, sec, nsec C.longlong) {
 }
 
 // SetName sets name value on target
+//
 //export SetName
 func SetName(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -369,6 +398,7 @@ func SetName(target C.uintptr_t, value *C.char) {
 }
 
 // SetOwner sets owner value on target
+//
 //export SetOwner
 func SetOwner(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -378,6 +408,7 @@ func SetOwner(target C.uintptr_t, value *C.char) {
 }
 
 // SetPropertyBool sets key:value property on target
+//
 //export SetPropertyBool
 func SetPropertyBool(target C.uintptr_t, key *C.char, value C.bool) {
 	h := cgo.Handle(target)
@@ -387,6 +418,7 @@ func SetPropertyBool(target C.uintptr_t, key *C.char, value C.bool) {
 }
 
 // SetPropertyDouble sets key:value property on target
+//
 //export SetPropertyDouble
 func SetPropertyDouble(target C.uintptr_t, key *C.char, value C.double) {
 	h := cgo.Handle(target)
@@ -396,6 +428,7 @@ func SetPropertyDouble(target C.uintptr_t, key *C.char, value C.double) {
 }
 
 // SetPropertyInt sets key:value property on target
+//
 //export SetPropertyInt
 func SetPropertyInt(target C.uintptr_t, key *C.char, value C.longlong) {
 	h := cgo.Handle(target)
@@ -405,6 +438,7 @@ func SetPropertyInt(target C.uintptr_t, key *C.char, value C.longlong) {
 }
 
 // SetPropertyStr sets key:value property on target
+//
 //export SetPropertyStr
 func SetPropertyStr(target C.uintptr_t, key *C.char, value *C.char) {
 	h := cgo.Handle(target)
@@ -414,6 +448,7 @@ func SetPropertyStr(target C.uintptr_t, key *C.char, value *C.char) {
 }
 
 // SetPropertyTime sets key:timestamp property on target
+//
 //export SetPropertyTime
 func SetPropertyTime(target C.uintptr_t, key *C.char, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -424,6 +459,7 @@ func SetPropertyTime(target C.uintptr_t, key *C.char, sec, nsec C.longlong) {
 }
 
 // SetSampleType sets status value on target
+//
 //export SetSampleType
 func SetSampleType(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -435,6 +471,7 @@ func SetSampleType(target C.uintptr_t, value *C.char) {
 }
 
 // SetStatus sets status value on target
+//
 //export SetStatus
 func SetStatus(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -444,6 +481,7 @@ func SetStatus(target C.uintptr_t, value *C.char) {
 }
 
 // SetTag sets key:value tag on target
+//
 //export SetTag
 func SetTag(target C.uintptr_t, key, value *C.char) {
 	h := cgo.Handle(target)
@@ -453,6 +491,7 @@ func SetTag(target C.uintptr_t, key, value *C.char) {
 }
 
 // SetType sets type value on target
+//
 //export SetType
 func SetType(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -467,6 +506,7 @@ func SetType(target C.uintptr_t, value *C.char) {
 }
 
 // SetUnit sets type value on target
+//
 //export SetUnit
 func SetUnit(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -476,6 +516,7 @@ func SetUnit(target C.uintptr_t, value *C.char) {
 }
 
 // SetValueBool sets value to target
+//
 //export SetValueBool
 func SetValueBool(target C.uintptr_t, value C.bool) {
 	h := cgo.Handle(target)
@@ -485,6 +526,7 @@ func SetValueBool(target C.uintptr_t, value C.bool) {
 }
 
 // SetValueDouble sets value to target
+//
 //export SetValueDouble
 func SetValueDouble(target C.uintptr_t, value C.double) {
 	h := cgo.Handle(target)
@@ -494,6 +536,7 @@ func SetValueDouble(target C.uintptr_t, value C.double) {
 }
 
 // SetValueInt sets value to target
+//
 //export SetValueInt
 func SetValueInt(target C.uintptr_t, value C.longlong) {
 	h := cgo.Handle(target)
@@ -503,6 +546,7 @@ func SetValueInt(target C.uintptr_t, value C.longlong) {
 }
 
 // SetValueStr sets value to target
+//
 //export SetValueStr
 func SetValueStr(target C.uintptr_t, value *C.char) {
 	h := cgo.Handle(target)
@@ -512,6 +556,7 @@ func SetValueStr(target C.uintptr_t, value *C.char) {
 }
 
 // SetValueTime sets timestamp value to target
+//
 //export SetValueTime
 func SetValueTime(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
@@ -524,6 +569,7 @@ func SetValueTime(target C.uintptr_t, sec, nsec C.longlong) {
 // MarshalIndentJSON is like Marshal but applies Indent to format the output.
 // Each JSON element in the output will begin on a new line beginning with prefix
 // followed by one or more copies of indent according to the indentation nesting.
+//
 //export MarshallIndentJSON
 func MarshallIndentJSON(
 	target C.uintptr_t,
@@ -548,6 +594,7 @@ func MarshallIndentJSON(
 }
 
 // Send sends request
+//
 //export Send
 func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	var sender func(context.Context, []byte) error

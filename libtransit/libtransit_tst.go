@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func test_SetCategory(t *testing.T) {
+func testSetCategory(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -46,7 +46,7 @@ func test_SetCategory(t *testing.T) {
 	}
 }
 
-func test_SetContextTimestamp(t *testing.T) {
+func testSetContextTimestamp(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -73,7 +73,7 @@ func test_SetContextTimestamp(t *testing.T) {
 	}
 }
 
-func test_SetContextToken(t *testing.T) {
+func testSetContextToken(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -100,7 +100,7 @@ func test_SetContextToken(t *testing.T) {
 	}
 }
 
-func test_SetDescription(t *testing.T) {
+func testSetDescription(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -139,7 +139,7 @@ func test_SetDescription(t *testing.T) {
 	}
 }
 
-func test_SetDevice(t *testing.T) {
+func testSetDevice(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -166,7 +166,7 @@ func test_SetDevice(t *testing.T) {
 	}
 }
 
-func test_SetIntervalEnd(t *testing.T) {
+func testSetIntervalEnd(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -189,7 +189,7 @@ func test_SetIntervalEnd(t *testing.T) {
 	}
 }
 
-func test_SetIntervalStart(t *testing.T) {
+func testSetIntervalStart(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -212,7 +212,7 @@ func test_SetIntervalStart(t *testing.T) {
 	}
 }
 
-func test_SetLastPluginOutput(t *testing.T) {
+func testSetLastPluginOutput(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -239,7 +239,7 @@ func test_SetLastPluginOutput(t *testing.T) {
 	}
 }
 
-func test_SetLastCheckTime(t *testing.T) {
+func testSetLastCheckTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -266,7 +266,7 @@ func test_SetLastCheckTime(t *testing.T) {
 	}
 }
 
-func test_SetNextCheckTime(t *testing.T) {
+func testSetNextCheckTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -293,7 +293,7 @@ func test_SetNextCheckTime(t *testing.T) {
 	}
 }
 
-func test_SetName(t *testing.T) {
+func testSetName(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -336,7 +336,7 @@ func test_SetName(t *testing.T) {
 	}
 }
 
-func test_SetOwner(t *testing.T) {
+func testSetOwner(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
@@ -371,7 +371,7 @@ func test_SetOwner(t *testing.T) {
 	}
 }
 
-func test_SetPropertyBool(t *testing.T) {
+func testSetPropertyBool(t *testing.T) {
 	key, value := "test-test", false
 	tests := []struct {
 		name   string
@@ -410,7 +410,7 @@ func test_SetPropertyBool(t *testing.T) {
 	}
 }
 
-func test_SetPropertyDouble(t *testing.T) {
+func testSetPropertyDouble(t *testing.T) {
 	key, value := "test-test", -1.1
 	tests := []struct {
 		name   string
@@ -446,7 +446,7 @@ func test_SetPropertyDouble(t *testing.T) {
 	}
 }
 
-func test_SetPropertyInt(t *testing.T) {
+func testSetPropertyInt(t *testing.T) {
 	key, value := "test-test", int64(42)
 	tests := []struct {
 		name   string
@@ -482,7 +482,7 @@ func test_SetPropertyInt(t *testing.T) {
 	}
 }
 
-func test_SetPropertyStr(t *testing.T) {
+func testSetPropertyStr(t *testing.T) {
 	key, value := "test-test", "foo-bar"
 	tests := []struct {
 		name   string
@@ -518,7 +518,7 @@ func test_SetPropertyStr(t *testing.T) {
 	}
 }
 
-func test_SetPropertyTime(t *testing.T) {
+func testSetPropertyTime(t *testing.T) {
 	key, v, v1, v2 := "test-test", "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
@@ -554,7 +554,7 @@ func test_SetPropertyTime(t *testing.T) {
 	}
 }
 
-func test_SetSampleType(t *testing.T) {
+func testSetSampleType(t *testing.T) {
 	value := transit.Value
 	tests := []struct {
 		name   string
@@ -577,7 +577,7 @@ func test_SetSampleType(t *testing.T) {
 	}
 }
 
-func test_SetStatus(t *testing.T) {
+func testSetStatus(t *testing.T) {
 	tests := []struct {
 		name   string
 		target interface{}
@@ -606,7 +606,7 @@ func test_SetStatus(t *testing.T) {
 	}
 }
 
-func test_SetTag(t *testing.T) {
+func testSetTag(t *testing.T) {
 	key, value := "test-test", "foo-bar"
 	tests := []struct {
 		name   string
@@ -629,7 +629,7 @@ func test_SetTag(t *testing.T) {
 	}
 }
 
-func test_SetType(t *testing.T) {
+func testSetType(t *testing.T) {
 	tests := []struct {
 		name   string
 		target interface{}
@@ -673,7 +673,7 @@ func test_SetType(t *testing.T) {
 	}
 }
 
-func test_SetUnit(t *testing.T) {
+func testSetUnit(t *testing.T) {
 	value := transit.UnitCounter
 	tests := []struct {
 		name   string
@@ -696,7 +696,7 @@ func test_SetUnit(t *testing.T) {
 	}
 }
 
-func test_SetValueBool(t *testing.T) {
+func testSetValueBool(t *testing.T) {
 	value := false
 	tests := []struct {
 		name   string
@@ -727,7 +727,7 @@ func test_SetValueBool(t *testing.T) {
 	}
 }
 
-func test_SetValueDouble(t *testing.T) {
+func testSetValueDouble(t *testing.T) {
 	value := -1.1
 	tests := []struct {
 		name   string
@@ -755,7 +755,7 @@ func test_SetValueDouble(t *testing.T) {
 	}
 }
 
-func test_SetValueInt(t *testing.T) {
+func testSetValueInt(t *testing.T) {
 	value := int64(42)
 	tests := []struct {
 		name   string
@@ -783,7 +783,7 @@ func test_SetValueInt(t *testing.T) {
 	}
 }
 
-func test_SetValueStr(t *testing.T) {
+func testSetValueStr(t *testing.T) {
 	value := "foo-bar"
 	tests := []struct {
 		name   string
@@ -811,7 +811,7 @@ func test_SetValueStr(t *testing.T) {
 	}
 }
 
-func test_SetValueTime(t *testing.T) {
+func testSetValueTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string

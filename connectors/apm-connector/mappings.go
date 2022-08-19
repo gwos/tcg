@@ -33,7 +33,6 @@ func unmarshalMappings(input []byte) (*transit.Mappings, error) {
 func applyResourceMapping(resource string) (bool, string) {
 	for _, mapping := range mappings.Resource {
 		if mapping.Source == resource && mapping.Enabled {
-
 			if strings.Contains(mapping.Destination, "$1") {
 				u, err := url.Parse(resource)
 				if err != nil {

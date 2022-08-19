@@ -101,9 +101,11 @@ type promMetricsData struct {
 }
 
 func (mi *promMetricsData) parse() (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
-	var textParser expfmt.TextParser
-	var promParser PromParser
-	prometheusServices := make(map[string]*dto.MetricFamily, 0)
+	var (
+		promParser         PromParser
+		textParser         expfmt.TextParser
+		prometheusServices map[string]*dto.MetricFamily
+	)
 	if mi.isProtobuf {
 		dest := make([]byte, len(mi.data))
 		dst, err := snappy.Decode(dest, mi.data)
@@ -337,7 +339,7 @@ func containsRef(refs []transit.ResourceRef, hostName string) bool {
 }
 
 func constructResourceGroups(groups map[string][]transit.ResourceRef) []transit.ResourceGroup {
-	var resourceGroups []transit.ResourceGroup
+	resourceGroups := make([]transit.ResourceGroup, 0, len(groups))
 	for groupName, resources := range groups {
 		resourceGroups = append(resourceGroups, transit.ResourceGroup{
 			GroupName: groupName,
@@ -354,9 +356,11 @@ func parsePrometheusServices(
 	resource string,
 	resourceIndex int,
 ) (*[]transit.MonitoredResource, error) {
-	var monitoredResources []transit.MonitoredResource
-	hostsMap := make(map[string]map[string][]connectors.MetricBuilder)
-	hostToDeviceMap := make(map[string]string)
+	var (
+		hostsMap        = make(map[string]map[string][]connectors.MetricBuilder)
+		hostToDeviceMap = make(map[string]string)
+	)
+
 	for _, prometheusService := range prometheusServices {
 		if len(prometheusService.GetMetric()) == 0 {
 			continue
@@ -367,6 +371,9 @@ func parsePrometheusServices(
 		}
 		extractIntoMetricBuilders(prometheusService, groups, hostsMap, resource, resourceIndex, hostToDeviceMap)
 	}
+
+	monitoredResources := make([]transit.MonitoredResource, 0, len(hostsMap))
+
 	for hostName, host := range hostsMap {
 		ss := make([]transit.MonitoredService, 0, len(host))
 		/* sort names for hashSum consistency */
