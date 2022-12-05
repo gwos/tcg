@@ -2,12 +2,16 @@ package metrics
 
 import (
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
+
+const lastPluginOutputLimit = 254
+const lastPluginOutputReplacement = "...<shortened>"
 
 type mapItem struct {
 	contexts []transit.TracerContext
@@ -28,8 +32,10 @@ func add(byGroups map[string]mapItem, p []byte) {
 	for i := range r.Resources {
 		for j := range r.Resources[i].Services {
 			applyTime(&r.Resources[i], &r.Resources[i].Services[j], r.Context.TimeStamp)
+			applyLastPluginOutputLimit(&r.Resources[i], &r.Resources[i].Services[j])
 		}
 		applyTime(&r.Resources[i], &transit.MonitoredService{}, r.Context.TimeStamp)
+		applyLastPluginOutputLimit(&r.Resources[i], &transit.MonitoredService{})
 	}
 
 	k := makeGKey(r.Groups)
@@ -116,4 +122,21 @@ func makeGKey(gg []transit.ResourceGroup) string {
 	}
 	sort.Strings(keys)
 	return strings.Join(keys, "#")
+}
+
+func applyLastPluginOutputLimit(res *transit.MonitoredResource, svc *transit.MonitoredService) {
+	if len(res.LastPluginOutput) > lastPluginOutputLimit {
+		res.LastPluginOutput = fmt.Sprintf(
+			"%s%s",
+			res.LastPluginOutput[:lastPluginOutputLimit-len(lastPluginOutputReplacement)],
+			lastPluginOutputReplacement,
+		)
+	}
+	if len(svc.LastPluginOutput) > lastPluginOutputLimit {
+		svc.LastPluginOutput = fmt.Sprintf(
+			"%s%s",
+			svc.LastPluginOutput[:lastPluginOutputLimit-len(lastPluginOutputReplacement)],
+			lastPluginOutputReplacement,
+		)
+	}
 }
