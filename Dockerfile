@@ -55,7 +55,7 @@ COPY --from=build /app .
 
 FROM alpine:3.11 as prod
 # update zlib to fix CVE
-RUN apk add -u --no-cache libmcrypt zlib
+RUN apk add -u --no-cache bash libmcrypt zlib
 COPY --from=build /app /app
 
 # Land docker exec into var folder
