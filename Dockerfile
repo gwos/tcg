@@ -54,7 +54,8 @@ FROM scratch as export
 COPY --from=build /app .
 
 FROM alpine:3.11 as prod
-RUN apk add --no-cache libmcrypt
+# update zlib to fix CVE
+RUN apk add -u --no-cache bash libmcrypt zlib
 COPY --from=build /app /app
 
 # Land docker exec into var folder
