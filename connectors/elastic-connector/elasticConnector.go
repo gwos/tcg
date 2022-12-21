@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"sort"
@@ -99,12 +98,22 @@ func initClients(cfg ExtConfig) (clients.KibanaClient, clients.EsClient, error) 
 		Username: cfg.Kibana.Username,
 		Password: cfg.Kibana.Password,
 	}
-	esClient := clients.EsClient{Servers: cfg.Servers}
-	err := esClient.InitEsClient()
-	if err != nil {
-		log.Err(err).Msg("could not initialize ES client")
-		return kibanaClient, esClient, errors.New("cannot initialize ES client")
+	esClient := clients.EsClient{
+		Addresses: cfg.Servers,
+		Username:  cfg.Kibana.Username,
+		Password:  cfg.Kibana.Password,
 	}
+	if err := kibanaClient.InitClient(); err != nil {
+		err = fmt.Errorf("could not initialize kibana client: %w", err)
+		log.Err(err).Msg("")
+		return kibanaClient, esClient, err
+	}
+	if err := esClient.InitClient(); err != nil {
+		err = fmt.Errorf("could not initialize ES client: %w", err)
+		log.Err(err).Msg("")
+		return kibanaClient, esClient, err
+	}
+
 	return kibanaClient, esClient, nil
 }
 

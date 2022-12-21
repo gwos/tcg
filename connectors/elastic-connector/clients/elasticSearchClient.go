@@ -12,19 +12,24 @@ import (
 )
 
 type EsClient struct {
-	Servers []string
-	Client  *elasticsearch.Client
+	Addresses []string // A list of Elasticsearch nodes to use
+	Username  string   // Username for HTTP Basic Authentication
+	Password  string   // Password for HTTP Basic Authentication
+
+	client *elasticsearch.Client
 }
 
-func (esClient *EsClient) InitEsClient() error {
+func (esClient *EsClient) InitClient() error {
 	cfg := elasticsearch.Config{
-		Addresses: esClient.Servers,
+		Addresses: esClient.Addresses,
+		Username:  esClient.Username,
+		Password:  esClient.Password,
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
 		log.Err(err).Msg("could not create ES client")
 	} else {
-		esClient.Client = client
+		esClient.client = client
 	}
 	return err
 }
@@ -146,14 +151,14 @@ func getAfterKey(searchResponse *EsSearchResponse) *EsAggregationKey {
 }
 
 func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []string) (*esapi.Response, error) {
-	if esClient.Client == nil {
-		err := esClient.InitEsClient()
+	if esClient.client == nil {
+		err := esClient.InitClient()
 		if err != nil {
 			log.Err(err).Msg("ES client was not initialized")
 			return nil, err
 		}
 	}
-	client := esClient.Client
+	client := esClient.client
 	var body bytes.Buffer
 	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
 		log.Err(err).Msg("could not encode ES Search Body")
@@ -228,14 +233,14 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		result[fieldName] = false
 	}
 
-	if esClient.Client == nil {
-		err := esClient.InitEsClient()
+	if esClient.client == nil {
+		err := esClient.InitClient()
 		if err != nil {
 			log.Err(err).Msg("ES client was not initialized")
 			return result, err
 		}
 	}
-	client := esClient.Client
+	client := esClient.client
 
 	log.Debug().
 		Strs("fieldNames", fieldNames).

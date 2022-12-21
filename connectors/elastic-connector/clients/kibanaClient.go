@@ -1,6 +1,7 @@
 package clients
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -30,15 +31,24 @@ const (
 	Title KibanaSavedObjectSearchField = "title"
 )
 
-var kibanaHeaders = map[string]string{
-	"Content-Type": "application/json",
-	"kbn-xsrf":     "true",
-}
-
 type KibanaClient struct {
 	APIRoot  string
 	Username string
 	Password string
+
+	headers map[string]string
+}
+
+func (client *KibanaClient) InitClient() error {
+	client.headers = map[string]string{
+		"Content-Type": "application/json",
+		"kbn-xsrf":     "true",
+	}
+	if len(client.Password) != 0 {
+		client.headers["Authorization"] = "Basic " +
+			base64.StdEncoding.EncodeToString([]byte(client.Username+":"+client.Password))
+	}
+	return nil
 }
 
 // Extracts stored queries with provided titles
@@ -97,7 +107,7 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 		path := client.buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
 
 		log.Debug().Msgf("performing Kibana Find Saved Objects request: %s", path)
-		status, response, err := clients.SendRequest(http.MethodGet, path, kibanaHeaders, nil, nil)
+		status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
 		log.Debug().Msgf("Kibana Find Saved Objects response: %s", string(response))
 
 		if err != nil || status != 200 || response == nil {
@@ -152,7 +162,7 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 		log.Err(err).Msg("could not marshal Kibana Bulk Get request")
 		return nil
 	}
-	status, response, err := clients.SendRequest(http.MethodPost, path, kibanaHeaders, nil, bodyBytes)
+	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, bodyBytes)
 	log.Debug().
 		Err(err).
 		Bytes("requestBody", bodyBytes).
