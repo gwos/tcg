@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"os"
 	"os/signal"
@@ -49,6 +50,8 @@ type AgentService struct {
 
 	configHandler func([]byte)
 	exitHandler   func()
+
+	stats *expvar.Map
 }
 
 type statsCounter struct {
@@ -108,6 +111,8 @@ func GetAgentService() *AgentService {
 
 			configHandler: defaultConfigHandler,
 			exitHandler:   defaultExitHandler,
+
+			stats: expvar.NewMap("stats"),
 		}
 
 		go agentService.listenStatsChan()
@@ -491,6 +496,7 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			}()
 
 			if err = handler(ctx, p); err == nil {
+				service.stats.Add("sentTo:"+durableName, 1)
 				service.updateStats(
 					statsCounter{bytesSent: len(p.Payload), payloadType: p.Type, timestamp: *transit.NewTimestamp()})
 			}
