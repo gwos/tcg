@@ -4,6 +4,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -34,12 +35,18 @@ dsConnection:  # empty set
 	_ = os.Setenv("TCG_CONNECTOR_AGENTID", `AGENT-ID`)
 	_ = os.Setenv("TCG_CONNECTOR_ENABLED", `false`)
 	_ = os.Setenv("TCG_CONNECTOR_BATCHMAXBYTES", `111`)
+	_ = os.Setenv("TCG_CONNECTOR_NATSACKWAIT", `1s`)
+	_ = os.Setenv("TCG_CONNECTOR_NATSMAXINFLIGHT", `1`)
+	_ = os.Setenv("TCG_CONNECTOR_NATSMAXPUBACKSINFLIGHT", `1`)
 	_ = os.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
 	_ = os.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
 	_ = os.Setenv("TCG_GWCONNECTIONS_1_PASSWORD", "SEC_RET")
 	defer os.Unsetenv("TCG_CONNECTOR_AGENTID")
 	defer os.Unsetenv("TCG_CONNECTOR_ENABLED")
 	defer os.Unsetenv("TCG_CONNECTOR_BATCHMAXBYTES")
+	defer os.Unsetenv("TCG_CONNECTOR_NATSACKWAIT")
+	defer os.Unsetenv("TCG_CONNECTOR_NATSMAXINFLIGHT")
+	defer os.Unsetenv("TCG_CONNECTOR_NATSMAXPUBACKSINFLIGHT")
 	defer os.Unsetenv("TCG_DSCONNECTION_HOSTNAME")
 	defer os.Unsetenv("TCG_GWCONNECTIONS_0_PASSWORD")
 	defer os.Unsetenv("TCG_GWCONNECTIONS_1_PASSWORD")
@@ -49,6 +56,9 @@ dsConnection:  # empty set
 	assert.Equal(t, "AGENT-ID", cfg.Connector.AgentID)
 	assert.Equal(t, false, cfg.Connector.Enabled)
 	assert.Equal(t, 111, cfg.Connector.BatchMaxBytes)
+	assert.Equal(t, 1*time.Second, cfg.Connector.NatsAckWait)
+	assert.Equal(t, 1, cfg.Connector.NatsMaxInflight)
+	assert.Equal(t, 1, cfg.Connector.NatsMaxPubAcksInflight)
 	// assert.Equal(t, "localhost:3001", cfg.DSConnection.HostName)
 	assert.Equal(t, "SEC RET", cfg.GWConnections[0].Password)
 	assert.Equal(t, "SEC_RET", cfg.GWConnections[1].Password)

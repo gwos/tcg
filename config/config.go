@@ -96,31 +96,31 @@ type Connector struct {
 
 	// NatsAckWait is the time the NATS server will wait before resending a message
 	// Should be greater then the GWClient request duration
-	NatsAckWait time.Duration `yaml:"-"`
+	NatsAckWait time.Duration `yaml:"natsAckWait"`
 	// designates the maximum number of outstanding acknowledgements
 	// (messages that have been delivered but not acknowledged)
 	// that NATS Streaming will allow for a given subscription.
 	// When this limit is reached, NATS Streaming will suspend delivery of messages
 	// to this subscription until the number of unacknowledged messages falls below the specified limit
-	NatsMaxInflight int `yaml:"-"`
+	NatsMaxInflight int `yaml:"natsMaxInflight"`
 	// NatsMaxPubAcksInflight accepts number of unacknowledged messages
 	// that a publisher may have in-flight at any given time.
 	// When this maximum is reached, further async publish calls will block
 	// until the number of unacknowledged messages falls below the specified limit
-	NatsMaxPubAcksInflight int   `yaml:"-"`
-	NatsMaxPayload         int32 `yaml:"-"`
+	NatsMaxPubAcksInflight int   `yaml:"natsMaxPubAcksInflight"`
+	NatsMaxPayload         int32 `yaml:"natsMaxPayload"`
 	// NatsMaxPendingBytes. Deprecated. Use NatsMaxInflight instead.
 	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
 	// Zero is not allowed. Any negative value means that the given metric is not limited.
-	NatsMaxPendingBytes int `yaml:"-"`
+	NatsMaxPendingBytes int `yaml:"natsMaxPendingBytes"`
 	// NatsMaxPendingMsgs. Deprecated. Use NatsMaxInflight instead.
 	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
 	// Zero is not allowed. Any negative value means that the given metric is not limited.
-	NatsMaxPendingMsgs int `yaml:"-"`
+	NatsMaxPendingMsgs int `yaml:"natsMaxPendingMsgs"`
 	// NatsMonitorPort enables monitoring on http port useful for debug
 	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
 	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
-	NatsMonitorPort int    `yaml:"-"`
+	NatsMonitorPort int    `yaml:"natsMonitorPort"`
 	NatsStoreDir    string `yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
 	NatsStoreType string `yaml:"natsStoreType"`
@@ -132,10 +132,10 @@ type Connector struct {
 	NatsStoreMaxMsgs int `yaml:"natsStoreMaxMsgs"`
 	// NatsStoreBufferSize for FileStore type
 	// size (in bytes) of the buffer used during file store operations
-	NatsStoreBufferSize int `yaml:"-"`
+	NatsStoreBufferSize int `yaml:"natsStoreBufferSize"`
 	// NatsStoreReadBufferSize for FileStore type
 	// size of the buffer to preload messages
-	NatsStoreReadBufferSize int `yaml:"-"`
+	NatsStoreReadBufferSize int `yaml:"natsStoreReadBufferSize"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
