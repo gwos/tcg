@@ -39,6 +39,7 @@ type natsDispatcher struct {
 	*state
 
 	durables *cache.Cache
+	duraSeqs *cache.Cache
 	msgsDone *cache.Cache
 	retryes  *cache.Cache
 
@@ -51,6 +52,7 @@ func getDispatcher() *natsDispatcher {
 			state: s,
 
 			durables: cache.New(-1, -1),
+			duraSeqs: cache.New(-1, -1),
 			msgsDone: cache.New(time.Minute*10, time.Minute*10),
 			retryes:  cache.New(time.Minute*30, time.Minute*30),
 		}
@@ -133,12 +135,23 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 				return
 			}
 
+			if seq, ok := d.duraSeqs.Get(opt.DurableName); ok {
+				if seq := seq.(uint64); seq >= msg.Sequence {
+					log.Warn().Str("durableName", opt.DurableName).
+						Uint64("done.sequence", seq).
+						Uint64("stan.sequence", msg.Sequence).
+						Int64("stan.timestamp", msg.Timestamp).
+						Msg("dispatcher lost order")
+				}
+			}
+
 			if err := opt.Handler(msg.Data); err != nil {
 				d.handleError(subscription, msg, err, opt)
 				return
 			}
 			_ = msg.Ack()
 			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
+			d.duraSeqs.Set(opt.DurableName, msg.Sequence, -1)
 			log.Info().Str("durableName", opt.DurableName).
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
