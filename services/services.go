@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"strconv"
 	"time"
@@ -35,24 +36,110 @@ const (
 	StatusUnknown    Status = "unknown"
 )
 
-// AgentStats defines TCG Agent statistics
-type AgentStats struct {
-	BytesSent              int                `json:"bytesSent"`
-	MetricsSent            int                `json:"metricsSent"`
-	MessagesSent           int                `json:"messagesSent"`
-	LastInventoryRun       *transit.Timestamp `json:"lastInventoryRun,omitempty"`
-	LastMetricsRun         *transit.Timestamp `json:"lastMetricsRun,omitempty"`
-	LastAlertRun           *transit.Timestamp `json:"lastAlertRun,omitempty"`
-	ExecutionTimeInventory time.Duration      `json:"executionTimeInventory"`
-	ExecutionTimeMetrics   time.Duration      `json:"executionTimeMetrics"`
-	UpSince                *transit.Timestamp `json:"upSince"`
+// Stats defines TCG statistics
+type Stats struct {
+	BytesSent              *expvar.Int
+	MetricsSent            *expvar.Int
+	MessagesSent           *expvar.Int
+	ExecutionTimeInventory *expvar.Int
+	ExecutionTimeMetrics   *expvar.Int
+	LastEventsRun          *expvar.Int
+	LastInventoryRun       *expvar.Int
+	LastMetricsRun         *expvar.Int
+	UpSince                *expvar.Int
+	// exp handles different counters for debug
+	exp *expvar.Map
+}
+
+func NewAgentStats() *Stats {
+	p := &Stats{
+		BytesSent:              expvar.NewInt("tcgBytesSent"),
+		MetricsSent:            expvar.NewInt("tcgMetricsSent"),
+		MessagesSent:           expvar.NewInt("tcgMessagesSent"),
+		ExecutionTimeInventory: expvar.NewInt("tcgExecutionTimeInventory"),
+		ExecutionTimeMetrics:   expvar.NewInt("tcgExecutionTimeMetrics"),
+		LastEventsRun:          expvar.NewInt("tcgLastAlertRun"),
+		LastInventoryRun:       expvar.NewInt("tcgLastInventoryRun"),
+		LastMetricsRun:         expvar.NewInt("tcgLastMetricsRun"),
+		UpSince:                expvar.NewInt("tcgUpSince"),
+		exp:                    expvar.NewMap("tcgExp"),
+	}
+	p.LastEventsRun.Set(-1)
+	p.LastInventoryRun.Set(-1)
+	p.LastMetricsRun.Set(-1)
+	p.UpSince.Set(time.Now().UnixMilli())
+	p.exp.Set("uptime", expvar.Func(func() interface{} {
+		return time.Since(time.UnixMilli(p.UpSince.Value())).Round(time.Second).String()
+	}))
+	return p
+}
+
+func (p Stats) MarshalJSON() ([]byte, error) {
+	// UpSince and Last*Run fields handle timestamps
+	// in output should be presented as string of millis
+	// so use Int->String conversion instead of Int->Timestamp->String
+	type ExportStat struct {
+		BytesSent              int64         `json:"bytesSent"`
+		MetricsSent            int64         `json:"metricsSent"`
+		MessagesSent           int64         `json:"messagesSent"`
+		ExecutionTimeInventory time.Duration `json:"executionTimeInventory"`
+		ExecutionTimeMetrics   time.Duration `json:"executionTimeMetrics"`
+		LastAlertRun           string        `json:"lastAlertRun,omitempty"`
+		LastInventoryRun       string        `json:"lastInventoryRun,omitempty"`
+		LastMetricsRun         string        `json:"lastMetricsRun,omitempty"`
+		UpSince                string        `json:"upSince"`
+	}
+	exp := ExportStat{
+		BytesSent:              p.BytesSent.Value(),
+		MetricsSent:            p.MetricsSent.Value(),
+		MessagesSent:           p.MessagesSent.Value(),
+		ExecutionTimeInventory: time.Duration(p.ExecutionTimeInventory.Value()),
+		ExecutionTimeMetrics:   time.Duration(p.ExecutionTimeMetrics.Value()),
+		UpSince:                p.UpSince.String(),
+	}
+	if v := p.LastEventsRun.Value(); v != -1 {
+		exp.LastAlertRun = p.LastEventsRun.String()
+	}
+	if v := p.LastInventoryRun.Value(); v != -1 {
+		exp.LastInventoryRun = p.LastInventoryRun.String()
+	}
+	if v := p.LastMetricsRun.Value(); v != -1 {
+		exp.LastMetricsRun = p.LastMetricsRun.String()
+	}
+	return json.Marshal(exp)
 }
 
 // AgentStatsExt defines complex type
 type AgentStatsExt struct {
 	transit.AgentIdentity
-	AgentStats
+	Stats
 	LastErrors []logzer.LogRecord `json:"lastErrors"`
+}
+
+// MarshalJSON implements json.Marshaler interface
+// handles nested structures
+func (p AgentStatsExt) MarshalJSON() ([]byte, error) {
+	var (
+		err error
+		buf []byte
+		bb  []byte
+	)
+	if bb, err = json.Marshal(p.AgentIdentity); err != nil {
+		return nil, err
+	}
+	buf = append(buf, bb[:len(bb)-1]...)
+	buf = append(buf, ',')
+	if bb, err = json.Marshal(p.Stats); err != nil {
+		return nil, err
+	}
+	buf = append(buf, bb[1:len(bb)-1]...)
+	buf = append(buf, `,"lastErrors":`...)
+	if bb, err = json.Marshal(p.LastErrors); err != nil {
+		return nil, err
+	}
+	buf = append(buf, bb...)
+	buf = append(buf, '}')
+	return buf, nil
 }
 
 // AgentStatus defines TCG Agent status
@@ -80,7 +167,7 @@ type AgentServices interface {
 	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
-	Stats() AgentStats
+	Stats() Stats
 	Status() AgentStatus
 
 	ExitAsync() (*taskqueue.Task, error)

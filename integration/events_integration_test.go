@@ -17,13 +17,12 @@ func TestEvents(t *testing.T) {
 	defer cleanNats(t)
 
 	l0 := len(services.GetTransitService().Stats().LastErrors)
-	m0 := services.GetTransitService().Stats().MessagesSent
+	m0 := services.GetTransitService().Stats().MessagesSent.Value()
 	assert.NoError(t, services.GetController().SendEvents(context.Background(), testMessage))
 	time.Sleep(1 * time.Second)
 
-	if services.GetTransitService().Stats().MessagesSent != m0+1 {
-		t.Errorf("Message should be delivered. deliveredCount = %d, want = %d",
-			services.GetTransitService().Stats().MessagesSent, m0+1)
+	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != 1 {
+		t.Errorf("Message should be delivered. deliveredCount = %d, want = %d", dc, 1)
 		return
 	}
 

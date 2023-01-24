@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/gwos/tcg/batcher"
 	"github.com/gwos/tcg/batcher/events"
@@ -112,6 +113,7 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
+	service.stats.LastEventsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchEvents == 0 {
 		return service.sendEvents(ctx, payload)
 	}
@@ -120,7 +122,7 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 }
 
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
-	service.stats.Add("sendEvents", 1)
+	service.stats.exp.Add("sendEvents", 1)
 	var (
 		b   []byte
 		err error
@@ -187,6 +189,7 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
+	service.stats.LastMetricsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchMetrics == 0 {
 		return service.sendMetrics(ctx, payload)
 	}
@@ -195,7 +198,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
-	service.stats.Add("sendMetrics", 1)
+	service.stats.exp.Add("sendMetrics", 1)
 	var (
 		b   []byte
 		err error
@@ -222,6 +225,7 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
 func (service *TransitService) SynchronizeInventory(ctx context.Context, payload []byte) error {
+	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
 	var (
 		b   []byte
 		err error
