@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -63,6 +64,15 @@ func (client *NediClient) Init(server string) error {
 }
 
 func (client *NediClient) GetDevices() ([]Device, error) {
+	monitored, err := client.getMonitoredDevices()
+	if err != nil {
+		return nil, err
+	}
+	if len(monitored) == 0 {
+		log.Warn().Msg("skipping NeDi Get Devices request due to empty monitored inventory")
+		return nil, nil
+	}
+
 	path, err := client.getConnectionString(tableDevices, "", "")
 	if err != nil {
 		log.Err(err).Msg("could not get NeDi connection string")
@@ -79,16 +89,7 @@ func (client *NediClient) GetDevices() ([]Device, error) {
 	}
 	log.Debug().Bytes("response", r).Msgf("NeDi Get Devices response")
 
-	var resp []interface{}
-	err = json.Unmarshal(r, &resp)
-	if err != nil {
-		log.Err(err).
-			Bytes("response", r).
-			Msg("could not parse NeDi response")
-		return nil, errors.New("failed to parse NeDi response")
-	}
-
-	return parseDevices(client, resp)
+	return parseDevices(r, monitored)
 }
 
 func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error) {
@@ -113,16 +114,7 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 	}
 	log.Debug().Bytes("response", r).Msgf("NeDi Get Interfaces response")
 
-	var resp []interface{}
-	err = json.Unmarshal(r, &resp)
-	if err != nil {
-		log.Err(err).
-			Bytes("response", r).
-			Msg("could not parse NeDi response")
-		return nil, errors.New("failed to parse NeDi response")
-	}
-
-	return parseInterfaces(resp), nil
+	return parseInterfaces(r), nil
 }
 
 func (client *NediClient) getConnectionString(table string, query string, order string) (*string, error) {
@@ -144,13 +136,9 @@ func (client *NediClient) getConnectionString(table string, query string, order 
 	return &connStr, nil
 }
 
-func parseDevices(client *NediClient, response []interface{}) ([]Device, error) {
-	var devices = make([]Device, 0)
-	monitoredDevices, err := getMonitoredDevices(client)
-	if err != nil {
-		return devices, err
-	}
-	for _, d := range parseResponse(response) {
+func parseDevices(bytes []byte, monitored map[string]Monitoring) ([]Device, error) {
+	var devices = make([]Device, 0, len(monitored))
+	for _, d := range parseResponse(bytes) {
 		var device Device
 
 		name := d[colDevice]
@@ -166,7 +154,7 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 			continue
 		}
 		// filter out un-monitored devices
-		if mon, ok := monitoredDevices[device.Name]; ok {
+		if mon, ok := monitored[device.Name]; ok {
 			device.LastOK = mon.LastOK
 		} else {
 			continue
@@ -194,7 +182,7 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 	return devices, nil
 }
 
-func parseInterfaces(response []interface{}) []Interface {
+func parseInterfaces(response []byte) []Interface {
 	var interfaces = make([]Interface, 0)
 	for _, i := range parseResponse(response) {
 		var iFace Interface
@@ -243,10 +231,16 @@ func parseInterfaces(response []interface{}) []Interface {
 	return interfaces
 }
 
-func parseResponse(response []interface{}) []map[string]interface{} {
+func parseResponse(bytes []byte) []map[string]interface{} {
 	log.Debug().
-		Interface("response", response).
+		Bytes("response", bytes).
 		Msg("parsing NeDi response")
+
+	var response []interface{}
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		log.Err(err).Bytes("response", bytes).Msg("could not parse NeDi response")
+		return nil
+	}
 
 	var res []map[string]interface{}
 	for i, r := range response {
@@ -286,26 +280,26 @@ func executeGet(url string) ([]byte, error) {
 	return r, nil
 }
 
-func getInt(val interface{}) (int, error) {
-	switch numVal := val.(type) {
+func getInt(v interface{}) (int, error) {
+	switch v := v.(type) {
 	case int:
-		return numVal, nil
+		return v, nil
 	case int8:
-		return int(numVal), nil
+		return int(v), nil
 	case int16:
-		return int(numVal), nil
+		return int(v), nil
 	case int32:
-		return int(numVal), nil
+		return int(v), nil
 	case int64:
-		return int(numVal), nil
+		return int(v), nil
 	case float32:
-		return int(numVal), nil
+		return int(v), nil
 	case float64:
-		return int(numVal), nil
+		return int(v), nil
 	case big.Int:
-		return int(numVal.Int64()), nil
+		return int(v.Int64()), nil
 	default:
-		return 0, errors.New("unsupported type: ")
+		return 0, fmt.Errorf("unsupported type: %T", v)
 	}
 }
 
@@ -315,7 +309,7 @@ func int2ip(val int) string {
 	return ip.String()
 }
 
-func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
+func (client *NediClient) getMonitoredDevices() (map[string]Monitoring, error) {
 	path, err := client.getConnectionString(tableMonitoring, "", "")
 	if err != nil {
 		msg := "failed to get NeDi monitoring connection string"
@@ -332,16 +326,8 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 	}
 	log.Debug().Bytes("response", response).Msgf("NeDi Get Monitoring response")
 
-	var resp []interface{}
-	err = json.Unmarshal(response, &resp)
-	if err != nil {
-		msg := "could not parse NeDi monitoring response"
-		log.Err(err).Bytes("response", response).Msg(msg)
-		return nil, errors.New(msg)
-	}
-
 	monitors := make(map[string]Monitoring)
-	for _, fields := range parseResponse(resp) {
+	for _, fields := range parseResponse(response) {
 		var monitor Monitoring
 		monitor.Name = fields[colName].(string)
 		monitor.Device = fields[colDevice].(string)
