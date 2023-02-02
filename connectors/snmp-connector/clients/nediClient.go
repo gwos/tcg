@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -63,6 +64,15 @@ func (client *NediClient) Init(server string) error {
 }
 
 func (client *NediClient) GetDevices() ([]Device, error) {
+	monitored, err := client.getMonitoredDevices()
+	if err != nil {
+		return nil, err
+	}
+	if len(monitored) == 0 {
+		log.Warn().Msg("skipping NeDi Get Devices request due to empty monitored inventory")
+		return nil, nil
+	}
+
 	path, err := client.getConnectionString(tableDevices, "", "")
 	if err != nil {
 		log.Err(err).Msg("could not get NeDi connection string")
@@ -77,18 +87,9 @@ func (client *NediClient) GetDevices() ([]Device, error) {
 			Msg("could not execute NeDi request")
 		return nil, errors.New("failed to execute NeDi request")
 	}
-	log.Debug().Bytes("response", r).Msgf("NeDi Get Devices response")
+	log.Debug().Bytes("response", r).Msg("NeDi Get Devices response")
 
-	var resp []interface{}
-	err = json.Unmarshal(r, &resp)
-	if err != nil {
-		log.Err(err).
-			Bytes("response", r).
-			Msg("could not parse NeDi response")
-		return nil, errors.New("failed to parse NeDi response")
-	}
-
-	return parseDevices(client, resp)
+	return parseDevices(r, monitored)
 }
 
 func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error) {
@@ -111,18 +112,9 @@ func (client *NediClient) GetDeviceInterfaces(device string) ([]Interface, error
 			Msg("could not execute NeDi request")
 		return nil, errors.New("failed to execute NeDi request")
 	}
-	log.Debug().Bytes("response", r).Msgf("NeDi Get Interfaces response")
+	log.Debug().Bytes("response", r).Msg("NeDi Get Interfaces response")
 
-	var resp []interface{}
-	err = json.Unmarshal(r, &resp)
-	if err != nil {
-		log.Err(err).
-			Bytes("response", r).
-			Msg("could not parse NeDi response")
-		return nil, errors.New("failed to parse NeDi response")
-	}
-
-	return parseInterfaces(resp), nil
+	return parseInterfaces(r), nil
 }
 
 func (client *NediClient) getConnectionString(table string, query string, order string) (*string, error) {
@@ -144,29 +136,25 @@ func (client *NediClient) getConnectionString(table string, query string, order 
 	return &connStr, nil
 }
 
-func parseDevices(client *NediClient, response []interface{}) ([]Device, error) {
-	var devices = make([]Device, 0)
-	monitoredDevices, err := getMonitoredDevices(client)
-	if err != nil {
-		return devices, err
-	}
-	for _, d := range parseResponse(response) {
+func parseDevices(bytes []byte, monitored map[string]Monitoring) ([]Device, error) {
+	var devices = make([]Device, 0, len(monitored))
+	for _, d := range parseResponse(bytes) {
 		var device Device
 
 		name := d[colDevice]
 		ip := d[colDevIP]
 		community := d[colReadComm]
 
-		switch nameVal := name.(type) {
+		switch name := name.(type) {
 		case string:
-			device.Name = nameVal
+			device.Name = name
 		default:
-			log.Warn().Msgf("skipping device '%s:%s' of unsupported type",
-				colDevice, nameVal)
+			log.Warn().Msgf("skipping device '%s:%v' of unsupported type %T",
+				colDevice, name, name)
 			continue
 		}
 		// filter out un-monitored devices
-		if mon, ok := monitoredDevices[device.Name]; ok {
+		if mon, ok := monitored[device.Name]; ok {
 			device.LastOK = mon.LastOK
 		} else {
 			continue
@@ -174,18 +162,18 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 
 		ipVal, err := getInt(ip)
 		if err != nil {
-			log.Warn().Msgf("skipping device '%s:%s:%d' of unsupported type",
-				device.Name, colDevIP, ipVal)
+			log.Warn().Msgf("skipping device '%s:%s:%v' of unsupported type %T",
+				device.Name, colDevIP, ip, ip)
 			continue
 		}
 		device.IP = int2ip(ipVal)
 
-		switch commVal := community.(type) {
+		switch community := community.(type) {
 		case string:
-			device.Community = commVal
+			device.Community = community
 		default:
-			log.Warn().Msgf("skipping device '%s:%s:%s' of unsupported type",
-				device.Name, colReadComm, commVal)
+			log.Warn().Msgf("skipping device '%s:%s:%v' of unsupported type %T",
+				device.Name, colReadComm, community, community)
 			continue
 		}
 
@@ -194,7 +182,7 @@ func parseDevices(client *NediClient, response []interface{}) ([]Device, error) 
 	return devices, nil
 }
 
-func parseInterfaces(response []interface{}) []Interface {
+func parseInterfaces(response []byte) []Interface {
 	var interfaces = make([]Interface, 0)
 	for _, i := range parseResponse(response) {
 		var iFace Interface
@@ -204,21 +192,21 @@ func parseInterfaces(response []interface{}) []Interface {
 		index := i[colIfIndex]
 		status := i[colIfStat]
 
-		switch nameVal := name.(type) {
+		switch name := name.(type) {
 		case string:
-			iFace.Name = nameVal
+			iFace.Name = name
 		default:
-			log.Warn().Msgf("skipping interface '%s:%s' of unsupported type",
-				colIfName, nameVal)
+			log.Warn().Msgf("skipping interface '%s:%v' of unsupported type %T",
+				colIfName, name, name)
 			continue
 		}
 
-		switch devVal := device.(type) {
+		switch device := device.(type) {
 		case string:
-			iFace.Device = devVal
+			iFace.Device = device
 		default:
-			log.Warn().Msgf("skipping interface '%s:%s:%s' of unsupported type",
-				iFace.Name, colDevice, devVal)
+			log.Warn().Msgf("skipping interface '%s:%s:%v' of unsupported type %T",
+				iFace.Name, colDevice, device, device)
 			continue
 		}
 
@@ -226,14 +214,14 @@ func parseInterfaces(response []interface{}) []Interface {
 		if statVal, err := getInt(status); err == nil {
 			iFace.Status = statVal
 		} else {
-			log.Warn().Msgf("skipping interface '%s:%s:%d' of unsupported type",
-				iFace.Name, colIfStat, status)
+			log.Warn().Msgf("skipping interface '%s:%s:%v' of unsupported type %T",
+				iFace.Name, colIfStat, status, status)
 		}
 
 		idxVal, err := getInt(index)
 		if err != nil {
-			log.Warn().Msgf("skipping interface '%s:%s:%d' of unsupported type",
-				iFace.Name, colIfIndex, idxVal)
+			log.Warn().Msgf("skipping interface '%s:%s:%v' of unsupported type %T",
+				iFace.Name, colIfIndex, index, index)
 			continue
 		}
 		iFace.Index = idxVal
@@ -243,10 +231,16 @@ func parseInterfaces(response []interface{}) []Interface {
 	return interfaces
 }
 
-func parseResponse(response []interface{}) []map[string]interface{} {
+func parseResponse(bytes []byte) []map[string]interface{} {
 	log.Debug().
-		Interface("response", response).
+		Bytes("response", bytes).
 		Msg("parsing NeDi response")
+
+	var response []interface{}
+	if err := json.Unmarshal(bytes, &response); err != nil {
+		log.Err(err).Bytes("response", bytes).Msg("could not parse NeDi response")
+		return nil
+	}
 
 	var res []map[string]interface{}
 	for i, r := range response {
@@ -257,13 +251,13 @@ func parseResponse(response []interface{}) []map[string]interface{} {
 			log.Debug().Msg("skipping system information")
 			continue
 		}
-		switch o := r.(type) {
+		switch r := r.(type) {
 		case map[string]interface{}:
-			res = append(res, o)
+			res = append(res, r)
 		default:
 			log.Warn().
-				Interface("obj", o).
-				Msg("skipping response object of unsupported type")
+				Interface("obj", r).
+				Msgf("skipping response object of unsupported type %T", r)
 			continue
 		}
 	}
@@ -286,26 +280,26 @@ func executeGet(url string) ([]byte, error) {
 	return r, nil
 }
 
-func getInt(val interface{}) (int, error) {
-	switch numVal := val.(type) {
+func getInt(v interface{}) (int, error) {
+	switch v := v.(type) {
 	case int:
-		return numVal, nil
+		return v, nil
 	case int8:
-		return int(numVal), nil
+		return int(v), nil
 	case int16:
-		return int(numVal), nil
+		return int(v), nil
 	case int32:
-		return int(numVal), nil
+		return int(v), nil
 	case int64:
-		return int(numVal), nil
+		return int(v), nil
 	case float32:
-		return int(numVal), nil
+		return int(v), nil
 	case float64:
-		return int(numVal), nil
+		return int(v), nil
 	case big.Int:
-		return int(numVal.Int64()), nil
+		return int(v.Int64()), nil
 	default:
-		return 0, errors.New("unsupported type: ")
+		return 0, fmt.Errorf("unsupported type: %T", v)
 	}
 }
 
@@ -315,7 +309,7 @@ func int2ip(val int) string {
 	return ip.String()
 }
 
-func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
+func (client *NediClient) getMonitoredDevices() (map[string]Monitoring, error) {
 	path, err := client.getConnectionString(tableMonitoring, "", "")
 	if err != nil {
 		msg := "failed to get NeDi monitoring connection string"
@@ -330,18 +324,10 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		log.Err(err).Msg(msg)
 		return nil, errors.New(msg)
 	}
-	log.Debug().Bytes("response", response).Msgf("NeDi Get Monitoring response")
-
-	var resp []interface{}
-	err = json.Unmarshal(response, &resp)
-	if err != nil {
-		msg := "could not parse NeDi monitoring response"
-		log.Err(err).Bytes("response", response).Msg(msg)
-		return nil, errors.New(msg)
-	}
+	log.Debug().Bytes("response", response).Msg("NeDi Get Monitoring response")
 
 	monitors := make(map[string]Monitoring)
-	for _, fields := range parseResponse(resp) {
+	for _, fields := range parseResponse(response) {
 		var monitor Monitoring
 		monitor.Name = fields[colName].(string)
 		monitor.Device = fields[colDevice].(string)
@@ -350,8 +336,8 @@ func getMonitoredDevices(client *NediClient) (map[string]Monitoring, error) {
 		ip := fields[colMonIP]
 		ipVal, err := getInt(ip)
 		if err != nil {
-			log.Warn().Msgf("skipping monitoring '%s:%s:%d' of unsupported type",
-				monitor.Name, colMonIP, ipVal)
+			log.Warn().Msgf("skipping monitoring '%s:%s:%v' of unsupported type %T",
+				monitor.Name, colMonIP, ip, ip)
 			continue
 		}
 		monitor.IP = int2ip(ipVal)

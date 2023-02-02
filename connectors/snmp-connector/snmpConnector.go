@@ -87,7 +87,8 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 			deviceExt := DeviceExt{Device: device}
 			secData, err := utils.GetSecurityData(device.Community)
 			if err != nil {
-				log.Err(err).Msgf("could not get security data of device '%s'", device.Name)
+				log.Err(err).Msgf("could not get security data of device '%s' by community '%s'",
+					device.Name, device.Community)
 			}
 			if secData != nil {
 				deviceExt.SecData = secData
