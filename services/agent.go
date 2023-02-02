@@ -35,12 +35,10 @@ import (
 type AgentService struct {
 	*config.Connector
 
-	agentStats  *AgentStats
 	agentStatus *AgentStatus
 	dsClient    *clients.DSClient
 	gwClients   []*clients.GWClient
 	quitChan    chan struct{}
-	statsChan   chan statsCounter
 	taskQueue   *taskqueue.TaskQueue
 
 	tracerCache    *cache.Cache
@@ -49,12 +47,8 @@ type AgentService struct {
 
 	configHandler func([]byte)
 	exitHandler   func()
-}
 
-type statsCounter struct {
-	bytesSent   int
-	payloadType payloadType
-	timestamp   transit.Timestamp
+	stats *Stats
 }
 
 type taskSubject string
@@ -93,9 +87,6 @@ func GetAgentService() *AgentService {
 		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
-			agentStats: &AgentStats{
-				UpSince: transit.NewTimestamp(),
-			},
 			agentStatus: &AgentStatus{
 				Controller: StatusStopped,
 				Nats:       StatusStopped,
@@ -103,14 +94,14 @@ func GetAgentService() *AgentService {
 			},
 			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
-			statsChan:   make(chan statsCounter),
 			tracerCache: cache.New(-1, -1),
 
 			configHandler: defaultConfigHandler,
 			exitHandler:   defaultExitHandler,
+
+			stats: NewAgentStats(),
 		}
 
-		go agentService.listenStatsChan()
 		agentService.initTracerToken()
 		agentService.initOTEL()
 		agentService.handleTasks()
@@ -310,7 +301,7 @@ func (service *AgentService) StopTransport() error {
 func (service *AgentService) Stats() AgentStatsExt {
 	return AgentStatsExt{
 		AgentIdentity: service.Connector.AgentIdentity,
-		AgentStats:    *service.agentStats,
+		Stats:         *service.stats,
 		LastErrors:    logzer.LastErrors(),
 	}
 }
@@ -378,28 +369,6 @@ func (service *AgentService) handleTasks() {
 		}),
 		taskqueue.WithDebugger(hDebug),
 	)
-}
-
-func (service *AgentService) listenStatsChan() {
-	for {
-		res := <-service.statsChan
-		service.agentStats.BytesSent += res.bytesSent
-		service.agentStats.MessagesSent++
-		switch res.payloadType {
-		case typeInventory:
-			service.agentStats.LastInventoryRun = &res.timestamp
-		case typeMetrics:
-			service.agentStats.LastMetricsRun = &res.timestamp
-			service.agentStats.MetricsSent++
-		case typeEvents:
-			// TODO: handle events acks, unacks
-			service.agentStats.LastAlertRun = &res.timestamp
-		}
-	}
-}
-
-func (service *AgentService) updateStats(c statsCounter) {
-	service.statsChan <- c
 }
 
 func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
@@ -491,8 +460,12 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.updateStats(
-					statsCounter{bytesSent: len(p.Payload), payloadType: p.Type, timestamp: *transit.NewTimestamp()})
+				service.stats.exp.Add("sentTo:"+durableName, 1)
+				service.stats.BytesSent.Add(int64(len(p.Payload)))
+				service.stats.MessagesSent.Add(1)
+				if p.Type == typeMetrics {
+					service.stats.MetricsSent.Add(1)
+				}
 			}
 			if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user

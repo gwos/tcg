@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"io"
 	"net/http"
@@ -602,4 +603,6 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	pprofGroup.GET("/heap", gin.WrapF(pprof.Handler("heap").ServeHTTP))
 	pprofGroup.GET("/mutex", gin.WrapF(pprof.Handler("mutex").ServeHTTP))
 	pprofGroup.GET("/threadcreate", gin.WrapF(pprof.Handler("threadcreate").ServeHTTP))
+
+	apiV1Group.GET("/debug/vars", gin.WrapH(expvar.Handler()))
 }

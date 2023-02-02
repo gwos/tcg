@@ -13,6 +13,14 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+func Test_statsMarshal(t *testing.T) {
+	p, err := json.Marshal(GetAgentService().Stats())
+	assert.NoError(t, err)
+	assert.Contains(t, string(p), "agentId")
+	assert.Contains(t, string(p), `"lastErrors":[`)
+	assert.Contains(t, string(p), `"upSince":"`)
+}
+
 func Test_natsPayloadMarshal(t *testing.T) {
 	p := natsPayload{
 		Type:    typeMetrics,
