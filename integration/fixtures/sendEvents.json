@@ -7,8 +7,8 @@
       "monitorStatus": "UP",
       "severity": "SERIOUS",
       "textMessage": "This is a serious Nagios Message on Device 127.0.0.1 - 0",
-      "lastInsertDate": 1370195732000,
-      "reportDate": 1579703726166,
+      "lastInsertDate": "1370195732000",
+      "reportDate": "1579703726166",
       "appType": "NAGIOS",
       "monitorServer":"localhost"
     },
@@ -19,8 +19,8 @@
       "monitorStatus": "UP",
       "severity": "SERIOUS",
       "textMessage": "This is a serious Nagios Message on Device 127.0.0.1 - 0",
-      "lastInsertDate": 1370195732000,
-      "reportDate": 1579703726166,
+      "lastInsertDate": "1370195732000",
+      "reportDate": "1579703726166",
       "appType": "NAGIOS",
       "monitorServer":"localhost"
     }
