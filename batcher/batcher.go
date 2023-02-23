@@ -15,7 +15,7 @@ import (
 type BatchBuilder interface {
 	// Build builds the batch payloads
 	// it's possible that not all input payloads can be combined into one
-	Build([][]byte) [][]byte
+	Build(input [][]byte, maxBytes int) [][]byte
 }
 
 // BatchHandler defines handler
@@ -79,8 +79,6 @@ func (bt *Batcher) Add(p []byte) {
 	bt.bufSize += len(p)
 
 	bt.mu.Unlock()
-
-	bt.bufSize += len(p)
 	if bt.bufSize > bt.maxBytes {
 		log.Debug().Msgf("batch buffer size %dKB exceeded the soft limit %dKB",
 			bt.bufSize/1024, bt.maxBytes/1024)
@@ -97,16 +95,18 @@ func (bt *Batcher) Batch() {
 
 	bt.mu.Unlock()
 	if len(buf) > 0 {
-		go func() {
-			/* cannot use services package due to import cycle */
+		func() {
+			/* wrap into closure for simple defer,
+			cannot use services package due to import cycle */
 			ctx, span := otel.GetTracerProvider().
 				Tracer("batcher").Start(context.Background(), "Batch:Build")
 			defer func() {
 				span.SetAttributes(attribute.Int("bufferSize", bufSize))
+				span.SetAttributes(attribute.Int("maxBytes", bt.maxBytes))
 				span.End()
 			}()
 
-			payloads := bt.builder.Build(buf)
+			payloads := bt.builder.Build(buf, bt.maxBytes)
 			if len(payloads) > 0 {
 				for _, p := range payloads {
 					if len(p) > 0 {

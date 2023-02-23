@@ -2,118 +2,174 @@ package metrics
 
 import (
 	"encoding/json"
-	"sort"
+	"fmt"
 	"strings"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
 
-type mapItem struct {
-	contexts []transit.TracerContext
-	groups   []transit.ResourceGroup
-	res      []transit.MonitoredResource
-}
-
-// Add adds single transit.ResourcesWithServicesRequest to batch
-func add(byGroups map[string]mapItem, p []byte) {
-	r := transit.ResourcesWithServicesRequest{}
-	if err := json.Unmarshal(p, &r); err != nil {
-		log.Err(err).
-			RawJSON("payload", p).
-			Msg("could not unmarshal metrics payload for batch")
-		return
-	}
-
-	for i := range r.Resources {
-		for j := range r.Resources[i].Services {
-			applyTime(&r.Resources[i], &r.Resources[i].Services[j], r.Context.TimeStamp)
-		}
-		applyTime(&r.Resources[i], &transit.MonitoredService{}, r.Context.TimeStamp)
-	}
-
-	k := makeGKey(r.Groups)
-	if item, ok := byGroups[k]; ok {
-		item.contexts = append(item.contexts, *r.Context)
-		item.res = append(item.res, r.Resources...)
-		byGroups[k] = item
-	} else {
-		byGroups[k] = mapItem{
-			contexts: []transit.TracerContext{*r.Context},
-			groups:   r.Groups,
-			res:      r.Resources,
-		}
-	}
-}
-
 // MetricsBatchBuilder implements builder
 type MetricsBatchBuilder struct{}
 
 // Build builds the batch payloads if not empty
-func (bld *MetricsBatchBuilder) Build(input [][]byte) [][]byte {
-	byGroups := make(map[string]mapItem)
+// splits incoming payloads bigger than maxBytes
+func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
+	// counter, batched request, and accum
+	c, bq := 0, transit.ResourcesWithServicesRequest{}
+	qq := make([]transit.ResourcesWithServicesRequest, 0)
+	// oversized payloads
+	xxl := make([][]byte, 0)
+
 	for _, p := range input {
-		add(byGroups, p)
-	}
-
-	pp := make([][]byte, len(byGroups))
-	for _, item := range byGroups {
-		r := transit.ResourcesWithServicesRequest{}
-		if len(item.contexts) > 0 {
-			r.Context = &item.contexts[0]
+		if len(p) > maxBytes {
+			xxl = append(xxl, p)
+			continue
 		}
-		r.Groups = item.groups
-		r.Resources = item.res
-		if len(r.Resources) > 0 {
-			p, err := json.Marshal(r)
-			if err == nil {
-				log.Debug().Msgf("batched %d resources in %d groups",
-					len(r.Resources), len(r.Groups))
-				pp = append(pp, p)
-				continue
-			}
+		q := transit.ResourcesWithServicesRequest{}
+		if err := json.Unmarshal(p, &q); err != nil {
 			log.Err(err).
-				Interface("resources", r).
-				Msg("could not marshal resources")
+				RawJSON("payload", p).
+				Msg("could not unmarshal metrics payload for batch")
+			continue
+		}
+		bq.SetContext(*q.Context)
+		bq.Groups = append(bq.Groups, q.Groups...)
+		bq.Resources = append(bq.Resources, q.Resources...)
+		c += len(p)
+		if c > maxBytes {
+			qq = append(qq, bq)
+			c, bq = 0, transit.ResourcesWithServicesRequest{}
 		}
 	}
-	return pp
+	if len(bq.Resources) > 0 {
+		qq = append(qq, bq)
+	}
+	qq = append(qq, xxl2qq(xxl, maxBytes)...)
+
+	output := make([][]byte, 0, len(qq))
+	for _, q := range qq {
+		q.Groups = packGroups(q.Groups)
+		p, err := json.Marshal(q)
+		if err == nil {
+			log.Debug().Msgf("batched %d resources", len(q.Resources))
+			output = append(output, p)
+			continue
+		}
+		log.Err(err).
+			Interface("resources", q).
+			Msg("could not marshal resources")
+	}
+	return output
 }
 
-func applyTime(
-	res *transit.MonitoredResource,
-	svc *transit.MonitoredService,
-	ts *transit.Timestamp,
-) {
-	isT := func(ts *transit.Timestamp) bool { return ts != nil && !ts.IsZero() }
-	if !isT(ts) {
-		ts = transit.NewTimestamp()
+func xxl2qq(input [][]byte, maxBytes int) []transit.ResourcesWithServicesRequest {
+	qq := make([]transit.ResourcesWithServicesRequest, 0)
+
+	for _, p := range input {
+		q := transit.ResourcesWithServicesRequest{}
+		if err := json.Unmarshal(p, &q); err != nil {
+			log.Err(err).
+				RawJSON("payload", p).
+				Msg("could not unmarshal metrics payload for batch")
+			continue
+		}
+
+		/* split big payload for parts contained ~lim metrics */
+		cnt := 0
+		for _, res := range q.Resources {
+			for _, svc := range res.Services {
+				cnt += len(svc.Metrics)
+			}
+		}
+		lim := cnt/(len(p)/maxBytes+1) + 1
+		log.Debug().Msgf("#MetricsBatchBuilder maxBytes:len(p):cnt:lim %v:%v:%v:%v",
+			maxBytes, len(p), cnt, lim)
+
+		// counter and accum
+		c, rr := 0, make([]transit.MonitoredResource, 0)
+		for _, res := range q.Resources {
+			pr := res
+			pr.Services = make([]transit.MonitoredService, 0)
+
+			for _, svc := range res.Services {
+				pr.Services = append(pr.Services, svc)
+				c += len(svc.Metrics)
+
+				if c > lim {
+					rr = append(rr, pr)
+					x := transit.ResourcesWithServicesRequest{
+						Groups:    q.Groups,
+						Resources: rr,
+					}
+					x.SetContext(*q.Context)
+					qq = append(qq, x)
+
+					c, rr = 0, make([]transit.MonitoredResource, 0)
+					pr = res
+					pr.Services = make([]transit.MonitoredService, 0)
+				}
+			}
+			if len(pr.Services) > 0 {
+				rr = append(rr, pr)
+			}
+		}
+
+		if len(rr) > 0 {
+			x := transit.ResourcesWithServicesRequest{
+				Groups:    q.Groups,
+				Resources: rr,
+			}
+			x.SetContext(*q.Context)
+			qq = append(qq, x)
+		}
 	}
-	switch {
-	case !isT(res.LastCheckTime) && isT(svc.LastCheckTime):
-		res.LastCheckTime = svc.LastCheckTime
-	case isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
-		svc.LastCheckTime = res.LastCheckTime
-	case !isT(res.LastCheckTime) && !isT(svc.LastCheckTime):
-		res.LastCheckTime = ts
-		svc.LastCheckTime = ts
+
+	for i := range qq {
+		t := qq[i].Context.TraceToken
+		if len(t) > 14 {
+			t = fmt.Sprintf("%s-%04d-%s", t[:8], i, t[14:])
+			qq[i].Context.TraceToken = t
+		}
 	}
-	switch {
-	case !isT(res.NextCheckTime) && isT(svc.NextCheckTime):
-		res.NextCheckTime = svc.NextCheckTime
-	case isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
-		svc.NextCheckTime = res.NextCheckTime
-	case !isT(res.NextCheckTime) && !isT(svc.NextCheckTime):
-		res.NextCheckTime = ts
-		svc.NextCheckTime = ts
-	}
+	return qq
 }
 
-func makeGKey(gg []transit.ResourceGroup) string {
-	keys := make([]string, len(gg))
-	for _, g := range gg {
-		keys = append(keys, string(g.Type)+":"+g.GroupName)
+func packGroups(input []transit.ResourceGroup) []transit.ResourceGroup {
+	if len(input) == 0 {
+		return nil
 	}
-	sort.Strings(keys)
-	return strings.Join(keys, "#")
+
+	type RG struct {
+		transit.ResourceGroup
+		resources map[string]transit.ResourceRef
+	}
+
+	m := make(map[string]RG)
+	for _, g := range input {
+		gk := strings.Join([]string{string(g.Type), g.GroupName}, ":")
+		if _, ok := m[gk]; !ok {
+			m[gk] = RG{ResourceGroup: g, resources: make(map[string]transit.ResourceRef)}
+		}
+		rg := m[gk]
+		for _, res := range g.Resources {
+			rk := strings.Join([]string{string(res.Type), res.Name}, ":")
+			rg.resources[rk] = res
+		}
+		m[gk] = rg
+	}
+
+	output := make([]transit.ResourceGroup, 0)
+	for _, rg := range m {
+		g := rg.ResourceGroup
+		if len(rg.resources) > 0 {
+			g.Resources = make([]transit.ResourceRef, 0)
+			for _, r := range rg.resources {
+				g.Resources = append(g.Resources, r)
+			}
+		}
+		output = append(output, g)
+	}
+
+	return output
 }
