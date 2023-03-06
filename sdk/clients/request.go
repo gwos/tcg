@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/gwos/tcg/sdk/logper"
 )
@@ -16,6 +17,7 @@ var httpClient = &http.Client{
 	Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	},
+	Timeout: time.Duration(5 * time.Second),
 }
 
 var HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
