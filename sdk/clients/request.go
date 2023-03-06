@@ -20,6 +20,10 @@ var httpClient = &http.Client{
 	Timeout: time.Duration(5 * time.Second),
 }
 
+// NetClientTimeout provides ability to change 5sec defaults:
+// *NetClientTimeout = time.Duration(10*time.Second)
+var NetClientTimeout = &(httpClient.Timeout)
+
 var HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
 	return ctx, req
 }
