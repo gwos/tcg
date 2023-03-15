@@ -10,7 +10,7 @@ import (
 )
 
 func TestEvents(t *testing.T) {
-	testMessage, err := parseJSON("fixtures/sendEvents.json")
+	testMessage, err := readFile("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
 	setupIntegration(t, 5*time.Second)
