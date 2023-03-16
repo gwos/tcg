@@ -144,7 +144,7 @@ func (client *GWClient) connectLocal() (string, error) {
 	switch {
 	case err != nil:
 		logper.Error(req, "could not connect local groundwork")
-		if tcgerr.IsErrorConnection(err) {
+		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -200,7 +200,7 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	switch {
 	case err != nil:
 		logper.Error(req, "could not authenticate password")
-		if tcgerr.IsErrorConnection(err) {
+		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -269,7 +269,7 @@ func (client *GWClient) Disconnect() error {
 	switch {
 	case err != nil:
 		logper.Error(req, "could not disconnect groundwork")
-		if tcgerr.IsErrorConnection(err) {
+		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return err
@@ -338,7 +338,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	}
 
 	logper.Error(req, "could not validate groundwork token")
-	if tcgerr.IsErrorConnection(err) {
+	if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
 	return err
@@ -545,7 +545,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, reqU
 	switch {
 	case err != nil:
 		logper.Error(req, "could not send request")
-		if tcgerr.IsErrorConnection(err) {
+		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return nil, err

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"strings"
 	"syscall"
 )
 
@@ -13,6 +14,7 @@ const (
 	WSAECONNABORTED syscall.Errno = 10053
 	WSAECONNRESET   syscall.Errno = 10054
 	WSAECONNREFUSED syscall.Errno = 10061
+	WSAETIMEDOUT    syscall.Errno = 10060
 )
 
 // define error types for retry logic
@@ -79,4 +81,18 @@ func IsErrorConnectionReset(err error) bool {
 		return errors.Is(err, WSAECONNRESET)
 	}
 	return errors.Is(err, syscall.ECONNRESET)
+}
+
+// IsErrorTimedOut verifies error
+func IsErrorTimedOut(err error) bool {
+	if runtime.GOOS == "windows" {
+		if errors.Is(err, WSAETIMEDOUT) {
+			return true
+		}
+	} else {
+		if errors.Is(err, syscall.ETIMEDOUT) {
+			return true
+		}
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "timeout")
 }
