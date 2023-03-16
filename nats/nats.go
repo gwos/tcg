@@ -1,23 +1,26 @@
 package nats
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"sync"
 	"time"
 
-	natsd "github.com/nats-io/nats-server/v2/server"
-	stand "github.com/nats-io/nats-streaming-server/server"
-	"github.com/nats-io/nats-streaming-server/stores"
-	"github.com/nats-io/stan.go"
+	"github.com/nats-io/nats-server/v2/server"
+	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
 // Define NATS IDs
 const (
-	clusterID    = "tcg-cluster"
-	dispatcherID = "tcg-dispatcher"
-	publisherID  = "tcg-publisher"
+	tcgClusterID  = "tcg-cluster"
+	tcgStreamName = "tcg-stream"
+
+	subjDowntime         = "downtime"
+	subjEvents           = "events"
+	subjInventoryMetrics = "inventory-metrics"
 )
 
 var (
@@ -30,11 +33,11 @@ var (
 type state struct {
 	sync.Mutex
 
-	config     Config
-	stanServer *stand.StanServer
+	config Config
+	server *server.Server
 	// if a client is too slow the server will eventually cut them off by closing the connection
-	connDispatcher stan.Conn
-	connPublisher  stan.Conn
+	jsDispatcher nats.JetStreamContext
+	jsPublisher  nats.JetStreamContext
 }
 
 // Config defines NATS configurable options
@@ -53,6 +56,8 @@ type Config struct {
 	StoreMaxMsgs        int
 	StoreBufferSize     int
 	StoreReadBufferSize int
+
+	ConfigFile string
 }
 
 // DispatcherOption defines subscription
@@ -64,53 +69,51 @@ type DispatcherOption struct {
 
 // StartServer runs NATS
 func StartServer(config Config) error {
-	natsOpts := stand.DefaultNatsServerOptions.Clone()
-	natsOpts.MaxPayload = config.MaxPayload
-	natsOpts.HTTPHost = "0.0.0.0"
-	natsOpts.HTTPPort = config.MonitorPort
-	natsOpts.Port = natsd.RANDOM_PORT
+	opts := server.Options{}
 
-	stanOpts := stand.GetDefaultOptions().Clone()
-	stanOpts.ID = clusterID
-	stanOpts.FilestoreDir = config.StoreDir
-	switch config.StoreType {
-	case "MEMORY":
-		stanOpts.StoreType = stores.TypeMemory
-	case "FILE":
-		stanOpts.StoreType = stores.TypeFile
-	default:
-		stanOpts.StoreType = stores.TypeFile
+	if config.ConfigFile != "" {
+		if _, err := os.Open(config.ConfigFile); err != nil {
+			return errors.New("invalid path to config file specified")
+		}
+		if err := opts.ProcessConfigFile(config.ConfigFile); err != nil {
+			return err
+		}
+	} else {
+		opts.Cluster.Name = tcgClusterID
+		opts.StoreDir = config.StoreDir
+		opts.JetStream = true
+		opts.JetStreamMaxStore = config.StoreMaxBytes
+		opts.HTTPHost = "0.0.0.0"
+		opts.HTTPPort = config.MonitorPort
+		opts.Host = "0.0.0.0"
+		opts.Port = nats.DefaultPort
 	}
-	stanOpts.StoreLimits.MaxAge = config.StoreMaxAge
-	stanOpts.StoreLimits.MaxBytes = config.StoreMaxBytes
-	stanOpts.StoreLimits.MaxMsgs = config.StoreMaxMsgs
-	stanOpts.FileStoreOpts.BufferSize = config.StoreBufferSize
-	stanOpts.FileStoreOpts.ReadBufferSize = config.StoreReadBufferSize
 
 	s.Lock()
 	defer s.Unlock()
 
 	s.config = config
-	if s.stanServer == nil {
-		if stanServer, err := stand.RunServerWithOpts(stanOpts, natsOpts); err == nil {
-			s.stanServer = stanServer
+	if s.server == nil {
+		if natsServer, err := server.NewServer(&opts); err == nil {
+			s.server = natsServer
 			log.Info().
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.Interface("stanOpts", stanOpts).
-							Interface("natsOpts", natsOpts)
+						e.Interface("natsOpts", opts)
 					}
 				}).
-				Msgf("nats started at: %s", s.stanServer.ClientURL())
+				Msgf("nats started at: %s", s.server.ClientURL())
 		} else {
 			log.Warn().
 				Err(err).
-				Interface("stanOpts", stanOpts).
-				Interface("natsOpts", natsOpts).
+				Interface("natsOpts", opts).
 				Msg("nats RunServerWithOpts failed")
 			return err
 		}
 	}
+
+	s.server.Start()
+
 	return nil
 }
 
@@ -119,17 +122,15 @@ func StopServer() {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.connDispatcher != nil {
-		_ = s.connDispatcher.Close()
-		s.connDispatcher = nil
+	if s.jsDispatcher != nil {
+		s.jsDispatcher = nil
 	}
-	if s.connPublisher != nil {
-		_ = s.connPublisher.Close()
-		s.connPublisher = nil
+	if s.jsPublisher != nil {
+		s.jsPublisher = nil
 	}
-	if s.stanServer != nil {
-		s.stanServer.Shutdown()
-		s.stanServer = nil
+	if s.server != nil {
+		s.server.Shutdown()
+		s.server = nil
 	}
 }
 
@@ -142,29 +143,47 @@ func StartDispatcher(options []DispatcherOption) error {
 	d.Lock()
 	defer d.Unlock()
 
-	if d.connDispatcher == nil {
-		if d.stanServer == nil {
+	if d.jsDispatcher == nil {
+		if d.server == nil {
 			err := fmt.Errorf("%v: unavailable", ErrNATS)
 			log.Warn().Err(err).Msg("nats dispatcher failed")
 			return err
 		}
-		var err error
-		if d.connDispatcher, err = stan.Connect(
-			clusterID,
-			dispatcherID,
-			stan.NatsURL(d.stanServer.ClientURL()),
-			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
-				log.Warn().Err(e).Msg("nats dispatcher invoked ConnectionLostHandler")
-				d.Lock()
-				_ = c.Close()
-				d.connDispatcher = nil
-				d.Unlock()
-				_ = StartDispatcher(options)
-			}),
-		); err != nil {
+
+		nc, err := nats.Connect(
+			nats.DefaultURL,
+			nats.RetryOnFailedConnect(true),
+		)
+		if err != nil {
 			log.Warn().Err(err).Msg("nats dispatcher failed to connect")
 			return err
 		}
+
+		js, err := nc.JetStream()
+		if err != nil {
+			return err
+		}
+
+		if _, err = js.StreamInfo(tcgStreamName); err != nil {
+			if err != nats.ErrStreamNotFound {
+				return err
+			}
+
+			if _, err = js.AddStream(&nats.StreamConfig{
+				Name: tcgStreamName,
+				Subjects: []string{
+					subjEvents,
+					subjDowntime,
+					subjInventoryMetrics,
+				},
+				Storage:   nats.FileStorage,
+				Retention: nats.InterestPolicy,
+			}); err != nil {
+				return err
+			}
+		}
+
+		d.jsDispatcher = js
 	}
 
 	d.durables.Flush()
@@ -182,15 +201,11 @@ func StopDispatcher() error {
 	d.Lock()
 	defer d.Unlock()
 
-	var err error
-	if d.connDispatcher != nil {
-		err = d.connDispatcher.Close()
-		d.connDispatcher = nil
-	}
+	d.jsDispatcher = nil
 	d.durables.Flush()
 	d.msgsDone.Flush()
 	d.retryes.Flush()
-	return err
+	return nil
 }
 
 // Publish adds message in queue
@@ -198,29 +213,31 @@ func Publish(subject string, msg []byte) error {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.connPublisher == nil {
-		if s.stanServer == nil {
+	if s.jsPublisher == nil {
+		if s.server == nil {
 			err := fmt.Errorf("%v: unavailable", ErrNATS)
 			log.Warn().Err(err).Msg("nats publisher failed")
 			return err
 		}
-		var err error
-		if s.connPublisher, err = stan.Connect(
-			clusterID,
-			publisherID,
-			stan.NatsURL(s.stanServer.ClientURL()),
-			stan.MaxPubAcksInflight(s.config.MaxPubAcksInflight),
-			stan.SetConnectionLostHandler(func(c stan.Conn, e error) {
-				log.Warn().Err(e).Msg("nats publisher invoked ConnectionLostHandler")
-				s.Lock()
-				_ = c.Close()
-				s.connPublisher = nil
-				s.Unlock()
-			}),
-		); err != nil {
+
+		nc, err := nats.Connect(
+			nats.DefaultURL,
+			nats.RetryOnFailedConnect(true),
+		)
+		if err != nil {
 			log.Warn().Err(err).Msg("nats publisher failed to connect")
 			return err
 		}
+
+		js, err := nc.JetStream()
+		if err != nil {
+			return err
+		}
+
+		s.jsPublisher = js
 	}
-	return s.connPublisher.Publish(subject, msg)
+
+	_, err := s.jsPublisher.Publish(subject, msg)
+
+	return err
 }

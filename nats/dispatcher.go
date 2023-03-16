@@ -8,7 +8,7 @@ import (
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/taskqueue"
-	"github.com/nats-io/stan.go"
+	"github.com/nats-io/nats.go"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -68,13 +68,13 @@ func getDispatcher() *natsDispatcher {
 // handleError handles the error in the processor of durable subscription
 // in case of some transient error (like networking issue)
 // it closes current subscription (doesn't unsubscribe) and plans retry
-func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
+func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.Msg, err error, opt DispatcherOption) {
 	logEvent := log.Info().Err(err).Str("durable", opt.Durable).
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.RawJSON("stan.data", msg.Data).
-					Uint64("stan.sequence", msg.Sequence).
-					Int64("stan.timestamp", msg.Timestamp)
+				e.RawJSON("nats.data", msg.Data)
+				//Uint64("stan.sequence", msg.Sequence).
+				//Int64("stan.timestamp", msg.Timestamp)
 			}
 		})
 
@@ -94,7 +94,6 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 				Msg("dispatcher could not deliver: will retry")
 
 			d.Lock()
-			_ = subscription.Close()
 			d.durables.Delete(opt.Durable)
 			d.retryes.Set(opt.Durable, retry, 0)
 			d.Unlock()
@@ -113,11 +112,12 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 	var (
 		errSubs      error
-		subscription stan.Subscription
+		subscription *nats.Subscription
 	)
-	if subscription, errSubs = d.connDispatcher.Subscribe(
+
+	if subscription, errSubs = d.jsDispatcher.Subscribe(
 		opt.Subject,
-		func(msg *stan.Msg) {
+		func(msg *nats.Msg) {
 			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
 			// ..when the subscription starts and has a lot of backlog messages,
 			// is that the server is going to send all pending messages for this consumer "at once",
@@ -127,33 +127,37 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
 			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
 			// and it may in that case resend again, so you should Ack the message there.
-			ckDone := fmt.Sprintf("%s#%d", opt.Durable, msg.Sequence)
+			// ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
+			md, err := msg.Metadata()
+			if err != nil {
+				return
+			}
+			ckDone := fmt.Sprintf("%s#%d", opt.Durable, md.Sequence.Stream)
+			fmt.Println(ckDone)
 			if _, isDone := d.msgsDone.Get(ckDone); isDone {
 				_ = msg.Ack()
 				return
 			}
-
 			if err := opt.Handler(msg.Data); err != nil {
 				d.handleError(subscription, msg, err, opt)
 				return
 			}
+			fmt.Printf("%s - %d\n", "DONE", md.Sequence.Stream)
 			_ = msg.Ack()
 			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
 			log.Info().Str("durable", opt.Durable).
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.RawJSON("stan.data", msg.Data).
-							Uint64("stan.sequence", msg.Sequence).
-							Int64("stan.timestamp", msg.Timestamp)
+						e.RawJSON("nats.data", msg.Data)
+						// Uint64("stan.sequence", msg.Sequence).
+						// Int64("stan.timestamp", msg.Timestamp)
 					}
 				}).
 				Msg("dispatcher delivered")
 		},
-		stan.SetManualAckMode(),
-		stan.AckWait(d.config.AckWait),
-		stan.MaxInflight(d.config.MaxInflight),
-		stan.DurableName(opt.Durable),
-		stan.StartWithLastReceived(),
+		nats.Durable(opt.Durable),
+		nats.ManualAck(),
+		//nats.Ack(d.config.AckWait),
 	); errSubs != nil {
 		return errSubs
 	}
@@ -175,7 +179,7 @@ func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 	defer d.Unlock()
 
 	var err error
-	if d.connDispatcher != nil {
+	if d.jsDispatcher != nil {
 		if _, isOpen := d.durables.Get(opt.Durable); !isOpen {
 			if err = d.openDurable(opt); err == nil {
 				d.durables.Set(opt.Durable, 0, -1)

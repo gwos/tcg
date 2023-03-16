@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -434,6 +435,8 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 }
 
 func (service *AgentService) makeDispatcherOption(durable, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
+	durable = strings.ReplaceAll(durable, "/", "")
+	durable = strings.ReplaceAll(durable, ".", "")
 	return nats.DispatcherOption{
 		Durable: durable,
 		Subject: subj,
@@ -617,6 +620,8 @@ func (service *AgentService) startNats() error {
 		StoreMaxMsgs:        service.Connector.NatsStoreMaxMsgs,
 		StoreBufferSize:     service.Connector.NatsStoreBufferSize,
 		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
+
+		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
 	if err == nil {
 		service.agentStatus.Nats = StatusRunning

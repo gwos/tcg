@@ -136,6 +136,9 @@ type Connector struct {
 	// NatsStoreReadBufferSize for FileStore type
 	// size of the buffer to preload messages
 	NatsStoreReadBufferSize int `yaml:"-"`
+	// NatsServerConfigFile is used to override yaml values for
+	// NATS server configuration (debug only).
+	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -256,6 +259,8 @@ func defaults() Config {
 			NatsStoreMaxMsgs:        1000000,                 // 1 000 000
 			NatsStoreBufferSize:     1024 * 1024 * 2,         // 2MB
 			NatsStoreReadBufferSize: 1024 * 1024 * 2,         // 2MB
+
+			NatsServerConfigFile: "",
 		},
 		// create disabled connections to support partial setting with struct-path
 		// 4 items should be enough
