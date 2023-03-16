@@ -115,7 +115,7 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 		subscription *nats.Subscription
 	)
 
-	if subscription, errSubs = d.jsDispatcher.Subscribe(
+	subscription, errSubs = d.jsDispatcher.Subscribe(
 		opt.Subject,
 		func(msg *nats.Msg) {
 			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
@@ -133,7 +133,6 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 				return
 			}
 			ckDone := fmt.Sprintf("%s#%d", opt.Durable, md.Sequence.Stream)
-			fmt.Println(ckDone)
 			if _, isDone := d.msgsDone.Get(ckDone); isDone {
 				_ = msg.Ack()
 				return
@@ -142,7 +141,6 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 				d.handleError(subscription, msg, err, opt)
 				return
 			}
-			fmt.Printf("%s - %d\n", "DONE", md.Sequence.Stream)
 			_ = msg.Ack()
 			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
 			log.Info().Str("durable", opt.Durable).
@@ -158,9 +156,12 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 		nats.Durable(opt.Durable),
 		nats.ManualAck(),
 		//nats.Ack(d.config.AckWait),
-	); errSubs != nil {
+	)
+	if errSubs != nil {
 		return errSubs
 	}
+
+	d.jsSubscription = subscription
 
 	// Workaround v8.1.3 to fix processing large natsstore from prior versions
 	// Modern envs should use the correct value of MaxInflight setting

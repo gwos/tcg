@@ -36,8 +36,9 @@ type state struct {
 	config Config
 	server *server.Server
 	// if a client is too slow the server will eventually cut them off by closing the connection
-	jsDispatcher nats.JetStreamContext
-	jsPublisher  nats.JetStreamContext
+	jsDispatcher   nats.JetStreamContext
+	jsPublisher    nats.JetStreamContext
+	jsSubscription *nats.Subscription
 }
 
 // Config defines NATS configurable options
@@ -201,6 +202,7 @@ func StopDispatcher() error {
 	d.Lock()
 	defer d.Unlock()
 
+	_ = d.jsSubscription.Unsubscribe()
 	d.jsDispatcher = nil
 	d.durables.Flush()
 	d.msgsDone.Flush()
