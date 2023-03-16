@@ -30,25 +30,20 @@ dsConnection:  # empty set
 	err = tmpFile.Close()
 	assert.NoError(t, err)
 
-	_ = os.Setenv(ConfigEnv, tmpFile.Name())
-	_ = os.Setenv("TCG_CONNECTOR_AGENTID", `AGENT-ID`)
-	_ = os.Setenv("TCG_CONNECTOR_ENABLED", `false`)
-	_ = os.Setenv("TCG_CONNECTOR_BATCHMAXBYTES", `111`)
-	_ = os.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
-	_ = os.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
-	_ = os.Setenv("TCG_GWCONNECTIONS_1_PASSWORD", "SEC_RET")
-	defer os.Unsetenv("TCG_CONNECTOR_AGENTID")
-	defer os.Unsetenv("TCG_CONNECTOR_ENABLED")
-	defer os.Unsetenv("TCG_CONNECTOR_BATCHMAXBYTES")
-	defer os.Unsetenv("TCG_DSCONNECTION_HOSTNAME")
-	defer os.Unsetenv("TCG_GWCONNECTIONS_0_PASSWORD")
-	defer os.Unsetenv("TCG_GWCONNECTIONS_1_PASSWORD")
-	defer os.Unsetenv(ConfigEnv)
+	t.Setenv(ConfigEnv, tmpFile.Name())
+	t.Setenv("TCG_CONNECTOR_AGENTID", `AGENT-ID`)
+	t.Setenv("TCG_CONNECTOR_ENABLED", `false`)
+	t.Setenv("TCG_CONNECTOR_BATCHMAXBYTES", `111`)
+	t.Setenv("TCG_CONNECTOR_LOGLEVEL", `2`)
+	t.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
+	t.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
+	t.Setenv("TCG_GWCONNECTIONS_1_PASSWORD", "SEC_RET")
 
 	_ = GetConfig()
 	assert.Equal(t, "AGENT-ID", cfg.Connector.AgentID)
 	assert.Equal(t, false, cfg.Connector.Enabled)
 	assert.Equal(t, 111, cfg.Connector.BatchMaxBytes)
+	assert.Equal(t, LogLevel(2), cfg.Connector.LogLevel)
 	// assert.Equal(t, "localhost:3001", cfg.DSConnection.HostName)
 	assert.Equal(t, "SEC RET", cfg.GWConnections[0].Password)
 	assert.Equal(t, "SEC_RET", cfg.GWConnections[1].Password)
@@ -82,18 +77,12 @@ gwConnections:
 	err = tmpFile.Close()
 	assert.NoError(t, err)
 
-	_ = os.Setenv(ConfigEnv, tmpFile.Name())
-	_ = os.Setenv("TCG_CONNECTOR_NATSSTOREMAXAGE", "1h")
-	_ = os.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-	_ = os.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
-	_ = os.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
-	_ = os.Setenv("TCG_GWCONNECTIONS_1_HOSTNAME", "localhost:3001")
-	defer os.Unsetenv(ConfigEnv)
-	defer os.Unsetenv("TCG_CONNECTOR_NATSSTOREMAXAGE")
-	defer os.Unsetenv("TCG_CONNECTOR_NATSSTORETYPE")
-	defer os.Unsetenv("TCG_DSCONNECTION_HOSTNAME")
-	defer os.Unsetenv("TCG_GWCONNECTIONS_0_PASSWORD")
-	defer os.Unsetenv("TCG_GWCONNECTIONS_1_HOSTNAME")
+	t.Setenv(ConfigEnv, tmpFile.Name())
+	t.Setenv("TCG_CONNECTOR_NATSSTOREMAXAGE", "1h")
+	t.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	t.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
+	t.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
+	t.Setenv("TCG_GWCONNECTIONS_1_HOSTNAME", "localhost:3001")
 
 	expected := defaults()
 	expected.Connector.AgentID = "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
@@ -135,10 +124,8 @@ dsConnection:
 	_, err = tmpFile.Write(configYAML)
 	assert.NoError(t, err)
 
-	_ = os.Setenv(ConfigEnv, tmpFile.Name())
-	_ = os.Setenv("TCG_CONNECTOR_CONTROLLERADDR", ":8022")
-	defer os.Unsetenv(ConfigEnv)
-	defer os.Unsetenv("TCG_CONNECTOR_CONTROLLERADDR")
+	t.Setenv(ConfigEnv, tmpFile.Name())
+	t.Setenv("TCG_CONNECTOR_CONTROLLERADDR", ":8022")
 
 	expected := defaults()
 	expected.Connector.AppName = "test-app"
@@ -223,8 +210,7 @@ gwConnections:
     password: _v1_fc0546f02af1c34298d207468a78bc38cda6bd480d3357c8220580883747505d7971c3c43610cea1bc1df9e3292cb935
 `)
 
-	_ = os.Setenv(SecKeyEnv, "SECRET")
-	defer os.Unsetenv(SecKeyEnv)
+	t.Setenv(SecKeyEnv, "SECRET")
 
 	var cfg Config
 	assert.NoError(t, yaml.Unmarshal(configYAML, &cfg))
