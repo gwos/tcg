@@ -177,7 +177,7 @@ func StartDispatcher(options []DispatcherOption) error {
 					subjInventoryMetrics,
 				},
 				Storage:   nats.FileStorage,
-				Retention: nats.InterestPolicy,
+				Retention: nats.LimitsPolicy,
 			}); err != nil {
 				return err
 			}
@@ -242,7 +242,7 @@ func Publish(subject string, msg []byte) error {
 		s.jsPublisher = js
 	}
 
-	_, err := s.jsPublisher.Publish(subject, msg)
+	_, err := s.jsPublisher.Publish(subject, msg, nats.RetryAttempts(0), nats.RetryWait(time.Minute*10))
 
 	return err
 }

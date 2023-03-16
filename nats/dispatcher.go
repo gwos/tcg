@@ -94,6 +94,7 @@ func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.
 				Msg("dispatcher could not deliver: will retry")
 
 			d.Lock()
+			_ = subscription.Unsubscribe()
 			d.durables.Delete(opt.Durable)
 			d.retryes.Set(opt.Durable, retry, 0)
 			d.Unlock()
@@ -118,16 +119,6 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 	subscription, errSubs = d.jsDispatcher.Subscribe(
 		opt.Subject,
 		func(msg *nats.Msg) {
-			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
-			// ..when the subscription starts and has a lot of backlog messages,
-			// is that the server is going to send all pending messages for this consumer "at once",
-			// that is, without releasing the consumer lock.
-			// The application may get them and ack, but the ack won't be processed
-			// because the server is still sending messages to this consumer.
-			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
-			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
-			// and it may in that case resend again, so you should Ack the message there.
-			// ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
 			md, err := msg.Metadata()
 			if err != nil {
 				return
@@ -146,16 +137,16 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 			log.Info().Str("durable", opt.Durable).
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.RawJSON("nats.data", msg.Data)
-						// Uint64("stan.sequence", msg.Sequence).
-						// Int64("stan.timestamp", msg.Timestamp)
+						e.RawJSON("nats.data", msg.Data).
+							Uint64("stan.sequence", md.Sequence.Stream).
+							Int64("stan.timestamp", md.Timestamp.Unix())
 					}
 				}).
 				Msg("dispatcher delivered")
 		},
 		nats.Durable(opt.Durable),
 		nats.ManualAck(),
-		//nats.Ack(d.config.AckWait),
+		nats.AckWait(d.config.AckWait),
 	)
 	if errSubs != nil {
 		return nil, errSubs
