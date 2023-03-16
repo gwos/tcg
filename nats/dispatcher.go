@@ -109,7 +109,7 @@ func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.
 	}
 }
 
-func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
+func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, error) {
 	var (
 		errSubs      error
 		subscription *nats.Subscription
@@ -158,14 +158,12 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 		//nats.Ack(d.config.AckWait),
 	)
 	if errSubs != nil {
-		return errSubs
+		return nil, errSubs
 	}
-
-	d.jsSubscription = subscription
 
 	// Workaround v8.1.3 to fix processing large natsstore from prior versions
 	// Modern envs should use the correct value of MaxInflight setting
-	return subscription.SetPendingLimits(d.config.MaxPendingMsgs, d.config.MaxPendingBytes)
+	return subscription, subscription.SetPendingLimits(d.config.MaxPendingMsgs, d.config.MaxPendingBytes)
 }
 
 func (d *natsDispatcher) retryDurable(opt DispatcherOption) error {
@@ -182,8 +180,8 @@ func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 	var err error
 	if d.jsDispatcher != nil {
 		if _, isOpen := d.durables.Get(opt.Durable); !isOpen {
-			if err = d.openDurable(opt); err == nil {
-				d.durables.Set(opt.Durable, 0, -1)
+			if sub, err := d.openDurable(opt); err == nil {
+				d.durables.Set(opt.Durable, sub, -1)
 			}
 		}
 	} else {
