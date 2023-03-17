@@ -292,18 +292,17 @@ func GetConfig() *Config {
 					Str("configPath", cfg.ConfigPath()).
 					Msg("could not parse config")
 			}
-
-			if data, err := yaml.Marshal(cfg); err == nil {
-				data = applyEnv(data)
-				if err := yaml.Unmarshal(data, cfg); err != nil {
-					log.Err(err).
-						Str("configData", string(data)).
-						Msg("could not apply env vars")
-				}
-			} else {
-				log.Warn().Err(err).
+		}
+		if data, err := yaml.Marshal(cfg); err == nil {
+			data = applyEnv(data)
+			if err := yaml.Unmarshal(data, cfg); err != nil {
+				log.Err(err).
+					Str("configData", string(data)).
 					Msg("could not apply env vars")
 			}
+		} else {
+			log.Warn().Err(err).
+				Msg("could not apply env vars")
 		}
 
 		/* init logger and flush buffer */
