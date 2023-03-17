@@ -242,7 +242,7 @@ func Publish(subject string, msg []byte) error {
 		s.jsPublisher = js
 	}
 
-	_, err := s.jsPublisher.Publish(subject, msg, nats.RetryAttempts(0), nats.RetryWait(time.Minute*10))
+	_, err := s.jsPublisher.Publish(subject, msg)
 
 	return err
 }
