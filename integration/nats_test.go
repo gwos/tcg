@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
 	"testing"
 	"time"
 
@@ -19,19 +18,24 @@ import (
 )
 
 const (
-	GWHostName       = "https://localhost"
-	GWUserNameEnv    = "TEST_GW_USERNAME"
-	GWPasswordEnv    = "TEST_GW_PASSWORD"
-	TestAgentID      = "INTEGRATION-TEST"
-	TestAppName      = "INTEGRATION-TEST"
-	TestAppType      = "VEMA"
-	TestHostName     = "GW8_TCG_TEST_HOST"
-	TestNatsStoreDir = "natsstore.test"
+	TestHostName = "GW8_TCG_TEST_HOST"
 
-	TestMessagesCount         = 3
-	PerformanceServicesCount  = 1
+	TestMessagesCount         = 4
+	PerformanceServicesCount  = 2
 	PerformanceResourcesCount = 1000
 )
+
+var TestConfigDefaults = map[string]string{
+	"TCG_CONNECTOR_AGENTID":          "INTEGRATION-TEST",
+	"TCG_CONNECTOR_APPNAME":          "INTEGRATION-TEST",
+	"TCG_CONNECTOR_APPTYPE":          "VEMA",
+	"TCG_CONNECTOR_ENABLED":          "true",
+	"TCG_CONNECTOR_NATSFILESTOREDIR": "natsstore.test",
+	"TCG_GWCONNECTIONS_0_ENABLED":    "true",
+	"TCG_GWCONNECTIONS_0_HOSTNAME":   "https://localhost",
+	"TCG_GWCONNECTIONS_0_PASSWORD":   "",
+	"TCG_GWCONNECTIONS_0_USERNAME":   "",
+}
 
 var apiClient = new(APIClient)
 
@@ -170,43 +174,33 @@ func TestNatsPerformance(t *testing.T) {
 }
 
 func setupIntegration(t *testing.T, natsAckWait time.Duration) {
-	testGWUsername := os.Getenv(GWUserNameEnv)
-	testGWPassword := os.Getenv(GWPasswordEnv)
-	if testGWUsername == "" || testGWPassword == "" {
-		t.Errorf("[setupIntegration]: Provide environment variables for Groundwork Connection username('%s') and password('%s')",
-			GWUserNameEnv, GWPasswordEnv)
+	for k, v := range TestConfigDefaults {
+		if _, ok := os.LookupEnv(k); !ok {
+			t.Setenv(k, v)
+		}
+	}
+	if len(os.Getenv("TCG_GWCONNECTIONS_0_USERNAME")) == 0 ||
+		len(os.Getenv("TCG_GWCONNECTIONS_0_PASSWORD")) == 0 {
+		t.Errorf("[setupIntegration]: Provide environment variables for Groundwork Connection: %s and %s",
+			"TCG_GWCONNECTIONS_0_USERNAME", "TCG_GWCONNECTIONS_0_PASSWORD")
 		t.SkipNow()
 	}
 
 	cfg := config.GetConfig()
-	cfg.Connector.AgentID = TestAgentID
-	cfg.Connector.AppName = TestAppName
-	cfg.Connector.AppType = TestAppType
 	cfg.Connector.NatsAckWait = natsAckWait
-	cfg.Connector.NatsStoreDir = TestNatsStoreDir
-	cfg.GWConnections = []*config.GWConnection{
-		{
-			Enabled:         true,
-			LocalConnection: false,
-			HostName:        GWHostName,
-			UserName:        testGWUsername,
-			Password:        testGWPassword,
-
-			IsDynamicInventory: cfg.Connector.IsDynamicInventory,
-			HTTPEncode:         func() bool { return strings.ToLower(cfg.Connector.GWEncode) == "force" }(),
-		},
-	}
 
 	service := services.GetTransitService()
 	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
 	t.Log("[setupIntegration]: ", service.Status())
+	t.Logf("cfg.Connector: %+v", cfg.Connector)
+	t.Logf("cfg.GWConnections[0]: %+v", cfg.GWConnections[0])
 }
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", TestNatsStoreDir)
+	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
