@@ -100,7 +100,7 @@ func GetAgentService() *AgentService {
 			configHandler: defaultConfigHandler,
 			exitHandler:   defaultExitHandler,
 
-			stats: NewAgentStats(),
+			stats: NewStats(),
 		}
 
 		agentService.initTracerToken()
@@ -435,8 +435,9 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 }
 
 func (service *AgentService) makeDispatcherOption(durable, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
-	durable = strings.ReplaceAll(durable, "/", "")
-	durable = strings.ReplaceAll(durable, ".", "")
+	for _, s := range []string{"/", ".", "*", ">"} {
+		durable = strings.ReplaceAll(durable, s, "")
+	}
 	return nats.DispatcherOption{
 		Durable: durable,
 		Subject: subj,
@@ -562,21 +563,8 @@ func (service *AgentService) resetNats() error {
 	if err := service.stopNats(); err != nil {
 		log.Warn().Err(err).Msg("could not stop nats")
 	}
-	globs := [...]string{
-		"*/msgs.*.dat",
-		"*/msgs.*.idx",
-		"*/subs.dat",
-		"clients.dat",
-		"server.dat",
-	}
-	for _, glob := range globs {
-		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
-		for _, f := range files {
-			log.Debug().Msgf("removing: %s", f)
-			if err := os.Remove(f); err != nil {
-				log.Warn().Msgf("could not remove: %s", f)
-			}
-		}
+	if err := os.RemoveAll(filepath.Join(service.Connector.NatsStoreDir, "jetstream")); err != nil {
+		log.Warn().Err(err).Msgf("could not remove nats jetstream dir")
 	}
 	if st0.Nats == StatusRunning {
 		if err := service.startNats(); err != nil {
@@ -610,8 +598,6 @@ func (service *AgentService) startNats() error {
 		MaxInflight:         service.Connector.NatsMaxInflight,
 		MaxPubAcksInflight:  service.Connector.NatsMaxPubAcksInflight,
 		MaxPayload:          service.Connector.NatsMaxPayload,
-		MaxPendingBytes:     service.Connector.NatsMaxPendingBytes,
-		MaxPendingMsgs:      service.Connector.NatsMaxPendingMsgs,
 		MonitorPort:         service.Connector.NatsMonitorPort,
 		StoreDir:            service.Connector.NatsStoreDir,
 		StoreType:           service.Connector.NatsStoreType,

@@ -109,14 +109,6 @@ type Connector struct {
 	// until the number of unacknowledged messages falls below the specified limit
 	NatsMaxPubAcksInflight int   `yaml:"-"`
 	NatsMaxPayload         int32 `yaml:"-"`
-	// NatsMaxPendingBytes. Deprecated. Use NatsMaxInflight instead.
-	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
-	// Zero is not allowed. Any negative value means that the given metric is not limited.
-	NatsMaxPendingBytes int `yaml:"-"`
-	// NatsMaxPendingMsgs. Deprecated. Use NatsMaxInflight instead.
-	// sets the limits for pending msgs and bytes for the internal low-level NATS Subscription.
-	// Zero is not allowed. Any negative value means that the given metric is not limited.
-	NatsMaxPendingMsgs int `yaml:"-"`
 	// NatsMonitorPort enables monitoring on http port useful for debug
 	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
 	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
@@ -246,11 +238,9 @@ func defaults() Config {
 			LogNoColor:              false,
 			LogTimeFormat:           time.RFC3339,
 			NatsAckWait:             time.Second * 30,
-			NatsMaxInflight:         1024,
-			NatsMaxPubAcksInflight:  1024,
-			NatsMaxPayload:          1024 * 1024 * 64, // 64MB github.com/nats-io/nats-server/releases/tag/v2.3.4
-			NatsMaxPendingBytes:     -1,
-			NatsMaxPendingMsgs:      1024,
+			NatsMaxInflight:         4,
+			NatsMaxPubAcksInflight:  4,
+			NatsMaxPayload:          1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
 			NatsMonitorPort:         0,
 			NatsStoreDir:            "natsstore",
 			NatsStoreType:           "FILE",

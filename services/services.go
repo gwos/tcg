@@ -51,7 +51,7 @@ type Stats struct {
 	exp *expvar.Map
 }
 
-func NewAgentStats() *Stats {
+func NewStats() *Stats {
 	p := &Stats{
 		BytesSent:              expvar.NewInt("tcgBytesSent"),
 		MetricsSent:            expvar.NewInt("tcgMetricsSent"),

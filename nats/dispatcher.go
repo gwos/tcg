@@ -40,7 +40,7 @@ type natsDispatcher struct {
 
 	durables *cache.Cache
 	msgsDone *cache.Cache
-	retryes  *cache.Cache
+	retries  *cache.Cache
 
 	taskQueue *taskqueue.TaskQueue
 }
@@ -52,7 +52,7 @@ func getDispatcher() *natsDispatcher {
 
 			durables: cache.New(-1, -1),
 			msgsDone: cache.New(time.Minute*10, time.Minute*10),
-			retryes:  cache.New(time.Minute*30, time.Minute*30),
+			retries:  cache.New(time.Minute*30, time.Minute*30),
 		}
 		// provide buffer to handle corner case: a few targets anavailable on startup
 		dispatcher.taskQueue = taskqueue.NewTaskQueue(
@@ -72,9 +72,12 @@ func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.
 	logEvent := log.Info().Err(err).Str("durable", opt.Durable).
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.RawJSON("nats.data", msg.Data)
-				//Uint64("stan.sequence", msg.Sequence).
-				//Int64("stan.timestamp", msg.Timestamp)
+				e.RawJSON("nats.msg.data", msg.Data)
+				if meta, err := msg.Metadata(); err == nil {
+					e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
+					e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
+					e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+				}
 			}
 		})
 
@@ -83,7 +86,7 @@ func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.
 			LastError: nil,
 			Retry:     0,
 		}
-		if r, isRetry := d.retryes.Get(opt.Durable); isRetry {
+		if r, isRetry := d.retries.Get(opt.Durable); isRetry {
 			retry = r.(dispatcherRetry)
 		}
 		retry.LastError = err
@@ -96,14 +99,14 @@ func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.
 			d.Lock()
 			_ = subscription.Unsubscribe()
 			d.durables.Delete(opt.Durable)
-			d.retryes.Set(opt.Durable, retry, 0)
+			d.retries.Set(opt.Durable, retry, 0)
 			d.Unlock()
 
 			delay := retryDelays[retry.Retry]
 			_ = time.AfterFunc(delay, func() { _ = d.retryDurable(opt) })
 		} else {
 			logEvent.Msg("dispatcher could not deliver: stop retrying")
-			d.retryes.Delete(opt.Durable)
+			d.retries.Delete(opt.Durable)
 		}
 	} else {
 		logEvent.Msg("dispatcher could not deliver: will not retry")
@@ -119,11 +122,11 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 	subscription, errSubs = d.jsDispatcher.Subscribe(
 		opt.Subject,
 		func(msg *nats.Msg) {
-			md, err := msg.Metadata()
+			meta, err := msg.Metadata()
 			if err != nil {
 				return
 			}
-			ckDone := fmt.Sprintf("%s#%d", opt.Durable, md.Sequence.Stream)
+			ckDone := fmt.Sprintf("%s#%d", opt.Durable, meta.Sequence.Stream)
 			if _, isDone := d.msgsDone.Get(ckDone); isDone {
 				_ = msg.Ack()
 				return
@@ -137,24 +140,21 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 			log.Info().Str("durable", opt.Durable).
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.RawJSON("nats.data", msg.Data).
-							Uint64("stan.sequence", md.Sequence.Stream).
-							Int64("stan.timestamp", md.Timestamp.Unix())
+						e.RawJSON("nats.msg.data", msg.Data)
+						e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
+						e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
+						e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
 					}
 				}).
 				Msg("dispatcher delivered")
 		},
+		nats.BindStream(tcgStreamName),
 		nats.Durable(opt.Durable),
 		nats.ManualAck(),
 		nats.AckWait(d.config.AckWait),
 	)
-	if errSubs != nil {
-		return nil, errSubs
-	}
 
-	// Workaround v8.1.3 to fix processing large natsstore from prior versions
-	// Modern envs should use the correct value of MaxInflight setting
-	return subscription, subscription.SetPendingLimits(d.config.MaxPendingMsgs, d.config.MaxPendingBytes)
+	return subscription, errSubs
 }
 
 func (d *natsDispatcher) retryDurable(opt DispatcherOption) error {

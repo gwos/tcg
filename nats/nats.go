@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 
 // Define NATS IDs
 const (
-	tcgClusterID  = "tcg-cluster"
+	// tcgClusterID  = "tcg-cluster"
 	tcgStreamName = "tcg-stream"
 
 	subjDowntime         = "downtime"
@@ -27,7 +28,8 @@ var (
 	ErrNATS       = fmt.Errorf("nats error")
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 
-	s = new(state)
+	s        = new(state)
+	subjects = []string{subjDowntime, subjEvents, subjInventoryMetrics}
 )
 
 type state struct {
@@ -46,8 +48,6 @@ type Config struct {
 	MaxInflight         int
 	MaxPubAcksInflight  int
 	MaxPayload          int32
-	MaxPendingBytes     int
-	MaxPendingMsgs      int
 	MonitorPort         int
 	StoreDir            string
 	StoreType           string
@@ -69,7 +69,7 @@ type DispatcherOption struct {
 
 // StartServer runs NATS
 func StartServer(config Config) error {
-	opts := server.Options{}
+	opts := new(server.Options)
 
 	if config.ConfigFile != "" {
 		if _, err := os.Open(config.ConfigFile); err != nil {
@@ -79,14 +79,18 @@ func StartServer(config Config) error {
 			return err
 		}
 	} else {
-		opts.Cluster.Name = tcgClusterID
+		// opts.Cluster.Name = tcgClusterID
 		opts.StoreDir = config.StoreDir
 		opts.JetStream = true
+		opts.JetStreamLimits = server.JSLimitOpts{}
 		opts.JetStreamMaxStore = config.StoreMaxBytes
-		opts.HTTPHost = "0.0.0.0"
+		opts.MaxPayload = config.MaxPayload
+		opts.HTTPHost = "127.0.0.1"
 		opts.HTTPPort = config.MonitorPort
-		opts.Host = "0.0.0.0"
-		opts.Port = nats.DefaultPort
+		opts.Host = "127.0.0.1"
+		opts.Port = server.RANDOM_PORT
+
+		opts.Debug = zerolog.GlobalLevel() <= zerolog.DebugLevel
 	}
 
 	s.Lock()
@@ -94,25 +98,29 @@ func StartServer(config Config) error {
 
 	s.config = config
 	if s.server == nil {
-		if natsServer, err := server.NewServer(&opts); err == nil {
+		if natsServer, err := server.NewServer(opts); err == nil {
 			s.server = natsServer
-			log.Info().
-				Func(func(e *zerolog.Event) {
-					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.Interface("natsOpts", opts)
-					}
-				}).
-				Msgf("nats started at: %s", s.server.ClientURL())
 		} else {
 			log.Warn().
 				Err(err).
-				Interface("natsOpts", opts).
-				Msg("nats RunServerWithOpts failed")
+				Interface("natsOpts", *opts).
+				Msg("nats NewServer failed")
 			return err
 		}
 	}
 
+	if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+		s.server.ConfigureLogger()
+	}
+
 	s.server.Start()
+	log.Info().
+		Func(func(e *zerolog.Event) {
+			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+				e.Interface("natsOpts", *opts)
+			}
+		}).
+		Msgf("nats started at: %s", s.server.ClientURL())
 
 	return nil
 }
@@ -151,7 +159,7 @@ func StartDispatcher(options []DispatcherOption) error {
 		}
 
 		nc, err := nats.Connect(
-			nats.DefaultURL,
+			d.server.ClientURL(),
 			nats.RetryOnFailedConnect(true),
 		)
 		if err != nil {
@@ -159,7 +167,9 @@ func StartDispatcher(options []DispatcherOption) error {
 			return err
 		}
 
-		js, err := nc.JetStream()
+		js, err := nc.JetStream(
+			nats.DirectGet(),
+		)
 		if err != nil {
 			return err
 		}
@@ -170,14 +180,17 @@ func StartDispatcher(options []DispatcherOption) error {
 			}
 
 			if _, err = js.AddStream(&nats.StreamConfig{
-				Name: tcgStreamName,
-				Subjects: []string{
-					subjEvents,
-					subjDowntime,
-					subjInventoryMetrics,
-				},
-				Storage:   nats.FileStorage,
+				Name:      tcgStreamName,
+				Subjects:  subjects,
 				Retention: nats.LimitsPolicy,
+				Storage: func() nats.StorageType {
+					if strings.ToUpper(d.config.StoreType) == "MEMORY" {
+						return nats.MemoryStorage
+					}
+					return nats.FileStorage
+				}(),
+				MaxAge:      d.config.StoreMaxAge,
+				AllowDirect: true,
 			}); err != nil {
 				return err
 			}
@@ -209,12 +222,17 @@ func StopDispatcher() error {
 	d.jsDispatcher = nil
 	d.durables.Flush()
 	d.msgsDone.Flush()
-	d.retryes.Flush()
+	d.retries.Flush()
 	return nil
 }
 
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
+	if len(msg) > int(s.config.MaxPayload) {
+		return fmt.Errorf("%v: payload too big for limit %v: %v",
+			subject, s.config.MaxPayload, len(msg))
+	}
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -226,7 +244,7 @@ func Publish(subject string, msg []byte) error {
 		}
 
 		nc, err := nats.Connect(
-			nats.DefaultURL,
+			s.server.ClientURL(),
 			nats.RetryOnFailedConnect(true),
 		)
 		if err != nil {
@@ -236,6 +254,7 @@ func Publish(subject string, msg []byte) error {
 
 		js, err := nc.JetStream()
 		if err != nil {
+			log.Warn().Err(err).Msg("nats publisher failed to JetStream")
 			return err
 		}
 
