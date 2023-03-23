@@ -67,7 +67,8 @@ func getDispatcher() *natsDispatcher {
 
 // handleError handles the error in the processor of durable subscription
 // in case of some transient error (like networking issue)
-// it closes current subscription (doesn't unsubscribe) and plans retry
+// it unsubscribes current subscription (durable consumer should not be deleted)
+// and schedules retry
 func (d *natsDispatcher) handleError(subscription *nats.Subscription, msg *nats.Msg, err error, opt DispatcherOption) {
 	logEvent := log.Info().Err(err).Str("durable", opt.Durable).
 		Func(func(e *zerolog.Event) {
@@ -119,7 +120,33 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 		subscription *nats.Subscription
 	)
 
-	subscription, errSubs = d.jsDispatcher.Subscribe(
+	js, err := d.ncDispatcher.JetStream(
+		nats.DirectGet(),
+	)
+	if err != nil {
+		log.Warn().Err(err).Msg("nats dispatcher failed JetStream")
+		return nil, err
+	}
+
+	// if ci, err := js.ConsumerInfo(streamName, opt.Durable); err == nats.ErrConsumerNotFound {
+	// 	if _, err = js.AddConsumer(streamName, &nats.ConsumerConfig{
+	// 		AckPolicy:     nats.AckExplicitPolicy,
+	// 		DeliverPolicy: nats.DeliverLastPolicy,
+	// 		Durable:       opt.Durable,
+	// 		Name:          opt.Durable,
+	// 	}); err != nil {
+	// 		log.Warn().Err(err).Msg("nats dispatcher failed AddConsumer")
+	// 		return nil, err
+	// 	}
+	// } else if err != nil {
+	// 	log.Warn().Err(err).Msg("nats dispatcher failed ConsumerInfo")
+	// 	return nil, err
+	// } else {
+	// 	log.Debug().Interface("consumer", *ci).
+	// 		Msg("found durable consumer")
+	// }
+
+	subscription, errSubs = js.Subscribe(
 		opt.Subject,
 		func(msg *nats.Msg) {
 			meta, err := msg.Metadata()
@@ -148,10 +175,11 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) (*nats.Subscription, 
 				}).
 				Msg("dispatcher delivered")
 		},
-		nats.BindStream(tcgStreamName),
+		// nats.Bind(streamName, opt.Durable),
+		nats.BindStream(streamName),
 		nats.Durable(opt.Durable),
-		nats.ManualAck(),
 		nats.AckWait(d.config.AckWait),
+		nats.ManualAck(),
 	)
 
 	return subscription, errSubs
@@ -169,7 +197,7 @@ func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 	defer d.Unlock()
 
 	var err error
-	if d.jsDispatcher != nil {
+	if d.ncDispatcher != nil {
 		if _, isOpen := d.durables.Get(opt.Durable); !isOpen {
 			if sub, err := d.openDurable(opt); err == nil {
 				d.durables.Set(opt.Durable, sub, -1)

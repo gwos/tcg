@@ -16,8 +16,7 @@ import (
 
 // Define NATS IDs
 const (
-	// tcgClusterID  = "tcg-cluster"
-	tcgStreamName = "tcg-stream"
+	streamName = "tcg-stream"
 
 	subjDowntime         = "downtime"
 	subjEvents           = "events"
@@ -38,8 +37,8 @@ type state struct {
 	config Config
 	server *server.Server
 	// if a client is too slow the server will eventually cut them off by closing the connection
-	jsDispatcher nats.JetStreamContext
-	jsPublisher  nats.JetStreamContext
+	ncDispatcher *nats.Conn
+	ncPublisher  *nats.Conn
 }
 
 // Config defines NATS configurable options
@@ -79,16 +78,16 @@ func StartServer(config Config) error {
 			return err
 		}
 	} else {
-		// opts.Cluster.Name = tcgClusterID
-		opts.StoreDir = config.StoreDir
-		opts.JetStream = true
-		opts.JetStreamLimits = server.JSLimitOpts{}
-		opts.JetStreamMaxStore = config.StoreMaxBytes
-		opts.MaxPayload = config.MaxPayload
 		opts.HTTPHost = "127.0.0.1"
 		opts.HTTPPort = config.MonitorPort
 		opts.Host = "127.0.0.1"
 		opts.Port = server.RANDOM_PORT
+		opts.StoreDir = config.StoreDir
+		opts.MaxPayload = config.MaxPayload
+
+		opts.JetStream = true
+		opts.JetStreamLimits = server.JSLimitOpts{}
+		opts.JetStreamMaxStore = config.StoreMaxBytes
 
 		opts.Debug = zerolog.GlobalLevel() <= zerolog.DebugLevel
 	}
@@ -104,7 +103,7 @@ func StartServer(config Config) error {
 			log.Warn().
 				Err(err).
 				Interface("natsOpts", *opts).
-				Msg("nats NewServer failed")
+				Msg("nats failed NewServer")
 			return err
 		}
 	}
@@ -122,6 +121,46 @@ func StartServer(config Config) error {
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
 
+	return addStream()
+}
+
+func addStream() error {
+	nc, err := nats.Connect(s.server.ClientURL())
+	if err != nil {
+		log.Warn().Err(err).Msg("nats failed Connect")
+		return err
+	}
+	js, err := nc.JetStream(nats.DirectGet())
+	if err != nil {
+		log.Warn().Err(err).Msg("nats failed JetStream")
+		return err
+	}
+
+	if _, err = js.StreamInfo(streamName); err == nats.ErrStreamNotFound {
+		if _, err = js.AddStream(&nats.StreamConfig{
+			Name:     streamName,
+			Subjects: subjects,
+			Storage: func(arg string) nats.StorageType {
+				switch strings.ToUpper(arg) {
+				case "MEMORY":
+					return nats.MemoryStorage
+				default:
+					return nats.FileStorage
+				}
+			}(s.config.StoreType),
+			AllowDirect: true,
+			MaxAge:      s.config.StoreMaxAge,
+			Retention:   nats.LimitsPolicy,
+		}); err != nil {
+			log.Warn().Err(err).Msg("nats failed AddStream")
+			return err
+		}
+	} else if err != nil {
+		log.Warn().Err(err).Msg("nats failed StreamInfo")
+		return err
+	}
+
+	s.ncPublisher = nc
 	return nil
 }
 
@@ -130,11 +169,13 @@ func StopServer() {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.jsDispatcher != nil {
-		s.jsDispatcher = nil
+	if s.ncPublisher != nil {
+		s.ncPublisher.Close()
+		s.ncPublisher = nil
 	}
-	if s.jsPublisher != nil {
-		s.jsPublisher = nil
+	if s.ncDispatcher != nil {
+		s.ncDispatcher.Close()
+		s.ncDispatcher = nil
 	}
 	if s.server != nil {
 		s.server.Shutdown()
@@ -151,52 +192,18 @@ func StartDispatcher(options []DispatcherOption) error {
 	d.Lock()
 	defer d.Unlock()
 
-	if d.jsDispatcher == nil {
-		if d.server == nil {
-			err := fmt.Errorf("%v: unavailable", ErrNATS)
-			log.Warn().Err(err).Msg("nats dispatcher failed")
-			return err
-		}
-
-		nc, err := nats.Connect(
-			d.server.ClientURL(),
-			nats.RetryOnFailedConnect(true),
-		)
+	if d.server == nil {
+		err := fmt.Errorf("%v: unavailable", ErrNATS)
+		log.Warn().Err(err).Msg("nats dispatcher failed")
+		return err
+	}
+	if d.ncDispatcher == nil {
+		nc, err := nats.Connect(s.server.ClientURL())
 		if err != nil {
-			log.Warn().Err(err).Msg("nats dispatcher failed to connect")
+			log.Warn().Err(err).Msg("nats dispatcher failed Connect")
 			return err
 		}
-
-		js, err := nc.JetStream(
-			nats.DirectGet(),
-		)
-		if err != nil {
-			return err
-		}
-
-		if _, err = js.StreamInfo(tcgStreamName); err != nil {
-			if err != nats.ErrStreamNotFound {
-				return err
-			}
-
-			if _, err = js.AddStream(&nats.StreamConfig{
-				Name:      tcgStreamName,
-				Subjects:  subjects,
-				Retention: nats.LimitsPolicy,
-				Storage: func() nats.StorageType {
-					if strings.ToUpper(d.config.StoreType) == "MEMORY" {
-						return nats.MemoryStorage
-					}
-					return nats.FileStorage
-				}(),
-				MaxAge:      d.config.StoreMaxAge,
-				AllowDirect: true,
-			}); err != nil {
-				return err
-			}
-		}
-
-		d.jsDispatcher = js
+		d.ncDispatcher = nc
 	}
 
 	d.durables.Flush()
@@ -214,12 +221,11 @@ func StopDispatcher() error {
 	d.Lock()
 	defer d.Unlock()
 
-	subs := d.durables.Items()
-	for _, value := range subs {
-		_ = value.Object.(*nats.Subscription).Unsubscribe()
+	if d.ncDispatcher != nil {
+		d.ncDispatcher.Close()
+		d.ncDispatcher = nil
 	}
 
-	d.jsDispatcher = nil
 	d.durables.Flush()
 	d.msgsDone.Flush()
 	d.retries.Flush()
@@ -236,32 +242,19 @@ func Publish(subject string, msg []byte) error {
 	s.Lock()
 	defer s.Unlock()
 
-	if s.jsPublisher == nil {
-		if s.server == nil {
-			err := fmt.Errorf("%v: unavailable", ErrNATS)
-			log.Warn().Err(err).Msg("nats publisher failed")
-			return err
-		}
-
-		nc, err := nats.Connect(
-			s.server.ClientURL(),
-			nats.RetryOnFailedConnect(true),
-		)
+	if s.server == nil {
+		err := fmt.Errorf("%v: unavailable", ErrNATS)
+		log.Warn().Err(err).Msg("nats publisher failed")
+		return err
+	}
+	if s.ncPublisher == nil {
+		nc, err := nats.Connect(s.server.ClientURL())
 		if err != nil {
-			log.Warn().Err(err).Msg("nats publisher failed to connect")
+			log.Warn().Err(err).Msg("nats publisher failed Connect")
 			return err
 		}
-
-		js, err := nc.JetStream()
-		if err != nil {
-			log.Warn().Err(err).Msg("nats publisher failed to JetStream")
-			return err
-		}
-
-		s.jsPublisher = js
+		s.ncPublisher = nc
 	}
 
-	_, err := s.jsPublisher.Publish(subject, msg)
-
-	return err
+	return s.ncPublisher.Publish(subject, msg)
 }

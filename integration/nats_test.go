@@ -73,7 +73,7 @@ func TestNatsQueue1(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(4 * time.Second)
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
