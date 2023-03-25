@@ -380,8 +380,8 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjDowntime, gwClient.HostName),
-				subjDowntime,
+				fmt.Sprintf("#%s#%s#", subjDowntimes, gwClient.HostName),
+				subjDowntimes,
 				func(ctx context.Context, p natsPayload) error {
 					var err error
 					switch p.Type {
@@ -390,7 +390,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeSetInDowntime:
 						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntime)
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
 					}
 					return err
 				},

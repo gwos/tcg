@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -17,10 +18,6 @@ import (
 // Define NATS IDs
 const (
 	streamName = "tcg-stream"
-
-	subjDowntime         = "downtime"
-	subjEvents           = "events"
-	subjInventoryMetrics = "inventory-metrics"
 )
 
 var (
@@ -28,7 +25,7 @@ var (
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 
 	s        = new(state)
-	subjects = []string{subjDowntime, subjEvents, subjInventoryMetrics}
+	subjects = []string{"tcg.>"}
 )
 
 type state struct {
@@ -121,15 +118,17 @@ func StartServer(config Config) error {
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
 
-	return addStream()
-}
-
-func addStream() error {
 	nc, err := nats.Connect(s.server.ClientURL())
 	if err != nil {
 		log.Warn().Err(err).Msg("nats failed Connect")
 		return err
 	}
+	s.ncPublisher = nc
+
+	return defineStream(nc, streamName, subjects)
+}
+
+func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 	js, err := nc.JetStream(nats.DirectGet())
 	if err != nil {
 		log.Warn().Err(err).Msg("nats failed JetStream")
@@ -160,7 +159,6 @@ func addStream() error {
 		return err
 	}
 
-	s.ncPublisher = nc
 	return nil
 }
 
@@ -206,11 +204,11 @@ func StartDispatcher(options []DispatcherOption) error {
 		d.ncDispatcher = nc
 	}
 
-	d.durables.Flush()
+	d.retries.Flush()
+	ctx, cancel := context.WithCancel(context.Background())
+	d.cancel = cancel
 	for _, opt := range options {
-		if err := d.retryDurable(opt); err != nil {
-			return err
-		}
+		d.OpenDurable(ctx, opt)
 	}
 	return nil
 }
@@ -221,14 +219,15 @@ func StopDispatcher() error {
 	d.Lock()
 	defer d.Unlock()
 
+	if d.cancel != nil {
+		d.cancel()
+		d.cancel = nil
+	}
 	if d.ncDispatcher != nil {
 		d.ncDispatcher.Close()
 		d.ncDispatcher = nil
 	}
 
-	d.durables.Flush()
-	d.msgsDone.Flush()
-	d.retries.Flush()
 	return nil
 }
 

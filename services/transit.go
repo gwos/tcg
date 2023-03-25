@@ -87,7 +87,7 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 	if err != nil {
 		return err
 	}
-	err = nats.Publish(subjDowntime, b)
+	err = nats.Publish(subjDowntimes, b)
 	return err
 }
 
@@ -111,7 +111,7 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 	if err != nil {
 		return err
 	}
-	err = nats.Publish(subjDowntime, b)
+	err = nats.Publish(subjDowntimes, b)
 	return err
 }
 
