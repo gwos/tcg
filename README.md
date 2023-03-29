@@ -196,40 +196,33 @@ $ go run .
 
 The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
-
-### Run all tests:
-
->Without logs:
-
-    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test ./...
-
->With logs:
-
-    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test -v ./...
-
-
 ### Run package tests:
-
->Without logs:
-
-    $ go test ./<package_name>/
 
 >With logs:
 
     $ go test -v ./<package_one>/ ./<package_two>/
     
-### Run tests with environment variables
+### Run integration tests:
 
->Before running integration tests you must provide environment variables for Groundwork Connection username and password:
+>For integration tests you must provide environment variables for Groundwork Connection.
 
-    $ TEST_GW_USERNAME=**** TEST_GW_PASSWORD=**** go test ./integration
+    $ TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
+        go test -v ./integration/
 
 
 ### Examples:
 
-    $ go test ./integration/
+    $ go test -v ./config/ ./services/
 
-    $ go test -v ./config
+    $ go test -v ./libtransit/
+
+    $ go test -v $(go list ./... | grep -v tcg/integration)
+
+    $ GOFLAGS="-count=1" \
+        TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
+        TCG_JAEGERTRACING_AGENT=localhost:6831 \
+        TCG_CONNECTOR_LOGLEVEL=3 \
+        go test -v ./integration/
 
 
 <a name="envvar"></a>

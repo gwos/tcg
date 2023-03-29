@@ -5,11 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
-	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -21,32 +18,43 @@ import (
 )
 
 const (
-	TestMessagesCount         = 3
-	PerformanceServicesCount  = 1
+	TestHostName = "GW8_TCG_TEST_HOST"
+
+	TestMessagesCount         = 4
+	PerformanceServicesCount  = 2
 	PerformanceResourcesCount = 1000
-	TestAgentID               = "INTEGRATION-TEST"
-	TestAppName               = "INTEGRATION-TEST"
-	TestAppType               = "VEMA"
-	GWAccountEnvVar           = "TEST_GW_USERNAME"
-	GWPasswordEnvVar          = "TEST_GW_PASSWORD"
-	GWValidHost               = "http://localhost:80"
-	GWInvalidHost             = "http://localhost:23"
-	TestConfigNatsStoreDir    = "natsstore.test"
 )
+
+var TestConfigDefaults = map[string]string{
+	"TCG_CONNECTOR_AGENTID":          "INTEGRATION-TEST",
+	"TCG_CONNECTOR_APPNAME":          "INTEGRATION-TEST",
+	"TCG_CONNECTOR_APPTYPE":          "VEMA",
+	"TCG_CONNECTOR_ENABLED":          "true",
+	"TCG_CONNECTOR_NATSFILESTOREDIR": "natsstore.test",
+	"TCG_GWCONNECTIONS_0_ENABLED":    "true",
+	"TCG_GWCONNECTIONS_0_HOSTNAME":   "https://localhost",
+	"TCG_GWCONNECTIONS_0_PASSWORD":   "",
+	"TCG_GWCONNECTIONS_0_USERNAME":   "",
+}
+
+var apiClient = new(APIClient)
 
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
-// TCG connects to Foundation as local connection
+// TODO: TCG connects to Foundation as local connection
 func TestNatsQueue_1(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 5*time.Second)
-	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
-	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
+
+	t.Log("Timeout all requests, messages will be stored in the queue")
+	defaultNetClientTimeout := *clients.NetClientTimeout
+	*clients.NetClientTimeout = 1 * time.Nanosecond
+
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
+	testMessage, err := readFile("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
@@ -55,37 +63,40 @@ func TestNatsQueue_1(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != 0 {
-		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
+		t.Errorf("Messages shouldn't be delivered, because cancelling all requests. deliveredCount = %d, want = %d",
 			dc, 0)
 		return
 	}
 
-	config.GetConfig().GWConnections[0].HostName = GWValidHost
-	t.Log("Invalid path was changed to valid one")
+	*clients.NetClientTimeout = defaultNetClientTimeout
+	t.Log("Allow all requests")
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
 	time.Sleep(1 * time.Second)
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
-		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
+		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
 			dc, "'>0'")
 	}
 }
 
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
-// TCG connects to Foundation as remote connection
+// TODO: TCG connects to Foundation as remote connection
 func TestNatsQueue_2(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 30*time.Second)
-	t.Log("Config has invalid path to Groundwork Foundation, messages will be stored in the queue:")
-	config.GetConfig().GWConnections[0].HostName = GWInvalidHost
+
+	t.Log("Timeout all requests, messages will be stored in the queue")
+	defaultNetClientTimeout := *clients.NetClientTimeout
+	*clients.NetClientTimeout = 1 * time.Nanosecond
+
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	testMessage, err := parseJSON("fixtures/sendResourceWithMetrics.json")
+	testMessage, err := readFile("fixtures/sendResourceWithMetrics.json")
 	assert.NoError(t, err)
 
 	for i := 0; i < TestMessagesCount; i++ {
@@ -94,7 +105,7 @@ func TestNatsQueue_2(t *testing.T) {
 	}
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != 0 {
-		t.Errorf("Messages shouldn't be delivered, because Groundwork entrypoint is invalid. deliveredCount = %d, want = %d",
+		t.Errorf("Messages shouldn't be delivered, because cancelling all requests. deliveredCount = %d, want = %d",
 			dc, 0)
 		return
 	}
@@ -103,8 +114,8 @@ func TestNatsQueue_2(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
 	t.Log("NATS Server was stopped successfully")
 
-	config.GetConfig().GWConnections[0].HostName = GWValidHost
-	t.Log("Invalid path was changed to valid one")
+	*clients.NetClientTimeout = defaultNetClientTimeout
+	t.Log("Allow all requests")
 
 	t.Log("Starting NATS server ...")
 	assert.NoError(t, services.GetTransitService().StartNats())
@@ -114,7 +125,7 @@ func TestNatsQueue_2(t *testing.T) {
 	time.Sleep(TestMessagesCount * 1 * time.Second)
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
-		t.Errorf("Messages should be delivered, because Groundwork entrypoint is valid. deliveredCount = %d, want = %s",
+		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
 			dc, "'>0'")
 	}
 }
@@ -122,34 +133,25 @@ func TestNatsQueue_2(t *testing.T) {
 // Test NATS performance
 func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
+	defer apiClient.RemoveHost(TestHostName)
+
 	setupIntegration(t, 30*time.Second)
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
 
-	var resources []transit.MonitoredResource
-
-	inventoryRes := inventoryResource()
-
-	for i := 0; i < PerformanceServicesCount; i++ {
-		inventoryRes.Services = append(inventoryRes.Services, inventoryService(i))
-	}
-
-	request := transit.InventoryRequest{
-		Context:   services.GetTransitService().MakeTracerContext(),
-		Resources: []transit.InventoryResource{inventoryRes},
-	}
-	jsonBytes, err := json.Marshal(request)
-	assert.NoError(t, err)
-	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), jsonBytes))
+	resources := make([]transit.MonitoredResource, 0, PerformanceResourcesCount)
+	inventory := new(transit.InventoryRequest)
+	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 
 	for i := 0; i < PerformanceResourcesCount; i++ {
-		res := resource()
+		rs := makeResource(PerformanceServicesCount)
 
-		for j := 0; j < PerformanceServicesCount; j++ {
-			res.Services = append(res.Services, service(i))
-		}
-
-		resources = append(resources, res)
+		resources = append(resources, *rs)
+		inventory.AddResource(rs.ToInventoryResource())
 	}
+
+	payload, err := json.Marshal(inventory)
+	assert.NoError(t, err)
+	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), payload))
 
 	time.Sleep(5 * time.Second)
 
@@ -158,9 +160,9 @@ func TestNatsPerformance(t *testing.T) {
 			Context:   services.GetTransitService().MakeTracerContext(),
 			Resources: []transit.MonitoredResource{res},
 		}
-		jsonBytes, err := json.Marshal(request)
+		payload, err := json.Marshal(request)
 		assert.NoError(t, err)
-		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), jsonBytes))
+		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
 	}
 
 	time.Sleep(10 * time.Second)
@@ -169,153 +171,87 @@ func TestNatsPerformance(t *testing.T) {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
 			dc, PerformanceResourcesCount+1)
 	}
-
-	defer removeHost(t)
 }
 
 func setupIntegration(t *testing.T, natsAckWait time.Duration) {
-	testGroundworkUserName := os.Getenv(GWAccountEnvVar)
-	testGroundworkPassword := os.Getenv(GWPasswordEnvVar)
-	if testGroundworkUserName == "" || testGroundworkPassword == "" {
-		t.Errorf("[setupIntegration]: Provide environment variables for Groundwork Connection username('%s') and password('%s')",
-			GWAccountEnvVar, GWPasswordEnvVar)
+	for k, v := range TestConfigDefaults {
+		if _, ok := os.LookupEnv(k); !ok {
+			t.Setenv(k, v)
+		}
+	}
+	if len(os.Getenv("TCG_GWCONNECTIONS_0_USERNAME")) == 0 ||
+		len(os.Getenv("TCG_GWCONNECTIONS_0_PASSWORD")) == 0 {
+		t.Errorf("[setupIntegration]: Provide environment variables for Groundwork Connection: %s and %s",
+			"TCG_GWCONNECTIONS_0_USERNAME", "TCG_GWCONNECTIONS_0_PASSWORD")
 		t.SkipNow()
 	}
 
 	cfg := config.GetConfig()
-	cfg.Connector.AgentID = TestAgentID
-	cfg.Connector.AppName = TestAppName
-	cfg.Connector.AppType = TestAppType
-	cfg.Connector.LogLevel = 2
 	cfg.Connector.NatsAckWait = natsAckWait
-	cfg.Connector.NatsStoreDir = TestConfigNatsStoreDir
-	cfg.GWConnections = []*config.GWConnection{
-		{
-			Enabled:         true,
-			LocalConnection: false,
-			HostName:        GWValidHost,
-			UserName:        testGroundworkUserName,
-			Password:        testGroundworkPassword,
-
-			IsDynamicInventory: cfg.Connector.IsDynamicInventory,
-			HTTPEncode:         func() bool { return strings.ToLower(cfg.Connector.GWEncode) == "force" }(),
-		},
-	}
 
 	service := services.GetTransitService()
 	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.StartNats())
 	assert.NoError(t, service.StartTransport())
 	t.Log("[setupIntegration]: ", service.Status())
+	t.Logf("cfg.Connector: %+v", cfg.Connector)
+	t.Logf("cfg.GWConnections[0]: %+v", cfg.GWConnections[0])
 }
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", TestConfigNatsStoreDir)
+	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsStoreDir)
 	_, err := cmd.Output()
 	assert.NoError(t, err)
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
 
-func parseJSON(filePath string) ([]byte, error) {
-	jsonFile, err := os.Open(filePath)
+func readFile(filePath string) ([]byte, error) {
+	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
-	defer jsonFile.Close()
+	defer f.Close()
 
-	byteValue, err := io.ReadAll(jsonFile)
+	bb, err := io.ReadAll(f)
 	if err != nil {
 		return nil, err
 	}
 
-	return byteValue, nil
+	return bb, nil
 }
 
-func resource() transit.MonitoredResource {
-	lastCheckTime := *transit.NewTimestamp()
-	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
-	return transit.MonitoredResource{
-		BaseResource: transit.BaseResource{
-			BaseInfo: transit.BaseInfo{
-				Name: TestHostName,
-				Type: transit.ResourceTypeHost,
-			},
-		},
-		MonitoredInfo: transit.MonitoredInfo{
-			Status:        transit.HostUp,
-			LastCheckTime: &lastCheckTime,
-			NextCheckTime: &nextCheckTime,
-		},
-		Services: []transit.MonitoredService{},
-	}
-}
+func makeResource(svcCount int) *transit.MonitoredResource {
+	rs := new(transit.MonitoredResource)
+	rs.Name = TestHostName
+	rs.Status = transit.HostUp
+	rs.Type = transit.ResourceTypeHost
+	rs.LastCheckTime = transit.NewTimestamp()
+	rs.NextCheckTime = transit.NewTimestamp()
+	*rs.NextCheckTime = rs.NextCheckTime.Add(time.Minute * 60)
 
-func service(i int) transit.MonitoredService {
-	lastCheckTime := *transit.NewTimestamp()
-	nextCheckTime := lastCheckTime.Add(time.Minute * 60)
-	return transit.MonitoredService{
-		BaseInfo: transit.BaseInfo{
-			Name:  fmt.Sprintf("%s_%s_0", TestHostName, "SERVICE"),
-			Type:  transit.ResourceTypeService,
-			Owner: TestHostName,
-		},
-		MonitoredInfo: transit.MonitoredInfo{
-			Status:        transit.ServiceOk,
-			LastCheckTime: &lastCheckTime,
-			NextCheckTime: &nextCheckTime,
-		},
-		Metrics: []transit.TimeSeries{
-			{
-				MetricName: "Test",
-				SampleType: transit.Value,
-				Interval: &transit.TimeInterval{
-					EndTime:   &lastCheckTime,
-					StartTime: &lastCheckTime,
-				},
-				Value: transit.NewTypedValue(i),
-				Unit:  transit.MB,
-			},
-		},
-	}
-}
+	for i := 0; i < svcCount; i++ {
+		svc := new(transit.MonitoredService)
+		svc.Name = fmt.Sprintf("%s_SERVICE_%v", TestHostName, i)
+		svc.Owner = TestHostName
+		svc.Status = transit.ServiceOk
+		svc.Type = transit.ResourceTypeService
+		svc.LastCheckTime = transit.NewTimestamp()
+		svc.NextCheckTime = transit.NewTimestamp()
+		*svc.NextCheckTime = svc.NextCheckTime.Add(time.Minute * 60)
 
-func inventoryResource() transit.InventoryResource {
-	return transit.InventoryResource{
-		BaseResource: transit.BaseResource{
-			BaseInfo: transit.BaseInfo{
-				Name: TestHostName,
-				Type: transit.ResourceTypeHost,
-			},
-		},
-	}
-}
+		m := new(transit.TimeSeries)
+		m.Interval = new(transit.TimeInterval)
+		m.Interval.StartTime = transit.NewTimestamp()
+		m.Interval.EndTime = transit.NewTimestamp()
+		m.MetricName = "test_metric"
+		m.SampleType = transit.Value
+		m.Value = transit.NewTypedValue(i)
+		m.Unit = transit.MB
 
-func inventoryService(i int) transit.InventoryService {
-	return transit.InventoryService{
-		BaseInfo: transit.BaseInfo{
-			Name:  fmt.Sprintf("%s_%s_%d", TestHostName, "SERVICE", i),
-			Type:  "network-device",
-			Owner: TestHostName,
-		},
-	}
-}
-
-func removeHost(t *testing.T) {
-	gwClient := &clients.GWClient{
-		AppName:      config.GetConfig().Connector.AppName,
-		GWConnection: (*clients.GWConnection)(config.GetConfig().GWConnections[0]),
-	}
-	err := gwClient.Connect()
-	assert.NoError(t, err)
-
-	token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
-	headers := map[string]string{
-		"Accept":         "application/json",
-		"GWOS-APP-NAME":  gwClient.AppName,
-		"GWOS-API-TOKEN": token,
+		svc.Metrics = append(svc.Metrics, *m)
+		rs.Services = append(rs.Services, *svc)
 	}
 
-	_, _, err = clients.SendRequest(http.MethodDelete, HostDeleteAPI+TestHostName, headers, nil, nil)
-	assert.NoError(t, err)
+	return rs
 }
