@@ -204,7 +204,7 @@ func StartDispatcher(options []DispatcherOption) error {
 		d.ncDispatcher = nc
 	}
 
-	d.retries.Flush()
+	d.Flush()
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancel = cancel
 	for _, opt := range options {

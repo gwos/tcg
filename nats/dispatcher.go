@@ -36,18 +36,25 @@ type dispatcherRetry struct {
 type natsDispatcher struct {
 	*state
 
-	retries *cache.Cache
-	cancel  context.CancelFunc
+	duraSeqs *cache.Cache
+	retries  *cache.Cache
+	cancel   context.CancelFunc
 }
 
 func getDispatcher() *natsDispatcher {
 	onceDispatcher.Do(func() {
 		dispatcher = &natsDispatcher{
-			state:   s,
-			retries: cache.New(time.Minute*30, time.Minute*30),
+			state:    s,
+			duraSeqs: cache.New(-1, -1),
+			retries:  cache.New(time.Minute*30, time.Minute*30),
 		}
 	})
 	return dispatcher
+}
+
+func (d *natsDispatcher) Flush() {
+	d.duraSeqs.Flush()
+	d.retries.Flush()
 }
 
 func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) {
@@ -155,24 +162,38 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, m
 			Msg("nats dispatcher failed Metadata")
 		return nil
 	}
-	logFn := func(e *zerolog.Event) {
-		if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-			e.RawJSON("nats.msg.data", msg.Data)
-			e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
-			e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
-			e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+	logDetailsFn := func(a ...bool) func(e *zerolog.Event) {
+		if zerolog.GlobalLevel() <= zerolog.DebugLevel ||
+			(len(a) > 0 && a[0]) {
+			return func(e *zerolog.Event) {
+				e.RawJSON("nats.msg.data", msg.Data)
+				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
+				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
+				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+			}
+		}
+		return func(e *zerolog.Event) {}
+	}
+
+	if seq, ok := d.duraSeqs.Get(opt.Durable); ok {
+		if seq := seq.(uint64); seq >= meta.Sequence.Stream {
+			log.Warn().Func(logDetailsFn(true)).
+				Uint64("done.sequence", seq).
+				Str("durable", opt.Durable).
+				Msg("dispatcher lost order")
 		}
 	}
 
 	err = opt.Handler(msg.Data)
 	if err == nil {
-		log.Info().Func(logFn).
+		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
+		log.Info().Func(logDetailsFn()).
 			Str("durable", opt.Durable).
 			Msg("dispatcher delivered")
 		return nil
 	}
 	if !errors.Is(err, tcgerr.ErrTransient) {
-		log.Warn().Err(err).Func(logFn).
+		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
 			Msg("dispatcher could not deliver: will not retry")
 		return nil
@@ -192,14 +213,14 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, m
 
 	if retry.Retry >= len(retryDelays) {
 		d.retries.Delete(opt.Durable)
-		log.Warn().Err(err).Func(logFn).
+		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
 			Msg("dispatcher could not deliver: stop retrying")
 		return nil
 	}
 
 	d.retries.Set(opt.Durable, *retry, 0)
-	log.Info().Err(err).Func(logFn).
+	log.Info().Err(err).Func(logDetailsFn()).
 		Int("retry", retry.Retry).
 		Str("durable", opt.Durable).
 		Msg("dispatcher could not deliver: will retry")
