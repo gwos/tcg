@@ -73,12 +73,14 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	b, err = natsPayload{span.SpanContext(), payload, typeClearInDowntime}.Marshal()
@@ -95,12 +97,14 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	b, err = natsPayload{span.SpanContext(), payload, typeSetInDowntime}.Marshal()
@@ -127,12 +131,14 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	b, err = natsPayload{span.SpanContext(), payload, typeEvents}.Marshal()
@@ -149,12 +155,14 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	b, err = natsPayload{span.SpanContext(), payload, typeEventsAck}.Marshal()
@@ -171,12 +179,14 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	b, err = natsPayload{span.SpanContext(), payload, typeEventsUnack}.Marshal()
@@ -203,12 +213,14 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	payload, err = service.mixTracerContext(payload)
@@ -230,12 +242,14 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 		b   []byte
 		err error
 	)
-	_, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	_, span2 := tracing.StartTraceSpan(ctx, "services", "send")
 	defer func() {
-		tracing.EndTraceSpan(span,
+		tracing.EndTraceSpan(span2,
 			tracing.TraceAttrError(err),
 			tracing.TraceAttrPayloadLen(b),
 		)
+		tracing.EndTraceSpan(span)
 	}()
 
 	payload, err = service.mixTracerContext(payload)

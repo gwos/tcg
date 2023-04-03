@@ -69,7 +69,7 @@ func getDispatcher() *natsDispatcher {
 // in case of some transient error (like networking issue)
 // it closes current subscription (doesn't unsubscribe) and plans retry
 func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
-	logEvent := log.Info().Err(err).Str("durableName", opt.DurableName).
+	logEvent := log.Info().Err(err).Str("durable", opt.Durable).
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
 				e.RawJSON("stan.data", msg.Data).
@@ -83,7 +83,7 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 			LastError: nil,
 			Retry:     0,
 		}
-		if r, isRetry := d.retryes.Get(opt.DurableName); isRetry {
+		if r, isRetry := d.retryes.Get(opt.Durable); isRetry {
 			retry = r.(dispatcherRetry)
 		}
 		retry.LastError = err
@@ -95,15 +95,15 @@ func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.M
 
 			d.Lock()
 			_ = subscription.Close()
-			d.durables.Delete(opt.DurableName)
-			d.retryes.Set(opt.DurableName, retry, 0)
+			d.durables.Delete(opt.Durable)
+			d.retryes.Set(opt.Durable, retry, 0)
 			d.Unlock()
 
 			delay := retryDelays[retry.Retry]
 			_ = time.AfterFunc(delay, func() { _ = d.retryDurable(opt) })
 		} else {
 			logEvent.Msg("dispatcher could not deliver: stop retrying")
-			d.retryes.Delete(opt.DurableName)
+			d.retryes.Delete(opt.Durable)
 		}
 	} else {
 		logEvent.Msg("dispatcher could not deliver: will not retry")
@@ -127,7 +127,7 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
 			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
 			// and it may in that case resend again, so you should Ack the message there.
-			ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
+			ckDone := fmt.Sprintf("%s#%d", opt.Durable, msg.Sequence)
 			if _, isDone := d.msgsDone.Get(ckDone); isDone {
 				_ = msg.Ack()
 				return
@@ -139,7 +139,7 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 			}
 			_ = msg.Ack()
 			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
-			log.Info().Str("durableName", opt.DurableName).
+			log.Info().Str("durable", opt.Durable).
 				Func(func(e *zerolog.Event) {
 					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
 						e.RawJSON("stan.data", msg.Data).
@@ -152,7 +152,7 @@ func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
 		stan.SetManualAckMode(),
 		stan.AckWait(d.config.AckWait),
 		stan.MaxInflight(d.config.MaxInflight),
-		stan.DurableName(opt.DurableName),
+		stan.DurableName(opt.Durable),
 		stan.StartWithLastReceived(),
 	); errSubs != nil {
 		return errSubs
@@ -176,9 +176,9 @@ func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 
 	var err error
 	if d.connDispatcher != nil {
-		if _, isOpen := d.durables.Get(opt.DurableName); !isOpen {
+		if _, isOpen := d.durables.Get(opt.Durable); !isOpen {
 			if err = d.openDurable(opt); err == nil {
-				d.durables.Set(opt.DurableName, 0, -1)
+				d.durables.Set(opt.Durable, 0, -1)
 			}
 		}
 	} else {
@@ -186,7 +186,7 @@ func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
 	}
 	if err != nil {
 		log.Info().Err(err).
-			Str("durableName", opt.DurableName).
+			Str("durable", opt.Durable).
 			Msg("dispatcher failed")
 	}
 	return err

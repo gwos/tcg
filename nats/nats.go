@@ -57,9 +57,9 @@ type Config struct {
 
 // DispatcherOption defines subscription
 type DispatcherOption struct {
-	DurableName string
-	Subject     string
-	Handler     func([]byte) error
+	Durable string
+	Subject string
+	Handler func([]byte) error
 }
 
 // StartServer runs NATS

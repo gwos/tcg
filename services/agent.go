@@ -433,10 +433,10 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durable, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
 	return nats.DispatcherOption{
-		DurableName: durableName,
-		Subject:     subj,
+		Durable: durable,
+		Subject: subj,
 		Handler: func(b []byte) error {
 			var err error
 			getCtx := func(sc trace.SpanContext) context.Context {
@@ -450,17 +450,18 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			if err = p.Unmarshal(b); err != nil {
 				log.Warn().Err(err).Msg("could not unmarshal payload")
 			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", subj)
+			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "dispatch")
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
 					tracing.TraceAttrPayloadLen(b),
-					tracing.TraceAttrStr("durableName", durableName),
+					tracing.TraceAttrStr("durable", durable),
+					tracing.TraceAttrStr("subject", subj),
 				)
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.stats.exp.Add("sentTo:"+durableName, 1)
+				service.stats.exp.Add("sentTo:"+durable, 1)
 				service.stats.BytesSent.Add(int64(len(p.Payload)))
 				service.stats.MessagesSent.Add(1)
 				if p.Type == typeMetrics {
