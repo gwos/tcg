@@ -14,6 +14,7 @@ import (
 func init() {
 	config.GetConfig().Connector.AppName = "test"
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
+	config.GetConfig().Connector.NatsStoreMaxBytes = 1024000
 	config.GetConfig().GWConnections = []*config.GWConnection{
 		{
 			Enabled:         true,
@@ -27,8 +28,8 @@ func init() {
 
 func TestController(t *testing.T) {
 	t.Cleanup(func() {
-		assert.NoError(t, os.RemoveAll(filepath.Join(GetAgentService().Connector.NatsStoreDir, "jetstream")))
-		assert.NoError(t, os.Remove(GetAgentService().Connector.NatsStoreDir))
+		assert.NoError(t, os.RemoveAll(filepath.Join(GetController().Connector.NatsStoreDir, "jetstream")))
+		assert.NoError(t, os.Remove(GetController().Connector.NatsStoreDir))
 	})
 
 	t.Run("NATS", func(t *testing.T) {

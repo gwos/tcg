@@ -40,18 +40,16 @@ type state struct {
 
 // Config defines NATS configurable options
 type Config struct {
-	AckWait             time.Duration
-	MaxInflight         int
-	MaxPubAcksInflight  int
-	MaxPayload          int32
-	MonitorPort         int
-	StoreDir            string
-	StoreType           string
-	StoreMaxAge         time.Duration
-	StoreMaxBytes       int64
-	StoreMaxMsgs        int
-	StoreBufferSize     int
-	StoreReadBufferSize int
+	AckWait            time.Duration
+	MaxInflight        int
+	MaxPubAcksInflight int
+	MaxPayload         int32
+	MonitorPort        int
+	StoreDir           string
+	StoreType          string
+	StoreMaxAge        time.Duration
+	StoreMaxBytes      int64
+	StoreMaxMsgs       int64
 
 	ConfigFile string
 }
@@ -65,8 +63,13 @@ type DispatcherOption struct {
 
 // StartServer runs NATS
 func StartServer(config Config) error {
-	opts := new(server.Options)
+	if s.server != nil {
+		log.Info().
+			Msgf("nats already started at: %s", s.server.ClientURL())
+		return nil
+	}
 
+	opts := new(server.Options)
 	if config.ConfigFile != "" {
 		if _, err := os.Open(config.ConfigFile); err != nil {
 			return errors.New("invalid path to config file specified")
@@ -149,10 +152,13 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 			}(s.config.StoreType),
 			AllowDirect: true,
 			MaxAge:      s.config.StoreMaxAge,
+			MaxBytes:    s.config.StoreMaxBytes,
+			MaxMsgs:     s.config.StoreMaxMsgs,
 			Retention:   nats.LimitsPolicy,
 		}); err != nil {
-			log.Warn().Err(err).Msg("nats failed AddStream")
-			return err
+			log.Warn().Err(err).
+				Interface("config", s.config).
+				Msg("nats failed AddStream")
 		}
 	} else if err != nil {
 		log.Warn().Err(err).Msg("nats failed StreamInfo")
@@ -179,6 +185,7 @@ func StopServer() {
 		s.server.Shutdown()
 		s.server = nil
 	}
+	log.Info().Msg("nats stopped")
 }
 
 // StartDispatcher connects to stan and adds durable subscriptions
@@ -210,6 +217,8 @@ func StartDispatcher(options []DispatcherOption) error {
 	for _, opt := range options {
 		d.OpenDurable(ctx, opt)
 	}
+
+	log.Info().Msg("dispatcher started")
 	return nil
 }
 
@@ -228,6 +237,7 @@ func StopDispatcher() error {
 		d.ncDispatcher = nil
 	}
 
+	log.Info().Msg("dispatcher stopped")
 	return nil
 }
 

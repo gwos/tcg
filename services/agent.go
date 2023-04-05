@@ -594,18 +594,16 @@ func (service *AgentService) stopController() error {
 
 func (service *AgentService) startNats() error {
 	err := nats.StartServer(nats.Config{
-		AckWait:             service.Connector.NatsAckWait,
-		MaxInflight:         service.Connector.NatsMaxInflight,
-		MaxPubAcksInflight:  service.Connector.NatsMaxPubAcksInflight,
-		MaxPayload:          service.Connector.NatsMaxPayload,
-		MonitorPort:         service.Connector.NatsMonitorPort,
-		StoreDir:            service.Connector.NatsStoreDir,
-		StoreType:           service.Connector.NatsStoreType,
-		StoreMaxAge:         service.Connector.NatsStoreMaxAge,
-		StoreMaxBytes:       service.Connector.NatsStoreMaxBytes,
-		StoreMaxMsgs:        service.Connector.NatsStoreMaxMsgs,
-		StoreBufferSize:     service.Connector.NatsStoreBufferSize,
-		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
+		AckWait:            service.Connector.NatsAckWait,
+		MaxInflight:        service.Connector.NatsMaxInflight,
+		MaxPubAcksInflight: service.Connector.NatsMaxPubAcksInflight,
+		MaxPayload:         service.Connector.NatsMaxPayload,
+		MonitorPort:        service.Connector.NatsMonitorPort,
+		StoreDir:           service.Connector.NatsStoreDir,
+		StoreType:          service.Connector.NatsStoreType,
+		StoreMaxAge:        service.Connector.NatsStoreMaxAge,
+		StoreMaxBytes:      service.Connector.NatsStoreMaxBytes,
+		StoreMaxMsgs:       service.Connector.NatsStoreMaxMsgs,
 
 		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
@@ -655,7 +653,6 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
-	log.Info().Msg("dispatcher started")
 	return nil
 }
 
@@ -667,7 +664,6 @@ func (service *AgentService) stopTransport() error {
 		return err
 	}
 	service.agentStatus.Transport = StatusStopped
-	log.Info().Msg("dispatcher stopped")
 	return nil
 }
 

@@ -121,13 +121,7 @@ type Connector struct {
 	// How many bytes are allowed per-channel
 	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
 	// How many messages are allowed per-channel
-	NatsStoreMaxMsgs int `yaml:"natsStoreMaxMsgs"`
-	// NatsStoreBufferSize for FileStore type
-	// size (in bytes) of the buffer used during file store operations
-	NatsStoreBufferSize int `yaml:"-"`
-	// NatsStoreReadBufferSize for FileStore type
-	// size of the buffer to preload messages
-	NatsStoreReadBufferSize int `yaml:"-"`
+	NatsStoreMaxMsgs int64 `yaml:"natsStoreMaxMsgs"`
 	// NatsServerConfigFile is used to override yaml values for
 	// NATS server configuration (debug only).
 	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
@@ -223,32 +217,30 @@ type Config struct {
 func defaults() Config {
 	return Config{
 		Connector: Connector{
-			BatchEvents:             0,
-			BatchMetrics:            0,
-			BatchMaxBytes:           1024 * 1024, // 1MB
-			ControllerAddr:          ":8099",
-			ControllerReadTimeout:   time.Second * 10,
-			ControllerWriteTimeout:  time.Second * 20,
-			ControllerStartTimeout:  time.Second * 4,
-			ControllerStopTimeout:   time.Second * 4,
-			LogCondense:             0,
-			LogFileMaxSize:          1024 * 1024 * 10, // 10MB
-			LogFileRotate:           5,
-			LogLevel:                1,
-			LogNoColor:              false,
-			LogTimeFormat:           time.RFC3339,
-			NatsAckWait:             time.Second * 30,
-			NatsMaxInflight:         4,
-			NatsMaxPubAcksInflight:  4,
-			NatsMaxPayload:          1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
-			NatsMonitorPort:         0,
-			NatsStoreDir:            "natsstore",
-			NatsStoreType:           "FILE",
-			NatsStoreMaxAge:         time.Hour * 24 * 10,     // 10days
-			NatsStoreMaxBytes:       1024 * 1024 * 1024 * 50, // 50GB
-			NatsStoreMaxMsgs:        1000000,                 // 1 000 000
-			NatsStoreBufferSize:     1024 * 1024 * 2,         // 2MB
-			NatsStoreReadBufferSize: 1024 * 1024 * 2,         // 2MB
+			BatchEvents:            0,
+			BatchMetrics:           0,
+			BatchMaxBytes:          1024 * 1024, // 1MB
+			ControllerAddr:         ":8099",
+			ControllerReadTimeout:  time.Second * 10,
+			ControllerWriteTimeout: time.Second * 20,
+			ControllerStartTimeout: time.Second * 4,
+			ControllerStopTimeout:  time.Second * 4,
+			LogCondense:            0,
+			LogFileMaxSize:         1024 * 1024 * 10, // 10MB
+			LogFileRotate:          5,
+			LogLevel:               1,
+			LogNoColor:             false,
+			LogTimeFormat:          time.RFC3339,
+			NatsAckWait:            time.Second * 30,
+			NatsMaxInflight:        4,
+			NatsMaxPubAcksInflight: 4,
+			NatsMaxPayload:         1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
+			NatsMonitorPort:        0,
+			NatsStoreDir:           "natsstore",
+			NatsStoreType:          "FILE",
+			NatsStoreMaxAge:        time.Hour * 24 * 10,     // 10days
+			NatsStoreMaxBytes:      1024 * 1024 * 1024 * 20, // 20GB
+			NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
 
 			NatsServerConfigFile: "",
 		},
