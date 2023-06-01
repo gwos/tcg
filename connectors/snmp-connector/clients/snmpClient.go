@@ -16,11 +16,6 @@ type SnmpClient struct {
 type SnmpUnitType string
 
 const (
-	Number SnmpUnitType = "number"
-	Bit    SnmpUnitType = "bits"
-)
-
-const (
 	// supported auth protocols
 	md5 = "md5"
 	sha = "sha"
@@ -29,30 +24,66 @@ const (
 	des = "des"
 )
 
+const (
+	IfSpeed       = "ifSpeed"
+	IfInErrors    = "ifInErrors"
+	IfOutErrors   = "ifOutErrors"
+	IfInDiscards  = "ifInDiscards"
+	IfOutDiscards = "ifOutDiscards"
+
+	IfInOctets    = "ifInOctets"
+	IfOutOctets   = "ifOutOctets"
+	IfHCInOctets  = "ifHCInOctets"
+	IfHCOutOctets = "ifHCOutOctets"
+
+	BytesIn     = "bytesIn"
+	BytesOut    = "bytesOut"
+	BytesInX64  = "bytesInX64"
+	BytesOutX64 = "bytesOutX64"
+
+	BytesPerSecondIn  = "bytesPerSecondIn"
+	BytesPerSecondOut = "bytesPerSecondOut"
+)
+
 var AvailableMetrics = map[string]*SnmpMetric{
-	"ifSpeed": {Mib: "ifSpeed", Oid: "1.3.6.1.2.1.2.2.1.5", Name: "Interface Speed", UnitType: Bit,
+	IfSpeed: {Key: "ifSpeed", Mib: "ifSpeed", Oid: "1.3.6.1.2.1.2.2.1.5", Name: "Interface Speed",
 		Description: "An estimate of the interface's current bandwidth in bits per second."},
-	"ifInOctets": {Mib: "ifInOctets", Oid: "1.3.6.1.2.1.2.2.1.10", Name: "Inbound Octets", UnitType: Number,
-		Description: "The total number of octets received on the interface, including framing characters."},
-	"ifOutOctets": {Mib: "ifOutOctets", Oid: "1.3.6.1.2.1.2.2.1.16", Name: "Outbound Octets", UnitType: Number,
-		Description: "The total number of octets transmitted out of the interface, including framing characters."},
-	"ifInErrors": {Mib: "ifInErrors", Oid: "1.3.6.1.2.1.2.2.1.14", Name: "Inbound Errors", UnitType: Number,
+	IfInErrors: {Key: "ifInErrors", Mib: "ifInErrors", Oid: "1.3.6.1.2.1.2.2.1.14", Name: "Inbound Errors",
 		Description: "For packet-oriented interfaces, the number of inbound packets that contained errors" +
 			" preventing them from being deliverable to a higher-layer protocol. For character- oriented or fixed-length interfaces," +
 			" the number of inbound transmission units that contained errors preventing them from being deliverable to a higher-layer protocol."},
-	"ifOutErrors": {Mib: "ifOutErrors", Oid: "1.3.6.1.2.1.2.2.1.20", Name: "Outbound Errors", UnitType: Number,
+	IfOutErrors: {Key: "ifOutErrors", Mib: "ifOutErrors", Oid: "1.3.6.1.2.1.2.2.1.20", Name: "Outbound Errors",
 		Description: "For packet-oriented interfaces, the number of outbound packets that could not be transmitted because of errors." +
 			" For character-oriented or fixed-length interfaces, the number of outbound transmission units that could not be transmitted" +
 			" because of errors."},
-	"ifInDiscards": {Mib: "ifInDiscards", Oid: "1.3.6.1.2.1.2.2.1.13", Name: "Inbound Discards", UnitType: Number,
+	IfInDiscards: {Key: "ifInDiscards", Mib: "ifInDiscards", Oid: "1.3.6.1.2.1.2.2.1.13", Name: "Inbound Discards",
 		Description: "The number of inbound packets which were chosen to be discarded" +
 			" even though no errors had been detected to prevent their being deliverable to a higher-layer protocol."},
-	"ifOutDiscards": {Mib: "ifOutDiscards", Oid: "1.3.6.1.2.1.2.2.1.19", Name: "Outbound Discards", UnitType: Number,
+	IfOutDiscards: {Key: "ifOutDiscards", Mib: "ifOutDiscards", Oid: "1.3.6.1.2.1.2.2.1.19", Name: "Outbound Discards",
 		Description: "The number of outbound packets which were chosen to be discarded" +
 			" even though no errors had been detected to prevent their being transmitted."},
+
+	BytesIn: {Key: "bytesIn", Mib: "ifInOctets", Oid: "1.3.6.1.2.1.2.2.1.10", Name: "Inbound Bytes",
+		Description: "The total number of octets received on the interface, including framing characters."},
+	BytesOut: {Key: "bytesOut", Mib: "ifOutOctets", Oid: "1.3.6.1.2.1.2.2.1.16", Name: "Outbound Bytes",
+		Description: "The total number of octets transmitted out of the interface, including framing characters."},
+	BytesInX64: {Key: "bytesInX64", Mib: "ifHCInOctets", Oid: "1.3.6.1.2.1.31.1.1.1.6", Name: "Inbound Bytes 64-bit",
+		Description: "The total number of octets received on the interface, including framing characters." +
+			"This object is a 64-bit version of ifInOctets."},
+	BytesOutX64: {Key: "bytesOutX64", Mib: "ifHCOutOctets", Oid: "1.3.6.1.2.1.31.1.1.1.10", Name: "Outbound Bytes 64-bit",
+		Description: "The total number of octets transmitted out of the interface, including framing characters. " +
+			"This object is a 64-bit version of ifOutOctets."},
+}
+
+var NonMibMetrics = map[string]*SnmpMetric{
+	BytesPerSecondIn: {Key: "bytesPerSecondIn", Mib: "-", Name: "Inbound Bytes Per Second",
+		Description: "The number of inbound bytes per second for the interface"},
+	BytesPerSecondOut: {Key: "bytesPerSecondOut", Mib: "-", Name: "Outbound Bytes Per Second",
+		Description: "The number of outbound bytes per second for the interface"},
 }
 
 type SnmpMetric struct {
+	Key         string
 	Mib         string
 	Oid         string
 	Name        string
