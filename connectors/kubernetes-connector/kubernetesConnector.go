@@ -367,13 +367,13 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		for key, element := range pod.Labels {
 			labels[key] = element
 		}
-		podName := pod.Name
+		resourceName := pod.Name
 		if *metricsPerContainer {
-			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
+			resourceName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
 		}
 		monitorStatus, message := connector.calculatePodStatus(&pod)
 		resource := KubernetesResource{
-			Name:     podName,
+			Name:     resourceName,
 			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
