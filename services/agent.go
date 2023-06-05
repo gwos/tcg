@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -99,7 +100,7 @@ func GetAgentService() *AgentService {
 			configHandler: defaultConfigHandler,
 			exitHandler:   defaultExitHandler,
 
-			stats: NewAgentStats(),
+			stats: NewStats(),
 		}
 
 		agentService.initTracerToken()
@@ -379,8 +380,8 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 		dispatcherOptions = append(
 			dispatcherOptions,
 			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjDowntime, gwClient.HostName),
-				subjDowntime,
+				fmt.Sprintf("#%s#%s#", subjDowntimes, gwClient.HostName),
+				subjDowntimes,
 				func(ctx context.Context, p natsPayload) error {
 					var err error
 					switch p.Type {
@@ -389,7 +390,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeSetInDowntime:
 						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntime)
+						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
 					}
 					return err
 				},
@@ -433,10 +434,13 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 	return dispatcherOptions
 }
 
-func (service *AgentService) makeDispatcherOption(durableName, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
+func (service *AgentService) makeDispatcherOption(durable, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
+	for _, s := range []string{"/", ".", "*", ">"} {
+		durable = strings.ReplaceAll(durable, s, "")
+	}
 	return nats.DispatcherOption{
-		DurableName: durableName,
-		Subject:     subj,
+		Durable: durable,
+		Subject: subj,
 		Handler: func(b []byte) error {
 			var err error
 			getCtx := func(sc trace.SpanContext) context.Context {
@@ -450,17 +454,18 @@ func (service *AgentService) makeDispatcherOption(durableName, subj string, hand
 			if err = p.Unmarshal(b); err != nil {
 				log.Warn().Err(err).Msg("could not unmarshal payload")
 			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", subj)
+			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "dispatch")
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
 					tracing.TraceAttrPayloadLen(b),
-					tracing.TraceAttrStr("durableName", durableName),
+					tracing.TraceAttrStr("durable", durable),
+					tracing.TraceAttrStr("subject", subj),
 				)
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.stats.exp.Add("sentTo:"+durableName, 1)
+				service.stats.exp.Add("sentTo:"+durable, 1)
 				service.stats.BytesSent.Add(int64(len(p.Payload)))
 				service.stats.MessagesSent.Add(1)
 				if p.Type == typeMetrics {
@@ -558,21 +563,8 @@ func (service *AgentService) resetNats() error {
 	if err := service.stopNats(); err != nil {
 		log.Warn().Err(err).Msg("could not stop nats")
 	}
-	globs := [...]string{
-		"*/msgs.*.dat",
-		"*/msgs.*.idx",
-		"*/subs.dat",
-		"clients.dat",
-		"server.dat",
-	}
-	for _, glob := range globs {
-		files, _ := filepath.Glob(filepath.Join(service.Connector.NatsStoreDir, glob))
-		for _, f := range files {
-			log.Debug().Msgf("removing: %s", f)
-			if err := os.Remove(f); err != nil {
-				log.Warn().Msgf("could not remove: %s", f)
-			}
-		}
+	if err := os.RemoveAll(filepath.Join(service.Connector.NatsStoreDir, "jetstream")); err != nil {
+		log.Warn().Err(err).Msgf("could not remove nats jetstream dir")
 	}
 	if st0.Nats == StatusRunning {
 		if err := service.startNats(); err != nil {
@@ -602,20 +594,18 @@ func (service *AgentService) stopController() error {
 
 func (service *AgentService) startNats() error {
 	err := nats.StartServer(nats.Config{
-		AckWait:             service.Connector.NatsAckWait,
-		MaxInflight:         service.Connector.NatsMaxInflight,
-		MaxPubAcksInflight:  service.Connector.NatsMaxPubAcksInflight,
-		MaxPayload:          service.Connector.NatsMaxPayload,
-		MaxPendingBytes:     service.Connector.NatsMaxPendingBytes,
-		MaxPendingMsgs:      service.Connector.NatsMaxPendingMsgs,
-		MonitorPort:         service.Connector.NatsMonitorPort,
-		StoreDir:            service.Connector.NatsStoreDir,
-		StoreType:           service.Connector.NatsStoreType,
-		StoreMaxAge:         service.Connector.NatsStoreMaxAge,
-		StoreMaxBytes:       service.Connector.NatsStoreMaxBytes,
-		StoreMaxMsgs:        service.Connector.NatsStoreMaxMsgs,
-		StoreBufferSize:     service.Connector.NatsStoreBufferSize,
-		StoreReadBufferSize: service.Connector.NatsStoreReadBufferSize,
+		AckWait:            service.Connector.NatsAckWait,
+		MaxInflight:        service.Connector.NatsMaxInflight,
+		MaxPubAcksInflight: service.Connector.NatsMaxPubAcksInflight,
+		MaxPayload:         service.Connector.NatsMaxPayload,
+		MonitorPort:        service.Connector.NatsMonitorPort,
+		StoreDir:           service.Connector.NatsStoreDir,
+		StoreType:          service.Connector.NatsStoreType,
+		StoreMaxAge:        service.Connector.NatsStoreMaxAge,
+		StoreMaxBytes:      service.Connector.NatsStoreMaxBytes,
+		StoreMaxMsgs:       service.Connector.NatsStoreMaxMsgs,
+
+		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
 	if err == nil {
 		service.agentStatus.Nats = StatusRunning
@@ -663,7 +653,6 @@ func (service *AgentService) startTransport() error {
 	} else {
 		return sdErr
 	}
-	log.Info().Msg("dispatcher started")
 	return nil
 }
 
@@ -675,7 +664,6 @@ func (service *AgentService) stopTransport() error {
 		return err
 	}
 	service.agentStatus.Transport = StatusStopped
-	log.Info().Msg("dispatcher stopped")
 	return nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -42,7 +42,7 @@ var apiClient = new(APIClient)
 // Test for ensuring that all data is stored in NATS and later resent
 // if Groundwork Foundation is unavailable
 // TODO: TCG connects to Foundation as local connection
-func TestNatsQueue_1(t *testing.T) {
+func TestNatsQueue1(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 5*time.Second)
 
@@ -73,7 +73,7 @@ func TestNatsQueue_1(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	time.Sleep(1 * time.Second)
+	time.Sleep(4 * time.Second)
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
@@ -84,7 +84,7 @@ func TestNatsQueue_1(t *testing.T) {
 // Test for ensuring that all data is stored in NATS and later resent
 // after NATS streaming server restarting
 // TODO: TCG connects to Foundation as remote connection
-func TestNatsQueue_2(t *testing.T) {
+func TestNatsQueue2(t *testing.T) {
 	defer cleanNats(t)
 	setupIntegration(t, 30*time.Second)
 
@@ -200,9 +200,8 @@ func setupIntegration(t *testing.T, natsAckWait time.Duration) {
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	cmd := exec.Command("rm", "-rf", config.GetConfig().Connector.NatsStoreDir)
-	_, err := cmd.Output()
-	assert.NoError(t, err)
+	assert.NoError(t, os.RemoveAll(filepath.Join(config.GetConfig().Connector.NatsStoreDir, "jetstream")))
+	assert.NoError(t, os.Remove(config.GetConfig().Connector.NatsStoreDir))
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
 

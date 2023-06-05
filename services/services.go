@@ -17,12 +17,14 @@ import (
 )
 
 // Define NATS subjects
-// group downtime, events actions, and inventory with metrics
-// as try to keep the processing order
+// group downtimes, events actions, and inventory with metrics
+// as try to keep the processing order.
+// It is recommended to keep the maximum number of tokens in your subjects
+// to a reasonable value of 16 tokens max. (https://docs.nats.io/nats-concepts/subjects)
 const (
-	subjDowntime         = "downtime"
-	subjEvents           = "events"
-	subjInventoryMetrics = "inventory-metrics"
+	subjDowntimes        = "tcg.downtimes"
+	subjEvents           = "tcg.events"
+	subjInventoryMetrics = "tcg.metrics"
 )
 
 // Status defines status value
@@ -51,7 +53,7 @@ type Stats struct {
 	exp *expvar.Map
 }
 
-func NewAgentStats() *Stats {
+func NewStats() *Stats {
 	p := &Stats{
 		BytesSent:              expvar.NewInt("tcgBytesSent"),
 		MetricsSent:            expvar.NewInt("tcgMetricsSent"),

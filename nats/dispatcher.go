@@ -1,14 +1,13 @@
 package nats
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"time"
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
-	"github.com/gwos/tcg/taskqueue"
-	"github.com/nats-io/stan.go"
+	"github.com/nats-io/nats.go"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -26,9 +25,8 @@ var (
 	}
 )
 
-const taskRetry = "taskRetry"
-
 type dispatcherRetry struct {
+	Timestamp time.Time
 	LastError error
 	Retry     int
 }
@@ -38,156 +36,194 @@ type dispatcherRetry struct {
 type natsDispatcher struct {
 	*state
 
-	durables *cache.Cache
-	msgsDone *cache.Cache
-	retryes  *cache.Cache
-
-	taskQueue *taskqueue.TaskQueue
+	duraSeqs *cache.Cache
+	retries  *cache.Cache
+	cancel   context.CancelFunc
 }
 
 func getDispatcher() *natsDispatcher {
 	onceDispatcher.Do(func() {
 		dispatcher = &natsDispatcher{
-			state: s,
-
-			durables: cache.New(-1, -1),
-			msgsDone: cache.New(time.Minute*10, time.Minute*10),
-			retryes:  cache.New(time.Minute*30, time.Minute*30),
+			state:    s,
+			duraSeqs: cache.New(-1, -1),
+			retries:  cache.New(time.Minute*30, time.Minute*30),
 		}
-		// provide buffer to handle corner case: a few targets anavailable on startup
-		dispatcher.taskQueue = taskqueue.NewTaskQueue(
-			taskqueue.WithCapacity(64),
-			taskqueue.WithHandlers(map[taskqueue.Subject]taskqueue.Handler{
-				taskRetry: dispatcher.taskRetryHandler,
-			}),
-		)
 	})
 	return dispatcher
 }
 
-// handleError handles the error in the processor of durable subscription
-// in case of some transient error (like networking issue)
-// it closes current subscription (doesn't unsubscribe) and plans retry
-func (d *natsDispatcher) handleError(subscription stan.Subscription, msg *stan.Msg, err error, opt DispatcherOption) {
-	logEvent := log.Info().Err(err).Str("durableName", opt.DurableName).
-		Func(func(e *zerolog.Event) {
-			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.RawJSON("stan.data", msg.Data).
-					Uint64("stan.sequence", msg.Sequence).
-					Int64("stan.timestamp", msg.Timestamp)
-			}
-		})
-
-	if errors.Is(err, tcgerr.ErrTransient) {
-		retry := dispatcherRetry{
-			LastError: nil,
-			Retry:     0,
-		}
-		if r, isRetry := d.retryes.Get(opt.DurableName); isRetry {
-			retry = r.(dispatcherRetry)
-		}
-		retry.LastError = err
-		retry.Retry++
-
-		if retry.Retry < len(retryDelays) {
-			logEvent.Int("retry", retry.Retry).
-				Msg("dispatcher could not deliver: will retry")
-
-			d.Lock()
-			_ = subscription.Close()
-			d.durables.Delete(opt.DurableName)
-			d.retryes.Set(opt.DurableName, retry, 0)
-			d.Unlock()
-
-			delay := retryDelays[retry.Retry]
-			_ = time.AfterFunc(delay, func() { _ = d.retryDurable(opt) })
-		} else {
-			logEvent.Msg("dispatcher could not deliver: stop retrying")
-			d.retryes.Delete(opt.DurableName)
-		}
-	} else {
-		logEvent.Msg("dispatcher could not deliver: will not retry")
-	}
+func (d *natsDispatcher) Flush() {
+	d.duraSeqs.Flush()
+	d.retries.Flush()
 }
 
-func (d *natsDispatcher) openDurable(opt DispatcherOption) error {
-	var (
-		errSubs      error
-		subscription stan.Subscription
+func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) {
+	js, err := d.ncDispatcher.JetStream(
+		nats.DirectGet(),
 	)
-	if subscription, errSubs = d.connDispatcher.Subscribe(
-		opt.Subject,
-		func(msg *stan.Msg) {
-			// Note: https://github.com/nats-io/nats-streaming-server/issues/1126#issuecomment-726903074
-			// ..when the subscription starts and has a lot of backlog messages,
-			// is that the server is going to send all pending messages for this consumer "at once",
-			// that is, without releasing the consumer lock.
-			// The application may get them and ack, but the ack won't be processed
-			// because the server is still sending messages to this consumer.
-			// ..if it takes longer to send all pending messages [then AckWait], the message will also get redelivered.
-			// ..If the server redelivers the message is that it thinks that the message has not been acknowledged,
-			// and it may in that case resend again, so you should Ack the message there.
-			ckDone := fmt.Sprintf("%s#%d", opt.DurableName, msg.Sequence)
-			if _, isDone := d.msgsDone.Get(ckDone); isDone {
-				_ = msg.Ack()
-				return
-			}
-
-			if err := opt.Handler(msg.Data); err != nil {
-				d.handleError(subscription, msg, err, opt)
-				return
-			}
-			_ = msg.Ack()
-			_ = d.msgsDone.Add(ckDone, 0, 10*time.Minute)
-			log.Info().Str("durableName", opt.DurableName).
-				Func(func(e *zerolog.Event) {
-					if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-						e.RawJSON("stan.data", msg.Data).
-							Uint64("stan.sequence", msg.Sequence).
-							Int64("stan.timestamp", msg.Timestamp)
-					}
-				}).
-				Msg("dispatcher delivered")
-		},
-		stan.SetManualAckMode(),
-		stan.AckWait(d.config.AckWait),
-		stan.MaxInflight(d.config.MaxInflight),
-		stan.DurableName(opt.DurableName),
-		stan.StartWithLastReceived(),
-	); errSubs != nil {
-		return errSubs
+	if err != nil {
+		log.Warn().Err(err).
+			Str("durable", opt.Durable).
+			Msg("nats dispatcher failed JetStream")
+		return
 	}
 
-	// Workaround v8.1.3 to fix processing large natsstore from prior versions
-	// Modern envs should use the correct value of MaxInflight setting
-	return subscription.SetPendingLimits(d.config.MaxPendingMsgs, d.config.MaxPendingBytes)
+	if _, err := js.ConsumerInfo(streamName, opt.Durable); errors.Is(err, nats.ErrConsumerNotFound) {
+		if _, err = js.AddConsumer(streamName, &nats.ConsumerConfig{
+			// AckWait:       d.config.AckWait,
+			AckPolicy:     nats.AckExplicitPolicy,
+			DeliverPolicy: nats.DeliverLastPolicy,
+			Durable:       opt.Durable,
+			Name:          opt.Durable,
+		}); err != nil {
+			log.Warn().Err(err).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed AddConsumer")
+			return
+		}
+	} else if err != nil {
+		log.Warn().Err(err).
+			Str("durable", opt.Durable).
+			Msg("nats dispatcher failed ConsumerInfo")
+		return
+	}
+
+	sub, err := js.PullSubscribe(
+		opt.Subject, opt.Durable,
+
+		nats.Bind(streamName, opt.Durable),
+		// nats.BindStream(streamName),
+		// nats.Durable(opt.Durable),
+		// nats.AckWait(d.config.AckWait),
+		nats.ManualAck(),
+	)
+	if err != nil {
+		log.Warn().Err(err).
+			Str("durable", opt.Durable).
+			Msg("nats dispatcher failed Subscribe")
+		return
+	}
+
+	go d.fetch(ctx, opt, sub)
 }
 
-func (d *natsDispatcher) retryDurable(opt DispatcherOption) error {
-	_, err := d.taskQueue.PushAsync(taskRetry, opt)
-	return err
-}
+func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *nats.Subscription) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
 
-func (d *natsDispatcher) taskRetryHandler(task *taskqueue.Task) error {
-	opt := task.Args[0].(DispatcherOption)
+		// Fetch will return as soon as any message is available rather than wait until the full batch size is available,
+		// using a batch size of more than 1 allows for higher throughput when needed.
+		msgs, err := sub.Fetch(4, nats.Context(ctx))
+		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			log.Warn().Err(err).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed Fetch")
+			continue
+		}
 
-	d.Lock()
-	defer d.Unlock()
+		// Process fetched messages and delay next fetching in case of transient error
+		var delayRetry *dispatcherRetry
+		for _, msg := range msgs {
+			if msg.Subject != opt.Subject {
+				// TODO: resolve this redundant case
+				_ = msg.Ack()
+				continue
+			}
+			if delayRetry != nil {
+				_ = msg.Nak()
+				continue
+			}
 
-	var err error
-	if d.connDispatcher != nil {
-		if _, isOpen := d.durables.Get(opt.DurableName); !isOpen {
-			if err = d.openDurable(opt); err == nil {
-				d.durables.Set(opt.DurableName, 0, -1)
+			delayRetry = d.processMsg(ctx, opt, msg)
+			if delayRetry != nil {
+				_ = msg.Nak()
+			} else {
+				_ = msg.Ack()
 			}
 		}
-	} else {
-		err = fmt.Errorf("%w: is not connected", ErrDispatcher)
+		if delayRetry != nil {
+			select {
+			case <-ctx.Done(): // context cancelled
+			case <-time.After(retryDelays[delayRetry.Retry]): // delay ended
+			}
+		}
 	}
+}
+
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, msg *nats.Msg) *dispatcherRetry {
+	meta, err := msg.Metadata()
 	if err != nil {
-		log.Info().Err(err).
-			Str("durableName", opt.DurableName).
-			Msg("dispatcher failed")
+		log.Warn().Err(err).Interface("msg", *msg).
+			Str("durable", opt.Durable).
+			Msg("nats dispatcher failed Metadata")
+		return nil
 	}
-	return err
+	logDetailsFn := func(a ...bool) func(e *zerolog.Event) {
+		if zerolog.GlobalLevel() <= zerolog.DebugLevel ||
+			(len(a) > 0 && a[0]) {
+			return func(e *zerolog.Event) {
+				e.RawJSON("nats.msg.data", msg.Data)
+				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
+				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
+				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+			}
+		}
+		return func(e *zerolog.Event) {}
+	}
+
+	if seq, ok := d.duraSeqs.Get(opt.Durable); ok {
+		if seq := seq.(uint64); seq >= meta.Sequence.Stream {
+			log.Warn().Func(logDetailsFn(true)).
+				Uint64("done.sequence", seq).
+				Str("durable", opt.Durable).
+				Msg("dispatcher lost order")
+		}
+	}
+
+	err = opt.Handler(msg.Data)
+	if err == nil {
+		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
+		log.Info().Func(logDetailsFn()).
+			Str("durable", opt.Durable).
+			Msg("dispatcher delivered")
+		return nil
+	}
+	if !errors.Is(err, tcgerr.ErrTransient) {
+		log.Warn().Err(err).Func(logDetailsFn(true)).
+			Str("durable", opt.Durable).
+			Msg("dispatcher could not deliver: will not retry")
+		return nil
+	}
+
+	retry := &dispatcherRetry{
+		Timestamp: time.Now().UTC(),
+		LastError: err,
+		Retry:     1,
+	}
+	if lastRetry, ok := d.retries.Get(opt.Durable); ok {
+		lastRetry := lastRetry.(dispatcherRetry)
+		if retry.Timestamp.Before(lastRetry.Timestamp.Add(time.Second * 10)) {
+			retry.Retry = lastRetry.Retry + 1
+		}
+	}
+
+	if retry.Retry >= len(retryDelays) {
+		d.retries.Delete(opt.Durable)
+		log.Warn().Err(err).Func(logDetailsFn(true)).
+			Str("durable", opt.Durable).
+			Msg("dispatcher could not deliver: stop retrying")
+		return nil
+	}
+
+	d.retries.Set(opt.Durable, *retry, 0)
+	log.Info().Err(err).Func(logDetailsFn()).
+		Int("retry", retry.Retry).
+		Str("durable", opt.Durable).
+		Msg("dispatcher could not deliver: will retry")
+
+	return retry
 }
