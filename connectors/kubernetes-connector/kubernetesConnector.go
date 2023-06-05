@@ -54,9 +54,10 @@ const (
 )
 
 const (
-	ClusterHostGroup                 = "cluster-"
-	ClusterNameLabel                 = "alpha.eksctl.io/cluster-name"
-	PodsHostGroup                    = "pods-"
+	ClusterHostGroup = "cluster-"
+	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
+	PodsHostGroup    = "pods-"
+
 	defaultKubernetesClusterEndpoint = ""
 )
 
@@ -362,33 +363,31 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		log.Err(err).Msg("could not collect pod inventory")
 		return
 	}
-	for _, pod := range pods.Items {
-		labels := make(map[string]string)
-		for key, element := range pod.Labels {
-			labels[key] = element
-		}
-		podName := pod.Name
-		if *metricsPerContainer {
-			podName = strings.TrimSuffix(pod.Spec.Containers[0].Name, "-")
-		}
-		monitorStatus, message := connector.calculatePodStatus(&pod)
+
+	addResource := func(
+		stateKey string,
+		resourceName string,
+		monitorStatus transit.MonitorStatus,
+		message string,
+		labels map[string]string,
+		podHostGroup string,
+	) {
 		resource := KubernetesResource{
-			Name:     podName,
+			Name:     resourceName,
 			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
 			Services: make(map[string]transit.MonitoredService),
 		}
-		monitoredState[resource.Name] = resource
+		monitoredState[stateKey] = resource
 		// no services to process at this stage
 
-		// add to namespace group for starters, need to consider namespace filtering
-		podHostGroup := PodsHostGroup + pod.Namespace
 		if _, found := groupsMap[resource.Name]; found {
-			continue
+			return
 		}
 		groupsMap[resource.Name] = true
+		// add to namespace group for starters, need to consider namespace filtering
 		if group, ok := groups[podHostGroup]; ok {
 			group.Resources = append(group.Resources, transit.ResourceRef{
 				Name:  resource.Name,
@@ -408,6 +407,28 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 				Type:  transit.ResourceTypeHost,
 			})
 			groups[podHostGroup] = group
+		}
+	}
+
+	for _, pod := range pods.Items {
+		labels := make(map[string]string)
+		for key, element := range pod.Labels {
+			labels[key] = element
+		}
+
+		monitorStatus, message := connector.calculatePodStatus(&pod)
+
+		if *metricsPerContainer {
+			for _, container := range pod.Spec.Containers {
+				resourceName := strings.TrimSuffix(container.Name, "-")
+				addResource(pod.Name+"/"+resourceName,
+					resourceName, monitorStatus, message, labels,
+					PodsHostGroup+pod.Namespace)
+			}
+		} else {
+			addResource(pod.Name,
+				pod.Name, monitorStatus, message, labels,
+				PodsHostGroup+pod.Namespace)
 		}
 	}
 }
@@ -523,12 +544,13 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 		log.Err(err).Msg("could not collect pod metrics")
 		return
 	}
+	debugDetails := false
 	builderMap := make(map[string][]connectors.MetricBuilder)
 	serviceMap := make(map[string]transit.MonitoredService)
 	for key, metricDefinition := range cfg.Views[ViewPods] {
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
-				if resource, ok := monitoredState[container.Name]; ok {
+				if resource, ok := monitoredState[pod.Name+"/"+container.Name]; ok {
 					var value interface{}
 					switch key {
 					case cpuCores:
@@ -586,10 +608,14 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 						resource.Services[metricDefinition.Name] = *monitoredService
 					}
 				} else {
-					log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
+					log.Error().Msgf("pod container not found in monitored state: %s/%s", pod.Name, container.Name)
+					debugDetails = true
 				}
 			}
 		}
+	}
+	if debugDetails {
+		log.Debug().Interface("monitoredState", monitoredState).Send()
 	}
 }
 
