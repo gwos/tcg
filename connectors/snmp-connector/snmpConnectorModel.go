@@ -40,7 +40,7 @@ type InterfaceExt struct {
 type InterfaceMetric struct {
 	Key   string
 	Mib   string
-	Value int
+	Value int64
 }
 
 func (state *MonitoringState) Init() {
@@ -74,18 +74,18 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	timestamp := transit.NewTimestamp()
 	i := 0
 	for _, iFace := range device.Interfaces {
-		bytesInPrev, bytesOutPrev, bytesInX64Prev, bytesOutX64Prev := -1, -1, -1, -1
+		var bytesInPrev, bytesOutPrev, bytesInX64Prev, bytesOutX64Prev int64 = -1, -1, -1, -1
 		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfInOctets)); ok {
-			bytesInPrev = val.(int)
+			bytesInPrev = val.(int64)
 		}
 		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfOutOctets)); ok {
-			bytesOutPrev = val.(int)
+			bytesOutPrev = val.(int64)
 		}
 		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCInOctets)); ok {
-			bytesInX64Prev = val.(int)
+			bytesInX64Prev = val.(int64)
 		}
 		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCOutOctets)); ok {
-			bytesOutX64Prev = val.(int)
+			bytesOutX64Prev = val.(int64)
 		}
 
 		var metricsBuilder []connectors.MetricBuilder
@@ -186,8 +186,8 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
 			case transit.UnitCounter:
-				previousValueCache.SetDefault(metricName, currentValue.(int))
-				currentValue = currentValue.(int) - previousValue.(int)
+				previousValueCache.SetDefault(metricName, currentValue.(int64))
+				currentValue = currentValue.(int64) - previousValue.(int64)
 			}
 			return true, true, currentValue
 		}
@@ -197,11 +197,11 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 }
 
 func calculateBytesPerSecond(metricName string, metricDefinition transit.MetricDefinition, current, currentX64, previous,
-	previousX64 int, timestamp *transit.Timestamp) connectors.MetricBuilder {
+	previousX64 int64, timestamp *transit.Timestamp) connectors.MetricBuilder {
 	seconds := int(connectors.CheckInterval.Seconds())
-	result := (current - previous) / seconds
+	result := (current - previous) / int64(seconds)
 	if currentX64 > 0 && previousX64 > 0 {
-		result = (currentX64 - previousX64) / seconds
+		result = (currentX64 - previousX64) / int64(seconds)
 	}
 
 	return connectors.MetricBuilder{

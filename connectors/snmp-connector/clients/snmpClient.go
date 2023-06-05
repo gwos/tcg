@@ -93,7 +93,7 @@ type SnmpMetric struct {
 
 type SnmpValue struct {
 	Name  string
-	Value int
+	Value int64
 }
 
 type SnmpMetricData struct {
@@ -286,7 +286,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		val.Name = dataUnit.Name
 		switch v := dataUnit.Value.(type) {
 		case uint:
-			val.Value = int(v)
+			val.Value = int64(v)
 			log.Info().Msgf("*** parsed value for %s: %d", val.Name, val.Value)
 		default:
 			log.Warn().Msgf("value '%s' of unsupported type for %s", v, dataUnit.Name)
