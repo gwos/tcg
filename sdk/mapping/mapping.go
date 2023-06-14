@@ -1,58 +1,45 @@
 package mapping
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
-
-	"gopkg.in/yaml.v3"
 )
 
 var (
 	ErrMapping = errors.New("mapping error")
 
+	ErrMappingCompile       = fmt.Errorf("%w: %v", ErrMapping, "compile")
 	ErrMappingMissedTag     = fmt.Errorf("%w: %v", ErrMapping, "missed tag")
 	ErrMappingMismatchedTag = fmt.Errorf("%w: %v", ErrMapping, "mismatched tag")
 )
 
 type Mapping struct {
-	Tag string `yaml:"tag"`
+	Tag string `json:"tag"`
 	// Match tag value with regexp
-	Matcher string `yaml:"matcher"`
+	Matcher string `json:"matcher"`
 	// Expand Template with matches
-	Template string `yaml:"template"`
+	Template string `json:"template"`
 
 	matcher *regexp.Regexp
 }
 
-// UnmarshalJSON implements json.Unmarshaler.
-func (p *Mapping) UnmarshalJSON(input []byte) error {
-	type plain Mapping
-	t := plain(*p)
-	var err error
-	if err = json.Unmarshal(input, &t); err != nil {
-		return err
+// NewMapping returns new mapping.
+func NewMapping(tag, matcher, template string) *Mapping {
+	if m, err := regexp.Compile(matcher); err != nil {
+		return nil
+	} else {
+		return &Mapping{Tag: tag, Matcher: matcher, Template: template, matcher: m}
 	}
-	if t.matcher, err = regexp.Compile(t.Matcher); err != nil {
-		return err
-	}
-	*p = Mapping(t)
-	return nil
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (p *Mapping) UnmarshalYAML(value *yaml.Node) error {
-	type plain Mapping
-	t := plain(*p)
-	var err error
-	if err = value.Decode(&t); err != nil {
+// Compile compiles matcher.
+func (p *Mapping) Compile() error {
+	if matcher, err := regexp.Compile(p.Matcher); err != nil {
 		return err
+	} else {
+		p.matcher = matcher
 	}
-	if t.matcher, err = regexp.Compile(t.Matcher); err != nil {
-		return err
-	}
-	*p = Mapping(t)
 	return nil
 }
 
@@ -76,4 +63,14 @@ func (p Mappings) Apply(tags map[string]string) (string, error) {
 		}
 	}
 	return string(result), nil
+}
+
+// Compile compiles mappings matchers.
+func (p Mappings) Compile() error {
+	for i := range p {
+		if err := p[i].Compile(); err != nil {
+			return fmt.Errorf("%w [%d:%v]: %v", ErrMappingCompile, i, p[i].Tag, err)
+		}
+	}
+	return nil
 }
