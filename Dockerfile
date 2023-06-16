@@ -2,18 +2,20 @@
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
 #
-FROM golang:latest as test-deb
+FROM golang:1.19-bullseye as test-deb
 
 WORKDIR /go/src/
 COPY . .
 
-RUN apt-get update -qq \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -qqy \
+RUN apt-get update -y \
+    && echo "--" \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
         libjansson-dev \
+    && echo "--" \
     && make clean && make \
     && echo "[GOTOCJSON TEST DONE]"
 
-FROM golang:alpine as build
+FROM golang:1.19-alpine as build
 ARG TRAVIS_TAG=
 ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 WORKDIR /go/src/
@@ -24,7 +26,7 @@ RUN apk add --no-cache \
         libmcrypt libmcrypt-dev \
     && echo "[CHECKER NSCA DEPS DONE]"
 
-RUN go test -v $(go list ./... | grep -v tcg/integration) \
+RUN go test  $(go list ./... | grep -v tcg/integration) \
     && echo "[Go TESTS DONE]"
 
 # use bash for run to support '[[' command
