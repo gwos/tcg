@@ -2,8 +2,9 @@
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
 #
-FROM golang:1.19-bullseye as test-deb
-
+FROM golang:1.19-bullseye AS build-libtransit
+ARG TRAVIS_TAG=
+ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 WORKDIR /go/src/
 COPY . .
 
@@ -11,11 +12,16 @@ RUN apt-get update -y \
     && echo "--" \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
         libjansson-dev \
-    && echo "--" \
-    && make clean && make \
-    && echo "[GOTOCJSON TEST DONE]"
+    && echo "--"
 
-FROM golang:1.19-alpine as build
+RUN make clean && make \
+    && cp libtransit/libtransit.so libtransit/libtransit.h libtransit/transit.h  build/ \
+    && echo "[LIBTRANSIT BUILD DONE]"
+
+FROM scratch AS export-libtransit
+COPY --from=build-libtransit /go/src/build /
+
+FROM golang:1.19-alpine AS build
 ARG TRAVIS_TAG=
 ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 WORKDIR /go/src/
@@ -52,10 +58,10 @@ RUN cp ./docker_cmd.sh /app/
 
 # Support custom-build-outputs for debug the build
 # https://docs.docker.com/engine/reference/commandline/build/#custom-build-outputs
-FROM scratch as export
-COPY --from=build /app .
+FROM scratch AS export
+COPY --from=build /app /
 
-FROM alpine:3.11 as prod
+FROM alpine:3.11 AS prod
 # update zlib to fix CVE
 RUN apk add -u --no-cache bash libmcrypt zlib
 COPY --from=build /app /app
