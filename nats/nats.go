@@ -138,27 +138,40 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		return err
 	}
 
-	if _, err = js.StreamInfo(streamName); err == nats.ErrStreamNotFound {
-		if _, err = js.AddStream(&nats.StreamConfig{
-			Name:     streamName,
-			Subjects: subjects,
-			Storage: func(arg string) nats.StorageType {
-				switch strings.ToUpper(arg) {
-				case "MEMORY":
-					return nats.MemoryStorage
-				default:
-					return nats.FileStorage
-				}
-			}(s.config.StoreType),
-			AllowDirect: true,
-			MaxAge:      s.config.StoreMaxAge,
-			MaxBytes:    s.config.StoreMaxBytes,
-			MaxMsgs:     s.config.StoreMaxMsgs,
-			Retention:   nats.LimitsPolicy,
-		}); err != nil {
+	storage := func(arg string) nats.StorageType {
+		switch strings.ToUpper(arg) {
+		case "MEMORY":
+			return nats.MemoryStorage
+		default:
+			return nats.FileStorage
+		}
+	}(s.config.StoreType)
+	sc := nats.StreamConfig{
+		Name:        streamName,
+		Subjects:    subjects,
+		Storage:     storage,
+		AllowDirect: true,
+		MaxAge:      s.config.StoreMaxAge,
+		MaxBytes:    s.config.StoreMaxBytes,
+		MaxMsgs:     s.config.StoreMaxMsgs,
+		Retention:   nats.LimitsPolicy,
+	}
+
+	if info, err := js.StreamInfo(streamName); err == nil {
+		if !equalStreamConfig(info.Config, sc) {
+			if _, err := js.UpdateStream(&sc); err != nil {
+				log.Warn().Err(err).
+					Interface("config", s.config).
+					Msg("nats failed UpdateStream")
+				return err
+			}
+		}
+	} else if err == nats.ErrStreamNotFound {
+		if _, err := js.AddStream(&sc); err != nil {
 			log.Warn().Err(err).
 				Interface("config", s.config).
 				Msg("nats failed AddStream")
+			return err
 		}
 	} else if err != nil {
 		log.Warn().Err(err).Msg("nats failed StreamInfo")
@@ -166,6 +179,30 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 	}
 
 	return nil
+}
+
+func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
+	return c1.MaxAge == c2.MaxAge &&
+		c1.MaxBytes == c2.MaxBytes &&
+		c1.MaxMsgs == c2.MaxMsgs &&
+		c1.Storage == c2.Storage &&
+		equalStrs(c1.Subjects, c2.Subjects)
+}
+
+func equalStrs(ss1, ss2 []string) bool {
+	if len(ss1) != len(ss2) {
+		return false
+	}
+	ms := make(map[string]bool, len(ss1))
+	for _, s := range ss1 {
+		ms[s] = false
+	}
+	for _, s := range ss2 {
+		if _, ok := ms[s]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // StopServer shutdowns NATS
