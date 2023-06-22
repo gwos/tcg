@@ -54,38 +54,33 @@ func (client *KibanaClient) InitClient() error {
 // Extracts stored queries with provided titles
 // If no titles provided extracts all stored queries
 func (client *KibanaClient) RetrieveStoredQueries(titles []string) []KSavedObject {
-	savedObjectType := StoredQuery
-	savedObjectSearchField := Title
-	return client.findSavedObjects(&savedObjectType, &savedObjectSearchField, titles)
+	return client.findSavedObjects(StoredQuery, Title, titles)
 }
 
 // RetrieveIndexTitles extracts index patterns titles associated with provided stored query
 func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []string {
-	var (
-		indexPatterns []KSavedObject
-		indexes       = make([]string, 0)
-	)
-
-	savedObjectType := IndexPattern
 	ids := storedQuery.ExtractIndexIds()
-	if ids == nil {
-		log.Warn().Msgf("no index patterns linked to query: %s", storedQuery.Attributes.Title)
-		return nil
-	}
-	indexPatterns = client.bulkGetSavedObjects(&savedObjectType, ids)
-	if indexPatterns == nil {
-		log.Error().Msg("could not get index patterns")
+	if len(ids) == 0 {
+		log.Warn().
+			Interface("storedQuery", storedQuery).
+			Msg("no index patterns linked to query")
 		return nil
 	}
 
-	indexSet := make(map[string]struct{})
+	indexPatterns := client.bulkGetSavedObjects(IndexPattern, ids)
+	if len(indexPatterns) == 0 {
+		log.Warn().Msg("could not get index patterns")
+		return nil
+	}
+
+	indexSet := make(map[string]bool)
 	for _, indexPattern := range indexPatterns {
-		title := indexPattern.Attributes.Title
-		if title != "" {
-			indexSet[title] = struct{}{}
+		if title := indexPattern.Attributes.Title; title != "" {
+			indexSet[title] = true
 		}
 	}
 
+	indexes := make([]string, 0, len(indexSet))
 	for index := range indexSet {
 		indexes = append(indexes, index)
 	}
@@ -95,22 +90,17 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 
 // Finds saved objects of provided type
 // and searchField matching searchValues if both searchField and searchValue set
-func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) []KSavedObject {
+func (client *KibanaClient) findSavedObjects(savedObjectType KibanaSavedObjectType, searchField KibanaSavedObjectSearchField, searchValues []string) []KSavedObject {
 	var savedObjects []KSavedObject
 
-	page := 0
-	perPage := 10000
-	total := -1
-
-	for total == -1 || total >= page*perPage {
-		page = page + 1
-		path := client.buildSavedObjectsFindPath(&page, &perPage, savedObjectType, searchField, searchValues)
-
-		log.Debug().Msgf("performing Kibana Find Saved Objects request: %s", path)
+	for page, perPage, total := 1, 1000, -1; total == -1 || total >= page*perPage; page++ {
+		path := client.buildSavedObjectsFindPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
 		status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
-		log.Debug().Msgf("Kibana Find Saved Objects response: %s", string(response))
+		log.Debug().
+			RawJSON("response", response).
+			Msgf("Kibana Find Saved Objects request: %s", path)
 
-		if err != nil || status != 200 || response == nil {
+		if err != nil || status != 200 || len(response) == 0 {
 			if err != nil {
 				log.Err(err).Msg("failed to perform Kibana Find Saved Objects request")
 			}
@@ -119,15 +109,14 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 					Int("status", status).
 					Msg("failure Kibana Find Saved Objects response")
 			}
-			if response == nil {
-				log.Error().Msg("Kibana Find Saved Objects response is nil")
+			if len(response) == 0 {
+				log.Error().Msg("Kibana Find Saved Objects response is empty")
 			}
 			return nil
 		}
 
 		var savedObjectsResponse KSavedObjectsResponse
-		err = json.Unmarshal(response, &savedObjectsResponse)
-		if err != nil {
+		if err := json.Unmarshal(response, &savedObjectsResponse); err != nil {
 			log.Err(err).Msg("could not parse Kibana Find Saved Objects response")
 			return savedObjects
 		}
@@ -141,16 +130,16 @@ func (client *KibanaClient) findSavedObjects(savedObjectType *KibanaSavedObjectT
 }
 
 // Performs bulk get of saved objects for provided type and ids
-func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObjectType, ids []string) []KSavedObject {
-	if savedObjectType == nil || ids == nil || len(ids) == 0 {
-		log.Warn().Msg("could not perform Kibana Bulk Get: type and at least one id required")
+func (client *KibanaClient) bulkGetSavedObjects(savedObjectType KibanaSavedObjectType, ids []string) []KSavedObject {
+	if len(ids) == 0 {
+		log.Warn().Msg("could not perform Kibana Bulk Get: at least one id required")
 		return nil
 	}
 
 	var requestBody = make([]KBulkGetRequestItem, 0, len(ids))
 	for _, id := range ids {
 		requestBody = append(requestBody, KBulkGetRequestItem{
-			Type: string(*savedObjectType),
+			Type: string(savedObjectType),
 			ID:   id,
 		})
 	}
@@ -165,11 +154,11 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, bodyBytes)
 	log.Debug().
 		Err(err).
-		Bytes("requestBody", bodyBytes).
-		Bytes("response", response).
+		RawJSON("request", bodyBytes).
+		RawJSON("response", response).
 		Msgf("Kibana Bulk Get Saved Objects request: %s", path)
 
-	if err != nil || status != 200 || response == nil {
+	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
 			log.Err(err).Msg("could not perform Kibana Bulk Get Saved Objects request")
 		}
@@ -178,8 +167,8 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 				Int("status", status).
 				Msg("failure Kibana Bulk Get Saved Objects response")
 		}
-		if response == nil {
-			log.Error().Msg("Kibana Bulk Get Saved Objects response is nil")
+		if len(response) == 0 {
+			log.Error().Msg("Kibana Bulk Get Saved Objects response is empty")
 		}
 		return nil
 	}

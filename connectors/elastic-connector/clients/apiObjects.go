@@ -162,13 +162,13 @@ type EsFieldCapsResponse struct {
 
 // Extracts indexes's ids linked to stored query's filters
 func (storedQuery *KSavedObject) ExtractIndexIds() []string {
-	indexIdsSet := make(map[string]struct{})
+	indexIdsSet := make(map[string]bool)
 	for _, filter := range storedQuery.Attributes.Filters {
 		if filter.Meta.Index != nil {
-			indexIdsSet[*filter.Meta.Index] = struct{}{}
+			indexIdsSet[*filter.Meta.Index] = true
 		}
 	}
-	var indexIDs = make([]string, 0, len(indexIdsSet))
+	indexIDs := make([]string, 0, len(indexIdsSet))
 	for indexID := range indexIdsSet {
 		indexIDs = append(indexIDs, indexID)
 	}
