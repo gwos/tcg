@@ -14,9 +14,23 @@ const (
 	now    = "now"
 )
 
-type KBulkGetRequest struct {
+type KBulkGetRequestItem struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
+}
+
+type KBulkGetResponse struct {
+	SavedObjects []struct {
+		KBulkGetRequestItem
+		Attributes *KAttributes `json:"attributes,omitempty"`
+		Error      *KError      `json:"error,omitempty"`
+	} `json:"saved_objects"`
+}
+
+type KError struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+	Status  int    `json:"statusCode"`
 }
 
 type KSavedObjectsResponse struct {

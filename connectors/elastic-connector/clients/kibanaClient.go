@@ -147,9 +147,9 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 		return nil
 	}
 
-	var requestBody = make([]KBulkGetRequest, 0, len(ids))
+	var requestBody = make([]KBulkGetRequestItem, 0, len(ids))
 	for _, id := range ids {
-		requestBody = append(requestBody, KBulkGetRequest{
+		requestBody = append(requestBody, KBulkGetRequestItem{
 			Type: string(*savedObjectType),
 			ID:   id,
 		})
@@ -184,13 +184,23 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType *KibanaSavedObje
 		return nil
 	}
 
-	var savedObjectsResponse KSavedObjectsResponse
-	err = json.Unmarshal(response, &savedObjectsResponse)
-	if err != nil {
+	bulkResponse := new(KBulkGetResponse)
+	if err := json.Unmarshal(response, bulkResponse); err != nil {
 		log.Err(err).Msg("could not parse Kibana Bulk Get Saved Objects response")
 		return nil
 	}
-	return savedObjectsResponse.SavedObjects
+	savedObjects := make([]KSavedObject, 0)
+	for _, o := range bulkResponse.SavedObjects {
+		if o.Error != nil {
+			log.Warn().
+				Interface("data", o).
+				Msg("error in Kibana Bulk Get Saved Objects response")
+			continue
+		}
+		savedObjects = append(savedObjects, KSavedObject{Type: o.Type, ID: o.ID, Attributes: o.Attributes})
+	}
+
+	return savedObjects
 }
 
 func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
