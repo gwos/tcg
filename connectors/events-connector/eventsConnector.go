@@ -29,13 +29,13 @@ func receiver(c *gin.Context) {
 		return
 	}
 
-	host, mb, err := helpers.GetMetricBuildersFromPrometheusData(data, extCfg)
+	host, mb, err := helpers.GetMetricBuildersFromPrometheusData(data, helpers.GetExtConfig())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	monitoredServices := make([]*transit.MonitoredService, 0, len(mb))
+	monitoredServices := make([]transit.MonitoredService, 0, len(mb))
 	for _, m := range mb {
 		service, err := connectors.BuildServiceForMetric(host, m)
 		if err != nil {
@@ -43,7 +43,7 @@ func receiver(c *gin.Context) {
 		}
 		service.Status = transit.ServiceWarning
 		service.LastPluginOutput = helpers.GetLastPluginOutput(m.Tags)
-		monitoredServices = append(monitoredServices, service)
+		monitoredServices = append(monitoredServices, *service)
 	}
 
 	resource, err := connectors.CreateResource(host, monitoredServices)
@@ -61,7 +61,7 @@ func receiver(c *gin.Context) {
 func initializeEntrypoints() []services.Entrypoint {
 	return []services.Entrypoint{
 		{
-			URL:     "/events",
+			URL:     "/receive/events",
 			Method:  http.MethodPost,
 			Handler: receiver,
 		},

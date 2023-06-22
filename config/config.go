@@ -373,7 +373,7 @@ func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
 	} */
 
 	switch cfg.Connector.AppType {
-	case "CHECKER", "APM":
+	case "CHECKER", "APM", "EVENTS":
 		cfg.Connector.IsDynamicInventory = true
 	default:
 		cfg.Connector.IsDynamicInventory = false

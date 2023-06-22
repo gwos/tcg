@@ -7,10 +7,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var (
-	extCfg = &helpers.ExtConfig{}
-)
-
 func main() {
 	var (
 		entries        = initializeEntrypoints()
@@ -18,13 +14,15 @@ func main() {
 		transitService = services.GetTransitService()
 	)
 
+	transitService.RegisterConfigHandler(helpers.ConfigHandler)
+	transitService.RegisterExitHandler(*helpers.GetCancelFunc())
+	controller.RegisterEntrypoints(entries)
+
 	log.Info().Msg("Waiting for configuration to be delivered...")
 	if err := transitService.DemandConfig(); err != nil {
 		log.Err(err).Msg("Failed to demand config")
 		return
 	}
-
-	controller.RegisterEntrypoints(entries)
 
 	if err := connectors.Start(); err != nil {
 		log.Err(err).Msg("Failed to start connector")

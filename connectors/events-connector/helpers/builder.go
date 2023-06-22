@@ -38,6 +38,7 @@ func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (st
 			ComputeType:    transit.Informational,
 			StartTimestamp: &transit.Timestamp{Time: alert.StartsAt},
 			EndTimestamp:   &transit.Timestamp{Time: alert.EndsAt},
+			Value:          -1,
 		}
 
 		for k, v := range alert.Annotations {
