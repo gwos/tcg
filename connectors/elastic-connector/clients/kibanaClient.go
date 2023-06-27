@@ -15,6 +15,7 @@ const (
 	savedObjectsPath = "saved_objects/"
 	findPath         = "_find"
 	bulkGetPath      = "_bulk_get"
+	bulkResolvePath  = "_bulk_resolve"
 )
 
 type KibanaSavedObjectType string
@@ -54,7 +55,7 @@ func (client *KibanaClient) InitClient() error {
 // Extracts stored queries with provided titles
 // If no titles provided extracts all stored queries
 func (client *KibanaClient) RetrieveStoredQueries(titles []string) []KSavedObject {
-	return client.findSavedObjects(StoredQuery, Title, titles)
+	return client.FindSO(StoredQuery, Title, titles)
 }
 
 // RetrieveIndexTitles extracts index patterns titles associated with provided stored query
@@ -67,9 +68,9 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 		return nil
 	}
 
-	indexPatterns := client.bulkGetSavedObjects(IndexPattern, ids)
+	indexPatterns := client.BulkResolveSO(IndexPattern, ids)
 	if len(indexPatterns) == 0 {
-		log.Warn().Msg("could not get index patterns")
+		log.Warn().Msg("could not resolve index patterns")
 		return nil
 	}
 
@@ -88,13 +89,13 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 	return indexes
 }
 
-// Finds saved objects of provided type
+// FindSO finds saved objects of provided type
 // and searchField matching searchValues if both searchField and searchValue set
-func (client *KibanaClient) findSavedObjects(savedObjectType KibanaSavedObjectType, searchField KibanaSavedObjectSearchField, searchValues []string) []KSavedObject {
+func (client *KibanaClient) FindSO(savedObjectType KibanaSavedObjectType, searchField KibanaSavedObjectSearchField, searchValues []string) []KSavedObject {
 	var savedObjects []KSavedObject
 
 	for page, perPage, total := 1, 1000, -1; total == -1 || total >= page*perPage; page++ {
-		path := client.buildSavedObjectsFindPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
+		path := client.buildFindSOPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
 		status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
 		log.Debug().
 			RawJSON("response", response).
@@ -129,22 +130,22 @@ func (client *KibanaClient) findSavedObjects(savedObjectType KibanaSavedObjectTy
 	return savedObjects
 }
 
-// Performs bulk get of saved objects for provided type and ids
-func (client *KibanaClient) bulkGetSavedObjects(savedObjectType KibanaSavedObjectType, ids []string) []KSavedObject {
+// BulkGetSO performs bulk get of saved objects for provided type and ids
+func (client *KibanaClient) BulkGetSO(savedObjectType KibanaSavedObjectType, ids []string) []KSavedObject {
 	if len(ids) == 0 {
 		log.Warn().Msg("could not perform Kibana Bulk Get: at least one id required")
 		return nil
 	}
 
-	var requestBody = make([]KBulkGetRequestItem, 0, len(ids))
+	var requestBody = make([]KBulkGetSORequestItem, 0, len(ids))
 	for _, id := range ids {
-		requestBody = append(requestBody, KBulkGetRequestItem{
+		requestBody = append(requestBody, KBulkGetSORequestItem{
 			Type: string(savedObjectType),
 			ID:   id,
 		})
 	}
 
-	path := client.buildBulkGetSavedObjectsPath()
+	path := client.buildBulkGetSOPath()
 
 	bodyBytes, err := json.Marshal(requestBody)
 	if err != nil {
@@ -173,7 +174,7 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType KibanaSavedObjec
 		return nil
 	}
 
-	bulkResponse := new(KBulkGetResponse)
+	bulkResponse := new(KBulkGetSOResponse)
 	if err := json.Unmarshal(response, bulkResponse); err != nil {
 		log.Err(err).Msg("could not parse Kibana Bulk Get Saved Objects response")
 		return nil
@@ -192,7 +193,71 @@ func (client *KibanaClient) bulkGetSavedObjects(savedObjectType KibanaSavedObjec
 	return savedObjects
 }
 
-func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
+// BulkResolveSO performs bulk resolve of saved objects for provided type and ids
+func (client *KibanaClient) BulkResolveSO(savedObjectType KibanaSavedObjectType, ids []string) []KSavedObject {
+	if len(ids) == 0 {
+		log.Warn().Msg("could not perform Kibana Bulk Resolve: at least one id required")
+		return nil
+	}
+
+	var requestBody = make([]KBulkGetSORequestItem, 0, len(ids))
+	for _, id := range ids {
+		requestBody = append(requestBody, KBulkGetSORequestItem{
+			Type: string(savedObjectType),
+			ID:   id,
+		})
+	}
+
+	path := client.buildBulkResolveSOPath()
+
+	bodyBytes, err := json.Marshal(requestBody)
+	if err != nil {
+		log.Err(err).Msg("could not marshal Kibana Bulk Resolve request")
+		return nil
+	}
+	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, bodyBytes)
+	log.Debug().
+		Err(err).
+		RawJSON("request", bodyBytes).
+		RawJSON("response", response).
+		Msgf("Kibana Bulk Resolve Saved Objects request: %s", path)
+
+	if err != nil || status != 200 || len(response) == 0 {
+		if err != nil {
+			log.Err(err).Msg("could not perform Kibana Bulk Resolve Saved Objects request")
+		}
+		if status != 200 {
+			log.Error().
+				Int("status", status).
+				Msg("failure Kibana Bulk Resolve Saved Objects response")
+		}
+		if len(response) == 0 {
+			log.Error().Msg("Kibana Bulk Resolve Saved Objects response is empty")
+		}
+		return nil
+	}
+
+	bulkResponse := new(KBulkResolveSOResponse)
+	if err := json.Unmarshal(response, bulkResponse); err != nil {
+		log.Err(err).Msg("could not parse Kibana Bulk Resolve Saved Objects response")
+		return nil
+	}
+	savedObjects := make([]KSavedObject, 0)
+	for _, item := range bulkResponse.ResolvedObjects {
+		if item.SavedObject.Error != nil {
+			log.Warn().
+				Interface("data", item).
+				Msg("error in Kibana Bulk Resolve Saved Objects response")
+			continue
+		}
+		savedObjects = append(savedObjects,
+			KSavedObject{Type: item.SavedObject.Type, ID: item.SavedObject.ID, Attributes: item.SavedObject.Attributes})
+	}
+
+	return savedObjects
+}
+
+func (client *KibanaClient) buildFindSOPath(page *int, perPage *int, savedObjectType *KibanaSavedObjectType, searchField *KibanaSavedObjectSearchField, searchValues []string) string {
 	params := make(map[string]string)
 	if savedObjectType != nil {
 		params["type"] = string(*savedObjectType)
@@ -217,6 +282,10 @@ func (client *KibanaClient) buildSavedObjectsFindPath(page *int, perPage *int, s
 	return client.APIRoot + apiPath + savedObjectsPath + findPath + clients.BuildQueryParams(params)
 }
 
-func (client *KibanaClient) buildBulkGetSavedObjectsPath() string {
+func (client *KibanaClient) buildBulkGetSOPath() string {
 	return client.APIRoot + apiPath + savedObjectsPath + bulkGetPath
+}
+
+func (client *KibanaClient) buildBulkResolveSOPath() string {
+	return client.APIRoot + apiPath + savedObjectsPath + bulkResolvePath
 }

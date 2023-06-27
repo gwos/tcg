@@ -14,17 +14,28 @@ const (
 	now    = "now"
 )
 
-type KBulkGetRequestItem struct {
+type KBulkGetSORequestItem struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
 }
 
-type KBulkGetResponse struct {
+type KBulkGetSOResponse struct {
 	SavedObjects []struct {
-		KBulkGetRequestItem
+		KBulkGetSORequestItem
 		Attributes *KAttributes `json:"attributes,omitempty"`
 		Error      *KError      `json:"error,omitempty"`
 	} `json:"saved_objects"`
+}
+
+type KBulkResolveSOResponse struct {
+	ResolvedObjects []struct {
+		SavedObject struct {
+			KBulkGetSORequestItem
+			Attributes *KAttributes `json:"attributes,omitempty"`
+			Error      *KError      `json:"error,omitempty"`
+		} `json:"saved_object"`
+		Outcome string `json:"outcome"`
+	} `json:"resolved_objects"`
 }
 
 type KError struct {
