@@ -29,7 +29,7 @@ func receiver(c *gin.Context) {
 		return
 	}
 
-	host, mb, err := helpers.GetMetricBuildersFromPrometheusData(data, helpers.GetExtConfig())
+	host, group, mb, err := helpers.GetMetricBuildersFromPrometheusData(data, helpers.GetExtConfig())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
@@ -52,7 +52,14 @@ func receiver(c *gin.Context) {
 		return
 	}
 
-	if err = connectors.SendMetrics(c.Request.Context(), []transit.MonitoredResource{*resource}, nil); err != nil {
+	groups := make([]transit.ResourceGroup, 0)
+	if group != "" {
+		resourceRef := connectors.CreateResourceRef(host, "", transit.ResourceTypeHost)
+		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, []transit.ResourceRef{resourceRef})
+		groups = append(groups, resourceGroup)
+	}
+
+	if err = connectors.SendMetrics(c.Request.Context(), []transit.MonitoredResource{*resource}, &groups); err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}

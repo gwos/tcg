@@ -21,8 +21,9 @@ var (
 )
 
 type ExtConfig struct {
-	HostMappings    mapping.Mappings `json:"hostMappings"`
-	ServiceMappings mapping.Mappings `json:"serviceMappings"`
+	HostMappings      mapping.Mappings `json:"hostMappings"`
+	HostGroupMappings mapping.Mappings `json:"hostGroupMappings"`
+	ServiceMappings   mapping.Mappings `json:"serviceMappings"`
 }
 
 func GetExtConfig() *ExtConfig {
@@ -58,6 +59,10 @@ func ConfigHandler(data []byte) {
 	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	if err := extConfig.HostMappings.Compile(); err != nil {
 		log.Err(err).Msg("failed to compile host mappings")
+		return
+	}
+	if err := extConfig.HostGroupMappings.Compile(); err != nil {
+		log.Err(err).Msg("failed to compile host group mappings")
 		return
 	}
 	if err := extConfig.ServiceMappings.Compile(); err != nil {

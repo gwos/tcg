@@ -11,7 +11,7 @@ const (
 	tagKeyDescription = "description"
 )
 
-func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (string, []connectors.MetricBuilder, error) {
+func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (string, string, []connectors.MetricBuilder, error) {
 	var (
 		err            error
 		hostName       string
@@ -21,7 +21,12 @@ func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (st
 
 	hostName, err = cfg.HostMappings.Apply(data.CommonLabels)
 	if err != nil || hostName == "" {
-		return "", nil, err
+		return "", "", nil, err
+	}
+
+	hostGroupName, err := cfg.HostGroupMappings.Apply(data.CommonLabels)
+	if err != nil {
+		return "", "", nil, err
 	}
 
 	for _, alert := range data.Alerts {
@@ -48,7 +53,7 @@ func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (st
 		metricBuilders = append(metricBuilders, mb)
 	}
 
-	return hostName, metricBuilders, nil
+	return hostName, hostGroupName, metricBuilders, nil
 }
 
 func GetLastPluginOutput(tag map[string]string) string {
