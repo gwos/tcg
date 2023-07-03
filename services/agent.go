@@ -390,7 +390,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeSetInDowntime:
 						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
 					}
 					return err
 				},
@@ -408,7 +408,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeEventsUnack:
 						_, err = gwClient.SendEventsUnack(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
 					}
 					return err
 				},
@@ -424,7 +424,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeMetrics:
 						_, err = gwClient.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
 					}
 					return err
 				},

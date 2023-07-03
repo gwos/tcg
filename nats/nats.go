@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/shirou/gopsutil/v3/disk"
 )
 
 // Define NATS IDs
@@ -158,27 +159,75 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 	}
 
 	if info, err := js.StreamInfo(streamName); err == nil {
-		if !equalStreamConfig(info.Config, sc) {
-			if _, err := js.UpdateStream(&sc); err != nil {
-				log.Warn().Err(err).
-					Interface("config", s.config).
-					Msg("nats failed UpdateStream")
-				return err
-			}
+		if err := doStream(js, &info.Config, &sc); err != nil {
+			return err
 		}
 	} else if err == nats.ErrStreamNotFound {
-		if _, err := js.AddStream(&sc); err != nil {
-			log.Warn().Err(err).
-				Interface("config", s.config).
-				Msg("nats failed AddStream")
+		if err := doStream(js, nil, &sc); err != nil {
 			return err
 		}
 	} else if err != nil {
-		log.Warn().Err(err).Msg("nats failed StreamInfo")
+		log.Err(err).Msg("nats failed StreamInfo")
 		return err
 	}
 
 	return nil
+}
+
+func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error {
+	fn, fnDesc := js.AddStream, "AddStream"
+	if curCfg != nil {
+		if equalStreamConfig(*curCfg, *newCfg) {
+			return nil
+		}
+		fn, fnDesc = js.UpdateStream, "UpdateStream"
+	}
+
+	_, err := fn(newCfg)
+	var apiErr *nats.APIError
+	if errors.As(err, &apiErr) && apiErr.ErrorCode == nats.JSErrCodeInsufficientResourcesErr &&
+		newCfg.Storage == nats.FileStorage {
+		/* retry with smaller storage */
+		u, errUsage := disk.Usage(s.config.StoreDir)
+		if errUsage != nil {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", errUsage).
+				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+			return err
+		}
+		if u.Free > uint64(newCfg.MaxBytes) {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", u).
+				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
+			return err
+		}
+		if u.Free < 1024*1024 {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", u).
+				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
+			return err
+		}
+
+		const m = int64(1024 * 1024) // 1MB
+		mb := (int64(u.Free)/m)*m - m/2
+		origCfg := *newCfg
+		newCfg.MaxBytes = mb
+		_, err2 := fn(newCfg)
+		log.Err(err2).
+			Interface("originalError", err).
+			Interface("originalConfig", origCfg).
+			Interface("reducedMaxBytes", mb).
+			Msgf("nats retrying %v with smaller storage", fnDesc)
+		return err2
+	}
+
+	log.Err(err).
+		Interface("config", *newCfg).
+		Msgf("nats %v", fnDesc)
+	return err
 }
 
 func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
