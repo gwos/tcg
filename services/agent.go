@@ -488,6 +488,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 
 func (service *AgentService) config(data []byte) error {
 	// stop nats processing, allow nats reconfiguring
+	transportOn := service.agentStatus.Transport == StatusRunning
 	if err := service.stopNats(); err != nil {
 		log.Err(err).Msg("error stopping nats on processing config")
 	}
@@ -524,7 +525,7 @@ func (service *AgentService) config(data []byte) error {
 	// configure nats service and start nats processing if enabled
 	if err := service.startNats(); err != nil {
 		log.Err(err).Msg("error starting nats on processing config")
-	} else if service.Connector.Enabled {
+	} else if service.Connector.Enabled && transportOn {
 		if err := service.startTransport(); err != nil {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}

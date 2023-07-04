@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -77,10 +78,16 @@ func Start() error {
 	if err := services.GetTransitService().StartNats(); err != nil {
 		return err
 	}
-	if err := services.GetTransitService().StartTransport(); err != nil {
-		return err
+
+	// delay transport on application startup
+	td := services.GetTransitService().TransportStartRndDelay
+	if td > 0 {
+		upSince := services.GetTransitService().Stats().UpSince.Value()
+		if time.Since(time.UnixMilli(upSince)).Round(time.Second) < 8 {
+			time.Sleep(DefaultCheckInterval + time.Second*time.Duration(rand.Intn(td)))
+		}
 	}
-	return nil
+	return services.GetTransitService().StartTransport()
 }
 
 // SendMetrics processes metrics payload

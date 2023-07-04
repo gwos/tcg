@@ -125,6 +125,8 @@ type Connector struct {
 	// NatsServerConfigFile is used to override yaml values for
 	// NATS server configuration (debug only).
 	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
+
+	TransportStartRndDelay int `yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -241,8 +243,8 @@ func defaults() Config {
 			NatsStoreMaxAge:        time.Hour * 24 * 10,     // 10days
 			NatsStoreMaxBytes:      1024 * 1024 * 1024 * 20, // 20GB
 			NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
-
-			NatsServerConfigFile: "",
+			NatsServerConfigFile:   "",
+			TransportStartRndDelay: 60,
 		},
 		// create disabled connections to support partial setting with struct-path
 		// 4 items should be enough
