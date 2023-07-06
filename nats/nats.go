@@ -184,9 +184,22 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 	}
 
 	_, err := fn(newCfg)
-	var apiErr *nats.APIError
-	if errors.As(err, &apiErr) && apiErr.ErrorCode == nats.JSErrCodeInsufficientResourcesErr &&
-		newCfg.Storage == nats.FileStorage {
+
+	chkAPIErr := func(err error) bool {
+		// Note: there is some inconsistency in public nats constants
+		codes := map[nats.ErrorCode]string{
+			10023: "nats.JSErrCodeInsufficientResourcesErr",
+			10047: "nats.JSStorageResourcesExceededErr", // missed as public const
+		}
+		var apiErr *nats.APIError
+		if errors.As(err, &apiErr) {
+			_, ok := codes[apiErr.ErrorCode]
+			return ok
+		}
+		return false
+	}
+
+	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
 		/* retry with smaller storage */
 		u, errUsage := disk.Usage(s.config.StoreDir)
 		if errUsage != nil {
@@ -211,8 +224,9 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 			return err
 		}
 
-		const m = int64(1024 * 1024) // 1MB
-		mb := (int64(u.Free)/m)*m - m/2
+		// Note: NATS Server allows up to 75% of available storage.
+		// https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go
+		mb := int64(u.Free) / 4 * 3
 		origCfg := *newCfg
 		newCfg.MaxBytes = mb
 		_, err2 := fn(newCfg)
@@ -220,6 +234,7 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 			Interface("originalError", err).
 			Interface("originalConfig", origCfg).
 			Interface("reducedMaxBytes", mb).
+			Interface("disk.Free", u.Free).
 			Msgf("nats retrying %v with smaller storage", fnDesc)
 		return err2
 	}
