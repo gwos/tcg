@@ -102,10 +102,8 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 		switch view {
 		case string(Interfaces):
 			var mibs []string
-			for k, v := range metrics {
-				if v.Monitored {
-					mibs = append(mibs, k)
-				}
+			for _, v := range clients.AvailableMetrics {
+				mibs = append(mibs, v.Mib)
 			}
 			connector.collectInterfacesMetrics(mibs)
 			break
@@ -178,9 +176,9 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 				}
 				if iFace, has := device.Interfaces[idx]; has {
 					metric := InterfaceMetric{
-						Mib:      data.SnmpMetric.Mib,
-						Value:    snmpValue.Value,
-						UnitType: data.SnmpMetric.UnitType,
+						Key:   data.SnmpMetric.Key,
+						Mib:   data.SnmpMetric.Mib,
+						Value: snmpValue.Value,
 					}
 					iFace.Metrics[metric.Mib] = metric
 					device.Interfaces[idx] = iFace
@@ -198,6 +196,11 @@ func (connector *SnmpConnector) listSuggestions(view string, name string) []stri
 	switch view {
 	case string(Interfaces):
 		for k := range clients.AvailableMetrics {
+			if name == "" || strings.Contains(k, name) {
+				suggestions = append(suggestions, k)
+			}
+		}
+		for k := range clients.NonMibMetrics {
 			if name == "" || strings.Contains(k, name) {
 				suggestions = append(suggestions, k)
 			}

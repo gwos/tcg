@@ -38,9 +38,9 @@ type InterfaceExt struct {
 }
 
 type InterfaceMetric struct {
-	Mib      string
-	Value    int
-	UnitType clients.SnmpUnitType
+	Key   string
+	Mib   string
+	Value int64
 }
 
 func (state *MonitoringState) Init() {
@@ -74,30 +74,36 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	timestamp := transit.NewTimestamp()
 	i := 0
 	for _, iFace := range device.Interfaces {
-		var metricsBuilder []connectors.MetricBuilder
+		var bytesInPrev, bytesOutPrev, bytesInX64Prev, bytesOutX64Prev int64 = -1, -1, -1, -1
+		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfInOctets)); ok {
+			bytesInPrev = val.(int64)
+		}
+		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfOutOctets)); ok {
+			bytesOutPrev = val.(int64)
+		}
+		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCInOctets)); ok {
+			bytesInX64Prev = val.(int64)
+		}
+		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCOutOctets)); ok {
+			bytesOutX64Prev = val.(int64)
+		}
 
-		for metricName, metric := range iFace.Metrics {
-			if metricDefinition, has := metricDefinitions[metricName]; has {
+		var metricsBuilder []connectors.MetricBuilder
+		for mib, metric := range iFace.Metrics {
+			if metricDefinition, has := metricDefinitions[metric.Key]; has {
 				var unitType transit.UnitType
 				var value interface{}
 
-				switch metric.UnitType {
-				case clients.Number:
-					unitType = transit.UnitCounter
-					value = metric.Value
-					break
-				case clients.Bit:
-					unitType = transit.MB
-					value = float64(metric.Value) / 8000000
-					break
-				default:
-					log.Warn().Msgf("could not process metric '%s' for interface '%s' of device '%s': unsupported unit type '%s': skipping",
-						metricName, iFace.Name, device.Name, metric.UnitType)
-					continue
+				unitType = transit.UnitCounter
+				value = metric.Value
+
+				switch mib {
+				case clients.IfInOctets, clients.IfOutOctets, clients.IfHCInOctets, clients.IfHCOutOctets:
+					value = metric.Value * 8
 				}
 
 				metricBuilder := connectors.MetricBuilder{
-					Name:           metricName,
+					Name:           metric.Key,
 					CustomName:     metricDefinition.CustomName,
 					ComputeType:    metricDefinition.ComputeType,
 					Expression:     metricDefinition.Expression,
@@ -112,10 +118,26 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 				}
 
 				isDelta, isPreviousPresent, valueToSet := calculateValue(metricDefinition.MetricType, unitType,
-					fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, metricName), value)
+					fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, mib), value)
 
 				if !isDelta || (isDelta && isPreviousPresent) {
 					metricBuilder.Value = valueToSet
+					metricsBuilder = append(metricsBuilder, metricBuilder)
+				}
+			}
+			previousValueCache.SetDefault(mib, metric.Value)
+		}
+
+		for key := range clients.NonMibMetrics {
+			if metricDefinition, has := metricDefinitions[key]; has {
+				switch key {
+				case clients.BytesPerSecondIn:
+					metricBuilder := calculateBytesPerSecond(key, metricDefinition,
+						iFace.Metrics[clients.IfInOctets].Value*8, iFace.Metrics[clients.IfHCInOctets].Value*8, bytesInPrev, bytesInX64Prev, timestamp)
+					metricsBuilder = append(metricsBuilder, metricBuilder)
+				case clients.BytesPerSecondOut:
+					metricBuilder := calculateBytesPerSecond(key, metricDefinition,
+						iFace.Metrics[clients.IfOutOctets].Value*8, iFace.Metrics[clients.IfHCOutOctets].Value*8, bytesOutPrev, bytesOutX64Prev, timestamp)
 					metricsBuilder = append(metricsBuilder, metricBuilder)
 				}
 			}
@@ -164,22 +186,36 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 		if previousValue, present := previousValueCache.Get(metricName); present {
 			switch unitType {
 			case transit.UnitCounter:
-				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
-				currentValue = int(float64(currentValue.(int)) - previousValue.(float64))
-			case transit.MB:
-				previousValueCache.SetDefault(metricName, currentValue.(float64))
-				currentValue = currentValue.(float64) - previousValue.(float64)
+				previousValueCache.SetDefault(metricName, currentValue.(int64))
+				currentValue = currentValue.(int64) - previousValue.(int64)
 			}
 			return true, true, currentValue
-		} else {
-			switch unitType {
-			case transit.UnitCounter:
-				previousValueCache.SetDefault(metricName, float64(currentValue.(int)))
-			case transit.MB:
-				previousValueCache.SetDefault(metricName, currentValue.(float64))
-			}
-			return true, false, currentValue
 		}
+		return true, false, currentValue
 	}
 	return false, false, currentValue
+}
+
+func calculateBytesPerSecond(metricName string, metricDefinition transit.MetricDefinition, current, currentX64, previous,
+	previousX64 int64, timestamp *transit.Timestamp) connectors.MetricBuilder {
+	seconds := int(connectors.CheckInterval.Seconds())
+	result := (current - previous) / int64(seconds)
+	if currentX64 > 0 && previousX64 > 0 {
+		result = (currentX64 - previousX64) / int64(seconds)
+	}
+
+	return connectors.MetricBuilder{
+		Name:           metricName,
+		CustomName:     metricDefinition.CustomName,
+		ComputeType:    metricDefinition.ComputeType,
+		Expression:     metricDefinition.Expression,
+		UnitType:       transit.UnitCounter,
+		Warning:        metricDefinition.WarningThreshold,
+		Critical:       metricDefinition.CriticalThreshold,
+		StartTimestamp: timestamp,
+		EndTimestamp:   timestamp,
+		Graphed:        metricDefinition.Graphed,
+
+		Value: result,
+	}
 }
