@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -27,6 +26,8 @@ const DefaultCheckInterval = time.Minute * 2
 
 // CheckInterval comes from extensions field
 var CheckInterval = DefaultCheckInterval
+
+var ErrUnsupportedType = errors.New("unsupported value type")
 
 // statusTextPattern is a pattern to be found in status message template and replaced by the value extracted with appropriate method stored in statusTextValGetters
 //
@@ -290,7 +291,7 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	// set the value based on variable type
 	typedValue := transit.NewTypedValue(value)
 	if typedValue == nil {
-		return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(value))
+		return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, value)
 	}
 	metric := transit.TimeSeries{
 		MetricName: name,
@@ -300,19 +301,19 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	// optional argument processing
 	// var arguments []interface{} = make([]interface{}, len(args))
 	for _, arg := range args {
-		switch arg.(type) {
+		switch arg := arg.(type) {
 		case string:
-			metric.Unit = transit.UnitType(arg.(string))
+			metric.Unit = transit.UnitType(arg)
 		case transit.UnitType:
-			metric.Unit = arg.(transit.UnitType)
+			metric.Unit = arg
 		case *transit.TimeInterval:
-			metric.Interval = arg.(*transit.TimeInterval)
+			metric.Interval = arg
 		case map[string]string:
-			metric.Tags = arg.(map[string]string)
+			metric.Tags = arg
 		//case transit.MetricSampleType:
 		//	metric.SampleType = arg.(transit.MetricSampleType)
 		default:
-			return nil, fmt.Errorf("unsupported arg type: %T", reflect.TypeOf(arg))
+			return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, arg)
 		}
 	}
 	// optional interval
@@ -342,7 +343,7 @@ func CreateThreshold(thresholdType transit.MetricSampleType, label string, value
 	// set the value based on variable type
 	typedValue := transit.NewTypedValue(value)
 	if typedValue == nil {
-		return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(value))
+		return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, value)
 	}
 	// create the threshold
 	threshold := transit.ThresholdValue{
@@ -429,9 +430,9 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 		},
 	}
 	for _, arg := range args {
-		switch arg.(type) {
+		switch arg := arg.(type) {
 		case []transit.TimeSeries:
-			service.Metrics = arg.([]transit.TimeSeries)
+			service.Metrics = arg
 			if len(service.Metrics) > 0 {
 				lastCheckTime = *service.Metrics[len(service.Metrics)-1].Interval.EndTime
 				nextCheckTime = lastCheckTime.Add(CheckInterval)
@@ -439,9 +440,9 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 				service.NextCheckTime = &nextCheckTime
 			}
 		case map[string]interface{}:
-			service.CreateProperties(arg.(map[string]interface{}))
+			service.CreateProperties(arg)
 		default:
-			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
+			return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, arg)
 		}
 	}
 	if service.Metrics != nil {
@@ -482,7 +483,7 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 		case string:
 			resource.Device = arg
 		default:
-			return nil, fmt.Errorf("unsupported value type: %T", reflect.TypeOf(arg))
+			return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, arg)
 		}
 	}
 
