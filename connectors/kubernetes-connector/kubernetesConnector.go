@@ -221,27 +221,22 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 	}
 
 	// convert to arrays as expected by TCG
-	inventory := make([]transit.InventoryResource, len(monitoredState))
-	monitored := make([]transit.MonitoredResource, len(monitoredState))
-	hostGroups := make([]transit.ResourceGroup, len(groups))
-	index := 0
+	inventory := make([]transit.InventoryResource, 0, len(monitoredState))
+	monitored := make([]transit.MonitoredResource, 0, len(monitoredState))
+	hostGroups := make([]transit.ResourceGroup, 0, len(groups))
 	for _, resource := range monitoredState {
 		// convert inventory
-		services := make([]transit.InventoryService, len(resource.Services))
-		serviceIndex := 0
+		services := make([]transit.InventoryService, 0, len(resource.Services))
 		for _, service := range resource.Services {
-			services[serviceIndex] = connectors.CreateInventoryService(service.Name, service.Owner)
-			serviceIndex = serviceIndex + 1
+			services = append(services, connectors.CreateInventoryService(service.Name, service.Owner))
 		}
-		inventory[index] = connectors.CreateInventoryResource(resource.Name, services)
+		inventory = append(inventory, connectors.CreateInventoryResource(resource.Name, services))
 		// convert monitored state
-		mServices := make([]transit.MonitoredService, len(resource.Services))
-		serviceIndex = 0
+		mServices := make([]transit.MonitoredService, 0, len(resource.Services))
 		for _, service := range resource.Services {
-			mServices[serviceIndex] = service
-			serviceIndex = serviceIndex + 1
+			mServices = append(mServices, service)
 		}
-		monitored[index] = transit.MonitoredResource{
+		monitored = append(monitored, transit.MonitoredResource{
 			BaseResource: transit.BaseResource{
 				BaseInfo: transit.BaseInfo{
 					Name: resource.Name,
@@ -255,13 +250,10 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 				LastPluginOutput: resource.Message,
 			},
 			Services: mServices,
-		}
-		index = index + 1
+		})
 	}
-	index = 0
 	for _, group := range groups {
-		hostGroups[index] = group
-		index = index + 1
+		hostGroups = append(hostGroups, group)
 	}
 	return inventory, monitored, hostGroups
 }
@@ -285,10 +277,10 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 	groups[clusterHostGroupName] = transit.ResourceGroup{
 		GroupName: clusterHostGroupName,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.ResourceRef, len(nodes.Items)),
+		Resources: make([]transit.ResourceRef, 0, len(nodes.Items)),
 	}
-	index := 0
-	for _, node := range nodes.Items {
+
+	for index, node := range nodes.Items {
 		labels := make(map[string]string)
 		for key, element := range node.Labels {
 			labels[key] = element
@@ -349,7 +341,6 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			Owner: clusterHostGroupName,
 			Type:  transit.ResourceTypeHost,
 		}
-		index = index + 1
 	}
 }
 
@@ -676,10 +667,8 @@ func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.M
 
 func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string {
 	if len(nodes.Items) > 0 {
-		for key, value := range nodes.Items[0].Labels {
-			if key == ClusterNameLabel {
-				return ClusterHostGroup + value
-			}
+		if value, ok := nodes.Items[0].Labels[ClusterNameLabel]; ok {
+			return ClusterHostGroup + value
 		}
 	}
 	return ClusterHostGroup + "1"
