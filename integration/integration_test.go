@@ -141,7 +141,7 @@ func BenchmarkE2E(b *testing.B) {
 		time.Sleep(15 * time.Second)
 		m0 := transitService.Stats().MessagesSent.Value()
 
-		for _, res := range resources(TestResourcesCount, TestServicesCount, OV{hostPrefix, "agent0"}, OV{servicePrefix, "s0"}, OV{hgPrefix, "g0"}) {
+		for i, res := range resources(TestResourcesCount, TestServicesCount, OV{hostPrefix, "agent0"}, OV{servicePrefix, "s0"}, OV{hgPrefix, "g0"}) {
 			request := transit.ResourcesWithServicesRequest{
 				Context:   transitService.MakeTracerContext(),
 				Resources: []transit.MonitoredResource{res},
@@ -154,6 +154,16 @@ func BenchmarkE2E(b *testing.B) {
 				assert.NoError(b, err)
 			} else {
 				assert.NoError(b, transitService.SendResourceWithMetrics(context.Background(), payload))
+
+				// nats pause / re-starte / unpause
+				if i == 2 || i%10 == 2 {
+					_ = services.GetTransitService().PauseNats()
+					_ = services.GetTransitService().StopNats()
+				}
+				if i == 4 || i%10 == 4 {
+					_ = services.GetTransitService().StartNats()
+					_ = services.GetTransitService().UnpauseNats()
+				}
 			}
 		}
 		time.Sleep(5 * time.Second) // time for batcher + dispatcher

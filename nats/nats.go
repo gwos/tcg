@@ -43,6 +43,9 @@ type state struct {
 	// if a client is too slow the server will eventually cut them off by closing the connection
 	ncDispatcher *nats.Conn
 	ncPublisher  *nats.Conn
+
+	onPause    bool
+	onPauseBuf *RBuf
 }
 
 // Config defines NATS configurable options
@@ -351,6 +354,11 @@ func Publish(subj string, data []byte, headers ...string) error {
 	s.Lock()
 	defer s.Unlock()
 
+	if s.onPause {
+		_, err := s.onPauseBuf.Put(subj, data, headers)
+		return err
+	}
+
 	if s.server == nil {
 		err := fmt.Errorf("%w: unavailable", ErrNATS)
 		log.Err(err).Msg("nats publisher failed")
@@ -383,4 +391,31 @@ func IsStartedDispatcher() bool {
 
 func IsStartedServer() bool {
 	return s != nil && s.server != nil
+}
+
+func Pause() error {
+	s.Lock()
+	defer s.Unlock()
+	if s.onPause {
+		return nil
+	}
+	s.onPause = true
+	s.onPauseBuf = &RBuf{Size: 2000}
+	return nil
+}
+
+func Unpause() error {
+	s.Lock()
+	defer s.Unlock()
+	if !s.onPause {
+		return nil
+	}
+	s.onPause = false
+	for _, item := range s.onPauseBuf.Records() {
+		if err := Publish(item.subj, item.data, item.hdrs...); err != nil {
+			log.Err(err).Str("subject", item.subj).
+				Msg("could not publish buffered item")
+		}
+	}
+	return nil
 }
