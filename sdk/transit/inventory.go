@@ -2,7 +2,6 @@ package transit
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/gwos/tcg/sdk/logper"
 )
@@ -47,7 +46,7 @@ func (p *BaseInfo) SetProperty(k string, v interface{}) {
 	t := NewTypedValue(v)
 	if t == nil {
 		logper.Error(nil, "could not set property %s on %s: unsupported value type: %T",
-			k, p.Name, reflect.TypeOf(v))
+			k, p.Name, v)
 		return
 	}
 	if p.Properties == nil {
