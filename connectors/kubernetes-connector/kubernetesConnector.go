@@ -56,6 +56,7 @@ const (
 const (
 	ClusterHostGroup = "cluster-"
 	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
+	ContainerPOD     = "POD"
 	PodsHostGroup    = "pods-"
 
 	defaultKubernetesClusterEndpoint = ""
@@ -412,6 +413,9 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		if *metricsPerContainer {
 			for _, container := range pod.Spec.Containers {
 				resourceName := strings.TrimSuffix(container.Name, "-")
+				if resourceName == ContainerPOD {
+					continue
+				}
 				addResource(pod.Name+"/"+resourceName,
 					resourceName, monitorStatus, message, labels,
 					PodsHostGroup+pod.Namespace)
@@ -480,6 +484,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 	for _, pod := range pods.Items {
 		if resource, ok := monitoredState[pod.Name]; ok {
 			for index, container := range pod.Containers {
+				if container.Name == ContainerPOD {
+					continue
+				}
 				metricBuilders := make([]connectors.MetricBuilder, 0)
 				for key, metricDefinition := range cfg.Views[ViewPods] {
 					var value interface{}
@@ -541,6 +548,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 	for key, metricDefinition := range cfg.Views[ViewPods] {
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
+				if container.Name == ContainerPOD {
+					continue
+				}
 				if resource, ok := monitoredState[pod.Name+"/"+container.Name]; ok {
 					var value interface{}
 					switch key {
