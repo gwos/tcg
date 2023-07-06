@@ -38,6 +38,9 @@ type state struct {
 	// if a client is too slow the server will eventually cut them off by closing the connection
 	ncDispatcher *nats.Conn
 	ncPublisher  *nats.Conn
+
+	onPause    bool
+	onPauseBuf *RBuf
 }
 
 // Config defines NATS configurable options
@@ -257,11 +260,17 @@ func StopServer() {
 	defer s.Unlock()
 
 	if s.ncPublisher != nil {
-		s.ncPublisher.Close()
+		if err := s.ncPublisher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats publisher connection")
+			s.ncPublisher.Close()
+		}
 		s.ncPublisher = nil
 	}
 	if s.ncDispatcher != nil {
-		s.ncDispatcher.Close()
+		if err := s.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+			s.ncDispatcher.Close()
+		}
 		s.ncDispatcher = nil
 	}
 	if s.server != nil {
@@ -281,7 +290,7 @@ func StartDispatcher(options []DispatcherOption) error {
 	defer d.Unlock()
 
 	if d.server == nil {
-		err := fmt.Errorf("%v: unavailable", ErrNATS)
+		err := fmt.Errorf("%w: unavailable", ErrNATS)
 		log.Warn().Err(err).Msg("nats dispatcher failed")
 		return err
 	}
@@ -343,8 +352,13 @@ func Publish(subject string, msg []byte) error {
 	s.Lock()
 	defer s.Unlock()
 
+	if s.onPause {
+		_, err := s.onPauseBuf.WriteMsg(subject, msg)
+		return err
+	}
+
 	if s.server == nil {
-		err := fmt.Errorf("%v: unavailable", ErrNATS)
+		err := fmt.Errorf("%w: unavailable", ErrNATS)
 		log.Warn().Err(err).Msg("nats publisher failed")
 		return err
 	}
@@ -358,4 +372,31 @@ func Publish(subject string, msg []byte) error {
 	}
 
 	return s.ncPublisher.Publish(subject, msg)
+}
+
+func Pause() error {
+	s.Lock()
+	defer s.Unlock()
+	if s.onPause {
+		return nil
+	}
+	s.onPause = true
+	s.onPauseBuf = &RBuf{Size: 200}
+	return nil
+}
+
+func Unpause() error {
+	s.Lock()
+	defer s.Unlock()
+	if !s.onPause {
+		return nil
+	}
+	s.onPause = false
+	for _, bufMsg := range s.onPauseBuf.Records() {
+		if err := s.ncPublisher.Publish(bufMsg.subj, bufMsg.msg); err != nil {
+			log.Warn().Err(err).Str("subject", bufMsg.subj).
+				Msg("could not publish buffered message")
+		}
+	}
+	return nil
 }

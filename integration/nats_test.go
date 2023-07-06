@@ -161,18 +161,32 @@ func TestNatsPerformance(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	for i := 0; i < PerformanceLoopMetrics; i++ {
-		for _, res := range resources {
-			request := transit.ResourcesWithServicesRequest{
-				Context:   services.GetTransitService().MakeTracerContext(),
-				Resources: []transit.MonitoredResource{res},
+	t1 := time.Now()
+	go func(t *testing.T) {
+		for i := 0; i < PerformanceLoopMetrics; i++ {
+			for _, res := range resources {
+				request := transit.ResourcesWithServicesRequest{
+					Context:   services.GetTransitService().MakeTracerContext(),
+					Resources: []transit.MonitoredResource{res},
+				}
+				payload, err := json.Marshal(request)
+				assert.NoError(t, err)
+				assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
 			}
-			payload, err := json.Marshal(request)
-			assert.NoError(t, err)
-			assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
-	}
+		t.Logf("--nats published %v %v", time.Since(t1).Round(time.Millisecond).String(), len(resources))
+	}(t)
+
+	time.Sleep(10 * time.Millisecond)
+	_ = services.GetTransitService().PauseNats()
+	_ = services.GetTransitService().StopNats()
+	_ = services.GetTransitService().StartNats()
+	_ = services.GetTransitService().UnpauseNats()
+	t.Logf("--nats paused/re-started/unpaused %v", time.Since(t1).Round(time.Millisecond).String())
+
+	_ = services.GetTransitService().StartTransport()
+	time.Sleep(20 * time.Second)
 
 	if cnt, dc := PerformanceLoopMetrics*len(resources), services.GetTransitService().Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
