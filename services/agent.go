@@ -515,8 +515,6 @@ func (service *AgentService) config(data []byte) error {
 	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)
 	GetTransitService().metricsBatcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
 	GetController().authCache.Flush()
-	// custom connector may provide additional handler for extended fields
-	service.configHandler(data)
 	// flush uploading telemetry and configure provider while processing stopped
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
@@ -530,6 +528,8 @@ func (service *AgentService) config(data []byte) error {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}
 	}
+	// custom connector may provide additional handler for extended fields
+	service.configHandler(data)
 	return nil
 }
 

@@ -80,14 +80,17 @@ func Start() error {
 	}
 
 	// delay transport on application startup
-	td := services.GetTransitService().TransportStartRndDelay
-	if td > 0 {
-		upSince := services.GetTransitService().Stats().UpSince.Value()
-		if time.Since(time.UnixMilli(upSince)).Round(time.Second) < 8 {
-			time.Sleep(DefaultCheckInterval + time.Second*time.Duration(rand.Intn(td)))
+	go func() {
+		td := services.GetTransitService().TransportStartRndDelay
+		if td > 0 {
+			upSince := services.GetTransitService().Stats().UpSince.Value()
+			if time.Since(time.UnixMilli(upSince)).Round(time.Second) < 8 {
+				time.Sleep(DefaultCheckInterval + time.Second*time.Duration(rand.Intn(td)))
+			}
 		}
-	}
-	return services.GetTransitService().StartTransport()
+		_ = services.GetTransitService().StartTransport()
+	}()
+	return nil
 }
 
 // SendMetrics processes metrics payload
