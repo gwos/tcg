@@ -13,6 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/shirou/gopsutil/v3/disk"
 )
 
 // Define NATS IDs
@@ -138,34 +139,134 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		return err
 	}
 
-	if _, err = js.StreamInfo(streamName); err == nats.ErrStreamNotFound {
-		if _, err = js.AddStream(&nats.StreamConfig{
-			Name:     streamName,
-			Subjects: subjects,
-			Storage: func(arg string) nats.StorageType {
-				switch strings.ToUpper(arg) {
-				case "MEMORY":
-					return nats.MemoryStorage
-				default:
-					return nats.FileStorage
-				}
-			}(s.config.StoreType),
-			AllowDirect: true,
-			MaxAge:      s.config.StoreMaxAge,
-			MaxBytes:    s.config.StoreMaxBytes,
-			MaxMsgs:     s.config.StoreMaxMsgs,
-			Retention:   nats.LimitsPolicy,
-		}); err != nil {
-			log.Warn().Err(err).
-				Interface("config", s.config).
-				Msg("nats failed AddStream")
+	storage := func(arg string) nats.StorageType {
+		switch strings.ToUpper(arg) {
+		case "MEMORY":
+			return nats.MemoryStorage
+		default:
+			return nats.FileStorage
+		}
+	}(s.config.StoreType)
+	sc := nats.StreamConfig{
+		Name:        streamName,
+		Subjects:    subjects,
+		Storage:     storage,
+		AllowDirect: true,
+		MaxAge:      s.config.StoreMaxAge,
+		MaxBytes:    s.config.StoreMaxBytes,
+		MaxMsgs:     s.config.StoreMaxMsgs,
+		Retention:   nats.LimitsPolicy,
+	}
+
+	if info, err := js.StreamInfo(streamName); err == nil {
+		if err := doStream(js, &info.Config, &sc); err != nil {
+			return err
+		}
+	} else if err == nats.ErrStreamNotFound {
+		if err := doStream(js, nil, &sc); err != nil {
+			return err
 		}
 	} else if err != nil {
-		log.Warn().Err(err).Msg("nats failed StreamInfo")
+		log.Err(err).Msg("nats failed StreamInfo")
 		return err
 	}
 
 	return nil
+}
+
+func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error {
+	fn, fnDesc := js.AddStream, "AddStream"
+	if curCfg != nil {
+		if equalStreamConfig(*curCfg, *newCfg) {
+			return nil
+		}
+		fn, fnDesc = js.UpdateStream, "UpdateStream"
+	}
+
+	_, err := fn(newCfg)
+
+	chkAPIErr := func(err error) bool {
+		// Note: there is some inconsistency in public nats constants
+		codes := map[nats.ErrorCode]string{
+			10023: "nats.JSErrCodeInsufficientResourcesErr",
+			10047: "nats.JSStorageResourcesExceededErr", // missed as public const
+		}
+		var apiErr *nats.APIError
+		if errors.As(err, &apiErr) {
+			_, ok := codes[apiErr.ErrorCode]
+			return ok
+		}
+		return false
+	}
+
+	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
+		/* retry with smaller storage */
+		u, errUsage := disk.Usage(s.config.StoreDir)
+		if errUsage != nil {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", errUsage).
+				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+			return err
+		}
+		if u.Free > uint64(newCfg.MaxBytes) {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", u).
+				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
+			return err
+		}
+		if u.Free < 1024*1024 {
+			log.Err(err).
+				Interface("config", *newCfg).
+				Interface("diskUsage", u).
+				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
+			return err
+		}
+
+		// Note: NATS Server allows up to 75% of available storage.
+		// https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go
+		mb := int64(u.Free) / 4 * 3
+		origCfg := *newCfg
+		newCfg.MaxBytes = mb
+		_, err2 := fn(newCfg)
+		log.Err(err2).
+			Interface("originalError", err).
+			Interface("originalConfig", origCfg).
+			Interface("reducedMaxBytes", mb).
+			Interface("disk.Free", u.Free).
+			Msgf("nats retrying %v with smaller storage", fnDesc)
+		return err2
+	}
+
+	log.Err(err).
+		Interface("config", *newCfg).
+		Msgf("nats %v", fnDesc)
+	return err
+}
+
+func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
+	return c1.MaxAge == c2.MaxAge &&
+		c1.MaxBytes == c2.MaxBytes &&
+		c1.MaxMsgs == c2.MaxMsgs &&
+		c1.Storage == c2.Storage &&
+		equalStrs(c1.Subjects, c2.Subjects)
+}
+
+func equalStrs(ss1, ss2 []string) bool {
+	if len(ss1) != len(ss2) {
+		return false
+	}
+	ms := make(map[string]bool, len(ss1))
+	for _, s := range ss1 {
+		ms[s] = false
+	}
+	for _, s := range ss2 {
+		if _, ok := ms[s]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 // StopServer shutdowns NATS

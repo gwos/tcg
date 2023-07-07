@@ -59,8 +59,7 @@ func TestAgentService(t *testing.T) {
 		assert.NoError(t, err)
 		defer os.Remove(tmpfile.Name())
 		t.Setenv(config.ConfigEnv, tmpfile.Name())
-		t.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
-		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "1024000")
+		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "222_111_222_000")
 
 		dto := []byte(`
 {

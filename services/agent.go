@@ -390,7 +390,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeSetInDowntime:
 						_, err = gwClient.SetInDowntime(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
 					}
 					return err
 				},
@@ -408,7 +408,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeEventsUnack:
 						_, err = gwClient.SendEventsUnack(ctx, p.Payload)
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
 					}
 					return err
 				},
@@ -424,7 +424,7 @@ func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
 					case typeMetrics:
 						_, err = gwClient.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
 					default:
-						err = fmt.Errorf("%v: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
+						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
 					}
 					return err
 				},
@@ -487,8 +487,17 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 }
 
 func (service *AgentService) config(data []byte) error {
+	// stop nats processing, allow nats reconfiguring
+	transportOn := service.agentStatus.Transport == StatusRunning
+	if err := service.stopNats(); err != nil {
+		log.Err(err).Msg("error stopping nats on processing config")
+	}
+
+	// TODO: add logic to avoid processing previous inventory in case of callback fails
+
 	// load general config data
 	if _, err := config.GetConfig().LoadConnectorDTO(data); err != nil {
+		log.Err(err).Msg("error on processing connector config")
 		return err
 	}
 	log.Debug().
@@ -508,17 +517,18 @@ func (service *AgentService) config(data []byte) error {
 	GetController().authCache.Flush()
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
-	// TODO: add logic to avoid processing previous inventory in case of callback fails
-	// stop nats processing
-	_ = service.stopTransport()
 	// flush uploading telemetry and configure provider while processing stopped
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
 	}
 	service.initOTEL()
-	// start nats processing if enabled
-	if service.Connector.Enabled {
-		_ = service.startTransport()
+	// configure nats service and start nats processing if enabled
+	if err := service.startNats(); err != nil {
+		log.Err(err).Msg("error starting nats on processing config")
+	} else if service.Connector.Enabled && transportOn {
+		if err := service.startTransport(); err != nil {
+			log.Err(err).Msg("error starting nats dispatcher on processing config")
+		}
 	}
 	return nil
 }
