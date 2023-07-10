@@ -156,7 +156,7 @@ func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 	return nil
 }
 
-// CollectMetrics retrives metric data
+// CollectMetrics retrieves metric data
 func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource, []transit.ResourceGroup) {
 	var err error
 
@@ -263,7 +263,7 @@ func (connector *ElasticConnector) getInventoryHashSum() ([]byte, error) {
 
 func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) error {
 	storedQueries := connector.kibanaClient.RetrieveStoredQueries(titles)
-	if storedQueries == nil || len(storedQueries) == 0 {
+	if len(storedQueries) == 0 {
 		log.Info().Msg("no stored queries retrieved")
 		return nil
 	}

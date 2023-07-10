@@ -14,9 +14,34 @@ const (
 	now    = "now"
 )
 
-type KBulkGetRequest struct {
+type KBulkGetSORequestItem struct {
 	Type string `json:"type"`
 	ID   string `json:"id"`
+}
+
+type KBulkGetSOResponse struct {
+	SavedObjects []struct {
+		KBulkGetSORequestItem
+		Attributes *KAttributes `json:"attributes,omitempty"`
+		Error      *KError      `json:"error,omitempty"`
+	} `json:"saved_objects"`
+}
+
+type KBulkResolveSOResponse struct {
+	ResolvedObjects []struct {
+		SavedObject struct {
+			KBulkGetSORequestItem
+			Attributes *KAttributes `json:"attributes,omitempty"`
+			Error      *KError      `json:"error,omitempty"`
+		} `json:"saved_object"`
+		Outcome string `json:"outcome"`
+	} `json:"resolved_objects"`
+}
+
+type KError struct {
+	Error   string `json:"error"`
+	Message string `json:"message"`
+	Status  int    `json:"statusCode"`
 }
 
 type KSavedObjectsResponse struct {
@@ -148,13 +173,13 @@ type EsFieldCapsResponse struct {
 
 // Extracts indexes's ids linked to stored query's filters
 func (storedQuery *KSavedObject) ExtractIndexIds() []string {
-	indexIdsSet := make(map[string]struct{})
+	indexIdsSet := make(map[string]bool)
 	for _, filter := range storedQuery.Attributes.Filters {
 		if filter.Meta.Index != nil {
-			indexIdsSet[*filter.Meta.Index] = struct{}{}
+			indexIdsSet[*filter.Meta.Index] = true
 		}
 	}
-	var indexIDs = make([]string, 0, len(indexIdsSet))
+	indexIDs := make([]string, 0, len(indexIdsSet))
 	for indexID := range indexIdsSet {
 		indexIDs = append(indexIDs, indexID)
 	}
