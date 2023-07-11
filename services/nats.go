@@ -72,9 +72,9 @@ func makeDurable(durable string, handleWithCtx func(context.Context, []byte) err
 		Handler: func(ctx context.Context, msg nats.NatsMsg) error {
 			var (
 				err     error
-				data    = msg.Data
-				headers = msg.Header
-				subject = msg.Subject
+				data    = msg.Data()
+				headers = msg.Headers()
+				subject = msg.Subject()
 				sCtxCfg = trace.SpanContextConfig{}
 				spanID  []byte
 				traceID []byte
