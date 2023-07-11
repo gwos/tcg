@@ -128,10 +128,10 @@ func StartServer(config Config) error {
 	}
 	s.ncPublisher = nc
 
-	return defineStream(nc, streamName, subjects)
+	return defineStream(nc)
 }
 
-func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
+func defineStream(nc *nats.Conn) error {
 	js, err := nc.JetStream(nats.DirectGet())
 	if err != nil {
 		log.Warn().Err(err).Msg("nats failed JetStream")
@@ -248,24 +248,7 @@ func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
 	return c1.MaxAge == c2.MaxAge &&
 		c1.MaxBytes == c2.MaxBytes &&
 		c1.MaxMsgs == c2.MaxMsgs &&
-		c1.Storage == c2.Storage &&
-		equalStrs(c1.Subjects, c2.Subjects)
-}
-
-func equalStrs(ss1, ss2 []string) bool {
-	if len(ss1) != len(ss2) {
-		return false
-	}
-	ms := make(map[string]bool, len(ss1))
-	for _, s := range ss1 {
-		ms[s] = false
-	}
-	for _, s := range ss2 {
-		if _, ok := ms[s]; !ok {
-			return false
-		}
-	}
-	return true
+		c1.Storage == c2.Storage
 }
 
 // StopServer shutdowns NATS
@@ -332,12 +315,21 @@ func StopDispatcher() error {
 		d.cancel()
 		d.cancel = nil
 	}
+
+	ze := log.Info()
 	if d.ncDispatcher != nil {
-		d.ncDispatcher.Close()
+		js, _ := d.ncDispatcher.JetStream()
+		info, _ := js.StreamInfo(streamName)
+		ze = ze.Interface("streamState", info.State)
+
+		if err := d.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+			d.ncDispatcher.Close()
+		}
 		d.ncDispatcher = nil
 	}
 
-	log.Info().Msg("dispatcher stopped")
+	ze.Msg("dispatcher stopped")
 	return nil
 }
 

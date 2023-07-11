@@ -80,9 +80,9 @@ func TestNatsQueue1(t *testing.T) {
 
 	time.Sleep(4 * time.Second)
 
-	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
-		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
-			dc, "'>0'")
+	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != TestMessagesCount {
+		t.Errorf("Messages should be delivered. deliveredCount = %v, want = %v",
+			dc, TestMessagesCount)
 	}
 }
 
@@ -149,6 +149,7 @@ func TestNatsPerformance(t *testing.T) {
 
 	for i := 0; i < PerformanceResourcesCount; i++ {
 		rs := makeResource(i, PerformanceServicesCount)
+		rs.SetProperty("__seq__", i)
 
 		resources = append(resources, *rs)
 		inventory.AddResource(rs.ToInventoryResource())

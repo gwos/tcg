@@ -62,43 +62,44 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 		nats.DirectGet(),
 	)
 	if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed JetStream")
 		return
 	}
 
-	if _, err := js.ConsumerInfo(streamName, opt.Durable); errors.Is(err, nats.ErrConsumerNotFound) {
-		if _, err = js.AddConsumer(streamName, &nats.ConsumerConfig{
+	consumerName, durableName := opt.Durable, opt.Durable
+	if _, err := js.ConsumerInfo(streamName, consumerName); errors.Is(err, nats.ErrConsumerNotFound) {
+		if _, err := js.AddConsumer(streamName, &nats.ConsumerConfig{
 			// AckWait:       d.config.AckWait,
 			AckPolicy:     nats.AckExplicitPolicy,
 			DeliverPolicy: nats.DeliverLastPolicy,
-			Durable:       opt.Durable,
-			Name:          opt.Durable,
+			Durable:       durableName,
+			Name:          consumerName,
 		}); err != nil {
-			log.Warn().Err(err).
+			log.Err(err).
 				Str("durable", opt.Durable).
 				Msg("nats dispatcher failed AddConsumer")
 			return
 		}
 	} else if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed ConsumerInfo")
 		return
 	}
 
 	sub, err := js.PullSubscribe(
-		opt.Subject, opt.Durable,
+		opt.Subject, durableName,
 
-		nats.Bind(streamName, opt.Durable),
+		nats.Bind(streamName, consumerName),
 		// nats.BindStream(streamName),
 		// nats.Durable(opt.Durable),
 		// nats.AckWait(d.config.AckWait),
 		nats.ManualAck(),
 	)
 	if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Subscribe")
 		return
@@ -119,7 +120,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 		// using a batch size of more than 1 allows for higher throughput when needed.
 		msgs, err := sub.Fetch(4, nats.Context(ctx))
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			log.Warn().Err(err).
+			log.Err(err).
 				Str("durable", opt.Durable).
 				Msg("nats dispatcher failed Fetch")
 			continue
@@ -157,7 +158,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
-		log.Warn().Err(err).Interface("msg", *msg).
+		log.Err(err).Interface("msg", *msg).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Metadata")
 		return nil
