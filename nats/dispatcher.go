@@ -7,7 +7,7 @@ import (
 	"time"
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -58,9 +58,7 @@ func (d *natsDispatcher) Flush() {
 }
 
 func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) {
-	js, err := d.ncDispatcher.JetStream(
-		nats.DirectGet(),
-	)
+	js, err := jetstream.New(d.ncDispatcher)
 	if err != nil {
 		log.Err(err).
 			Str("durable", opt.Durable).
@@ -68,47 +66,80 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 		return
 	}
 
-	consumerName, durableName := opt.Durable, opt.Durable
-	if _, err := js.ConsumerInfo(streamName, consumerName); errors.Is(err, nats.ErrConsumerNotFound) {
-		if _, err := js.AddConsumer(streamName, &nats.ConsumerConfig{
-			// AckWait:       d.config.AckWait,
-			AckPolicy:     nats.AckExplicitPolicy,
-			DeliverPolicy: nats.DeliverLastPolicy,
-			Durable:       durableName,
-			Name:          consumerName,
-		}); err != nil {
-			log.Err(err).
-				Str("durable", opt.Durable).
-				Msg("nats dispatcher failed AddConsumer")
-			return
-		}
-	} else if err != nil {
-		log.Err(err).
-			Str("durable", opt.Durable).
-			Msg("nats dispatcher failed ConsumerInfo")
-		return
-	}
-
-	sub, err := js.PullSubscribe(
-		opt.Subject, durableName,
-
-		nats.Bind(streamName, consumerName),
-		// nats.BindStream(streamName),
-		// nats.Durable(opt.Durable),
-		// nats.AckWait(d.config.AckWait),
-		nats.ManualAck(),
-	)
+	cons, err := js.CreateOrUpdateConsumer(ctx, streamName, jetstream.ConsumerConfig{
+		AckPolicy:     jetstream.AckExplicitPolicy,
+		DeliverPolicy: jetstream.DeliverLastPolicy,
+		FilterSubject: opt.Subject,
+		Durable:       opt.Durable,
+		Name:          opt.Durable,
+	})
+	// cons, err := js.OrderedConsumer(ctx, streamName, jetstream.OrderedConsumerConfig{
+	// 	DeliverPolicy:  jetstream.DeliverLastPolicy,
+	// 	FilterSubjects: []string{opt.Subject},
+	// })
 	if err != nil {
 		log.Err(err).
 			Str("durable", opt.Durable).
-			Msg("nats dispatcher failed Subscribe")
+			Msg("nats dispatcher failed jetstream Consumer")
 		return
 	}
 
-	go d.fetch(ctx, opt, sub)
+	go d.fetch(ctx, opt, cons)
 }
 
-func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *nats.Subscription) {
+func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons jetstream.Consumer) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		iter, err := cons.Messages(jetstream.PullMaxMessages(4))
+		// if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		if err != nil {
+			log.Err(err).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed consume Messages")
+			continue
+		}
+
+		// Process fetched messages and delay next fetching in case of transient error
+		var delayRetry *dispatcherRetry
+		// Next can return error, e.g. when iterator is closed or no heartbeats were received
+		for msg, err := iter.Next(); err == nil; msg, err = iter.Next() {
+			if msg.Subject() != opt.Subject {
+				println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
+
+				// NOTE: this redundant case resolved in Consumer with FilterSubject
+				// but OrderedConsumer with FilterSubjects
+				_ = msg.Ack()
+				continue
+			}
+			if delayRetry != nil {
+				_ = msg.Nak()
+				continue
+			}
+
+			delayRetry = d.processMsg(ctx, opt, msg)
+			if delayRetry != nil {
+				_ = msg.Nak()
+			} else {
+				_ = msg.Ack()
+			}
+		}
+		iter.Stop()
+
+		if delayRetry != nil {
+			select {
+			case <-ctx.Done(): // context cancelled
+			case <-time.After(retryDelays[delayRetry.Retry]): // delay ended
+			}
+		}
+	}
+}
+
+func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, cons jetstream.Consumer) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -118,7 +149,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 
 		// Fetch will return as soon as any message is available rather than wait until the full batch size is available,
 		// using a batch size of more than 1 allows for higher throughput when needed.
-		msgs, err := sub.Fetch(4, nats.Context(ctx))
+		msgBatch, err := cons.FetchNoWait(4)
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			log.Err(err).
 				Str("durable", opt.Durable).
@@ -128,8 +159,10 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 
 		// Process fetched messages and delay next fetching in case of transient error
 		var delayRetry *dispatcherRetry
-		for _, msg := range msgs {
-			if msg.Subject != opt.Subject {
+		for msg := range msgBatch.Messages() {
+			if msg.Subject() != opt.Subject {
+				println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
+
 				// TODO: resolve this redundant case
 				_ = msg.Ack()
 				continue
@@ -155,10 +188,10 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 	}
 }
 
-func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, msg *nats.Msg) *dispatcherRetry {
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, msg jetstream.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
-		log.Err(err).Interface("msg", *msg).
+		log.Err(err).Interface("msg", msg).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Metadata")
 		return nil
@@ -167,7 +200,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, m
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel ||
 			(len(a) > 0 && a[0]) {
 			return func(e *zerolog.Event) {
-				e.RawJSON("nats.msg.data", msg.Data)
+				e.RawJSON("nats.msg.data", msg.Data())
 				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
 				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
 				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
@@ -185,7 +218,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, m
 		}
 	}
 
-	err = opt.Handler(ctx, msg.Data)
+	err = opt.Handler(ctx, msg.Data())
 	if err == nil {
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).

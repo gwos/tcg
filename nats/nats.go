@@ -12,6 +12,7 @@ import (
 	"github.com/nats-io/nats-server/v2/logger"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v3/disk"
@@ -135,21 +136,15 @@ func StartServer(config Config) error {
 }
 
 func defineStream(nc *nats.Conn) error {
-	js, err := nc.JetStream(nats.DirectGet())
-	if err != nil {
-		log.Warn().Err(err).Msg("nats failed JetStream")
-		return err
-	}
-
-	storage := func(arg string) nats.StorageType {
+	storage := func(arg string) jetstream.StorageType {
 		switch strings.ToUpper(arg) {
 		case "MEMORY":
-			return nats.MemoryStorage
+			return jetstream.MemoryStorage
 		default:
-			return nats.FileStorage
+			return jetstream.FileStorage
 		}
 	}(s.config.StoreType)
-	sc := nats.StreamConfig{
+	sc := jetstream.StreamConfig{
 		Name:        streamName,
 		Subjects:    subjects,
 		Storage:     storage,
@@ -157,101 +152,102 @@ func defineStream(nc *nats.Conn) error {
 		MaxAge:      s.config.StoreMaxAge,
 		MaxBytes:    s.config.StoreMaxBytes,
 		MaxMsgs:     s.config.StoreMaxMsgs,
-		Retention:   nats.LimitsPolicy,
+		Retention:   jetstream.LimitsPolicy,
 	}
 
-	if info, err := js.StreamInfo(streamName); err == nil {
-		if err := doStream(js, &info.Config, &sc); err != nil {
-			return err
-		}
-	} else if err == nats.ErrStreamNotFound {
-		if err := doStream(js, nil, &sc); err != nil {
-			return err
-		}
-	} else if err != nil {
-		log.Err(err).Msg("nats failed StreamInfo")
+	js, err := jetstream.New(nc)
+	if err != nil {
+		log.Err(err).Msg("nats failed JetStream")
 		return err
 	}
 
-	return nil
-}
-
-func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error {
-	fn, fnDesc := js.AddStream, "AddStream"
-	if curCfg != nil {
-		if equalStreamConfig(*curCfg, *newCfg) {
+	ctx := context.Background()
+	fn, fnDesc := js.UpdateStream, "UpdateStream"
+	stream, err := js.Stream(ctx, streamName)
+	if err == jetstream.ErrStreamNotFound {
+		fn, fnDesc = js.CreateStream, "CreateStream"
+	} else if err != nil {
+		log.Err(err).Msg("nats failed Stream")
+		return err
+	} else {
+		info, err := stream.Info(ctx)
+		if err != nil {
+			log.Err(err).Msg("nats failed JetStream Info")
+			return err
+		}
+		if equalStreamConfig(sc, info.Config) {
 			return nil
 		}
-		fn, fnDesc = js.UpdateStream, "UpdateStream"
 	}
 
-	_, err := fn(newCfg)
-
-	chkAPIErr := func(err error) bool {
-		// Note: there is some inconsistency in public nats constants
-		codes := map[nats.ErrorCode]string{
-			10023: "nats.JSErrCodeInsufficientResourcesErr",
-			10047: "nats.JSStorageResourcesExceededErr", // missed as public const
-		}
-		var apiErr *nats.APIError
-		if errors.As(err, &apiErr) {
-			_, ok := codes[apiErr.ErrorCode]
-			return ok
-		}
-		return false
+	_, err = fn(ctx, sc)
+	if err == nil {
+		return nil
+	} else if !isJSStorageErr(err) || sc.Storage != jetstream.FileStorage {
+		log.Err(err).
+			Interface("config", sc).
+			Msgf("nats failed %v", fnDesc)
+		return err
 	}
 
-	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
-		/* retry with smaller storage, 5/8 that smaller then 3/4
-		NATS Server allows up to 75% of available storage.
-		https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
-		u, errUsage := disk.Usage(s.config.StoreDir)
-		if errUsage != nil {
-			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", errUsage).
-				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
-			return err
-		}
-		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
-			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", u).
-				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
-			return err
-		}
-		if u.Free < 1024*1024 {
-			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", u).
-				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
-			return err
-		}
-
-		mb := int64(u.Free) / 8 * 5
-		origCfg := *newCfg
-		newCfg.MaxBytes = mb
-		_, err2 := fn(newCfg)
-		log.Err(err2).
-			Interface("originalError", err).
-			Interface("originalConfig", origCfg).
-			Interface("reducedMaxBytes", mb).
-			Interface("disk.Free", u.Free).
-			Msgf("nats retrying %v with smaller storage", fnDesc)
-		return err2
+	/* retry with smaller storage, 5/8 that smaller then 3/4
+	NATS Server allows up to 75% of available storage.
+	https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
+	u, errUsage := disk.Usage(s.config.StoreDir)
+	if errUsage != nil {
+		log.Err(err).
+			Interface("config", sc).
+			Interface("diskUsage", errUsage).
+			Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+		return err
+	}
+	if u.Free/8*5 > uint64(sc.MaxBytes) {
+		log.Err(err).
+			Interface("config", sc).
+			Interface("diskUsage", u).
+			Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
+		return err
+	}
+	if u.Free < 1024*1024 {
+		log.Err(err).
+			Interface("config", sc).
+			Interface("diskUsage", u).
+			Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
+		return err
 	}
 
+	mb := int64(u.Free) / 8 * 5
+	origCfg, origErr := sc, err
+	sc.MaxBytes = mb
+	_, err = fn(ctx, sc)
 	log.Err(err).
-		Interface("config", *newCfg).
-		Msgf("nats %v", fnDesc)
+		Interface("originalError", origErr).
+		Interface("originalConfig", origCfg).
+		Interface("reducedMaxBytes", mb).
+		Interface("disk.Free", u.Free).
+		Msgf("nats retrying %v with smaller storage", fnDesc)
 	return err
 }
 
-func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
+func equalStreamConfig(c1, c2 jetstream.StreamConfig) bool {
 	return c1.MaxAge == c2.MaxAge &&
 		c1.MaxBytes == c2.MaxBytes &&
 		c1.MaxMsgs == c2.MaxMsgs &&
 		c1.Storage == c2.Storage
+}
+
+func isJSStorageErr(err error) bool {
+	// Note: there is some inconsistency in public nats constants
+	codes := map[jetstream.ErrorCode]string{
+		10023: "nats.JSErrCodeInsufficientResourcesErr",
+		10047: "nats.JSStorageResourcesExceededErr", // missed as public const
+	}
+	var apiErr *jetstream.APIError
+	if errors.As(err, &apiErr) {
+		_, ok := codes[apiErr.ErrorCode]
+		return ok
+	}
+	return false
 }
 
 // StopServer shutdowns NATS
