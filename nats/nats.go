@@ -200,7 +200,9 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 	}
 
 	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
-		/* retry with smaller storage */
+		/* retry with smaller storage, 5/8 that smaller then 3/4
+		NATS Server allows up to 75% of available storage.
+		https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
 		u, errUsage := disk.Usage(s.config.StoreDir)
 		if errUsage != nil {
 			log.Err(err).
@@ -209,7 +211,7 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
 			return err
 		}
-		if u.Free > uint64(newCfg.MaxBytes) {
+		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
 			log.Err(err).
 				Interface("config", *newCfg).
 				Interface("diskUsage", u).
@@ -224,9 +226,7 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 			return err
 		}
 
-		// Note: NATS Server allows up to 75% of available storage.
-		// https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go
-		mb := int64(u.Free) / 4 * 3
+		mb := int64(u.Free) / 8 * 5
 		origCfg := *newCfg
 		newCfg.MaxBytes = mb
 		_, err2 := fn(newCfg)
