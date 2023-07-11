@@ -38,6 +38,7 @@ func TestAgentService(t *testing.T) {
 	})
 
 	t.Run("NATS", func(t *testing.T) {
+		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "333_222_111_000")
 		assert.NoError(t, GetAgentService().StartNats())
 		assert.NoError(t, GetAgentService().StopNats())
 		assert.NoError(t, GetAgentService().StartNats())
@@ -45,6 +46,7 @@ func TestAgentService(t *testing.T) {
 	})
 
 	t.Run("Transport", func(t *testing.T) {
+		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "333_222_111_000")
 		assert.NoError(t, GetAgentService().StartNats())
 		assert.NoError(t, GetAgentService().StartTransport())
 		assert.NoError(t, GetAgentService().StopTransport())
@@ -59,7 +61,7 @@ func TestAgentService(t *testing.T) {
 		assert.NoError(t, err)
 		defer os.Remove(tmpfile.Name())
 		t.Setenv(config.ConfigEnv, tmpfile.Name())
-		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "222_111_222_000")
+		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "333_222_111_000")
 
 		dto := []byte(`
 {
