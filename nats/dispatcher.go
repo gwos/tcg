@@ -185,7 +185,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 	}
 }
 
-func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
 		log.Warn().Err(err).Str("msg", fmt.Sprintf("%+v", *msg)).
@@ -215,7 +215,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 		}
 	}
 
-	err = opt.Handler(NatsMsg{msg})
+	err = opt.Handler(ctx, NatsMsg{msg})
 	if err == nil {
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).

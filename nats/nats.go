@@ -66,7 +66,7 @@ type Config struct {
 type DurableCfg struct {
 	Durable string
 	Subject string
-	Handler func(msg NatsMsg) error
+	Handler func(context.Context, NatsMsg) error
 }
 
 type NatsMsg struct {
