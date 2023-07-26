@@ -56,11 +56,11 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...strin
 	return err
 }
 
-func getCtx(sc trace.SpanContext) context.Context {
+func getCtx(ctx context.Context, sc trace.SpanContext) context.Context {
 	if sc.IsValid() {
-		return trace.ContextWithRemoteSpanContext(context.Background(), sc)
+		return trace.ContextWithRemoteSpanContext(ctx, sc)
 	}
-	return context.Background()
+	return ctx
 }
 
 func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byte) error) nats.DurableCfg {
@@ -70,9 +70,8 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 	return nats.DurableCfg{
 		Durable: durable,
 		Subject: subj,
-		Handler: func(msg nats.NatsMsg) error {
+		Handler: func(ctx context.Context, msg nats.NatsMsg) error {
 			var (
-				ctx     context.Context
 				err     error
 				data    = msg.Data
 				headers = msg.Header
@@ -85,7 +84,7 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 			p := natsPayload{}
 			if err = p.Unmarshal(data); err == nil {
 				data = p.Payload
-				ctx = getCtx(p.SpanContext)
+				ctx = getCtx(ctx, p.SpanContext)
 				if pType, t := p.Type.String(), headers.Get(clients.HdrPayloadType); t == "" {
 					headers.Set(clients.HdrPayloadType, pType)
 				}
@@ -102,7 +101,7 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 					if trFlags, err = hex.DecodeString(tf); err == nil {
 						sCtxCfg.TraceFlags = trace.TraceFlags(trFlags[0])
 					}
-					ctx = getCtx(trace.NewSpanContext(sCtxCfg))
+					ctx = getCtx(ctx, trace.NewSpanContext(sCtxCfg))
 				}
 			}
 			ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
