@@ -490,7 +490,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 	switch {
 	case err != nil:
 		logper.Error(req, "could not send request")
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+			tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return nil, err
