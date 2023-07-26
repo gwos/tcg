@@ -84,10 +84,13 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 		return
 	}
 
-	go d.fetch(ctx, opt, cons)
+	go d.fetch3(ctx, opt, cons)
 }
 
 func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons jetstream.Consumer) {
+	println("\n__fetch2_start__", opt.Durable)
+	defer println("\n__fetch2_exit__", opt.Durable)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -131,9 +134,66 @@ func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons 
 		iter.Stop()
 
 		if delayRetry != nil {
+			delayRetryTimer := time.NewTimer(retryDelays[delayRetry.Retry])
 			select {
-			case <-ctx.Done(): // context cancelled
-			case <-time.After(retryDelays[delayRetry.Retry]): // delay ended
+			case <-ctx.Done(): // dispatcher stopped while delaying retry
+				println("\n__ctx__ context cancelled", opt.Durable)
+				delayRetryTimer.Stop()
+				return
+			case <-delayRetryTimer.C: // delay ended
+				println("\n__delayRetry__ delay ended", opt.Durable)
+			}
+		}
+	}
+}
+
+func (d *natsDispatcher) fetch3(ctx context.Context, opt DispatcherOption, cons jetstream.Consumer) {
+	println("\n__fetch3_start__", opt.Durable)
+	defer println("\n__fetch3_exit__", opt.Durable)
+
+	// Retry processing messages with delay in case of transient error
+	for {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		var delayRetry *dispatcherRetry
+
+		consContext, consErr := cons.Consume(func(msg jetstream.Msg) {
+			println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
+
+			delayRetry = d.processMsg(ctx, opt, msg)
+			if delayRetry != nil {
+				_ = msg.Nak()
+				cancel2()
+				return
+			}
+			_ = msg.Ack()
+		},
+		// jetstream.PullMaxMessages(4),
+		)
+		if consErr != nil {
+			log.Err(consErr).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed Consume")
+			continue
+		}
+		// defer consContext.Stop()
+
+		select {
+		case <-ctx.Done(): // dispatcher stopped
+			println("\n__ctx__ context cancelled", opt.Durable)
+			consContext.Stop()
+			return
+		case <-ctx2.Done(): // error on processing msg
+			println("\n__ctx2__ context cancelled", opt.Durable)
+			consContext.Stop()
+
+			delayRetryTimer := time.NewTimer(retryDelays[delayRetry.Retry])
+			select {
+			case <-ctx.Done(): // dispatcher stopped while delaying retry
+				println("\n__ctx__ context cancelled", opt.Durable)
+				delayRetryTimer.Stop()
+				return
+			case <-delayRetryTimer.C: // delay ended
+				println("\n__delayRetry__ delay ended", opt.Durable)
 			}
 		}
 	}
