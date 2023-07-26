@@ -441,20 +441,16 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 	return nats.DispatcherOption{
 		Durable: durable,
 		Subject: subj,
-		Handler: func(b []byte) error {
-			var err error
-			getCtx := func(sc trace.SpanContext) context.Context {
-				if sc.IsValid() {
-					return trace.ContextWithRemoteSpanContext(context.Background(), sc)
-				}
-				return context.Background()
-			}
-
+		Handler: func(ctx context.Context, b []byte) (err error) {
 			p := natsPayload{}
 			if err = p.Unmarshal(b); err != nil {
-				log.Warn().Err(err).Msg("could not unmarshal payload")
+				log.Err(err).Msg("could not unmarshal payload")
+				return
 			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "nats:dispatch")
+			if p.SpanContext.IsValid() {
+				ctx = trace.ContextWithRemoteSpanContext(ctx, p.SpanContext)
+			}
+			ctx, span := tracing.StartTraceSpan(ctx, "services", "nats:dispatch")
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
@@ -483,7 +479,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 				/* it looks like an issue with data */
 				log.Err(err).Msg("dispatcher got an issue with data")
 			}
-			return err
+			return
 		},
 	}
 }

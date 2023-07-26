@@ -61,7 +61,7 @@ type Config struct {
 type DispatcherOption struct {
 	Durable string
 	Subject string
-	Handler func([]byte) error
+	Handler func(context.Context, []byte) error
 }
 
 // StartServer runs NATS
