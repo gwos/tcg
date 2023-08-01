@@ -72,6 +72,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 		Durable:        opt.Durable,
 		Name:           opt.Durable,
 	})
+	//// nats: cannot run concurrent processing using ordered consumer
 	// cons, err := js.OrderedConsumer(ctx, streamName, jetstream.OrderedConsumerConfig{
 	// 	DeliverPolicy:  jetstream.DeliverLastPolicy,
 	// 	FilterSubjects: []string{opt.Subject},
@@ -83,7 +84,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 		return
 	}
 
-	go d.fetch3(ctx, opt, cons)
+	go d.fetch2(ctx, opt, cons)
 }
 
 func (d *natsDispatcher) fetch2(ctx context.Context, opt DurableCfg, cons jetstream.Consumer) {
@@ -118,6 +119,14 @@ func (d *natsDispatcher) fetch2(ctx context.Context, opt DurableCfg, cons jetstr
 			// 	_ = msg.Ack()
 			// 	continue
 			// }
+			select {
+			case <-ctx.Done():
+				_ = msg.Nak()
+				iter.Stop()
+				return
+			default:
+			}
+
 			if delayRetry != nil {
 				_ = msg.Nak()
 				continue
@@ -185,6 +194,9 @@ func (d *natsDispatcher) fetch3(ctx context.Context, opt DurableCfg, cons jetstr
 			println("\n__ctx2__ context cancelled", opt.Durable)
 			consContext.Stop()
 
+			if delayRetry == nil {
+				println("!! delayRetry == nil")
+			}
 			delayRetryTimer := time.NewTimer(RetryDelays[delayRetry.Retry])
 			select {
 			case <-ctx.Done(): // dispatcher stopped while delaying retry
