@@ -17,7 +17,7 @@ var (
 	dispatcher     *natsDispatcher
 	onceDispatcher sync.Once
 
-	retryDelays = map[int]time.Duration{
+	RetryDelays = map[int]time.Duration{
 		1: time.Second * 30,
 		2: time.Minute * 1,
 		3: time.Minute * 5,
@@ -73,6 +73,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 		Durable:       opt.Durable,
 		Name:          opt.Durable,
 	})
+	//// nats: cannot run concurrent processing using ordered consumer
 	// cons, err := js.OrderedConsumer(ctx, streamName, jetstream.OrderedConsumerConfig{
 	// 	DeliverPolicy:  jetstream.DeliverLastPolicy,
 	// 	FilterSubjects: []string{opt.Subject},
@@ -84,7 +85,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 		return
 	}
 
-	go d.fetch3(ctx, opt, cons)
+	go d.fetch2(ctx, opt, cons)
 }
 
 func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons jetstream.Consumer) {
@@ -111,14 +112,14 @@ func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons 
 		var delayRetry *dispatcherRetry
 		// Next can return error, e.g. when iterator is closed or no heartbeats were received
 		for msg, err := iter.Next(); err == nil; msg, err = iter.Next() {
-			if msg.Subject() != opt.Subject {
-				println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
-
-				// NOTE: this redundant case resolved in Consumer with FilterSubject
-				// but OrderedConsumer with FilterSubjects
-				_ = msg.Ack()
-				continue
+			select {
+			case <-ctx.Done():
+				_ = msg.Nak()
+				iter.Stop()
+				return
+			default:
 			}
+
 			if delayRetry != nil {
 				_ = msg.Nak()
 				continue
@@ -134,7 +135,7 @@ func (d *natsDispatcher) fetch2(ctx context.Context, opt DispatcherOption, cons 
 		iter.Stop()
 
 		if delayRetry != nil {
-			delayRetryTimer := time.NewTimer(retryDelays[delayRetry.Retry])
+			delayRetryTimer := time.NewTimer(RetryDelays[delayRetry.Retry])
 			select {
 			case <-ctx.Done(): // dispatcher stopped while delaying retry
 				println("\n__ctx__ context cancelled", opt.Durable)
@@ -186,7 +187,10 @@ func (d *natsDispatcher) fetch3(ctx context.Context, opt DispatcherOption, cons 
 			println("\n__ctx2__ context cancelled", opt.Durable)
 			consContext.Stop()
 
-			delayRetryTimer := time.NewTimer(retryDelays[delayRetry.Retry])
+			if delayRetry == nil {
+				println("!! delayRetry == nil")
+			}
+			delayRetryTimer := time.NewTimer(RetryDelays[delayRetry.Retry])
 			select {
 			case <-ctx.Done(): // dispatcher stopped while delaying retry
 				println("\n__ctx__ context cancelled", opt.Durable)
@@ -223,7 +227,8 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, cons j
 			if msg.Subject() != opt.Subject {
 				println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
 
-				// TODO: resolve this redundant case
+				// NOTE: this redundant case resolved in Consumer with FilterSubject
+				// but OrderedConsumer with FilterSubjects
 				_ = msg.Ack()
 				continue
 			}
@@ -242,7 +247,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, cons j
 		if delayRetry != nil {
 			select {
 			case <-ctx.Done(): // context cancelled
-			case <-time.After(retryDelays[delayRetry.Retry]): // delay ended
+			case <-time.After(RetryDelays[delayRetry.Retry]): // delay ended
 			}
 		}
 	}
@@ -305,7 +310,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, m
 		}
 	}
 
-	if retry.Retry >= len(retryDelays) {
+	if retry.Retry >= len(RetryDelays) {
 		d.retries.Delete(opt.Durable)
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/config"
+	_ "github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
@@ -78,7 +79,7 @@ func TestNatsQueue1(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	time.Sleep(40 * time.Second)
+	time.Sleep(44 * time.Second) // > nats.retryDelays[x]
 
 	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != TestMessagesCount {
 		t.Errorf("Messages should be delivered. deliveredCount = %v, want = %v",
@@ -195,6 +196,13 @@ func TestNatsPerformance(t *testing.T) {
 }
 
 func setupIntegration(t *testing.T, natsAckWait time.Duration, isDynamicInventory bool) {
+	// nats.RetryDelays = map[int]time.Duration{
+	// 	1: time.Second * 1,
+	// 	2: time.Second * 1,
+	// 	3: time.Second * 1,
+	// 	4: time.Second * 1,
+	// }
+
 	for k, v := range TestConfigDefaults {
 		if _, ok := os.LookupEnv(k); !ok {
 			t.Setenv(k, v)
