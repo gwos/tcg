@@ -103,14 +103,15 @@ func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClien
 
 func (monitoringState *MonitoringState) updateHosts(values map[string]int, serviceName string,
 	timeInterval *transit.TimeInterval) {
-	for hostName, host := range monitoringState.Hosts {
-		if host.services != nil {
-			if service, exists := host.services[serviceName]; exists {
-				service.hits = values[hostName]
+	for hostName, value := range values {
+		if host, ok := monitoringState.Hosts[hostName]; ok {
+			if service, ok := host.services[serviceName]; ok {
+				service.hits = value
 				if service.timeInterval == nil {
 					service.timeInterval = timeInterval
 				}
 				host.services[serviceName] = service
+				monitoringState.Hosts[hostName] = host
 			}
 		}
 	}
