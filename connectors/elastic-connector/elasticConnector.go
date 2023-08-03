@@ -306,11 +306,9 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 
 func retrieveMonitoredServiceNames(view ElasticView, metrics map[string]transit.MetricDefinition) []string {
 	var srvs []string
-	if metrics != nil {
-		for _, metric := range metrics {
-			if metric.ServiceType == string(view) && metric.Monitored {
-				srvs = append(srvs, metric.Name)
-			}
+	for _, metric := range metrics {
+		if metric.ServiceType == string(view) && metric.Monitored {
+			srvs = append(srvs, metric.Name)
 		}
 	}
 	return srvs

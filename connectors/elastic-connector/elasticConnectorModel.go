@@ -265,8 +265,7 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 		}
 		var hostNames []string
 		for _, gwService := range gwServices.Services {
-			if _, exists := gwHosts[gwService.HostName]; exists {
-			} else {
+			if _, exists := gwHosts[gwService.HostName]; !exists {
 				host := monitoringHost{
 					name: gwService.HostName,
 				}
