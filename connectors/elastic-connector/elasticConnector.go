@@ -299,6 +299,14 @@ func (connector *ElasticConnector) collectStoredQueriesMetrics(titles []string) 
 			}
 		}
 		connector.monitoringState.updateHosts(result, storedQuery.Attributes.Title, timeInterval)
+
+		log.Debug().
+			Interface("  title", storedQuery.Attributes.Title).
+			Interface("  query", storedQuery.Attributes.Query).
+			Interface("  esQuery", query).
+			Interface("  update", result).
+			Interface(" state", connector.monitoringState).
+			Msg("updateHosts")
 	}
 
 	return nil
