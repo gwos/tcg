@@ -98,9 +98,6 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 func (client *KibanaClient) GetDefaultIndexID() string {
 	path := client.APIRoot + apiPath + defaultIndexPath
 	status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
-	log.Debug().
-		RawJSON("response", response).
-		Msgf("Kibana Get Default Index request: %s", path)
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
@@ -115,6 +112,10 @@ func (client *KibanaClient) GetDefaultIndexID() string {
 			log.Error().Msg("Kibana Get Default Index response is empty")
 		}
 		return ""
+	} else {
+		log.Debug().
+			RawJSON("response", response).
+			Msgf("Kibana Get Default Index request: %s", path)
 	}
 
 	p := new(struct {
@@ -135,9 +136,6 @@ func (client *KibanaClient) FindSO(savedObjectType KibanaSavedObjectType, search
 	for page, perPage, total := 1, 1000, -1; total == -1 || total >= page*perPage; page++ {
 		path := client.buildFindSOPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
 		status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
-		log.Debug().
-			RawJSON("response", response).
-			Msgf("Kibana Find Saved Objects request: %s", path)
 
 		if err != nil || status != 200 || len(response) == 0 {
 			if err != nil {
@@ -152,6 +150,10 @@ func (client *KibanaClient) FindSO(savedObjectType KibanaSavedObjectType, search
 				log.Error().Msg("Kibana Find Saved Objects response is empty")
 			}
 			return nil
+		} else {
+			log.Debug().
+				RawJSON("response", response).
+				Msgf("Kibana Find Saved Objects request: %s", path)
 		}
 
 		var savedObjectsResponse KSavedObjectsResponse
@@ -191,11 +193,6 @@ func (client *KibanaClient) BulkGetSO(savedObjectType KibanaSavedObjectType, ids
 		return nil
 	}
 	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, bodyBytes)
-	log.Debug().
-		Err(err).
-		RawJSON("request", bodyBytes).
-		RawJSON("response", response).
-		Msgf("Kibana Bulk Get Saved Objects request: %s", path)
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
@@ -210,6 +207,12 @@ func (client *KibanaClient) BulkGetSO(savedObjectType KibanaSavedObjectType, ids
 			log.Error().Msg("Kibana Bulk Get Saved Objects response is empty")
 		}
 		return nil
+	} else {
+		log.Debug().
+			Err(err).
+			RawJSON("request", bodyBytes).
+			RawJSON("response", response).
+			Msgf("Kibana Bulk Get Saved Objects request: %s", path)
 	}
 
 	bulkResponse := new(KBulkGetSOResponse)
@@ -254,11 +257,6 @@ func (client *KibanaClient) BulkResolveSO(savedObjectType KibanaSavedObjectType,
 		return nil
 	}
 	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, bodyBytes)
-	log.Debug().
-		Err(err).
-		RawJSON("request", bodyBytes).
-		RawJSON("response", response).
-		Msgf("Kibana Bulk Resolve Saved Objects request: %s", path)
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
@@ -273,6 +271,12 @@ func (client *KibanaClient) BulkResolveSO(savedObjectType KibanaSavedObjectType,
 			log.Error().Msg("Kibana Bulk Resolve Saved Objects response is empty")
 		}
 		return nil
+	} else {
+		log.Debug().
+			Err(err).
+			RawJSON("request", bodyBytes).
+			RawJSON("response", response).
+			Msgf("Kibana Bulk Resolve Saved Objects request: %s", path)
 	}
 
 	bulkResponse := new(KBulkResolveSOResponse)
