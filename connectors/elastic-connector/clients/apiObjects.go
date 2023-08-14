@@ -62,6 +62,11 @@ type KAttributes struct {
 	Description string       `json:"description"`
 	Filters     []KFilter    `json:"filters,omitempty"`
 	TimeFilter  *KTimeFilter `json:"timefilter,omitempty"`
+
+	Query *struct {
+		Language string `json:"language"`
+		Query    string `json:"query"`
+	} `json:"query,omitempty"`
 }
 
 type KFilter struct {
@@ -96,6 +101,8 @@ type EsSearchBody struct {
 
 type EsQuery struct {
 	Bool EsQueryBool `json:"bool"`
+
+	lucene string
 }
 
 type EsQueryBool struct {
@@ -216,21 +223,22 @@ func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupFiel
 
 func copyQuery(query *EsQuery) *EsQuery {
 	if query != nil {
-		queryCopy := &EsQuery{}
+		queryCopy := new(EsQuery)
+		queryCopy.lucene = query.lucene
 		if query.Bool.Must != nil {
-			queryCopy.Bool.Must = make([]interface{}, len(query.Bool.Must))
+			queryCopy.Bool.Must = make([]interface{}, 0, len(query.Bool.Must))
 			copy(queryCopy.Bool.Must, query.Bool.Must)
 		}
 		if query.Bool.MustNot != nil {
-			queryCopy.Bool.MustNot = make([]interface{}, len(query.Bool.MustNot))
+			queryCopy.Bool.MustNot = make([]interface{}, 0, len(query.Bool.MustNot))
 			copy(queryCopy.Bool.MustNot, query.Bool.MustNot)
 		}
 		if query.Bool.Should != nil {
-			queryCopy.Bool.Should = make([]interface{}, len(query.Bool.Should))
+			queryCopy.Bool.Should = make([]interface{}, 0, len(query.Bool.Should))
 			copy(queryCopy.Bool.Should, query.Bool.Should)
 		}
 		if query.Bool.Filter != nil {
-			queryCopy.Bool.Filter = make([]interface{}, len(query.Bool.Filter))
+			queryCopy.Bool.Filter = make([]interface{}, 0, len(query.Bool.Filter))
 			copy(queryCopy.Bool.Filter, query.Bool.Filter)
 		}
 		return queryCopy

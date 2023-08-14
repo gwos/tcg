@@ -164,9 +164,14 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 		log.Err(err).Msg("could not encode ES Search Body")
 		return nil, nil
 	}
+	query := ""
+	if searchBody.Query != nil {
+		query = searchBody.Query.lucene
+	}
 
 	log.Debug().
 		Bytes("body", body.Bytes()).
+		Str("query", query).
 		Msg("performing ES search request with body")
 
 	response, err := client.Search(
@@ -175,6 +180,7 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 		client.Search.WithBody(&body),
 		client.Search.WithTrackTotalHits(true),
 		client.Search.WithSize(0),
+		client.Search.WithQuery(query),
 	)
 
 	if err != nil {

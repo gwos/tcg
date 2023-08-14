@@ -1,12 +1,14 @@
 package clients
 
+import (
+	"strings"
+
+	"github.com/rs/zerolog/log"
+)
+
 // = buildEsQuery method in /kibana/src/plugins/data/common/es_query/es_query/build_es_query.ts
 func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 	var esQuery EsQuery
-
-	// TODO kueryQuery := buildQueryFromKuery; append
-	// TODO luceneQuery := buildQueryFromLucene; append
-
 	if storedQuery.Attributes == nil {
 		return esQuery
 	}
@@ -22,6 +24,31 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 	if storedQuery.Attributes.TimeFilter != nil {
 		esQuery.Bool.Filter = append(esQuery.Bool.Filter,
 			buildRangeFilterFromTimeFilter(*storedQuery.Attributes.TimeFilter))
+	}
+
+	// TODO kueryQuery := buildQueryFromKuery; append
+	// TODO luceneQuery := buildQueryFromLucene; append
+	if storedQuery.Attributes.Query != nil &&
+		storedQuery.Attributes.Query.Query != "" {
+		switch storedQuery.Attributes.Query.Language {
+		case "kuery":
+			// a = append([]T{x}, a...)
+			// esQuery.Bool.Must = append([]interface{}{},  esQuery.Bool.Must...)
+			log.Warn().
+				Str("title", storedQuery.Attributes.Title).
+				Str("kuery", storedQuery.Attributes.Query.Query).
+				MsgFunc(func() string {
+					msg := "KQL query"
+					if strings.ContainsAny(storedQuery.Attributes.Query.Query, ":=<>[]\n") {
+						msg += " incompatible to lucene"
+					}
+					return msg
+				})
+			esQuery.lucene = storedQuery.Attributes.Query.Query
+
+		case "lucene":
+			esQuery.lucene = storedQuery.Attributes.Query.Query
+		}
 	}
 
 	return esQuery

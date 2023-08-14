@@ -322,7 +322,7 @@ func (client *KibanaClient) buildFindSOPath(page *int, perPage *int, savedObject
 		params["search"] = searchValue
 	}
 	return client.APIRoot + apiPath + savedObjectsPath + findPath + clients.BuildQueryParams(params) +
-		`&fields=filters&fields=title&fields=typeMeta`
+		`&fields=filters&fields=title&fields=typeMeta&fields=query`
 }
 
 func (client *KibanaClient) buildBulkGetSOPath() string {
