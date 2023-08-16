@@ -6,7 +6,7 @@ run:
     - var
     - tmp
     - gotocjson
-    # - libtransit
+    - libtransit
     - deprecated
     - connectors/nsca-connector
   skip-files:

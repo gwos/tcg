@@ -18,7 +18,7 @@ const (
 )
 
 func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, error) {
-	var results []ParseResult
+	results := make([]ParseResult, 0)
 
 	for _, alert := range data.Alerts {
 		hostName, err := cfg.HostMappings.Apply(alert.Labels)

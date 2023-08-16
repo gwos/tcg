@@ -34,45 +34,49 @@ func receiver(c *gin.Context) {
 	}
 	log.Debug().Interface("data", data).Msg("receive data")
 
-	host, group, mb, err := helpers.GetMetricBuildersFromPrometheusData(data, helpers.GetExtConfig())
+	results, err := helpers.ParsePrometheusData(data, helpers.GetExtConfig())
 	if err != nil {
 		log.Debug().Err(err).
-			Msg("could not process incomings")
-		c.JSON(http.StatusInternalServerError, err.Error())
-		return
-	}
-
-	monitoredServices := make([]transit.MonitoredService, 0, len(mb))
-	for _, m := range mb {
-		service, err := connectors.BuildServiceForMetric(host, m)
-		if err != nil {
-			log.Debug().Err(err).
-				Str("host", host).
-				Msg("could not build service")
-			c.JSON(http.StatusInternalServerError, err.Error())
-		}
-		service.Status = transit.ServiceWarning
-		service.LastPluginOutput = helpers.GetLastPluginOutput(m.Tags)
-		monitoredServices = append(monitoredServices, *service)
-	}
-
-	resource, err := connectors.CreateResource(host, monitoredServices)
-	if err != nil {
-		log.Debug().Err(err).
-			Str("host", host).
-			Msg("could not create resource")
+			Msg("could not parse prometheus data")
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	groups := make([]transit.ResourceGroup, 0)
-	if group != "" {
-		resourceRef := connectors.CreateResourceRef(host, "", transit.ResourceTypeHost)
-		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, []transit.ResourceRef{resourceRef})
+	hostToServiceMap := make(map[string][]*transit.MonitoredService)
+	hostToHostGroupMap := make(map[string]string)
+
+	for _, r := range results {
+		service, err := connectors.BuildServiceForMetric(r.HostName, r.MetricBuilder)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err.Error())
+		}
+		service.Status = transit.ServiceWarning
+		service.LastPluginOutput = helpers.GetLastPluginOutput(r.MetricBuilder.Tags)
+
+		hostToServiceMap[r.HostName] = append(hostToServiceMap[r.HostName], service)
+		if r.HostGroupName != "" {
+			hostToHostGroupMap[r.HostName] = r.HostGroupName
+		}
+	}
+
+	monitoredResources := make([]transit.MonitoredResource, 0, len(hostToServiceMap))
+	for h, s := range hostToServiceMap {
+		resource, err := connectors.CreateResource(h, s)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, err.Error())
+			return
+		}
+		monitoredResources = append(monitoredResources, *resource)
+	}
+
+	for h, hg := range hostToHostGroupMap {
+		resourceRef := connectors.CreateResourceRef(h, "", transit.ResourceTypeHost)
+		resourceGroup := connectors.CreateResourceGroup(hg, hg, transit.HostGroup, []transit.ResourceRef{resourceRef})
 		groups = append(groups, resourceGroup)
 	}
 
-	if err = connectors.SendMetrics(c.Request.Context(), []transit.MonitoredResource{*resource}, &groups); err != nil {
+	if err = connectors.SendMetrics(c.Request.Context(), monitoredResources, &groups); err != nil {
 		log.Err(err).
 			Msg("could not send metrics")
 		c.JSON(http.StatusInternalServerError, err.Error())
