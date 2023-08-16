@@ -6,31 +6,32 @@ import (
 	"github.com/prometheus/alertmanager/template"
 )
 
+type ParseResult struct {
+	HostName      string
+	HostGroupName string
+	MetricBuilder connectors.MetricBuilder
+}
+
 const (
 	tagKeySummary     = "summary"
 	tagKeyDescription = "description"
 )
 
-func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (string, string, []connectors.MetricBuilder, error) {
-	var (
-		err            error
-		hostName       string
-		serviceName    string
-		metricBuilders = make([]connectors.MetricBuilder, 0)
-	)
-
-	hostName, err = cfg.HostMappings.Apply(data.CommonLabels)
-	if err != nil || hostName == "" {
-		return "", "", nil, err
-	}
-
-	hostGroupName, err := cfg.HostGroupMappings.Apply(data.CommonLabels)
-	if err != nil {
-		return "", "", nil, err
-	}
+func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, error) {
+	var results []ParseResult
 
 	for _, alert := range data.Alerts {
-		serviceName, err = cfg.ServiceMappings.Apply(alert.Labels)
+		hostName, err := cfg.HostMappings.Apply(alert.Labels)
+		if err != nil || hostName == "" {
+			return nil, err
+		}
+
+		hostGroupName, err := cfg.HostGroupMappings.Apply(data.CommonLabels)
+		if err != nil {
+			return nil, err
+		}
+
+		serviceName, err := cfg.ServiceMappings.Apply(alert.Labels)
 		if err != nil || serviceName == "" {
 			continue
 		}
@@ -50,10 +51,14 @@ func GetMetricBuildersFromPrometheusData(data template.Data, cfg *ExtConfig) (st
 			mb.Tags[k] = v
 		}
 
-		metricBuilders = append(metricBuilders, mb)
+		results = append(results, ParseResult{
+			HostName:      hostName,
+			HostGroupName: hostGroupName,
+			MetricBuilder: mb,
+		})
 	}
 
-	return hostName, hostGroupName, metricBuilders, nil
+	return results, nil
 }
 
 func GetLastPluginOutput(tag map[string]string) string {
