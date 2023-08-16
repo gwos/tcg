@@ -278,7 +278,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 	groups[clusterHostGroupName] = transit.ResourceGroup{
 		GroupName: clusterHostGroupName,
 		Type:      transit.HostGroup,
-		Resources: make([]transit.ResourceRef, 0, len(nodes.Items)),
+		Resources: make([]transit.ResourceRef, len(nodes.Items)),
 	}
 
 	for index, node := range nodes.Items {
