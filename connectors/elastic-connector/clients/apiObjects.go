@@ -101,8 +101,6 @@ type EsSearchBody struct {
 
 type EsQuery struct {
 	Bool EsQueryBool `json:"bool"`
-
-	lucene string
 }
 
 type EsQueryBool struct {
@@ -110,6 +108,13 @@ type EsQueryBool struct {
 	Filter  []interface{} `json:"filter"`
 	Should  []interface{} `json:"should"`
 	MustNot []interface{} `json:"must_not"`
+}
+
+type EsQueryString struct {
+	QueryString struct {
+		Query           string `json:"query"`
+		AnalyzeWildcard bool   `json:"analyze_wildcard"`
+	} `json:"query_string"`
 }
 
 type EsAggs struct {
@@ -224,7 +229,6 @@ func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupFiel
 func copyQuery(query *EsQuery) *EsQuery {
 	if query != nil {
 		queryCopy := new(EsQuery)
-		queryCopy.lucene = query.lucene
 		if query.Bool.Must != nil {
 			queryCopy.Bool.Must = make([]interface{}, 0, len(query.Bool.Must))
 			copy(queryCopy.Bool.Must, query.Bool.Must)

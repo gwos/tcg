@@ -1,8 +1,9 @@
 package clients
 
 import (
-	"strings"
-
+	"github.com/markel1974/gokuery/src/config"
+	"github.com/markel1974/gokuery/src/context"
+	"github.com/markel1974/gokuery/src/nodes"
 	"github.com/rs/zerolog/log"
 )
 
@@ -11,6 +12,32 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 	var esQuery EsQuery
 	if storedQuery.Attributes == nil {
 		return esQuery
+	}
+
+	if storedQuery.Attributes.Query != nil &&
+		storedQuery.Attributes.Query.Query != "" {
+		switch storedQuery.Attributes.Query.Language {
+		case "kuery":
+			/* similar to Kibana, parse KQL string and use as 1st filter member */
+			q, err := nodes.ParseKueryString(storedQuery.Attributes.Query.Query,
+				nil, config.New(), context.New())
+			if err == nil {
+				/* got parsed query organized in nested map[string]interface{} similar to EsQuery type
+				with `.bool.minimum_should_match:1` and filled `.bool.should` members */
+				esQuery.Bool.Filter = append(esQuery.Bool.Filter, q)
+			} else {
+				log.Err(err).
+					Str("title", storedQuery.Attributes.Title).
+					Str("kuery", storedQuery.Attributes.Query.Query).
+					Msg("could not parse KQL")
+			}
+		case "lucene":
+			/* similar to Kibana, create query_string and use as 1st must member */
+			qs := EsQueryString{}
+			qs.QueryString.AnalyzeWildcard = true
+			qs.QueryString.Query = storedQuery.Attributes.Query.Query
+			esQuery.Bool.Must = append(esQuery.Bool.Must, qs)
+		}
 	}
 
 	if storedQuery.Attributes.Filters != nil {
@@ -24,31 +51,6 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 	if storedQuery.Attributes.TimeFilter != nil {
 		esQuery.Bool.Filter = append(esQuery.Bool.Filter,
 			buildRangeFilterFromTimeFilter(*storedQuery.Attributes.TimeFilter))
-	}
-
-	// TODO kueryQuery := buildQueryFromKuery; append
-	// TODO luceneQuery := buildQueryFromLucene; append
-	if storedQuery.Attributes.Query != nil &&
-		storedQuery.Attributes.Query.Query != "" {
-		switch storedQuery.Attributes.Query.Language {
-		case "kuery":
-			// a = append([]T{x}, a...)
-			// esQuery.Bool.Must = append([]interface{}{},  esQuery.Bool.Must...)
-			log.Warn().
-				Str("title", storedQuery.Attributes.Title).
-				Str("kuery", storedQuery.Attributes.Query.Query).
-				MsgFunc(func() string {
-					msg := "KQL query"
-					if strings.ContainsAny(storedQuery.Attributes.Query.Query, ":=<>[]\n") {
-						msg += " incompatible to lucene"
-					}
-					return msg
-				})
-			esQuery.lucene = storedQuery.Attributes.Query.Query
-
-		case "lucene":
-			esQuery.lucene = storedQuery.Attributes.Query.Query
-		}
 	}
 
 	return esQuery
