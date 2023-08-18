@@ -36,13 +36,13 @@ type MonitoringState struct {
 
 type monitoringService struct {
 	name         string
-	Hits         int
+	hits         int
 	timeInterval *transit.TimeInterval
 }
 
 type monitoringHost struct {
 	name       string
-	Services   map[string]monitoringService
+	services   map[string]monitoringService
 	hostGroups []string
 }
 
@@ -89,10 +89,10 @@ func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClien
 	// nullify services
 	if currentState.Metrics != nil {
 		for _, host := range currentState.Hosts {
-			host.Services = make(map[string]monitoringService, len(currentState.Metrics))
+			host.services = make(map[string]monitoringService, len(currentState.Metrics))
 			for metricName := range currentState.Metrics {
-				service := monitoringService{name: metricName, Hits: 0}
-				host.Services[metricName] = service
+				service := monitoringService{name: metricName, hits: 0}
+				host.services[metricName] = service
 			}
 			currentState.Hosts[host.name] = host
 		}
@@ -105,12 +105,12 @@ func (monitoringState *MonitoringState) updateHosts(values map[string]int, servi
 	timeInterval *transit.TimeInterval) {
 	for hostName, value := range values {
 		if host, ok := monitoringState.Hosts[hostName]; ok {
-			if service, ok := host.Services[serviceName]; ok {
-				service.Hits = value
+			if service, ok := host.services[serviceName]; ok {
+				service.hits = value
 				if service.timeInterval == nil {
 					service.timeInterval = timeInterval
 				}
-				host.Services[serviceName] = service
+				host.services[serviceName] = service
 				monitoringState.Hosts[hostName] = host
 			}
 		}
@@ -139,12 +139,12 @@ func (monitoringState *MonitoringState) toTransitResources() ([]transit.Monitore
 }
 
 func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
-	monitoredServices := make([]transit.MonitoredService, 0, len(host.Services))
-	inventoryServices := make([]transit.InventoryService, 0, len(host.Services))
+	monitoredServices := make([]transit.MonitoredService, 0, len(host.services))
+	inventoryServices := make([]transit.InventoryService, 0, len(host.services))
 	if metricDefinitions == nil {
 		return monitoredServices, inventoryServices
 	}
-	for serviceName, service := range host.Services {
+	for serviceName, service := range host.services {
 		if metricDefinition, has := metricDefinitions[serviceName]; has {
 			customServiceName := connectors.Name(serviceName, metricDefinition.CustomName)
 
@@ -156,7 +156,7 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				CustomName:  metricDefinition.CustomName,
 				ComputeType: metricDefinition.ComputeType,
 				Expression:  metricDefinition.Expression,
-				Value:       service.Hits,
+				Value:       service.hits,
 				UnitType:    transit.UnitCounter,
 				Warning:     metricDefinition.WarningThreshold,
 				Critical:    metricDefinition.CriticalThreshold,
