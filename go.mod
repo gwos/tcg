@@ -14,6 +14,7 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/gosnmp/gosnmp v1.35.0
 	github.com/hashicorp/go-uuid v1.0.3
+	github.com/markel1974/gokuery v1.0.3
 	github.com/nats-io/nats-server/v2 v2.9.15
 	github.com/nats-io/nats.go v1.24.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible

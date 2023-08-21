@@ -103,14 +103,15 @@ func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClien
 
 func (monitoringState *MonitoringState) updateHosts(values map[string]int, serviceName string,
 	timeInterval *transit.TimeInterval) {
-	for hostName, host := range monitoringState.Hosts {
-		if host.services != nil {
-			if service, exists := host.services[serviceName]; exists {
-				service.hits = values[hostName]
+	for hostName, value := range values {
+		if host, ok := monitoringState.Hosts[hostName]; ok {
+			if service, ok := host.services[serviceName]; ok {
+				service.hits = value
 				if service.timeInterval == nil {
 					service.timeInterval = timeInterval
 				}
 				host.services[serviceName] = service
+				monitoringState.Hosts[hostName] = host
 			}
 		}
 	}
@@ -118,41 +119,37 @@ func (monitoringState *MonitoringState) updateHosts(values map[string]int, servi
 
 func (monitoringState *MonitoringState) toTransitResources() ([]transit.MonitoredResource, []transit.InventoryResource) {
 	hosts := monitoringState.Hosts
-	mrs := make([]transit.MonitoredResource, len(hosts))
-	irs := make([]transit.InventoryResource, len(hosts))
-	i := 0
+	mrs := make([]transit.MonitoredResource, 0, len(hosts))
+	irs := make([]transit.InventoryResource, 0, len(hosts))
 	for _, host := range hosts {
 		monitoredServices, inventoryServices := host.toTransitResources(monitoringState.Metrics)
 
 		inventoryResource := connectors.CreateInventoryResource(host.name, inventoryServices)
-		irs[i] = inventoryResource
+		irs = append(irs, inventoryResource)
 
 		monitoredResource, err := connectors.CreateResource(host.name, monitoredServices)
 		if err != nil {
 			log.Err(err).Msgf("could not create resource %s", host.name)
 		}
 		if monitoredResource != nil {
-			mrs[i] = *monitoredResource
+			mrs = append(mrs, *monitoredResource)
 		}
-
-		i++
 	}
 	return mrs, irs
 }
 
 func (host monitoringHost) toTransitResources(metricDefinitions map[string]transit.MetricDefinition) ([]transit.MonitoredService, []transit.InventoryService) {
-	monitoredServices := make([]transit.MonitoredService, len(host.services))
-	inventoryServices := make([]transit.InventoryService, len(host.services))
+	monitoredServices := make([]transit.MonitoredService, 0, len(host.services))
+	inventoryServices := make([]transit.InventoryService, 0, len(host.services))
 	if metricDefinitions == nil {
 		return monitoredServices, inventoryServices
 	}
-	i := 0
 	for serviceName, service := range host.services {
 		if metricDefinition, has := metricDefinitions[serviceName]; has {
 			customServiceName := connectors.Name(serviceName, metricDefinition.CustomName)
 
 			inventoryService := connectors.CreateInventoryService(customServiceName, host.name)
-			inventoryServices[i] = inventoryService
+			inventoryServices = append(inventoryServices, inventoryService)
 
 			metricBuilder := connectors.MetricBuilder{
 				Name:        serviceName,
@@ -195,29 +192,24 @@ func (host monitoringHost) toTransitResources(metricDefinitions map[string]trans
 				log.Err(err).Msgf("could not create service %s:%s", host.name, customServiceName)
 			}
 			if monitoredService != nil {
-				monitoredServices[i] = *monitoredService
+				monitoredServices = append(monitoredServices, *monitoredService)
 			}
 		}
-		i = i + 1
 	}
 	return monitoredServices, inventoryServices
 }
 
 func (monitoringState *MonitoringState) toResourceGroups() []transit.ResourceGroup {
 	groups := monitoringState.buildGroups()
-	rgs := make([]transit.ResourceGroup, len(groups))
-	j := 0
+	rgs := make([]transit.ResourceGroup, 0, len(groups))
 	for group, hostsInGroup := range groups {
-		monitoredResourceRefs := make([]transit.ResourceRef, len(hostsInGroup))
-		k := 0
+		monitoredResourceRefs := make([]transit.ResourceRef, 0, len(hostsInGroup))
 		for host := range hostsInGroup {
 			monitoredResourceRef := connectors.CreateResourceRef(host, "", transit.ResourceTypeHost)
-			monitoredResourceRefs[k] = monitoredResourceRef
-			k++
+			monitoredResourceRefs = append(monitoredResourceRefs, monitoredResourceRef)
 		}
 		resourceGroup := connectors.CreateResourceGroup(group, group, transit.HostGroup, monitoredResourceRefs)
-		rgs[j] = resourceGroup
-		j++
+		rgs = append(rgs, resourceGroup)
 	}
 	return rgs
 }
@@ -265,8 +257,7 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 		}
 		var hostNames []string
 		for _, gwService := range gwServices.Services {
-			if _, exists := gwHosts[gwService.HostName]; exists {
-			} else {
+			if _, exists := gwHosts[gwService.HostName]; !exists {
 				host := monitoringHost{
 					name: gwService.HostName,
 				}

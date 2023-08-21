@@ -1,14 +1,43 @@
 package clients
 
+import (
+	"github.com/markel1974/gokuery/src/config"
+	"github.com/markel1974/gokuery/src/context"
+	"github.com/markel1974/gokuery/src/nodes"
+	"github.com/rs/zerolog/log"
+)
+
 // = buildEsQuery method in /kibana/src/plugins/data/common/es_query/es_query/build_es_query.ts
 func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 	var esQuery EsQuery
-
-	// TODO kueryQuery := buildQueryFromKuery; append
-	// TODO luceneQuery := buildQueryFromLucene; append
-
 	if storedQuery.Attributes == nil {
 		return esQuery
+	}
+
+	if storedQuery.Attributes.Query != nil &&
+		storedQuery.Attributes.Query.Query != "" {
+		switch storedQuery.Attributes.Query.Language {
+		case "kuery":
+			/* similar to Kibana, parse KQL string and use as 1st filter member */
+			q, err := nodes.ParseKueryString(storedQuery.Attributes.Query.Query,
+				nil, config.New(), context.New())
+			if err == nil {
+				/* got parsed query organized in nested map[string]interface{} similar to EsQuery type
+				with `.bool.minimum_should_match:1` and filled `.bool.should` members */
+				esQuery.Bool.Filter = append(esQuery.Bool.Filter, q)
+			} else {
+				log.Err(err).
+					Str("title", storedQuery.Attributes.Title).
+					Str("kuery", storedQuery.Attributes.Query.Query).
+					Msg("could not parse KQL")
+			}
+		case "lucene":
+			/* similar to Kibana, create query_string and use as 1st must member */
+			qs := EsQueryString{}
+			qs.QueryString.AnalyzeWildcard = true
+			qs.QueryString.Query = storedQuery.Attributes.Query.Query
+			esQuery.Bool.Must = append(esQuery.Bool.Must, qs)
+		}
 	}
 
 	if storedQuery.Attributes.Filters != nil {
