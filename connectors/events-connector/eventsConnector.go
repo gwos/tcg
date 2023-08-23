@@ -43,18 +43,22 @@ func receiver(c *gin.Context) {
 	}
 
 	groups := make([]transit.ResourceGroup, 0)
-	hostToServiceMap := make(map[string][]*transit.MonitoredService)
+	hostToServiceMap := make(map[string][]transit.MonitoredService)
 	hostToHostGroupMap := make(map[string]string)
 
 	for _, r := range results {
 		service, err := connectors.BuildServiceForMetric(r.HostName, r.MetricBuilder)
 		if err != nil {
+			log.Debug().Err(err).
+				Interface("res", r).
+				Msg("could not build service for metric")
 			c.JSON(http.StatusInternalServerError, err.Error())
+			return
 		}
 		service.Status = transit.ServiceWarning
 		service.LastPluginOutput = helpers.GetLastPluginOutput(r.MetricBuilder.Tags)
 
-		hostToServiceMap[r.HostName] = append(hostToServiceMap[r.HostName], service)
+		hostToServiceMap[r.HostName] = append(hostToServiceMap[r.HostName], *service)
 		if r.HostGroupName != "" {
 			hostToHostGroupMap[r.HostName] = r.HostGroupName
 		}
@@ -64,6 +68,10 @@ func receiver(c *gin.Context) {
 	for h, s := range hostToServiceMap {
 		resource, err := connectors.CreateResource(h, s)
 		if err != nil {
+			log.Debug().Err(err).
+				Str("host", h).
+				Interface("services", s).
+				Msg("could not create resource")
 			c.JSON(http.StatusInternalServerError, err.Error())
 			return
 		}
