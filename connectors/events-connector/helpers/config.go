@@ -45,10 +45,7 @@ func GetMetricsProfile() *transit.MonitorConnection {
 func ConfigHandler(data []byte) {
 	log.Info().Msg("configuration received")
 	/* Init config with default values */
-	tExt := &ExtConfig{
-		HostMappings:    mapping.Mappings{},
-		ServiceMappings: mapping.Mappings{},
-	}
+	tExt := &ExtConfig{}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
 	if err := connectors.UnmarshalConfig(data, tMetProf, tMonConn); err != nil {

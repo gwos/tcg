@@ -4,6 +4,7 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/prometheus/alertmanager/template"
+	"github.com/rs/zerolog/log"
 )
 
 type ParseResult struct {
@@ -21,34 +22,53 @@ func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, err
 	results := make([]ParseResult, 0)
 
 	for _, alert := range data.Alerts {
-		hostName, err := cfg.HostMappings.Apply(alert.Labels)
-		if err != nil || hostName == "" {
-			return nil, err
+		tags := make(map[string]string,
+			len(data.CommonAnnotations)+len(alert.Annotations)+len(data.CommonLabels)+len(alert.Labels))
+		for k, v := range data.CommonAnnotations {
+			tags[k] = v
+		}
+		for k, v := range alert.Annotations {
+			tags[k] = v
+		}
+		for k, v := range data.CommonLabels {
+			tags[k] = v
+		}
+		for k, v := range alert.Labels {
+			tags[k] = v
 		}
 
-		hostGroupName, err := cfg.HostGroupMappings.Apply(data.CommonLabels)
+		hostGroupName, err := cfg.HostGroupMappings.Apply(tags)
 		if err != nil {
-			return nil, err
+			log.Debug().Err(err).Interface("tags", tags).Send()
+			continue
 		}
-
-		serviceName, err := cfg.ServiceMappings.Apply(alert.Labels)
+		hostName, err := cfg.HostMappings.Apply(tags)
+		if err != nil || hostName == "" {
+			log.Debug().Err(err).Interface("tags", tags).Send()
+			continue
+		}
+		serviceName, err := cfg.ServiceMappings.Apply(tags)
 		if err != nil || serviceName == "" {
+			log.Debug().Err(err).Interface("tags", tags).Send()
 			continue
 		}
 
 		mb := connectors.MetricBuilder{
 			Name:           serviceName,
 			Graphed:        false,
-			Tags:           alert.Labels,
+			Tags:           tags,
 			UnitType:       transit.UnitCounter,
 			ComputeType:    transit.Informational,
-			StartTimestamp: &transit.Timestamp{Time: alert.StartsAt},
-			EndTimestamp:   &transit.Timestamp{Time: alert.EndsAt},
+			StartTimestamp: transit.NewTimestamp(),
+			EndTimestamp:   transit.NewTimestamp(),
 			Value:          -1,
 		}
-
-		for k, v := range alert.Annotations {
-			mb.Tags[k] = v
+		if !alert.StartsAt.IsZero() {
+			mb.StartTimestamp.Time = alert.StartsAt.UTC()
+			mb.EndTimestamp.Time = alert.StartsAt.UTC()
+		}
+		if !alert.EndsAt.IsZero() {
+			mb.EndTimestamp.Time = alert.EndsAt.UTC()
 		}
 
 		results = append(results, ParseResult{
