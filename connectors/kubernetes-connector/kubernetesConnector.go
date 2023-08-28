@@ -6,11 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,13 +22,13 @@ import (
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	EndPoint      string                                                 `json:"kubernetesClusterEndpoint"`
-	Views         map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
-	Groups        []transit.ResourceGroup                                `json:"groups"`
-	CheckInterval time.Duration                                          `json:"checkIntervalMinutes"`
-	Ownership     transit.HostOwnershipType                              `json:"ownership,omitempty"`
-	AuthType      AuthType                                               `json:"authType"`
-	Insecure      bool                                                   `json:"insecure"`
+	EndPoint string                                                 `json:"kubernetesClusterEndpoint"`
+	Views    map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
+	// Groups        []transit.ResourceGroup                                `json:"groups"`
+	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
+	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
+	AuthType      AuthType                  `json:"authType"`
+	Insecure      bool                      `json:"insecure"`
 
 	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
 	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
@@ -73,11 +72,13 @@ const (
 )
 
 type KubernetesConnector struct {
-	config     ExtConfig
+	ExtConfig
+	iChksum []byte
+	ctx     context.Context
+
 	kapi       kv1.CoreV1Interface
 	kClientSet kubernetes.Interface
 	mapi       mv1.MetricsV1beta1Interface
-	ctx        context.Context
 }
 
 type Cluster struct {
@@ -107,10 +108,10 @@ type KubernetesResource struct {
 	Services map[string]transit.MonitoredService
 }
 
-func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
+func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// kubeStateMetricsEndpoint := "http://" + config.EndPoint + "/api/v1/namespaces/kube-system/services/kube-state-metrics:http-metrics/proxy/metrics"
 	kConfig := rest.Config{
-		Host:                config.EndPoint,
+		Host:                connector.ExtConfig.EndPoint,
 		APIPath:             "",
 		ContentConfig:       rest.ContentConfig{},
 		Username:            "",
@@ -122,7 +123,7 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		AuthConfigPersister: nil,
 		ExecProvider:        nil,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: config.Insecure,
+			Insecure: connector.ExtConfig.Insecure,
 		},
 		UserAgent:          "",
 		DisableCompression: false,
@@ -135,19 +136,19 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 		Dial:               nil,
 	}
 
-	switch config.AuthType {
+	switch connector.ExtConfig.AuthType {
 	case InCluster:
 		log.Info().Msg("using InCluster auth")
 	case Credentials:
-		kConfig.Username = extConfig.KubernetesUserName
-		kConfig.Password = extConfig.KubernetesUserPassword
+		kConfig.Username = connector.ExtConfig.KubernetesUserName
+		kConfig.Password = connector.ExtConfig.KubernetesUserPassword
 		log.Info().Msg("using Credentials auth")
 	case BearerToken:
-		kConfig.BearerToken = extConfig.KubernetesBearerToken
+		kConfig.BearerToken = connector.ExtConfig.KubernetesBearerToken
 		log.Info().Msg("using Bearer Token auth")
 	case ConfigFile:
 		fConfig := KubernetesYaml{}
-		err := yaml.Unmarshal([]byte(config.KubernetesConfigFile), &fConfig)
+		err := yaml.Unmarshal([]byte(connector.ExtConfig.KubernetesConfigFile), &fConfig)
 		if err != nil {
 			return err
 		}
@@ -179,10 +180,10 @@ func (connector *KubernetesConnector) Initialize(config ExtConfig) error {
 	}
 	connector.kapi = connector.kClientSet.CoreV1()
 	connector.mapi = mClientSet.MetricsV1beta1()
-	connector.ctx = context.TODO()
+	connector.ctx = ctx
 
 	log.Debug().Msgf("initialized Kubernetes connection to server version %s, for client version: %s, and endPoint %s",
-		version.String(), connector.kapi.RESTClient().APIVersion(), config.EndPoint)
+		version.String(), connector.kapi.RESTClient().APIVersion(), connector.ExtConfig.EndPoint)
 
 	return nil
 }
@@ -198,27 +199,19 @@ func (connector *KubernetesConnector) Ping() error {
 	return nil
 }
 
-func (connector *KubernetesConnector) Shutdown() {
-	connector.ctx = nil
-	connector.kapi = nil
-	connector.mapi = nil
-	connector.kClientSet = nil
-	connector.config = ExtConfig{}
-}
-
 // Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
+func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
 	// gather inventory and Metrics
 	metricsPerContainer := true
 	monitoredState := make(map[string]KubernetesResource)
 	groups := make(map[string]transit.ResourceGroup)
-	connector.collectNodeInventory(monitoredState, groups, cfg)
-	connector.collectPodInventory(monitoredState, groups, cfg, &metricsPerContainer)
-	connector.collectNodeMetrics(monitoredState, cfg)
+	connector.collectNodeInventory(monitoredState, groups)
+	connector.collectPodInventory(monitoredState, groups, &metricsPerContainer)
+	connector.collectNodeMetrics(monitoredState)
 	if metricsPerContainer {
-		connector.collectPodMetricsPerContainer(monitoredState, cfg)
+		connector.collectPodMetricsPerContainer(monitoredState)
 	} else {
-		connector.collectPodMetricsPerReplica(monitoredState, cfg)
+		connector.collectPodMetricsPerReplica(monitoredState)
 	}
 
 	// convert to arrays as expected by TCG
@@ -272,7 +265,7 @@ func (connector *KubernetesConnector) Collect(cfg *ExtConfig) ([]transit.Invento
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 1930m
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 18242267924,
-func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig) {
+func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup) {
 	nodes, _ := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{}) // TODO: ListOptions can filter by label
 	clusterHostGroupName := connector.makeClusterName(nodes)
 	groups[clusterHostGroupName] = transit.ResourceGroup{
@@ -297,7 +290,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		}
 		monitoredState[resource.Name] = resource
 		// process services
-		for key, metricDefinition := range cfg.Views[ViewNodes] {
+		for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 			var value interface{}
 			switch key {
 			case cpuCores:
@@ -347,7 +340,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 
 // Pod Inventory also retrieves status
 // inventory also contains status, pod counts, capacity and allocation metrics
-func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, cfg *ExtConfig, metricsPerContainer *bool) {
+func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, metricsPerContainer *bool) {
 	// TODO: filter pods by namespace(s)
 	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
@@ -428,7 +421,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 	}
 }
 
-func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
+func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource) {
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
 		log.Err(err).Msg("could not collect node metrics")
@@ -437,7 +430,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 
 	for _, node := range nodes.Items {
 		if resource, ok := monitoredState[node.Name]; ok {
-			for key, metricDefinition := range cfg.Views[ViewNodes] {
+			for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 				var value interface{}
 				switch key {
 				case cpu:
@@ -475,7 +468,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 	}
 }
 
-func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
+func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
 		log.Err(err).Msg("could not collect pod metrics")
@@ -488,7 +481,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					continue
 				}
 				metricBuilders := make([]connectors.MetricBuilder, 0)
-				for key, metricDefinition := range cfg.Views[ViewPods] {
+				for key, metricDefinition := range connector.ExtConfig.Views[ViewPods] {
 					var value interface{}
 					switch key {
 					case cpuCores:
@@ -536,7 +529,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 }
 
 // treat each container uniquely -- store multi-metrics per pod replica for each node
-func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource, cfg *ExtConfig) {
+func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource) {
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
 	if err != nil {
 		log.Err(err).Msg("could not collect pod metrics")
@@ -545,7 +538,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 	debugDetails := false
 	builderMap := make(map[string][]connectors.MetricBuilder)
 	serviceMap := make(map[string]transit.MonitoredService)
-	for key, metricDefinition := range cfg.Views[ViewPods] {
+	for key, metricDefinition := range connector.ExtConfig.Views[ViewPods] {
 		for _, pod := range pods.Items {
 			for _, container := range pod.Containers {
 				if container.Name == ContainerPOD {

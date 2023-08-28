@@ -7,24 +7,18 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	connector         KubernetesConnector
-	chksum            []byte
-	fresh             = true
-	extConfig         = &ExtConfig{}
 	ctxCancel, cancel = context.WithCancel(context.Background())
-	monitorConnection = &transit.MonitorConnection{
-		Extensions: extConfig,
-	}
+	connector         = KubernetesConnector{}
 )
 
 func main() {
@@ -50,13 +44,19 @@ func main() {
 }
 
 func configHandler(data []byte) {
-	log.Info().Msg("Configuration received")
+	log.Info().
+		Func(func(e *zerolog.Event) {
+			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
+				e.RawJSON("data", data)
+			}
+		}).
+		Msg("Configuration received")
 	/* Init config with default values */
 	tExt := &ExtConfig{
 		EndPoint:  defaultKubernetesClusterEndpoint,
 		Ownership: transit.Yield,
 		Views:     make(map[KubernetesView]map[string]transit.MetricDefinition),
-		Groups:    []transit.ResourceGroup{},
+		// Groups:    []transit.ResourceGroup{},
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -68,9 +68,9 @@ func configHandler(data []byte) {
 	}
 
 	var yamlData []byte
-	switch tMonConn.Extensions.(*ExtConfig).AuthType {
+	switch tExt.AuthType {
 	case ConfigFile:
-		yamlData = []byte(tMonConn.Extensions.(*ExtConfig).KubernetesConfigFile)
+		yamlData = []byte(tExt.KubernetesConfigFile)
 	default:
 		yamlData, err = yaml.Marshal(struct {
 			Auth                   AuthType `yaml:"auth"`
@@ -79,11 +79,11 @@ func configHandler(data []byte) {
 			KubernetesUserPassword string   `yaml:"password,omitempty"`
 			KubernetesBearerToken  string   `yaml:"token,omitempty"`
 		}{
-			tMonConn.Extensions.(*ExtConfig).AuthType,
-			tMonConn.Extensions.(*ExtConfig).EndPoint,
-			tMonConn.Extensions.(*ExtConfig).KubernetesUserName,
-			tMonConn.Extensions.(*ExtConfig).KubernetesUserPassword,
-			tMonConn.Extensions.(*ExtConfig).KubernetesBearerToken,
+			tExt.AuthType,
+			tExt.EndPoint,
+			tExt.KubernetesUserName,
+			tExt.KubernetesUserPassword,
+			tExt.KubernetesBearerToken,
 		})
 		if err != nil {
 			log.Err(err).Msg("Could not marshal struct to yaml")
@@ -110,62 +110,48 @@ func configHandler(data []byte) {
 		}
 	}
 
-	extConfig, monitorConnection = tExt, tMonConn
-	monitorConnection.Extensions = extConfig
-
-	/* Process checksums */
-	chk, err := connectors.Hashsum(extConfig, tMetProf, tMonConn)
-	if err != nil || !bytes.Equal(chksum, chk) {
-		fresh = true
-	}
-	if err == nil {
-		chksum = chk
-	}
-
-	if monitorConnection.ConnectorID != 0 {
-		if err = connector.Initialize(*monitorConnection.Extensions.(*ExtConfig)); err != nil {
-			connector.Shutdown()
-			log.Err(err).Msg("Could not initialize connector")
-		}
-	} else {
-		connector.Shutdown()
-	}
-
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	services.GetTransitService().RegisterExitHandler(cancel)
-	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+
+	connector = KubernetesConnector{ExtConfig: *tExt}
+	if tMonConn.ConnectorID != 0 {
+		connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+	}
 }
 
 func periodicHandler() {
-	if connector.kapi != nil {
-		inventory, monitored, groups := connector.Collect(extConfig)
-		log.Debug().Msgf("Collected %d:%d:%d", len(inventory), len(monitored), len(groups))
-
-		if fresh {
-			err := connectors.SendInventory(
-				context.Background(),
-				inventory,
-				groups,
-				extConfig.Ownership,
-			)
-			// TODO: better way to assure sync completion?
-			log.Err(err).Msg("Sending inventory")
-			time.Sleep(3 * time.Second)
+	if connector.kapi == nil {
+		if err := connector.Initialize(ctxCancel); err != nil {
+			log.Err(err).Msg("Could not initialize connector")
+			return
 		}
-		err := connectors.SendMetrics(context.Background(), monitored, &groups)
-		log.Err(err).Msg("Sending metrics")
 	}
+
+	inventory, monitored, groups := connector.Collect()
+	log.Debug().Msgf("Collected %d:%d:%d", len(inventory), len(monitored), len(groups))
+
+	if chk, err := connectors.Hashsum(inventory, groups); err != nil || !bytes.Equal(connector.iChksum, chk) {
+		if err == nil {
+			connector.iChksum = chk
+		}
+
+		log.Err(connectors.SendInventory(ctxCancel, inventory, groups, connector.ExtConfig.Ownership)).
+			Msg("Sending inventory")
+		// TODO: better way to assure sync completion?
+		time.Sleep(8 * time.Second)
+	}
+
+	log.Err(connectors.SendMetrics(ctxCancel, monitored, &groups)).
+		Msg("Sending metrics")
 }
 
 func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	if metricsArray != nil {
-		for _, metric := range metricsArray {
-			if metric.ServiceType == string(ViewNodes) {
-				metrics[metric.Name] = metric
-			}
+	for _, metric := range metricsArray {
+		if metric.ServiceType == string(ViewNodes) {
+			metrics[metric.Name] = metric
 		}
 	}
 
@@ -175,11 +161,9 @@ func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]tra
 
 func buildPodMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
 	metrics := make(map[string]transit.MetricDefinition)
-	if metricsArray != nil {
-		for _, metric := range metricsArray {
-			if metric.ServiceType == string(ViewPods) {
-				metrics[metric.Name] = metric
-			}
+	for _, metric := range metricsArray {
+		if metric.ServiceType == string(ViewPods) {
+			metrics[metric.Name] = metric
 		}
 	}
 
