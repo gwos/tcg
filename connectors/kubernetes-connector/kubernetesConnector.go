@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/mapping"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
@@ -108,8 +109,8 @@ type KubernetesConnector struct {
 	iChksum []byte
 	ctx     context.Context
 
-	kapi       kv1.CoreV1Interface
 	kClientSet kubernetes.Interface
+	kapi       kv1.CoreV1Interface
 	mapi       mv1.MetricsV1beta1Interface
 }
 
@@ -148,7 +149,12 @@ type MonitoredState struct {
 
 func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// kubeStateMetricsEndpoint := "http://" + config.EndPoint + "/api/v1/namespaces/kube-system/services/kube-state-metrics:http-metrics/proxy/metrics"
-	kConfig := rest.Config{
+
+	// update global HttpClient according to connector settings
+	clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify =
+		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify || connector.ExtConfig.Insecure
+
+	kConfig := &rest.Config{
 		Host:                connector.ExtConfig.EndPoint,
 		APIPath:             "",
 		ContentConfig:       rest.ContentConfig{},
@@ -161,7 +167,7 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		AuthConfigPersister: nil,
 		ExecProvider:        nil,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: connector.ExtConfig.Insecure,
+			Insecure: clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify,
 		},
 		UserAgent:          "",
 		DisableCompression: false,
@@ -202,21 +208,22 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		log.Info().Msg("using YAML file auth")
 	}
 
-	x, err := kubernetes.NewForConfig(&kConfig)
+	kClientSet, err := kubernetes.NewForConfigAndClient(kConfig, clients.HttpClient)
 	if err != nil {
 		return err
 	}
-	connector.kClientSet = x
-	mClientSet, err := metricsApi.NewForConfig(&kConfig)
+	version, err := kClientSet.Discovery().ServerVersion()
 	if err != nil {
 		return err
 	}
 
-	version, err := connector.kClientSet.Discovery().ServerVersion()
+	mClientSet, err := metricsApi.NewForConfigAndClient(kConfig, clients.HttpClient)
 	if err != nil {
 		return err
 	}
-	connector.kapi = connector.kClientSet.CoreV1()
+
+	connector.kClientSet = kClientSet
+	connector.kapi = kClientSet.CoreV1()
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = ctx
 

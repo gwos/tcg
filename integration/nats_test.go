@@ -47,8 +47,8 @@ func TestNatsQueue1(t *testing.T) {
 	setupIntegration(t, 5*time.Second)
 
 	t.Log("Timeout all requests, messages will be stored in the queue")
-	defaultNetClientTimeout := *clients.NetClientTimeout
-	*clients.NetClientTimeout = 1 * time.Nanosecond
+	httpClientTimeout0 := clients.HttpClient.Timeout
+	clients.HttpClient.Timeout = 1 * time.Nanosecond
 
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
@@ -68,7 +68,7 @@ func TestNatsQueue1(t *testing.T) {
 		return
 	}
 
-	*clients.NetClientTimeout = defaultNetClientTimeout
+	clients.HttpClient.Timeout = httpClientTimeout0
 	t.Log("Allow all requests")
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
@@ -89,8 +89,8 @@ func TestNatsQueue2(t *testing.T) {
 	setupIntegration(t, 30*time.Second)
 
 	t.Log("Timeout all requests, messages will be stored in the queue")
-	defaultNetClientTimeout := *clients.NetClientTimeout
-	*clients.NetClientTimeout = 1 * time.Nanosecond
+	httpClientTimeout0 := clients.HttpClient.Timeout
+	clients.HttpClient.Timeout = 1 * time.Nanosecond
 
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
@@ -114,7 +114,7 @@ func TestNatsQueue2(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
 	t.Log("NATS Server was stopped successfully")
 
-	*clients.NetClientTimeout = defaultNetClientTimeout
+	clients.HttpClient.Timeout = httpClientTimeout0
 	t.Log("Allow all requests")
 
 	t.Log("Starting NATS server ...")
