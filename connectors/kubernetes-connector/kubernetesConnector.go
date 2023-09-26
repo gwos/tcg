@@ -115,17 +115,26 @@ type KubernetesConnector struct {
 }
 
 type Cluster struct {
-	Cl struct {
+	Name    string `yaml:"name"`
+	Cluster struct {
+		// CAData contains PEM-encoded certificate authority certificates.
+		CAData []byte `yaml:"certificate-authority-data"`
+		// Server is the address of the kubernetes cluster (https://hostname:port).
 		Server string `yaml:"server"`
 	} `yaml:"cluster"`
 }
 
 type User struct {
+	Name string `yaml:"name"`
 	User struct {
-		Token string `yaml:"token"`
-	}
+		CertData []byte `yaml:"client-certificate-data"`
+		KeyData  []byte `yaml:"client-key-data"`
+		Token    string `yaml:"token"`
+	} `yaml:"user"`
 }
 
+// KubernetesYaml defines config structure
+// kubectl config view --flatten
 type KubernetesYaml struct {
 	Kind     string    `yaml:"kind"`
 	Users    []User    `yaml:"users"`
@@ -197,13 +206,16 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 			return err
 		}
 
-		if len(fConfig.Clusters) != 1 || len(fConfig.Users) != 1 ||
-			fConfig.Clusters[0].Cl.Server == "" || fConfig.Users[0].User.Token == "" || fConfig.Kind != "Config" {
+		if fConfig.Kind != "Config" || len(fConfig.Clusters) == 0 || len(fConfig.Users) == 0 ||
+			fConfig.Clusters[0].Cluster.Server == "" {
 			return errors.New("invalid configuration file")
 		}
 
 		kConfig.BearerToken = fConfig.Users[0].User.Token
-		kConfig.Host = fConfig.Clusters[0].Cl.Server
+		kConfig.KeyData = fConfig.Users[0].User.KeyData
+		kConfig.CertData = fConfig.Users[0].User.CertData
+		kConfig.CAData = fConfig.Clusters[0].Cluster.CAData
+		kConfig.Host = fConfig.Clusters[0].Cluster.Server
 
 		log.Info().Msg("using YAML file auth")
 	}
