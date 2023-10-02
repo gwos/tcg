@@ -59,6 +59,13 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 		mResource.Status = calculateHostStatus(device.LastOK)
 		mResources = append(mResources, *mResource)
 	}
+
+	// log.Debug().
+	// 	Interface("devices", state.devices).
+	// 	Interface("metricDefinitions", metricDefinitions).
+	// 	Interface("mResources", mResources).
+	// 	Msg("__ retrieveMonitoredResources")
+
 	return mResources
 }
 
@@ -87,7 +94,7 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 
 		var metricsBuilder []connectors.MetricBuilder
 		for mib, metric := range iFace.Metrics {
-			if metricDefinition, has := metricDefinitions[metric.Key]; has {
+			if metricDefinition, has := metricDefinitions[metric.Mib]; has {
 				var unitType transit.UnitType
 				var value interface{}
 
@@ -124,6 +131,14 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 				}
 
 				previousValueCache.SetDefault(ck, metric.Value)
+
+				// log.Debug().
+				// 	Interface("_ck", ck).
+				// 	Interface("_isDelta", isDelta).
+				// 	Interface("_isPreviousPresent", isPreviousPresent).
+				// 	Interface("_valueToSet", valueToSet).
+				// 	Interface("metricsBuilder", metricsBuilder).
+				// 	Msg("__ ck")
 			}
 		}
 

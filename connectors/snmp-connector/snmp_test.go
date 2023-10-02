@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,29 @@ func normalizeData(mr []transit.MonitoredResource, ts *transit.Timestamp) {
 // data from 8.7.0
 func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transit.MonitoredResource, error) {
 	metricDefinitionsJSON := []byte(`{
+	"ifHCInOctets": {
+		"computeType": "Query",
+		"criticalThreshold": -1,
+		"customName": "ifHCInOctets",
+		"description": "ifHCInOctets",
+		"graphed": true,
+		"metricType": "Delta",
+		"monitored": true,
+		"name": "ifHCInOctets",
+		"serviceType": "interfaces",
+		"warningThreshold": -1
+	},
+	"ifHCOutOctets": {
+		"computeType": "Query",
+		"criticalThreshold": -1,
+		"customName": "ifHCOutOctets",
+		"graphed": true,
+		"metricType": "Delta",
+		"monitored": true,
+		"name": "ifHCOutOctets",
+		"serviceType": "interfaces",
+		"warningThreshold": -1
+	},
 	"ifInDiscards": {
 		"computeType": "Query",
 		"criticalThreshold": -1,
@@ -158,6 +182,16 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 1,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 161142097880
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 151443135683
+					},
 					"ifInDiscards": {
 						"Key": "ifInDiscards",
 						"Mib": "ifInDiscards",
@@ -168,6 +202,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Mib": "ifInErrors",
 						"Value": 226
 					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 2228306860
+					},
 					"ifOutDiscards": {
 						"Key": "ifOutDiscards",
 						"Mib": "ifOutDiscards",
@@ -177,6 +216,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Key": "ifOutErrors",
 						"Mib": "ifOutErrors",
 						"Value": 0
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
+						"Value": 1119276519
 					},
 					"ifSpeed": {
 						"Key": "ifSpeed",
@@ -191,6 +235,16 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 2,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 61917601069
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 100727023225
+					},
 					"ifInDiscards": {
 						"Key": "ifInDiscards",
 						"Mib": "ifInDiscards",
@@ -201,6 +255,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Mib": "ifInErrors",
 						"Value": 8
 					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 1788058925
+					},
 					"ifOutDiscards": {
 						"Key": "ifOutDiscards",
 						"Mib": "ifOutDiscards",
@@ -210,6 +269,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Key": "ifOutErrors",
 						"Mib": "ifOutErrors",
 						"Value": 0
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
+						"Value": 1942775357
 					},
 					"ifSpeed": {
 						"Key": "ifSpeed",
@@ -234,6 +298,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Mib": "ifInErrors",
 						"Value": 0
 					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 2708168336
+					},
 					"ifOutDiscards": {
 						"Key": "ifOutDiscards",
 						"Mib": "ifOutDiscards",
@@ -242,6 +311,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 					"ifOutErrors": {
 						"Key": "ifOutErrors",
 						"Mib": "ifOutErrors",
+						"Value": 0
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
 						"Value": 0
 					},
 					"ifSpeed": {
@@ -257,6 +331,16 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 5,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 0
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 0
+					},
 					"ifInDiscards": {
 						"Key": "ifInDiscards",
 						"Mib": "ifInDiscards",
@@ -267,6 +351,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Mib": "ifInErrors",
 						"Value": 0
 					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 0
+					},
 					"ifOutDiscards": {
 						"Key": "ifOutDiscards",
 						"Mib": "ifOutDiscards",
@@ -275,6 +364,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 					"ifOutErrors": {
 						"Key": "ifOutErrors",
 						"Mib": "ifOutErrors",
+						"Value": 0
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
 						"Value": 0
 					},
 					"ifSpeed": {
@@ -290,6 +384,16 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 6,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 119534809582
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 73503320633
+					},
 					"ifInDiscards": {
 						"Key": "ifInDiscards",
 						"Mib": "ifInDiscards",
@@ -300,6 +404,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Mib": "ifInErrors",
 						"Value": 0
 					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 3570691956
+					},
 					"ifOutDiscards": {
 						"Key": "ifOutDiscards",
 						"Mib": "ifOutDiscards",
@@ -309,6 +418,11 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 						"Key": "ifOutErrors",
 						"Mib": "ifOutErrors",
 						"Value": 0
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
+						"Value": 488871949
 					},
 					"ifSpeed": {
 						"Key": "ifSpeed",
@@ -323,6 +437,26 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 7,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 159652206772
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 150976952657
+					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 738410420
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
+						"Value": 653071117
+					},
 					"ifSpeed": {
 						"Key": "ifSpeed",
 						"Mib": "ifSpeed",
@@ -336,6 +470,26 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Device": "c2801",
 				"Index": 8,
 				"Metrics": {
+					"ifHCInOctets": {
+						"Key": "bytesInX64",
+						"Mib": "ifHCInOctets",
+						"Value": 61917593807
+					},
+					"ifHCOutOctets": {
+						"Key": "bytesOutX64",
+						"Mib": "ifHCOutOctets",
+						"Value": 100229698830
+					},
+					"ifInOctets": {
+						"Key": "bytesIn",
+						"Mib": "ifInOctets",
+						"Value": 1788051663
+					},
+					"ifOutOctets": {
+						"Key": "bytesOut",
+						"Mib": "ifOutOctets",
+						"Value": 1445451022
+					},
 					"ifSpeed": {
 						"Key": "ifSpeed",
 						"Mib": "ifSpeed",
@@ -346,7 +500,7 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 				"Status": 3
 			}
 		},
-		"LastOK": 1696235042,
+		"LastOK": 1696286883,
 		"Name": "c2801",
 		"SecData": {
 			"AuthPassword": "***",
@@ -360,927 +514,1733 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 
 	mResourcesJSON := []byte(`[
 	{
+		"lastCheckTime": "1696286942511",
 		"name": "c2801",
-		"type": "host",
-		"status": "HOST_UNREACHABLE",
-		"lastCheckTime": "1696253136855",
-		"nextCheckTime": "1696253256855",
+		"nextCheckTime": "1696287002511",
 		"services": [
 			{
-				"name": "Nu0",
-				"type": "service",
-				"owner": "c2801",
-				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
+				"lastCheckTime": "1696286942511",
 				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
 				"metrics": [
 					{
-						"metricName": "Outbound Errors",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
 						"thresholds": [
 							{
+								"label": "Outbound Octets_wn",
 								"sampleType": "Warning",
-								"label": "Outbound Errors_wn",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
+								"label": "Outbound Octets_cr",
 								"sampleType": "Critical",
-								"label": "Outbound Errors_cr",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 4571497819,
+							"valueType": "IntegerType"
+						}
 					},
 					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 1117565447404,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCOutOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCOutOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 1056838668599,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
 						"metricName": "Interface Speed",
 						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 4294967295
-						},
-						"unit": "1",
 						"thresholds": [
 							{
-								"sampleType": "Warning",
 								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
-								"sampleType": "Critical",
 								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 100000000,
+							"valueType": "IntegerType"
+						}
 					},
 					{
-						"metricName": "Inbound Discards",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
 						"thresholds": [
 							{
+								"label": "Inbound Octets_wn",
 								"sampleType": "Warning",
-								"label": "Inbound Discards_wn",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
+								"label": "Inbound Octets_cr",
 								"sampleType": "Critical",
-								"label": "Inbound Discards_cr",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
-					},
-					{
-						"metricName": "Inbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
+						],
 						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
 						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
+							"integerValue": 5168872940,
+							"valueType": "IntegerType"
+						}
 					}
-				]
-			},
-			{
-				"name": "Lo6774",
-				"type": "service",
-				"owner": "c2801",
-				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
-				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
-				"metrics": [
-					{
-						"metricName": "Inbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Inbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Interface Speed",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 4294967295
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Interface Speed_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Interface Speed_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					}
-				]
-			},
-			{
-				"name": "Tu0",
-				"type": "service",
-				"owner": "c2801",
-				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
-				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
-				"metrics": [
-					{
-						"metricName": "Inbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Inbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Interface Speed",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 9000
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Interface Speed_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Interface Speed_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					}
-				]
-			},
-			{
+				],
 				"name": "Fa0/0.1003",
-				"type": "service",
+				"nextCheckTime": "1696287002511",
 				"owner": "c2801",
 				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
+				"type": "service"
+			},
+			{
+				"lastCheckTime": "1696286942511",
 				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
 				"metrics": [
 					{
-						"metricName": "Interface Speed",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 100000000
-						},
-						"unit": "1",
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
 						"thresholds": [
 							{
+								"label": "ifHCOutOctets_wn",
 								"sampleType": "Warning",
-								"label": "Interface Speed_wn",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
+								"label": "ifHCOutOctets_cr",
 								"sampleType": "Critical",
-								"label": "Interface Speed_cr",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 701607891810,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Interface Speed",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 100000000,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 12516361641,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 10118157154,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 433423156649,
+							"valueType": "IntegerType"
+						}
 					}
-				]
-			},
-			{
+				],
 				"name": "Fa0/1.1002",
-				"type": "service",
+				"nextCheckTime": "1696287002511",
 				"owner": "c2801",
 				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
+				"type": "service"
+			},
+			{
+				"lastCheckTime": "1696286942511",
 				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
 				"metrics": [
 					{
-						"metricName": "Interface Speed",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 100000000
-						},
-						"unit": "1",
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
 						"thresholds": [
 							{
+								"label": "ifHCOutOctets_wn",
 								"sampleType": "Warning",
-								"label": "Interface Speed_wn",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
+								"label": "ifHCOutOctets_cr",
 								"sampleType": "Critical",
-								"label": "Interface Speed_cr",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 1060101949781,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Interface Speed",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 100000000,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 7834935633,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 1127994685160,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 15598148020,
+							"valueType": "IntegerType"
+						}
 					}
-				]
-			},
-			{
+				],
 				"name": "Fa0/0",
-				"type": "service",
+				"nextCheckTime": "1696287002511",
 				"owner": "c2801",
 				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
-				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
-				"metrics": [
-					{
-						"metricName": "Inbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Inbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Discards",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Outbound Errors",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Outbound Errors_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Outbound Errors_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
-						"metricName": "Interface Speed",
-						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 100000000
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Interface Speed_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Interface Speed_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					}
-				]
+				"type": "service"
 			},
 			{
-				"name": "Fa0/1",
-				"type": "service",
-				"owner": "c2801",
-				"status": "SERVICE_OK",
-				"lastCheckTime": "1696253136855",
-				"nextCheckTime": "1696253256855",
+				"lastCheckTime": "1696286942511",
 				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
 				"metrics": [
 					{
-						"metricName": "Inbound Discards",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
-						"thresholds": [
-							{
-								"sampleType": "Warning",
-								"label": "Inbound Discards_wn",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							},
-							{
-								"sampleType": "Critical",
-								"label": "Inbound Discards_cr",
-								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
-								}
-							}
-						]
-					},
-					{
 						"metricName": "Inbound Errors",
 						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
 						"thresholds": [
 							{
-								"sampleType": "Warning",
 								"label": "Inbound Errors_wn",
+								"sampleType": "Warning",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
-								"sampleType": "Critical",
 								"label": "Inbound Errors_cr",
+								"sampleType": "Critical",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
 					},
 					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 12516412475,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
 						"metricName": "Outbound Discards",
 						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
 						"thresholds": [
 							{
-								"sampleType": "Warning",
 								"label": "Outbound Discards_wn",
+								"sampleType": "Warning",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
-								"sampleType": "Critical",
 								"label": "Outbound Discards_cr",
+								"sampleType": "Critical",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
 					},
 					{
-						"metricName": "Outbound Errors",
-						"sampleType": "Value",
 						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
 						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 0
-						},
-						"unit": "1",
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
 						"thresholds": [
 							{
+								"label": "Outbound Octets_wn",
 								"sampleType": "Warning",
-								"label": "Outbound Errors_wn",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
+								"label": "Outbound Octets_cr",
 								"sampleType": "Critical",
-								"label": "Outbound Errors_cr",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 13599427499,
+							"valueType": "IntegerType"
+						}
 					},
 					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 433423207483,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCOutOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCOutOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 705089162575,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
 						"metricName": "Interface Speed",
 						"sampleType": "Value",
-						"interval": {
-							"endTime": "1696253136855",
-							"startTime": "1696253136855"
-						},
-						"value": {
-							"valueType": "IntegerType",
-							"integerValue": 100000000
-						},
-						"unit": "1",
 						"thresholds": [
 							{
-								"sampleType": "Warning",
 								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							},
 							{
-								"sampleType": "Critical",
 								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
 								"value": {
-									"valueType": "IntegerType",
-									"integerValue": -1
+									"integerValue": -1,
+									"valueType": "IntegerType"
 								}
 							}
-						]
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 100000000,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
 					}
-				]
+				],
+				"name": "Fa0/1",
+				"nextCheckTime": "1696287002511",
+				"owner": "c2801",
+				"status": "SERVICE_OK",
+				"type": "service"
+			},
+			{
+				"lastCheckTime": "1696286942511",
+				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
+				"metrics": [
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 18957178352,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Interface Speed",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 4294967295,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					}
+				],
+				"name": "Nu0",
+				"nextCheckTime": "1696287002511",
+				"owner": "c2801",
+				"status": "SERVICE_OK",
+				"type": "service"
+			},
+			{
+				"lastCheckTime": "1696286942511",
+				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
+				"metrics": [
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCOutOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCOutOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Interface Speed",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 4294967295,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					}
+				],
+				"name": "Lo6774",
+				"nextCheckTime": "1696287002511",
+				"owner": "c2801",
+				"status": "SERVICE_OK",
+				"type": "service"
+			},
+			{
+				"lastCheckTime": "1696286942511",
+				"lastPluginOutput": "Interface Operational State is UP, Administrative state is UP",
+				"metrics": [
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Interface Speed",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Interface Speed_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Interface Speed_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 9000,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 3422103643,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCOutOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCOutOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCOutOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 514523244431,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Outbound Errors",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Outbound Errors_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Outbound Errors_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Discards",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Discards_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Discards_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 0,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "Inbound Octets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "Inbound Octets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "Inbound Octets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 24994843692,
+							"valueType": "IntegerType"
+						}
+					},
+					{
+						"interval": {
+							"endTime": "1696286942511",
+							"startTime": "1696286942511"
+						},
+						"metricName": "ifHCInOctets",
+						"sampleType": "Value",
+						"thresholds": [
+							{
+								"label": "ifHCInOctets_wn",
+								"sampleType": "Warning",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							},
+							{
+								"label": "ifHCInOctets_cr",
+								"sampleType": "Critical",
+								"value": {
+									"integerValue": -1,
+									"valueType": "IntegerType"
+								}
+							}
+						],
+						"unit": "1",
+						"value": {
+							"integerValue": 836743667074,
+							"valueType": "IntegerType"
+						}
+					}
+				],
+				"name": "Tu0",
+				"nextCheckTime": "1696287002511",
+				"owner": "c2801",
+				"status": "SERVICE_OK",
+				"type": "service"
 			}
-		]
+		],
+		"status": "HOST_UP",
+		"type": "host"
 	}
 ]`)
 
@@ -1288,10 +2248,17 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 	if err := json.Unmarshal(metricDefinitionsJSON, &metricDefinitions); err != nil {
 		return nil, nil, nil, err
 	}
+
 	state := new(MonitoringState)
 	if err := json.Unmarshal(devicesJSON, &state.devices); err != nil {
 		return nil, nil, nil, err
 	}
+	lastOK := float64(time.Now().Unix())
+	for k, d := range state.devices {
+		d.LastOK = lastOK
+		state.devices[k] = d
+	}
+
 	mResources := make([]transit.MonitoredResource, 0)
 	if err := json.Unmarshal(mResourcesJSON, &mResources); err != nil {
 		return nil, nil, nil, err
