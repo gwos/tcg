@@ -63,14 +63,14 @@ var AvailableMetrics = map[string]*SnmpMetric{
 		Description: "The number of outbound packets which were chosen to be discarded" +
 			" even though no errors had been detected to prevent their being transmitted."},
 
-	BytesIn: {Key: "bytesIn", Mib: "ifInOctets", Oid: "1.3.6.1.2.1.2.2.1.10", Name: "Inbound Bytes",
+	IfInOctets: {Key: "bytesIn", Mib: "ifInOctets", Oid: "1.3.6.1.2.1.2.2.1.10", Name: "Inbound Bytes",
 		Description: "The total number of octets received on the interface, including framing characters."},
-	BytesOut: {Key: "bytesOut", Mib: "ifOutOctets", Oid: "1.3.6.1.2.1.2.2.1.16", Name: "Outbound Bytes",
+	IfOutOctets: {Key: "bytesOut", Mib: "ifOutOctets", Oid: "1.3.6.1.2.1.2.2.1.16", Name: "Outbound Bytes",
 		Description: "The total number of octets transmitted out of the interface, including framing characters."},
-	BytesInX64: {Key: "bytesInX64", Mib: "ifHCInOctets", Oid: "1.3.6.1.2.1.31.1.1.1.6", Name: "Inbound Bytes 64-bit",
+	IfHCInOctets: {Key: "bytesInX64", Mib: "ifHCInOctets", Oid: "1.3.6.1.2.1.31.1.1.1.6", Name: "Inbound Bytes 64-bit",
 		Description: "The total number of octets received on the interface, including framing characters." +
 			"This object is a 64-bit version of ifInOctets."},
-	BytesOutX64: {Key: "bytesOutX64", Mib: "ifHCOutOctets", Oid: "1.3.6.1.2.1.31.1.1.1.10", Name: "Outbound Bytes 64-bit",
+	IfHCOutOctets: {Key: "bytesOutX64", Mib: "ifHCOutOctets", Oid: "1.3.6.1.2.1.31.1.1.1.10", Name: "Outbound Bytes 64-bit",
 		Description: "The total number of octets transmitted out of the interface, including framing characters. " +
 			"This object is a 64-bit version of ifOutOctets."},
 }
@@ -286,6 +286,9 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		val.Name = dataUnit.Name
 		switch v := dataUnit.Value.(type) {
 		case uint:
+			val.Value = int64(v)
+			log.Info().Msgf("*** parsed value for %s: %d", val.Name, val.Value)
+		case uint64:
 			val.Value = int64(v)
 			log.Info().Msgf("*** parsed value for %s: %d", val.Name, val.Value)
 		default:
