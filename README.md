@@ -249,4 +249,5 @@ For more info see package `config` and tests.
 
 ## Run golangci-lint locally:
 
-    $ golangci-lint --config ./.golangci.yaml run ./... --deadline=2m
+    $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+    $ ~/go/bin/golangci-lint --config ./.golangci.yaml run ./... --deadline=2m
