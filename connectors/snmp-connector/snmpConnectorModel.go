@@ -48,8 +48,7 @@ func (state *MonitoringState) Init() {
 }
 
 func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredResource {
-	mResources := make([]transit.MonitoredResource, len(state.devices))
-	i := 0
+	mResources := make([]transit.MonitoredResource, 0, len(state.devices))
 	for _, device := range state.devices {
 		mServices := device.retrieveMonitoredServices(metricDefinitions)
 		mResource, err := connectors.CreateResource(device.Name, mServices)
@@ -58,21 +57,19 @@ func (state *MonitoringState) retrieveMonitoredResources(metricDefinitions map[s
 			continue
 		}
 		mResource.Status = calculateHostStatus(device.LastOK)
-		mResources[i] = *mResource
-		i++
+		mResources = append(mResources, *mResource)
 	}
 	return mResources
 }
 
 func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]transit.MetricDefinition) []transit.MonitoredService {
-	mServices := make([]transit.MonitoredService, len(device.Interfaces))
+	mServices := make([]transit.MonitoredService, 0, len(device.Interfaces))
 
 	if metricDefinitions == nil {
 		return mServices
 	}
 
 	timestamp := transit.NewTimestamp()
-	i := 0
 	for _, iFace := range device.Interfaces {
 		var bytesInPrev, bytesOutPrev, bytesInX64Prev, bytesOutX64Prev int64 = -1, -1, -1, -1
 		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfInOctets)); ok {
@@ -117,15 +114,17 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 					Value: nil,
 				}
 
+				ck := fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, mib)
 				isDelta, isPreviousPresent, valueToSet := calculateValue(metricDefinition.MetricType, unitType,
-					fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, mib), value)
+					ck, value)
 
 				if !isDelta || (isDelta && isPreviousPresent) {
 					metricBuilder.Value = valueToSet
 					metricsBuilder = append(metricsBuilder, metricBuilder)
 				}
+
+				previousValueCache.SetDefault(ck, metric.Value)
 			}
-			previousValueCache.SetDefault(mib, metric.Value)
 		}
 
 		for key := range clients.NonMibMetrics {
@@ -163,9 +162,8 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP"
 			case -1:
 			}
-			mServices[i] = *mService
+			mServices = append(mServices, *mService)
 		}
-		i++
 	}
 
 	return mServices
@@ -189,11 +187,11 @@ func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
 				previousValueCache.SetDefault(metricName, currentValue.(int64))
 				currentValue = currentValue.(int64) - previousValue.(int64)
 			}
-			return true, true, currentValue
+			return true, true, currentValue.(int64)
 		}
-		return true, false, currentValue
+		return true, false, currentValue.(int64)
 	}
-	return false, false, currentValue
+	return false, false, currentValue.(int64)
 }
 
 func calculateBytesPerSecond(metricName string, metricDefinition transit.MetricDefinition, current, currentX64, previous,
