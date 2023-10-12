@@ -140,6 +140,12 @@ type KubernetesResource struct {
 	Services map[string]transit.MonitoredService
 }
 
+type MonitoredState struct {
+	State      map[string]KubernetesResource
+	Groups     map[string]transit.ResourceGroup
+	Mismatched map[string]bool
+}
+
 func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// kubeStateMetricsEndpoint := "http://" + config.EndPoint + "/api/v1/namespaces/kube-system/services/kube-state-metrics:http-metrics/proxy/metrics"
 	kConfig := rest.Config{
@@ -231,26 +237,38 @@ func (connector *KubernetesConnector) Ping() error {
 	return nil
 }
 
-// Collect inventory and metrics for all kinds of Kubernetes resources. Sort resources into groups and return inventory of host resources and inventory of groups
-func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []transit.MonitoredResource, []transit.ResourceGroup) {
+// Collect inventory and metrics for all kinds of Kubernetes resources.
+// Sort resources into groups and return inventory of host resources and inventory of groups
+func (connector *KubernetesConnector) Collect() (
+	[]transit.InventoryResource,
+	[]transit.MonitoredResource,
+	[]transit.ResourceGroup,
+	error) {
 	// gather inventory and Metrics
 	metricsPerContainer := true
-	monitoredState := make(map[string]KubernetesResource)
-	groups := make(map[string]transit.ResourceGroup)
-	connector.collectNodeInventory(monitoredState, groups)
-	connector.collectPodInventory(monitoredState, groups, &metricsPerContainer)
-	connector.collectNodeMetrics(monitoredState)
+	state := MonitoredState{
+		State:      make(map[string]KubernetesResource),
+		Groups:     make(map[string]transit.ResourceGroup),
+		Mismatched: make(map[string]bool),
+	}
+	if err := connector.collectNodeInventory(&state); err != nil {
+		return nil, nil, nil, err
+	}
+	if err := connector.collectPodInventory(&state, &metricsPerContainer); err != nil {
+		return nil, nil, nil, err
+	}
+	_ = connector.collectNodeMetrics(&state)
 	if metricsPerContainer {
-		connector.collectPodMetricsPerContainer(monitoredState)
+		_ = connector.collectPodMetricsPerContainer(&state)
 	} else {
-		connector.collectPodMetricsPerReplica(monitoredState)
+		_ = connector.collectPodMetricsPerReplica(&state)
 	}
 
 	// convert to arrays as expected by TCG
-	inventory := make([]transit.InventoryResource, 0, len(monitoredState))
-	monitored := make([]transit.MonitoredResource, 0, len(monitoredState))
-	hostGroups := make([]transit.ResourceGroup, 0, len(groups))
-	for _, resource := range monitoredState {
+	inventory := make([]transit.InventoryResource, 0, len(state.State))
+	monitored := make([]transit.MonitoredResource, 0, len(state.State))
+	hostGroups := make([]transit.ResourceGroup, 0, len(state.Groups))
+	for _, resource := range state.State {
 		// convert inventory
 		services := make([]transit.InventoryService, 0, len(resource.Services))
 		for _, service := range resource.Services {
@@ -279,7 +297,7 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 			Services: mServices,
 		})
 	}
-	for _, group := range groups {
+	for _, group := range state.Groups {
 		slices.SortFunc(group.Resources, func(a, b transit.ResourceRef) int { return cmp.Compare(a.Name, b.Name) })
 		hostGroups = append(hostGroups, group)
 	}
@@ -287,7 +305,7 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 	slices.SortFunc(hostGroups, func(a, b transit.ResourceGroup) int { return cmp.Compare(a.GroupName, b.GroupName) })
 	slices.SortFunc(inventory, func(a, b transit.InventoryResource) int { return cmp.Compare(a.Name, b.Name) })
 
-	return inventory, monitored, hostGroups
+	return inventory, monitored, hostGroups, nil
 }
 
 // Node Inventory also retrieves status, capacity, and allocations
@@ -303,12 +321,19 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 //	(v1.ResourceName) (len=4) pods: (resource.Quantity) 17,
 //	(v1.ResourceName) (len=3) cpu: (resource.Quantity) 1930m
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 18242267924,
-func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup) {
-	nodes, _ := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{}) // TODO: ListOptions can filter by label
+func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState) error {
+	// TODO: ListOptions can filter by label
+	nodes, err := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Err(err).Msg("could not collect nodes inventory")
+		return err
+	}
+
 	for _, node := range nodes.Items {
 		resourceName := node.Name
 		labels := GetLabels(node)
 		namespace := labels["namespace"]
+		stateKey := fmt.Sprintf("node:%v:%v", namespace, node.Name)
 		// apply mapping and skip unmatched entries
 		if len(connector.ExtConfig.GWMapping.HostName) > 0 {
 			var err error
@@ -317,6 +342,8 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 				log.Debug().Err(err).
 					Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
 					Msg("could not map hostname on node")
+
+				state.Mismatched[stateKey] = true
 				continue
 			}
 		}
@@ -329,11 +356,11 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 		}
 
 		rf := transit.ResourceRef{Name: resourceName, Owner: groupName, Type: transit.ResourceTypeHost}
-		if group, ok := groups[groupName]; ok {
+		if group, ok := state.Groups[groupName]; ok {
 			group.Resources = append(group.Resources, rf)
-			groups[groupName] = group
+			state.Groups[groupName] = group
 		} else {
-			groups[groupName] = transit.ResourceGroup{
+			state.Groups[groupName] = transit.ResourceGroup{
 				GroupName: groupName,
 				Resources: []transit.ResourceRef{rf},
 				Type:      transit.HostGroup,
@@ -383,27 +410,30 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 			customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 			monitoredService, err := connectors.BuildServiceForMetric(resource.Name, metricBuilder)
 			if err != nil {
-				log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
+				log.Err(err).Msgf("could not create service %s:%s", stateKey, customServiceName)
 			}
 			if monitoredService != nil {
 				resource.Services[metricBuilder.Name] = *monitoredService
 			}
 		}
-		monitoredState[fmt.Sprintf("node:%v:%v", namespace, node.Name)] = resource
+		state.State[stateKey] = resource
 	}
+	return nil
 }
 
 // Pod Inventory also retrieves status
 // inventory also contains status, pod counts, capacity and allocation metrics
-func (connector *KubernetesConnector) collectPodInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup, metricsPerContainer *bool) {
+func (connector *KubernetesConnector) collectPodInventory(
+	state *MonitoredState,
+	metricsPerContainer *bool) error {
 	// TODO: filter pods by namespace(s)
-	groupsMap := make(map[string]bool)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect pod inventory")
-		return
+		log.Err(err).Msg("could not collect pods inventory")
+		return err
 	}
 
+	groupsMap := make(map[string]bool)
 	addResource := func(
 		stateKey string,
 		resourceName string,
@@ -420,7 +450,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			Labels:   labels,
 			Services: make(map[string]transit.MonitoredService),
 		}
-		monitoredState[stateKey] = resource
+		state.State[stateKey] = resource
 		// no services to process at this stage
 
 		if _, found := groupsMap[resource.Name]; found {
@@ -428,11 +458,11 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		}
 		groupsMap[resource.Name] = true
 		rf := transit.ResourceRef{Name: resource.Name, Owner: groupName, Type: transit.ResourceTypeHost}
-		if group, ok := groups[groupName]; ok {
+		if group, ok := state.Groups[groupName]; ok {
 			group.Resources = append(group.Resources, rf)
-			groups[groupName] = group
+			state.Groups[groupName] = group
 		} else {
-			groups[groupName] = transit.ResourceGroup{
+			state.Groups[groupName] = transit.ResourceGroup{
 				GroupName: groupName,
 				Resources: []transit.ResourceRef{rf},
 				Type:      transit.HostGroup,
@@ -453,6 +483,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 				resourceName := container.Name
 				labels := GetLabels(pod, container)
 				namespace := labels["namespace"]
+				stateKey := fmt.Sprintf("pod:%v:%v:%v", namespace, pod.Name, container.Name)
 				// apply mapping and skip unmatched entries
 				if len(connector.ExtConfig.GWMapping.HostName) > 0 {
 					var err error
@@ -461,6 +492,8 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 						log.Debug().Err(err).
 							Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
 							Msg("could not map hostname on pod container")
+
+						state.Mismatched[stateKey] = true
 						continue
 					}
 				}
@@ -472,7 +505,6 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 						Msg("could not map hostgroup on pod container, adding to pods-namespace group")
 				}
 
-				stateKey := fmt.Sprintf("pod:%v:%v:%v", namespace, pod.Name, container.Name)
 				addResource(stateKey,
 					resourceName, monitorStatus, message, labels,
 					groupName)
@@ -480,6 +512,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		} else {
 			labels := GetLabels(pod)
 			namespace := labels["namespace"]
+			stateKey := fmt.Sprintf("pod:%v:%v", namespace, pod.Name)
 			// apply mapping and skip unmatched entries
 			if len(connector.ExtConfig.GWMapping.HostName) > 0 {
 				var err error
@@ -488,6 +521,8 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 					log.Debug().Err(err).
 						Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
 						Msg("could not map hostname on pod")
+
+					state.Mismatched[stateKey] = true
 					continue
 				}
 			}
@@ -499,24 +534,25 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 					Msg("could not map hostgroup on pod, adding to pods-namespace group")
 			}
 
-			stateKey := fmt.Sprintf("pod:%v:%v", namespace, pod.Name)
 			addResource(stateKey,
 				resourceName, monitorStatus, message, labels,
 				groupName)
 		}
 	}
+	return nil
 }
 
-func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[string]KubernetesResource) {
-	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
+func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) error {
+	// TODO: filter by namespace
+	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect node metrics")
-		return
+		log.Err(err).Msg("could not collect nodes metrics")
+		return err
 	}
 
 	for _, node := range nodes.Items {
 		stateKey := fmt.Sprintf("node:%v:%v", GetLabels(node)["namespace"], node.Name)
-		if resource, ok := monitoredState[stateKey]; ok {
+		if resource, ok := state.State[stateKey]; ok {
 			for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 				var value interface{}
 				switch key {
@@ -543,28 +579,31 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
 				monitoredService, err := connectors.BuildServiceForMetric(resource.Name, metricBuilder)
 				if err != nil {
-					log.Err(err).Msgf("could not create service %v:%v", resource.Name, customServiceName)
+					log.Err(err).Msgf("could not create service %v:%v", stateKey, customServiceName)
 				}
 				if monitoredService != nil {
 					resource.Services[metricBuilder.Name] = *monitoredService
-					monitoredState[stateKey] = resource
 				}
 			}
-		} else {
+			state.State[stateKey] = resource
+		} else if _, ok = state.Mismatched[stateKey]; !ok {
 			log.Warn().Msgf("node not found in monitored state: %v", stateKey)
 		}
 	}
+	return nil
 }
 
-func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState map[string]KubernetesResource) {
-	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
+func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *MonitoredState) error {
+	// TODO: filter by namespace
+	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect pod metrics")
-		return
+		log.Err(err).Msg("could not collect pods metrics")
+		return err
 	}
+
 	for _, pod := range pods.Items {
 		stateKey := fmt.Sprintf("pod:%v:%v", GetLabels(pod)["namespace"], pod.Name)
-		if resource, ok := monitoredState[stateKey]; ok {
+		if resource, ok := state.State[stateKey]; ok {
 			for index, container := range pod.Containers {
 				if container.Name == ContainerPOD {
 					continue
@@ -608,22 +647,24 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					}
 					if monitoredService != nil {
 						resource.Services[metricBuilder.Name] = *monitoredService
-						monitoredState[stateKey] = resource
 					}
 				}
 			}
-		} else {
+			state.State[stateKey] = resource
+		} else if _, ok = state.Mismatched[stateKey]; !ok {
 			log.Warn().Msgf("pod not found in monitored state: %v", stateKey)
 		}
 	}
+	return nil
 }
 
 // treat each container uniquely -- store multi-metrics per pod replica for each node
-func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredState map[string]KubernetesResource) {
-	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{}) // TODO: filter by namespace
+func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *MonitoredState) error {
+	// TODO: filter by namespace
+	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Err(err).Msg("could not collect pod metrics")
-		return
+		return err
 	}
 	debugDetails := false
 	builderMap := make(map[string][]connectors.MetricBuilder)
@@ -636,7 +677,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 				}
 
 				stateKey := fmt.Sprintf("pod:%v:%v:%v", GetLabels(pod, container)["namespace"], pod.Name, container.Name)
-				if resource, ok := monitoredState[stateKey]; ok {
+				if resource, ok := state.State[stateKey]; ok {
 					var value interface{}
 					switch key {
 					case cpuCores:
@@ -692,18 +733,19 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					}
 					if monitoredService != nil {
 						resource.Services[metricDefinition.Name] = *monitoredService
-						monitoredState[stateKey] = resource
 					}
-				} else {
-					log.Warn().Msgf("pod container not found in monitored state: %v", stateKey)
+					state.State[stateKey] = resource
+				} else if _, ok = state.Mismatched[stateKey]; !ok {
+					log.Debug().Msgf("pod container not found in monitored state: %v", stateKey)
 					debugDetails = true
 				}
 			}
 		}
 	}
 	if debugDetails {
-		log.Debug().Interface("monitoredState", monitoredState).Send()
+		log.Debug().Interface("monitoredState", state).Send()
 	}
+	return nil
 }
 
 // Calculate Node Status based on Conditions, PID Pressure, memory Pressure, Disk Pressure all treated as default

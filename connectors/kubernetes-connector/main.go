@@ -130,8 +130,11 @@ func periodicHandler() {
 		}
 	}
 
-	inventory, monitored, groups := connector.Collect()
-	log.Debug().Msgf("Collected %d:%d:%d", len(inventory), len(monitored), len(groups))
+	inventory, monitored, groups, err := connector.Collect()
+	log.Err(err).Msgf("Collect data  %d:%d:%d", len(inventory), len(monitored), len(groups))
+	if err != nil {
+		return
+	}
 
 	if chk, err := connectors.Hashsum(inventory, groups); err != nil || !bytes.Equal(connector.iChksum, chk) {
 		if err == nil {
