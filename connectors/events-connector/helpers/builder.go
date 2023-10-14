@@ -37,19 +37,19 @@ func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, err
 			tags[k] = v
 		}
 
-		hostGroupName, err := cfg.HostGroupMappings.Apply(tags)
+		hostGroupName, err := cfg.MapHostgroup.ApplyOR(tags)
 		if err != nil {
-			log.Debug().Err(err).Interface("tags", tags).Send()
+			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapHostgroup).Send()
 			continue
 		}
-		hostName, err := cfg.HostMappings.Apply(tags)
+		hostName, err := cfg.MapHostname.ApplyOR(tags)
 		if err != nil || hostName == "" {
-			log.Debug().Err(err).Interface("tags", tags).Send()
+			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapHostname).Send()
 			continue
 		}
-		serviceName, err := cfg.ServiceMappings.Apply(tags)
+		serviceName, err := cfg.MapService.ApplyOR(tags)
 		if err != nil || serviceName == "" {
-			log.Debug().Err(err).Interface("tags", tags).Send()
+			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapService).Send()
 			continue
 		}
 
