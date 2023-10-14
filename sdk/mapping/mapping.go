@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -63,6 +64,44 @@ func (p Mappings) Apply(tags map[string]string) (string, error) {
 		}
 	}
 	return string(result), nil
+}
+
+func (p Mappings) ApplyOR(tags map[string]string) (string, error) {
+	mismatched := false
+LOOP_OR:
+	for _, mapping := range p {
+		if mapping.Tag == "" {
+			return mapping.Template, nil
+		}
+
+		var vals []string
+		for _, key := range strings.Split(mapping.Tag, ",") {
+			if val, ok := tags[strings.TrimSpace(key)]; ok {
+				vals = append(vals, val)
+			} else {
+				continue LOOP_OR
+			}
+		}
+		content := strings.Join(vals, ",")
+		matches := mapping.matcher.FindAllStringSubmatchIndex(content, -1)
+		if matches == nil {
+			mismatched = true
+			continue LOOP_OR
+		}
+		result := []byte{}
+		for _, submatches := range matches {
+			result = mapping.matcher.ExpandString(result, mapping.Template, content, submatches)
+		}
+		return string(result), nil
+	}
+
+	if mismatched {
+		return "", ErrMappingMismatchedTag
+	}
+	if len(p) > 0 {
+		return "", ErrMappingMissedTag
+	}
+	return "", nil
 }
 
 // Compile compiles mappings matchers.

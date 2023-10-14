@@ -2,6 +2,7 @@ package mapping
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -853,6 +854,198 @@ func TestMappings(t *testing.T) {
 			for i, tags := range tagMaps {
 				str, err := p.Mappings.Apply(tags)
 				if tc.Results[i].str != str || tc.Results[i].err != error2string(err) {
+					t.Errorf("error:\tnot equal:\n\texpected: %+v\n\tactual  : %+v",
+						tc.Results[i], FnRes{str, error2string(err)})
+				}
+
+				// t.Logf("%s %d\t %+v", t.Name(), i, FnRes{str, error2string(err)})
+			}
+		})
+	}
+}
+
+func TestMappingsApplyOR(t *testing.T) {
+	tagMaps := testData()
+
+	error2string := func(err error) string {
+		if err != nil {
+			return err.Error()
+		}
+		return ""
+	}
+
+	type FnRes struct{ str, err string }
+	type TestCase struct {
+		Name     string
+		Mappings string
+		Results  []FnRes
+	}
+
+	cases := []TestCase{
+		{"pod_or_node",
+			`{"mappings":[{"tag":"pod_name","matcher":"(.*)","template":"pod-$1"},{"tag":"node_name","matcher":"(.*)","template":"node-$1"}]}`,
+			[]FnRes{
+				{"node-minikube", ""},
+				{"node-minikube", ""},
+				{"node-minikube", ""},
+				{"node-minikube", ""},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"pod-metrics-server-6796b9d575-b26t8", ""},
+				{"pod-kube-proxy-kvdm2", ""},
+				{"pod-coredns-bd6b6df9f-5pjvl", ""},
+				{"pod-storage-provisioner", ""},
+				{"pod-kube-apiserver-minikube", ""},
+				{"pod-kube-scheduler-minikube", ""},
+				{"pod-etcd-minikube", ""},
+				{"pod-picasa-connector-wp7hc", ""},
+				{"pod-coredns-bd6b6df9f-hfc84", ""},
+				{"pod-calico-node-xx6kj", ""},
+				{"pod-kube-controller-manager-minikube", ""},
+				{"pod-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"pod-registry-t86w2", ""},
+				{"pod-registry-proxy-ks9xb", ""},
+				{"pod-storage-provisioner", ""},
+				{"pod-storage-provisioner", ""},
+				{"pod-storage-provisioner", ""},
+				{"pod-metrics-server-6796b9d575-b26t8", ""},
+				{"pod-metrics-server-6796b9d575-b26t8", ""},
+				{"pod-metrics-server-6796b9d575-b26t8", ""},
+				{"pod-metrics-server-6796b9d575-b26t8", ""},
+				{"pod-registry-proxy-ks9xb", ""},
+				{"pod-registry-proxy-ks9xb", ""},
+				{"pod-registry-proxy-ks9xb", ""},
+				{"pod-kube-controller-manager-minikube", ""},
+				{"pod-kube-controller-manager-minikube", ""},
+				{"pod-kube-scheduler-minikube", ""},
+				{"pod-kube-scheduler-minikube", ""},
+				{"pod-kube-apiserver-minikube", ""},
+				{"pod-kube-apiserver-minikube", ""},
+				{"pod-coredns-bd6b6df9f-hfc84", ""},
+				{"pod-coredns-bd6b6df9f-hfc84", ""},
+				{"pod-coredns-bd6b6df9f-hfc84", ""},
+				{"pod-coredns-bd6b6df9f-hfc84", ""},
+				{"pod-calico-node-xx6kj", ""},
+				{"pod-calico-node-xx6kj", ""},
+				{"pod-calico-node-xx6kj", ""},
+				{"pod-picasa-connector-wp7hc", ""},
+				{"pod-picasa-connector-wp7hc", ""},
+				{"pod-picasa-connector-wp7hc", ""},
+				{"pod-picasa-connector-wp7hc", ""},
+				{"pod-etcd-minikube", ""},
+				{"pod-etcd-minikube", ""},
+				{"pod-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"pod-registry-t86w2", ""},
+				{"pod-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"pod-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"pod-registry-t86w2", ""},
+				{"pod-registry-t86w2", ""},
+				{"pod-coredns-bd6b6df9f-5pjvl", ""},
+				{"pod-coredns-bd6b6df9f-5pjvl", ""},
+				{"pod-coredns-bd6b6df9f-5pjvl", ""},
+				{"pod-coredns-bd6b6df9f-5pjvl", ""},
+				{"pod-kube-proxy-kvdm2", ""},
+				{"pod-kube-proxy-kvdm2", ""},
+				{"pod-kube-proxy-kvdm2", ""},
+				{"pod-kube-proxy-kvdm2", ""},
+			},
+		},
+
+		{"node_pod_or_missing_label",
+			`{"mappings":[{"tag":"node_name,pod_name","matcher":"(.*),(.*)","template":"$1-$2"},{"tag":"missing_label","matcher":"(.*)","template":"source-$1"}]}`,
+			[]FnRes{
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"", "mapping error: missed tag"},
+				{"minikube-metrics-server-6796b9d575-b26t8", ""},
+				{"minikube-kube-proxy-kvdm2", ""},
+				{"minikube-coredns-bd6b6df9f-5pjvl", ""},
+				{"minikube-storage-provisioner", ""},
+				{"minikube-kube-apiserver-minikube", ""},
+				{"minikube-kube-scheduler-minikube", ""},
+				{"minikube-etcd-minikube", ""},
+				{"minikube-picasa-connector-wp7hc", ""},
+				{"minikube-coredns-bd6b6df9f-hfc84", ""},
+				{"minikube-calico-node-xx6kj", ""},
+				{"minikube-kube-controller-manager-minikube", ""},
+				{"minikube-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"minikube-registry-t86w2", ""},
+				{"minikube-registry-proxy-ks9xb", ""},
+				{"minikube-storage-provisioner", ""},
+				{"minikube-storage-provisioner", ""},
+				{"minikube-storage-provisioner", ""},
+				{"minikube-metrics-server-6796b9d575-b26t8", ""},
+				{"minikube-metrics-server-6796b9d575-b26t8", ""},
+				{"minikube-metrics-server-6796b9d575-b26t8", ""},
+				{"minikube-metrics-server-6796b9d575-b26t8", ""},
+				{"minikube-registry-proxy-ks9xb", ""},
+				{"minikube-registry-proxy-ks9xb", ""},
+				{"minikube-registry-proxy-ks9xb", ""},
+				{"minikube-kube-controller-manager-minikube", ""},
+				{"minikube-kube-controller-manager-minikube", ""},
+				{"minikube-kube-scheduler-minikube", ""},
+				{"minikube-kube-scheduler-minikube", ""},
+				{"minikube-kube-apiserver-minikube", ""},
+				{"minikube-kube-apiserver-minikube", ""},
+				{"minikube-coredns-bd6b6df9f-hfc84", ""},
+				{"minikube-coredns-bd6b6df9f-hfc84", ""},
+				{"minikube-coredns-bd6b6df9f-hfc84", ""},
+				{"minikube-coredns-bd6b6df9f-hfc84", ""},
+				{"minikube-calico-node-xx6kj", ""},
+				{"minikube-calico-node-xx6kj", ""},
+				{"minikube-calico-node-xx6kj", ""},
+				{"minikube-picasa-connector-wp7hc", ""},
+				{"minikube-picasa-connector-wp7hc", ""},
+				{"minikube-picasa-connector-wp7hc", ""},
+				{"minikube-picasa-connector-wp7hc", ""},
+				{"minikube-etcd-minikube", ""},
+				{"minikube-etcd-minikube", ""},
+				{"minikube-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"minikube-registry-t86w2", ""},
+				{"minikube-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"minikube-calico-kube-controllers-7b8458594b-chv99", ""},
+				{"minikube-registry-t86w2", ""},
+				{"minikube-registry-t86w2", ""},
+				{"minikube-coredns-bd6b6df9f-5pjvl", ""},
+				{"minikube-coredns-bd6b6df9f-5pjvl", ""},
+				{"minikube-coredns-bd6b6df9f-5pjvl", ""},
+				{"minikube-coredns-bd6b6df9f-5pjvl", ""},
+				{"minikube-kube-proxy-kvdm2", ""},
+				{"minikube-kube-proxy-kvdm2", ""},
+				{"minikube-kube-proxy-kvdm2", ""},
+				{"minikube-kube-proxy-kvdm2", ""},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.Name, func(t *testing.T) {
+			p := new(struct {
+				Mappings `json:"mappings"`
+			})
+			if err := json.Unmarshal([]byte(tc.Mappings), p); err != nil {
+				t.Errorf("error unmarshalling mappings: %v", err)
+			}
+			if err := p.Mappings.Compile(); err != nil {
+				t.Errorf("error compiling mappings: %v", err)
+			}
+
+			for i, tags := range tagMaps {
+				str, err := p.Mappings.ApplyOR(tags)
+				if tc.Results[i].str != str || !strings.HasPrefix(error2string(err), tc.Results[i].err) {
 					t.Errorf("error:\tnot equal:\n\texpected: %+v\n\tactual  : %+v",
 						tc.Results[i], FnRes{str, error2string(err)})
 				}

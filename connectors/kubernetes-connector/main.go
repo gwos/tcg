@@ -94,6 +94,7 @@ func configHandler(data []byte) {
 	}
 
 	/* Update config with received values */
+	tExt.GWMapping.Prepare()
 	tExt.Views[ViewNodes] = buildNodeMetricsMap(tMetProf.Metrics)
 	tExt.Views[ViewPods] = buildPodMetricsMap(tMetProf.Metrics)
 

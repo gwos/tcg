@@ -1,12 +1,16 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/sdk/mapping"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
@@ -15,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	kv1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/metrics/pkg/apis/metrics/v1beta1"
 	metricsApi "k8s.io/metrics/pkg/client/clientset/versioned"
 	mv1 "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 )
@@ -34,6 +39,33 @@ type ExtConfig struct {
 	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
 	KubernetesBearerToken  string `json:"kubernetesBearerToken,omitempty"`
 	KubernetesConfigFile   string `json:"kubernetesConfigFile,omitempty"`
+
+	GWMapping
+}
+
+type GWMapping struct {
+	HostGroup mapping.Mappings `json:"mapHostgroup"`
+	HostName  mapping.Mappings `json:"mapHostname"`
+}
+
+// Prepare compiles mappings
+func (m *GWMapping) Prepare() {
+	var hg, hn mapping.Mappings
+	for i := range m.HostGroup {
+		if err := m.HostGroup[i].Compile(); err != nil {
+			log.Warn().Err(err).Interface("mapping", m.HostGroup[i]).Msg("could not prepare mapping")
+			continue
+		}
+		hg = append(hg, m.HostGroup[i])
+	}
+	for i := range m.HostName {
+		if err := m.HostName[i].Compile(); err != nil {
+			log.Warn().Err(err).Interface("mapping", m.HostName[i]).Msg("could not prepare mapping")
+			continue
+		}
+		hn = append(hn, m.HostName[i])
+	}
+	m.HostGroup, m.HostName = hg, hn
 }
 
 type KubernetesView string
@@ -53,10 +85,10 @@ const (
 )
 
 const (
-	ClusterHostGroup = "cluster-"
-	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
 	ContainerPOD     = "POD"
-	PodsHostGroup    = "pods-"
+	ClusterNameLabel = "alpha.eksctl.io/cluster-name"
+	// ClusterHostGroup = "cluster-"
+	// PodsHostGroup    = "pods-"
 
 	defaultKubernetesClusterEndpoint = ""
 )
@@ -224,6 +256,7 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 		for _, service := range resource.Services {
 			services = append(services, connectors.CreateInventoryService(service.Name, service.Owner))
 		}
+		slices.SortFunc(services, func(a, b transit.InventoryService) int { return cmp.Compare(a.Name, b.Name) })
 		inventory = append(inventory, connectors.CreateInventoryResource(resource.Name, services))
 		// convert monitored state
 		mServices := make([]transit.MonitoredService, 0, len(resource.Services))
@@ -247,8 +280,13 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 		})
 	}
 	for _, group := range groups {
+		slices.SortFunc(group.Resources, func(a, b transit.ResourceRef) int { return cmp.Compare(a.Name, b.Name) })
 		hostGroups = append(hostGroups, group)
 	}
+	/* sort inventory data structures to allow checksums */
+	slices.SortFunc(hostGroups, func(a, b transit.ResourceGroup) int { return cmp.Compare(a.GroupName, b.GroupName) })
+	slices.SortFunc(inventory, func(a, b transit.InventoryResource) int { return cmp.Compare(a.Name, b.Name) })
+
 	return inventory, monitored, hostGroups
 }
 
@@ -267,28 +305,50 @@ func (connector *KubernetesConnector) Collect() ([]transit.InventoryResource, []
 //	(v1.ResourceName) (len=17) ephemeral-storage: (resource.Quantity) 18242267924,
 func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[string]KubernetesResource, groups map[string]transit.ResourceGroup) {
 	nodes, _ := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{}) // TODO: ListOptions can filter by label
-	clusterHostGroupName := connector.makeClusterName(nodes)
-	groups[clusterHostGroupName] = transit.ResourceGroup{
-		GroupName: clusterHostGroupName,
-		Type:      transit.HostGroup,
-		Resources: make([]transit.ResourceRef, len(nodes.Items)),
-	}
-
-	for index, node := range nodes.Items {
-		labels := make(map[string]string)
-		for key, element := range node.Labels {
-			labels[key] = element
+	for _, node := range nodes.Items {
+		resourceName := node.Name
+		labels := GetLabels(node)
+		namespace := labels["namespace"]
+		// apply mapping and skip unmatched entries
+		if len(connector.ExtConfig.GWMapping.HostName) > 0 {
+			var err error
+			resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
+			if err != nil || resourceName == "" {
+				log.Debug().Err(err).
+					Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
+					Msg("could not map hostname on node")
+				continue
+			}
 		}
+		groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
+		if err != nil || groupName == "" {
+			groupName = "nodes-" + namespace
+			log.Debug().Err(err).
+				Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
+				Msg("could not map hostgroup on node, adding to nodes-namespace group")
+		}
+
+		rf := transit.ResourceRef{Name: resourceName, Owner: groupName, Type: transit.ResourceTypeHost}
+		if group, ok := groups[groupName]; ok {
+			group.Resources = append(group.Resources, rf)
+			groups[groupName] = group
+		} else {
+			groups[groupName] = transit.ResourceGroup{
+				GroupName: groupName,
+				Resources: []transit.ResourceRef{rf},
+				Type:      transit.HostGroup,
+			}
+		}
+
 		monitorStatus, message := connector.calculateNodeStatus(&node)
 		resource := KubernetesResource{
-			Name:     node.Name,
+			Name:     resourceName,
 			Type:     transit.ResourceTypeHost,
 			Status:   monitorStatus,
 			Message:  message,
 			Labels:   labels,
 			Services: make(map[string]transit.MonitoredService),
 		}
-		monitoredState[resource.Name] = resource
 		// process services
 		for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 			var value interface{}
@@ -321,7 +381,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 				Critical: metricDefinition.CriticalThreshold,
 			}
 			customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
-			monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
+			monitoredService, err := connectors.BuildServiceForMetric(resource.Name, metricBuilder)
 			if err != nil {
 				log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
 			}
@@ -329,12 +389,7 @@ func (connector *KubernetesConnector) collectNodeInventory(monitoredState map[st
 				resource.Services[metricBuilder.Name] = *monitoredService
 			}
 		}
-		// add to default Cluster group
-		groups[clusterHostGroupName].Resources[index] = transit.ResourceRef{
-			Name:  resource.Name,
-			Owner: clusterHostGroupName,
-			Type:  transit.ResourceTypeHost,
-		}
+		monitoredState[fmt.Sprintf("node:%v:%v", namespace, node.Name)] = resource
 	}
 }
 
@@ -355,7 +410,7 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 		monitorStatus transit.MonitorStatus,
 		message string,
 		labels map[string]string,
-		podHostGroup string,
+		groupName string,
 	) {
 		resource := KubernetesResource{
 			Name:     resourceName,
@@ -372,51 +427,82 @@ func (connector *KubernetesConnector) collectPodInventory(monitoredState map[str
 			return
 		}
 		groupsMap[resource.Name] = true
-		// add to namespace group for starters, need to consider namespace filtering
-		if group, ok := groups[podHostGroup]; ok {
-			group.Resources = append(group.Resources, transit.ResourceRef{
-				Name:  resource.Name,
-				Owner: group.GroupName,
-				Type:  transit.ResourceTypeHost,
-			})
-			groups[podHostGroup] = group
+		rf := transit.ResourceRef{Name: resource.Name, Owner: groupName, Type: transit.ResourceTypeHost}
+		if group, ok := groups[groupName]; ok {
+			group.Resources = append(group.Resources, rf)
+			groups[groupName] = group
 		} else {
-			group = transit.ResourceGroup{
-				GroupName: podHostGroup,
+			groups[groupName] = transit.ResourceGroup{
+				GroupName: groupName,
+				Resources: []transit.ResourceRef{rf},
 				Type:      transit.HostGroup,
-				Resources: make([]transit.ResourceRef, 0),
 			}
-			group.Resources = append(group.Resources, transit.ResourceRef{
-				Name:  resource.Name,
-				Owner: group.GroupName,
-				Type:  transit.ResourceTypeHost,
-			})
-			groups[podHostGroup] = group
 		}
 	}
 
 	for _, pod := range pods.Items {
-		labels := make(map[string]string)
-		for key, element := range pod.Labels {
-			labels[key] = element
-		}
-
 		monitorStatus, message := connector.calculatePodStatus(&pod)
+		resourceName := pod.Name
 
 		if *metricsPerContainer {
 			for _, container := range pod.Spec.Containers {
-				resourceName := strings.TrimSuffix(container.Name, "-")
-				if resourceName == ContainerPOD {
+				if ContainerPOD == strings.TrimSuffix(container.Name, "-") {
 					continue
 				}
-				addResource(pod.Name+"/"+resourceName,
+
+				resourceName := container.Name
+				labels := GetLabels(pod, container)
+				namespace := labels["namespace"]
+				// apply mapping and skip unmatched entries
+				if len(connector.ExtConfig.GWMapping.HostName) > 0 {
+					var err error
+					resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
+					if err != nil || resourceName == "" {
+						log.Debug().Err(err).
+							Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
+							Msg("could not map hostname on pod container")
+						continue
+					}
+				}
+				groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
+				if err != nil || groupName == "" {
+					groupName = "pods-" + namespace
+					log.Debug().Err(err).
+						Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
+						Msg("could not map hostgroup on pod container, adding to pods-namespace group")
+				}
+
+				stateKey := fmt.Sprintf("pod:%v:%v:%v", namespace, pod.Name, container.Name)
+				addResource(stateKey,
 					resourceName, monitorStatus, message, labels,
-					PodsHostGroup+pod.Namespace)
+					groupName)
 			}
 		} else {
-			addResource(pod.Name,
-				pod.Name, monitorStatus, message, labels,
-				PodsHostGroup+pod.Namespace)
+			labels := GetLabels(pod)
+			namespace := labels["namespace"]
+			// apply mapping and skip unmatched entries
+			if len(connector.ExtConfig.GWMapping.HostName) > 0 {
+				var err error
+				resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
+				if err != nil || resourceName == "" {
+					log.Debug().Err(err).
+						Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
+						Msg("could not map hostname on pod")
+					continue
+				}
+			}
+			groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
+			if err != nil || groupName == "" {
+				groupName = "pods-" + namespace
+				log.Debug().Err(err).
+					Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
+					Msg("could not map hostgroup on pod, adding to pods-namespace group")
+			}
+
+			stateKey := fmt.Sprintf("pod:%v:%v", namespace, pod.Name)
+			addResource(stateKey,
+				resourceName, monitorStatus, message, labels,
+				groupName)
 		}
 	}
 }
@@ -429,7 +515,8 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 	}
 
 	for _, node := range nodes.Items {
-		if resource, ok := monitoredState[node.Name]; ok {
+		stateKey := fmt.Sprintf("node:%v:%v", GetLabels(node)["namespace"], node.Name)
+		if resource, ok := monitoredState[stateKey]; ok {
 			for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 				var value interface{}
 				switch key {
@@ -454,16 +541,17 @@ func (connector *KubernetesConnector) collectNodeMetrics(monitoredState map[stri
 				metricBuilder.StartTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
 				metricBuilder.EndTimestamp = &transit.Timestamp{Time: node.Timestamp.Time.UTC()}
 				customServiceName := connectors.Name(metricBuilder.Name, metricDefinition.CustomName)
-				monitoredService, err := connectors.BuildServiceForMetric(node.Name, metricBuilder)
+				monitoredService, err := connectors.BuildServiceForMetric(resource.Name, metricBuilder)
 				if err != nil {
-					log.Err(err).Msgf("could not create service %s:%s", node.Name, customServiceName)
+					log.Err(err).Msgf("could not create service %v:%v", resource.Name, customServiceName)
 				}
 				if monitoredService != nil {
 					resource.Services[metricBuilder.Name] = *monitoredService
+					monitoredState[stateKey] = resource
 				}
 			}
 		} else {
-			log.Error().Msgf("node not found in monitored state: %s", node.Name)
+			log.Warn().Msgf("node not found in monitored state: %v", stateKey)
 		}
 	}
 }
@@ -475,7 +563,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 		return
 	}
 	for _, pod := range pods.Items {
-		if resource, ok := monitoredState[pod.Name]; ok {
+		stateKey := fmt.Sprintf("pod:%v:%v", GetLabels(pod)["namespace"], pod.Name)
+		if resource, ok := monitoredState[stateKey]; ok {
 			for index, container := range pod.Containers {
 				if container.Name == ContainerPOD {
 					continue
@@ -513,17 +602,18 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(monitoredState
 					metricBuilder.StartTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					metricBuilder.EndTimestamp = &transit.Timestamp{Time: pod.Timestamp.Time.UTC()}
 					metricBuilders = append(metricBuilders, metricBuilder)
-					monitoredService, err := connectors.BuildServiceForMultiMetric(container.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
+					monitoredService, err := connectors.BuildServiceForMultiMetric(resource.Name, metricDefinition.Name, metricDefinition.CustomName, metricBuilders)
 					if err != nil {
-						log.Err(err).Msgf("could not create service %s:%s", pod.Name, metricDefinition.Name)
+						log.Err(err).Msgf("could not create service %v:%v", stateKey, metricDefinition.Name)
 					}
 					if monitoredService != nil {
 						resource.Services[metricBuilder.Name] = *monitoredService
+						monitoredState[stateKey] = resource
 					}
 				}
 			}
 		} else {
-			log.Error().Msgf("pod not found in monitored state: %s", pod.Name)
+			log.Warn().Msgf("pod not found in monitored state: %v", stateKey)
 		}
 	}
 }
@@ -544,7 +634,9 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 				if container.Name == ContainerPOD {
 					continue
 				}
-				if resource, ok := monitoredState[pod.Name+"/"+container.Name]; ok {
+
+				stateKey := fmt.Sprintf("pod:%v:%v:%v", GetLabels(pod, container)["namespace"], pod.Name, container.Name)
+				if resource, ok := monitoredState[stateKey]; ok {
 					var value interface{}
 					switch key {
 					case cpuCores:
@@ -600,9 +692,10 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(monitoredSta
 					}
 					if monitoredService != nil {
 						resource.Services[metricDefinition.Name] = *monitoredService
+						monitoredState[stateKey] = resource
 					}
 				} else {
-					log.Error().Msgf("pod container not found in monitored state: %s/%s", pod.Name, container.Name)
+					log.Warn().Msgf("pod container not found in monitored state: %v", stateKey)
 					debugDetails = true
 				}
 			}
@@ -668,15 +761,6 @@ func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.M
 	return status, message.String()
 }
 
-func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string {
-	if len(nodes.Items) > 0 {
-		if value, ok := nodes.Items[0].Labels[ClusterNameLabel]; ok {
-			return ClusterHostGroup + value
-		}
-	}
-	return ClusterHostGroup + "1"
-}
-
 // toPercentage - converts CPU from cores to percentage
 //
 // 1 core = 1000 Millicores = 100%
@@ -691,4 +775,72 @@ func (connector *KubernetesConnector) makeClusterName(nodes *v1.NodeList) string
 // If you wish to assign a third of a CPU, you should assign 333Mi (millicores) or 0.333(cores) to your container.
 func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
 	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
+}
+
+func GetLabels(a ...interface{}) map[string]string {
+	labels := map[string]string{
+		"cluster":   "default",
+		"namespace": "default",
+	}
+	for _, v := range a {
+		switch v := v.(type) {
+		case v1.Container:
+			labels["container_name"] = v.Name
+		case v1beta1.ContainerMetrics:
+			labels["container_name"] = v.Name
+		case v1.Node:
+			labels["node_name"] = v.Name
+			for key, element := range v.GetLabels() {
+				labels[key] = element
+			}
+			if ns := v.GetNamespace(); ns != "" {
+				labels["namespace"] = ns
+			}
+		case v1beta1.NodeMetrics:
+			labels["node_name"] = v.Name
+			for key, element := range v.GetLabels() {
+				labels[key] = element
+			}
+			if ns := v.GetNamespace(); ns != "" {
+				labels["namespace"] = ns
+			}
+		case v1.Pod:
+			labels["pod_name"] = v.Name
+			for key, element := range v.GetLabels() {
+				labels[key] = element
+			}
+			if ns := v.GetNamespace(); ns != "" {
+				labels["namespace"] = ns
+			}
+		case v1beta1.PodMetrics:
+			labels["pod_name"] = v.Name
+			for key, element := range v.GetLabels() {
+				labels[key] = element
+			}
+			if ns := v.GetNamespace(); ns != "" {
+				labels["namespace"] = ns
+			}
+		}
+
+		if value, ok := labels[ClusterNameLabel]; ok {
+			labels["cluster"] = value
+		}
+
+		// TODO: looks better but won't work
+		// if v, ok := v.(interface{ GetLabels() map[string]string }); ok {
+		// 	for key, element := range v.GetLabels() {
+		// 		labels[key] = element
+		// 	}
+		// 	if value, ok := labels[ClusterNameLabel]; ok {
+		// 		labels["cluster"] = value
+		// 	}
+		// }
+		// if v, ok := v.(interface{ GetNamespace() string }); ok {
+		// 	if ns := v.GetNamespace(); ns != "" {
+		// 		labels["namespace"] = ns
+		// 	}
+		// }
+	}
+
+	return labels
 }
