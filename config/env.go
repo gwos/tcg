@@ -78,10 +78,10 @@ func applyEnv(yamldoc []byte) []byte {
 		var key, val = pair[0], pair[1]
 		n := scalars[key]
 		if n == nil {
-			log.Warn().
-				// Interface("scalars", scalars). // TODO: remove
-				Str("env", env).
-				Msg("could not apply env: not found node")
+			// log.Debug().
+			// 	Interface("scalars", scalars). // TODO: remove
+			// 	Str("env", env).
+			// 	Msg("could not apply env: not found node")
 			continue
 		}
 		if n.ShortTag() == "!!null" {

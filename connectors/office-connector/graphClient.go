@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
 )
@@ -21,11 +21,7 @@ const (
 	maxRetries = 5
 )
 
-var httpClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	},
-}
+var httpClient = clients.HttpClient
 
 func login(tenantID, clientID, clientSecret, resource string) (str string, err error) {
 	var (

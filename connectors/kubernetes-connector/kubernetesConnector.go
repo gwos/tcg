@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/connectors"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/mapping"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
@@ -108,23 +109,32 @@ type KubernetesConnector struct {
 	iChksum []byte
 	ctx     context.Context
 
-	kapi       kv1.CoreV1Interface
 	kClientSet kubernetes.Interface
+	kapi       kv1.CoreV1Interface
 	mapi       mv1.MetricsV1beta1Interface
 }
 
 type Cluster struct {
-	Cl struct {
+	Name    string `yaml:"name"`
+	Cluster struct {
+		// CAData contains PEM-encoded certificate authority certificates.
+		CAData []byte `yaml:"certificate-authority-data"`
+		// Server is the address of the kubernetes cluster (https://hostname:port).
 		Server string `yaml:"server"`
 	} `yaml:"cluster"`
 }
 
 type User struct {
+	Name string `yaml:"name"`
 	User struct {
-		Token string `yaml:"token"`
-	}
+		CertData []byte `yaml:"client-certificate-data"`
+		KeyData  []byte `yaml:"client-key-data"`
+		Token    string `yaml:"token"`
+	} `yaml:"user"`
 }
 
+// KubernetesYaml defines config structure
+// kubectl config view --flatten
 type KubernetesYaml struct {
 	Kind     string    `yaml:"kind"`
 	Users    []User    `yaml:"users"`
@@ -148,7 +158,12 @@ type MonitoredState struct {
 
 func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// kubeStateMetricsEndpoint := "http://" + config.EndPoint + "/api/v1/namespaces/kube-system/services/kube-state-metrics:http-metrics/proxy/metrics"
-	kConfig := rest.Config{
+
+	// update global HttpClient according to connector settings
+	clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify =
+		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify || connector.ExtConfig.Insecure
+
+	kConfig := &rest.Config{
 		Host:                connector.ExtConfig.EndPoint,
 		APIPath:             "",
 		ContentConfig:       rest.ContentConfig{},
@@ -161,7 +176,7 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		AuthConfigPersister: nil,
 		ExecProvider:        nil,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: connector.ExtConfig.Insecure,
+			Insecure: clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify,
 		},
 		UserAgent:          "",
 		DisableCompression: false,
@@ -191,32 +206,36 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 			return err
 		}
 
-		if len(fConfig.Clusters) != 1 || len(fConfig.Users) != 1 ||
-			fConfig.Clusters[0].Cl.Server == "" || fConfig.Users[0].User.Token == "" || fConfig.Kind != "Config" {
+		if fConfig.Kind != "Config" || len(fConfig.Clusters) == 0 || len(fConfig.Users) == 0 ||
+			fConfig.Clusters[0].Cluster.Server == "" {
 			return errors.New("invalid configuration file")
 		}
 
 		kConfig.BearerToken = fConfig.Users[0].User.Token
-		kConfig.Host = fConfig.Clusters[0].Cl.Server
+		kConfig.KeyData = fConfig.Users[0].User.KeyData
+		kConfig.CertData = fConfig.Users[0].User.CertData
+		kConfig.CAData = fConfig.Clusters[0].Cluster.CAData
+		kConfig.Host = fConfig.Clusters[0].Cluster.Server
 
 		log.Info().Msg("using YAML file auth")
 	}
 
-	x, err := kubernetes.NewForConfig(&kConfig)
+	kClientSet, err := kubernetes.NewForConfigAndClient(kConfig, clients.HttpClient)
 	if err != nil {
 		return err
 	}
-	connector.kClientSet = x
-	mClientSet, err := metricsApi.NewForConfig(&kConfig)
+	version, err := kClientSet.Discovery().ServerVersion()
 	if err != nil {
 		return err
 	}
 
-	version, err := connector.kClientSet.Discovery().ServerVersion()
+	mClientSet, err := metricsApi.NewForConfigAndClient(kConfig, clients.HttpClient)
 	if err != nil {
 		return err
 	}
-	connector.kapi = connector.kClientSet.CoreV1()
+
+	connector.kClientSet = kClientSet
+	connector.kapi = kClientSet.CoreV1()
 	connector.mapi = mClientSet.MetricsV1beta1()
 	connector.ctx = ctx
 

@@ -8,21 +8,41 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/gwos/tcg/sdk/logper"
 )
 
-var httpClient = &http.Client{
-	Transport: &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+const (
+	EnvHttpClientTimeout = "TCG_HTTP_CLIENT_TIMEOUT"
+	EnvTlsClientInsecure = "TCG_TLS_CLIENT_INSECURE"
+)
+
+var HttpClientTransport = &http.Transport{
+	TLSClientConfig: &tls.Config{
+		InsecureSkipVerify: func(env string) bool {
+			v, err := strconv.ParseBool(os.Getenv(env))
+			return err == nil && v
+		}(EnvTlsClientInsecure),
+
+		RootCAs: nil, // If RootCAs is nil, TLS uses the host's root CA set.
 	},
-	Timeout: time.Duration(5 * time.Second),
 }
 
-// NetClientTimeout provides ability to change 5sec defaults:
-// *NetClientTimeout = time.Duration(10*time.Second)
-var NetClientTimeout = &(httpClient.Timeout)
+var HttpClient = &http.Client{
+	Timeout: func(env string) time.Duration {
+		if s, ok := os.LookupEnv(env); ok {
+			if v, err := time.ParseDuration(s); err == nil {
+				return v
+			}
+		}
+		return time.Duration(5 * time.Second)
+	}(EnvHttpClientTimeout),
+
+	Transport: HttpClientTransport,
+}
 
 var HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
 	return ctx, req
@@ -81,7 +101,7 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 	}
 
 	_, request = HookRequestContext(ctx, request)
-	response, err = httpClient.Do(request)
+	response, err = HttpClient.Do(request)
 	if err != nil {
 		return -1, nil, err
 	}
