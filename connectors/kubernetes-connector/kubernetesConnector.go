@@ -118,7 +118,7 @@ type Cluster struct {
 	Name    string `yaml:"name"`
 	Cluster struct {
 		// CAData contains PEM-encoded certificate authority certificates.
-		CAData []byte `yaml:"certificate-authority-data"`
+		CAData string `yaml:"certificate-authority-data"`
 		// Server is the address of the kubernetes cluster (https://hostname:port).
 		Server string `yaml:"server"`
 	} `yaml:"cluster"`
@@ -127,8 +127,8 @@ type Cluster struct {
 type User struct {
 	Name string `yaml:"name"`
 	User struct {
-		CertData []byte `yaml:"client-certificate-data"`
-		KeyData  []byte `yaml:"client-key-data"`
+		CertData string `yaml:"client-certificate-data"`
+		KeyData  string `yaml:"client-key-data"`
 		Token    string `yaml:"token"`
 	} `yaml:"user"`
 }
@@ -212,9 +212,9 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		}
 
 		kConfig.BearerToken = fConfig.Users[0].User.Token
-		kConfig.KeyData = fConfig.Users[0].User.KeyData
-		kConfig.CertData = fConfig.Users[0].User.CertData
-		kConfig.CAData = fConfig.Clusters[0].Cluster.CAData
+		kConfig.KeyData = []byte(fConfig.Users[0].User.KeyData)
+		kConfig.CertData = []byte(fConfig.Users[0].User.CertData)
+		kConfig.CAData = []byte(fConfig.Clusters[0].Cluster.CAData)
 		kConfig.Host = fConfig.Clusters[0].Cluster.Server
 
 		log.Info().Msg("using YAML file auth")
