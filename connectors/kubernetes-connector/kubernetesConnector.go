@@ -159,7 +159,10 @@ type MonitoredState struct {
 func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// kubeStateMetricsEndpoint := "http://" + config.EndPoint + "/api/v1/namespaces/kube-system/services/kube-state-metrics:http-metrics/proxy/metrics"
 
-	// update global HttpClient according to connector settings
+	// Note:  kubernetes.NewForConfigAndClient(kConfig, clients.HttpClient)
+	// The global HttpClient won't work with BearerToken
+	// and global HttpClientTransport cannot be used with the TLS client certificate.
+	// So, using a new default httpClient and configuring both according to connector settings.
 	clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify =
 		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify || connector.ExtConfig.Insecure
 
@@ -185,7 +188,7 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		QPS:                0,
 		Burst:              0,
 		RateLimiter:        nil,
-		Timeout:            0,
+		Timeout:            clients.HttpClient.Timeout,
 		Dial:               nil,
 	}
 
@@ -220,7 +223,8 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		log.Info().Msg("using YAML file auth")
 	}
 
-	kClientSet, err := kubernetes.NewForConfigAndClient(kConfig, clients.HttpClient)
+	// kClientSet, err := kubernetes.NewForConfigAndClient(kConfig, clients.HttpClient)
+	kClientSet, err := kubernetes.NewForConfig(kConfig)
 	if err != nil {
 		return err
 	}
@@ -229,7 +233,8 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 		return err
 	}
 
-	mClientSet, err := metricsApi.NewForConfigAndClient(kConfig, clients.HttpClient)
+	// mClientSet, err := metricsApi.NewForConfigAndClient(kConfig, clients.HttpClient)
+	mClientSet, err := metricsApi.NewForConfig(kConfig)
 	if err != nil {
 		return err
 	}
