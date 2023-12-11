@@ -9,9 +9,16 @@ import (
 
 // = buildEsQuery method in /kibana/src/plugins/data/common/es_query/es_query/build_es_query.ts
 func BuildEsQuery(storedQuery KSavedObject) EsQuery {
-	var esQuery EsQuery
+	esQuery := EsQuery{Bool: &EsQueryBool{}}
 	if storedQuery.Attributes == nil {
 		return esQuery
+	}
+
+	if FilterHostsWithLucene != "" {
+		esQuery.Bool.Must = append(esQuery.Bool.Must, EsQuery{Str: &EsQueryStr{
+			Query:           FilterHostsWithLucene,
+			AnalyzeWildcard: true,
+		}})
 	}
 
 	if storedQuery.Attributes.Query != nil &&
@@ -33,9 +40,10 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 			}
 		case "lucene":
 			/* similar to Kibana, create query_string and use as 1st must member */
-			qs := EsQueryString{}
-			qs.QueryString.AnalyzeWildcard = true
-			qs.QueryString.Query = storedQuery.Attributes.Query.Query
+			qs := EsQuery{Str: &EsQueryStr{
+				Query:           storedQuery.Attributes.Query.Query,
+				AnalyzeWildcard: true,
+			}}
 			esQuery.Bool.Must = append(esQuery.Bool.Must, qs)
 		}
 	}

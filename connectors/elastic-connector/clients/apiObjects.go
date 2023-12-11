@@ -100,7 +100,8 @@ type EsSearchBody struct {
 }
 
 type EsQuery struct {
-	Bool EsQueryBool `json:"bool"`
+	Bool *EsQueryBool `json:"bool,omitempty"`
+	Str  *EsQueryStr  `json:"query_string,omitempty"`
 }
 
 type EsQueryBool struct {
@@ -110,11 +111,9 @@ type EsQueryBool struct {
 	MustNot []interface{} `json:"must_not"`
 }
 
-type EsQueryString struct {
-	QueryString struct {
-		Query           string `json:"query"`
-		AnalyzeWildcard bool   `json:"analyze_wildcard"`
-	} `json:"query_string"`
+type EsQueryStr struct {
+	Query           string `json:"query"`
+	AnalyzeWildcard bool   `json:"analyze_wildcard"`
 }
 
 type EsAggs struct {

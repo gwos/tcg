@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +20,10 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 )
+
+// EnvELKFilterHostsWithLucene provides pre-filter to reduce inventory size
+// TCG_ELK_FILTER_HOSTS_WITH_LUCENE='container.name:*a1test*'
+const EnvELKFilterHostsWithLucene = "TCG_ELK_FILTER_HOSTS_WITH_LUCENE"
 
 // ElasticView describes flow
 type ElasticView string
@@ -41,19 +46,20 @@ type Kibana struct {
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	Kibana             Kibana              `json:"kibana"`
-	Servers            []string            `json:"servers"`
-	CustomTimeFilter   clients.KTimeFilter `json:"timefilter"`
-	OverrideTimeFilter bool                `json:"override"`
-	HostNameField      string              `json:"hostNameLabelPath"`
-	HostGroupField     string              `json:"hostGroupLabelPath"`
-	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
-	CheckInterval      time.Duration       `json:"checkIntervalMinutes"`
-	AppType            string
-	AgentID            string
-	GWConnections      config.GWConnections
-	Ownership          transit.HostOwnershipType
-	Views              map[string]map[string]transit.MetricDefinition
+	Kibana                Kibana              `json:"kibana"`
+	Servers               []string            `json:"servers"`
+	CustomTimeFilter      clients.KTimeFilter `json:"timefilter"`
+	OverrideTimeFilter    bool                `json:"override"`
+	FilterHostsWithLucene string              `json:"filterHostsWithLucene"`
+	HostNameField         string              `json:"hostNameLabelPath"`
+	HostGroupField        string              `json:"hostGroupLabelPath"`
+	GroupNameByUser       bool                `json:"hostGroupNameByUser"`
+	CheckInterval         time.Duration       `json:"checkIntervalMinutes"`
+	AppType               string
+	AgentID               string
+	GWConnections         config.GWConnections
+	Ownership             transit.HostOwnershipType
+	Views                 map[string]map[string]transit.MetricDefinition
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -142,6 +148,11 @@ type ElasticConnector struct {
 
 // LoadConfig updates state
 func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
+	clients.FilterHostsWithLucene = config.FilterHostsWithLucene
+	if s, ok := os.LookupEnv(EnvELKFilterHostsWithLucene); ok {
+		clients.FilterHostsWithLucene = s
+	}
+
 	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
 		return err
