@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -20,10 +19,6 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/attribute"
 )
-
-// EnvELKFilterHostsWithLucene provides pre-filter to reduce inventory size
-// TCG_ELK_FILTER_HOSTS_WITH_LUCENE='container.name:*a1test*'
-const EnvELKFilterHostsWithLucene = "TCG_ELK_FILTER_HOSTS_WITH_LUCENE"
 
 // ElasticView describes flow
 type ElasticView string
@@ -149,9 +144,6 @@ type ElasticConnector struct {
 // LoadConfig updates state
 func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 	clients.FilterHostsWithLucene = config.FilterHostsWithLucene
-	if s, ok := os.LookupEnv(EnvELKFilterHostsWithLucene); ok {
-		clients.FilterHostsWithLucene = s
-	}
 
 	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
