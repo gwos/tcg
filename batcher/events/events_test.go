@@ -28,9 +28,9 @@ func TestBuild(t *testing.T) {
 		qq = append(qq, *q)
 	}
 	assert.Equal(t, 3, len(qq))
-	assert.Equal(t, 2, len(qq[0].Events))
-	assert.Equal(t, "host12", qq[0].Events[1].Host)
-	assert.Equal(t, 3, len(qq[1].Events))
-	assert.Equal(t, 1, len(qq[2].Events))
-	assert.Equal(t, "host5", qq[2].Events[0].Host)
+	assert.Equal(t, 3, len(qq[0].Events))
+	assert.Equal(t, "host2", qq[0].Events[1].Host)
+	assert.Equal(t, 1, len(qq[1].Events))
+	assert.Equal(t, 2, len(qq[2].Events))
+	assert.Equal(t, "host11", qq[2].Events[0].Host)
 }

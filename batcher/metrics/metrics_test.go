@@ -77,11 +77,11 @@ func TestBuild(t *testing.T) {
 			assert.NoError(t, json.Unmarshal(p, q))
 			qq = append(qq, *q)
 		}
-		assert.Equal(t, 3, len(qq))
+		assert.Equal(t, 4, len(qq))
 		assert.Contains(t, qq[0].Context.TraceToken, "b491b98e-0000")
 		assert.Contains(t, qq[1].Context.TraceToken, "b491b98e-0001")
-		assert.Equal(t, 3, len(qq[0].Resources[0].Services))
-		assert.Equal(t, 2, len(qq[2].Resources[0].Services))
+		assert.Equal(t, 2, len(qq[0].Resources[0].Services))
+		assert.Equal(t, 2, len(qq[3].Resources[0].Services))
 
 		// bb, err := json.MarshalIndent(qq, "", "  ")
 		// assert.NoError(t, err)
@@ -105,10 +105,10 @@ func TestBuild(t *testing.T) {
 		}
 		assert.Equal(t, 3, len(qq))
 		assert.Equal(t, 1, len(qq[0].Groups))
-		assert.Equal(t, "linux_load_996", qq[0].Resources[0].Services[0].Name)
-		assert.Equal(t, "linux_load_997", qq[0].Resources[1].Services[0].Name)
-		assert.Equal(t, "linux_load_998", qq[1].Resources[0].Services[0].Name)
-		assert.Equal(t, "local_load_6009", qq[2].Resources[0].Services[0].Name)
+		assert.Equal(t, "local_load_6009", qq[0].Resources[0].Services[0].Name)
+		assert.Equal(t, "linux_load_996", qq[1].Resources[0].Services[0].Name)
+		assert.Equal(t, "linux_load_997", qq[1].Resources[1].Services[0].Name)
+		assert.Equal(t, "linux_load_998", qq[2].Resources[0].Services[0].Name)
 	})
 }
 
