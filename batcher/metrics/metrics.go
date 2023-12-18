@@ -12,7 +12,7 @@ import (
 // MetricsBatchBuilder implements builder
 type MetricsBatchBuilder struct{}
 
-// Build builds the batch payloads if not empty
+// Build builds the batch payloads for HostUnchanged and not empty
 // splits incoming payloads bigger than maxBytes
 func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 	// counter, batched request, and accum
@@ -30,6 +30,16 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 			log.Err(err).
 				RawJSON("payload", p).
 				Msg("could not unmarshal metrics payload for batch")
+			continue
+		}
+
+		// in case of not HostUnchanged stop combining, put bq and q into accum
+		if hasStatus(q) {
+			if len(bq.Resources) > 0 {
+				qq = append(qq, bq)
+				c, bq = 0, transit.ResourcesWithServicesRequest{}
+			}
+			qq = append(qq, q)
 			continue
 		}
 
@@ -60,6 +70,15 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 			Msg("could not marshal resources")
 	}
 	return output
+}
+
+func hasStatus(q transit.ResourcesWithServicesRequest) bool {
+	for _, res := range q.Resources {
+		if res.Status != transit.HostUnchanged {
+			return true
+		}
+	}
+	return false
 }
 
 func xxl2qq(p []byte, maxBytes int) []transit.ResourcesWithServicesRequest {
