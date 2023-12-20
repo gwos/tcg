@@ -19,7 +19,6 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	cfgChksum         []byte
 	invChksum         []byte
 	connector         ElasticConnector
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -131,23 +130,11 @@ func configHandler(data []byte) {
 	tExt.replaceIntervalTemplates()
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-	/* Process checksums */
-	chk, err := connectors.Hashsum(extConfig)
-	if err != nil || !bytes.Equal(cfgChksum, chk) {
-		if err := connector.LoadConfig(*extConfig); err != nil {
-			log.Err(err).Msg("could not reload config")
-		} else {
-			_, inventory, groups := connector.CollectMetrics()
-			err := connectors.SendInventory(context.Background(), inventory, groups, connector.config.Ownership)
-			log.Err(err).Msg("sending inventory")
-			if invChk, err := connector.getInventoryHashSum(); err == nil {
-				invChksum = invChk
-			}
-		}
+
+	if err := connector.LoadConfig(*extConfig); err != nil {
+		log.Err(err).Msg("could not reload config")
 	}
-	if err == nil {
-		cfgChksum = chk
-	}
+
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

@@ -137,7 +137,7 @@ func TestInitFullConfig(t *testing.T) {
 	  }
 	}`)
 
-	cfgChksum, _ = connectors.Hashsum(expected)
+	_, _ = connectors.Hashsum(expected)
 	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
@@ -175,7 +175,7 @@ func TestInitConfigWithNotPresentedValues(t *testing.T) {
 
 	data := []byte(`{}`)
 
-	cfgChksum, _ = connectors.Hashsum(expected)
+	_, _ = connectors.Hashsum(expected)
 	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
@@ -219,7 +219,7 @@ func TestInitConfigWithPartialPresentedValues(t *testing.T) {
 		}
 	}`)
 
-	cfgChksum, _ = connectors.Hashsum(expected)
+	_, _ = connectors.Hashsum(expected)
 	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 
@@ -263,7 +263,7 @@ func TestHandleEmptyConfig(t *testing.T) {
 		}
 	}`)
 
-	cfgChksum, _ = connectors.Hashsum(expected)
+	_, _ = connectors.Hashsum(expected)
 	_, _ = config.GetConfig().LoadConnectorDTO(data)
 	configHandler(data)
 

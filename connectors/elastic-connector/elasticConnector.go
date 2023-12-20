@@ -149,7 +149,8 @@ func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
 	if err != nil {
 		return err
 	}
-	monitoringState := config.initMonitoringState(connector.monitoringState, &esClient)
+	// drop previousState
+	monitoringState := config.initMonitoringState(MonitoringState{}, &esClient)
 
 	connector.config = config
 	connector.kibanaClient = kibanaClient
