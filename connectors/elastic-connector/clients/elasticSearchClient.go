@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var FilterHostsWithLucene = ""
+
 type EsClient struct {
 	Addresses []string // A list of Elasticsearch nodes to use
 	Username  string   // Username for HTTP Basic Authentication
@@ -38,6 +40,16 @@ func (esClient *EsClient) GetHosts(hostField string, hostGroupField *string) ([]
 	searchBody := EsSearchBody{
 		Aggs: BuildAggregationsByHostNameAndHostGroup(hostField, hostGroupField),
 	}
+
+	if FilterHostsWithLucene != "" {
+		flt := &EsQuery{Bool: &EsQueryBool{}}
+		flt.Bool.Must = append(flt.Bool.Must, EsQuery{Str: &EsQueryStr{
+			Query:           FilterHostsWithLucene,
+			AnalyzeWildcard: true,
+		}})
+		searchBody.Query = flt
+	}
+
 	response, err := esClient.doSearchRequest(searchBody, nil)
 	if err != nil {
 		return nil, err

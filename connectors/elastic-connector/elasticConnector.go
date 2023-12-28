@@ -41,19 +41,20 @@ type Kibana struct {
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	Kibana             Kibana              `json:"kibana"`
-	Servers            []string            `json:"servers"`
-	CustomTimeFilter   clients.KTimeFilter `json:"timefilter"`
-	OverrideTimeFilter bool                `json:"override"`
-	HostNameField      string              `json:"hostNameLabelPath"`
-	HostGroupField     string              `json:"hostGroupLabelPath"`
-	GroupNameByUser    bool                `json:"hostGroupNameByUser"`
-	CheckInterval      time.Duration       `json:"checkIntervalMinutes"`
-	AppType            string
-	AgentID            string
-	GWConnections      config.GWConnections
-	Ownership          transit.HostOwnershipType
-	Views              map[string]map[string]transit.MetricDefinition
+	Kibana                Kibana              `json:"kibana"`
+	Servers               []string            `json:"servers"`
+	CustomTimeFilter      clients.KTimeFilter `json:"timefilter"`
+	OverrideTimeFilter    bool                `json:"override"`
+	FilterHostsWithLucene string              `json:"filterHostsWithLucene"`
+	HostNameField         string              `json:"hostNameLabelPath"`
+	HostGroupField        string              `json:"hostGroupLabelPath"`
+	GroupNameByUser       bool                `json:"hostGroupNameByUser"`
+	CheckInterval         time.Duration       `json:"checkIntervalMinutes"`
+	AppType               string
+	AgentID               string
+	GWConnections         config.GWConnections
+	Ownership             transit.HostOwnershipType
+	Views                 map[string]map[string]transit.MetricDefinition
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
@@ -142,11 +143,14 @@ type ElasticConnector struct {
 
 // LoadConfig updates state
 func (connector *ElasticConnector) LoadConfig(config ExtConfig) error {
+	clients.FilterHostsWithLucene = config.FilterHostsWithLucene
+
 	kibanaClient, esClient, err := initClients(config)
 	if err != nil {
 		return err
 	}
-	monitoringState := config.initMonitoringState(connector.monitoringState, &esClient)
+	// drop previousState
+	monitoringState := config.initMonitoringState(MonitoringState{}, &esClient)
 
 	connector.config = config
 	connector.kibanaClient = kibanaClient
