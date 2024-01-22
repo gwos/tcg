@@ -605,6 +605,7 @@ func (service *AgentService) stopController() error {
 func (service *AgentService) startNats() error {
 	err := nats.StartServer(nats.Config{
 		AckWait:            service.Connector.NatsAckWait,
+		LogColors:          service.Connector.LogColors,
 		MaxInflight:        service.Connector.NatsMaxInflight,
 		MaxPubAcksInflight: service.Connector.NatsMaxPubAcksInflight,
 		MaxPayload:         service.Connector.NatsMaxPayload,

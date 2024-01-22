@@ -91,7 +91,7 @@ type Connector struct {
 	// If count is 0, old versions are removed rather than rotated.
 	LogFileRotate int      `yaml:"logFileRotate"`
 	LogLevel      LogLevel `yaml:"logLevel"`
-	LogNoColor    bool     `yaml:"logNoColor"`
+	LogColors     bool     `yaml:"logColors"`
 	LogTimeFormat string   `yaml:"logTimeFormat"`
 
 	// NatsAckWait is the time the NATS server will wait before resending a message
@@ -231,7 +231,7 @@ func defaults() Config {
 			LogFileMaxSize:         1024 * 1024 * 10, // 10MB
 			LogFileRotate:          5,
 			LogLevel:               1,
-			LogNoColor:             false,
+			LogColors:              false,
 			LogTimeFormat:          time.RFC3339,
 			NatsAckWait:            time.Second * 30,
 			NatsMaxInflight:        4,
@@ -474,7 +474,7 @@ func (cfg Config) initLogger() {
 		logzer.WithCondense(cfg.Connector.LogCondense),
 		logzer.WithLastErrors(10),
 		logzer.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
-		logzer.WithNoColor(cfg.Connector.LogNoColor),
+		logzer.WithColors(cfg.Connector.LogColors),
 		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
 	}
 	if cfg.Connector.LogFile != "" {
