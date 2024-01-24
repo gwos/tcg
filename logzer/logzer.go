@@ -262,9 +262,9 @@ func WithCondense(d time.Duration) Option {
 	return func() { condenser.Condense = d }
 }
 
-// WithNoColor sets formatter option
-func WithNoColor(b bool) Option {
-	return func() { formatter.NoColor = b }
+// WithColors sets formatter option
+func WithColors(b bool) Option {
+	return func() { formatter.NoColor = !b }
 }
 
 // WithTimeFormat sets formatter option

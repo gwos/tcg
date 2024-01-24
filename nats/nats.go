@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nats-io/nats-server/v2/logger"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
@@ -42,6 +43,7 @@ type state struct {
 // Config defines NATS configurable options
 type Config struct {
 	AckWait            time.Duration
+	LogColors          bool
 	MaxInflight        int
 	MaxPubAcksInflight int
 	MaxPayload         int32
@@ -89,8 +91,6 @@ func StartServer(config Config) error {
 		opts.JetStream = true
 		opts.JetStreamLimits = server.JSLimitOpts{}
 		opts.JetStreamMaxStore = config.StoreMaxBytes
-
-		opts.Debug = zerolog.GlobalLevel() <= zerolog.DebugLevel
 	}
 
 	s.Lock()
@@ -109,9 +109,8 @@ func StartServer(config Config) error {
 		}
 	}
 
-	if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-		s.server.ConfigureLogger()
-	}
+	s.server.SetLogger(logger.NewStdLogger(true, false, false, config.LogColors, false),
+		zerolog.GlobalLevel() <= zerolog.DebugLevel, false)
 
 	s.server.Start()
 	log.Info().
