@@ -213,7 +213,6 @@ type Config struct {
 	Connector     Connector     `yaml:"connector"`
 	DSConnection  DSConnection  `yaml:"dsConnection"`
 	GWConnections GWConnections `yaml:"gwConnections"`
-	Jaegertracing Jaegertracing `yaml:"jaegertracing"`
 }
 
 func defaults() Config {
@@ -250,7 +249,6 @@ func defaults() Config {
 		// 4 items should be enough
 		GWConnections: GWConnections{{}, {}, {}, {}},
 		DSConnection:  DSConnection{},
-		Jaegertracing: Jaegertracing{},
 	}
 }
 
@@ -448,7 +446,6 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* update config */
 	cfg.Connector = newCfg.Connector
 	cfg.DSConnection = newCfg.DSConnection
-	cfg.Jaegertracing = newCfg.Jaegertracing
 	cfg.GWConnections = newCfg.GWConnections
 
 	/* update logger */
@@ -465,7 +462,7 @@ func (cfg *Config) IsConfiguringPMC() bool {
 
 // InitTracerProvider inits provider
 func (cfg Config) InitTracerProvider() (*tracesdk.TracerProvider, error) {
-	return initJaegertracing(cfg.Jaegertracing, fmt.Sprintf("%s:%s:%s",
+	return initOTLP(fmt.Sprintf("%s:%s:%s",
 		cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID))
 }
 

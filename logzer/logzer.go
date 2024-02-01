@@ -272,6 +272,9 @@ func WithTimeFormat(s string) Option {
 	return func() { formatter.TimeFormat = s }
 }
 
+// IsDebugEnabled defines debugging
+func IsDebugEnabled() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel }
+
 // LastErrors returns last error writes
 func LastErrors() []LogRecord {
 	return errBuffer.Records()
