@@ -38,7 +38,7 @@ var HttpClient = &http.Client{
 				return v
 			}
 		}
-		return 0 // no timeout by default
+		return time.Duration(5 * time.Second)
 	}(EnvHttpClientTimeout),
 
 	Transport: HttpClientTransport,
