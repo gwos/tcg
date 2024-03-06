@@ -58,60 +58,22 @@ var GZIP = func(ctx context.Context, p []byte) (context.Context, []byte, error) 
 
 // SendRequest wraps HTTP methods
 func SendRequest(httpMethod string, requestURL string,
-	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
-	return SendRequestWithContext(context.Background(), httpMethod, requestURL, headers, formValues, byteBody)
+	headers map[string]string, formValues map[string]string, body []byte) (int, []byte, error) {
+	return SendRequestWithContext(context.Background(), httpMethod, requestURL, headers, formValues, body)
 }
 
 // SendRequestWithContext wraps HTTP methods
 func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
-	headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
+	headers map[string]string, formValues map[string]string, body []byte) (int, []byte, error) {
 
-	var request *http.Request
-	var response *http.Response
-	var err error
-
-	urlValues := url.Values{}
-	if formValues != nil {
-		for k, v := range formValues {
-			urlValues.Add(k, v)
-		}
-		byteBody = []byte(urlValues.Encode())
-	}
-
-	if headers["Content-Encoding"] == "gzip" {
-		ctx, byteBody, err = GZIP(ctx, byteBody)
-		if err != nil {
-			return -1, nil, err
-		}
-	}
-
-	var body io.Reader
-	if byteBody != nil {
-		body = bytes.NewBuffer(byteBody)
-	}
-
-	request, err = http.NewRequestWithContext(ctx, httpMethod, requestURL, body)
-	if err != nil {
-		return -1, nil, err
-	}
-
-	request.Header.Set("Connection", "close")
-	for k, v := range headers {
-		request.Header.Add(k, v)
-	}
-
-	_, request = HookRequestContext(ctx, request)
-	response, err = HttpClient.Do(request)
-	if err != nil {
-		return -1, nil, err
-	}
-
-	defer response.Body.Close()
-	responseBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return -1, nil, err
-	}
-	return response.StatusCode, responseBody, nil
+	req, err := (&Req{
+		URL:     requestURL,
+		Method:  httpMethod,
+		Headers: headers,
+		Form:    formValues,
+		Payload: body,
+	}).SendWithContext(ctx)
+	return req.Status, req.Response, err
 }
 
 // BuildQueryParams makes the query parameters string
@@ -142,6 +104,14 @@ type Req struct {
 	Response []byte
 	Status   int
 	URL      string
+
+	client *http.Client
+}
+
+// SetClient sets http.Client to use
+func (q *Req) SetClient(c *http.Client) *Req {
+	q.client = c
+	return q
 }
 
 // Send sends request
@@ -151,18 +121,62 @@ func (q *Req) Send() (*Req, error) {
 
 // SendWithContext sends request
 func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
-	status, response, err := SendRequestWithContext(
-		ctx,
-		q.Method,
-		q.URL,
-		q.Headers,
-		q.Form,
-		q.Payload,
+	var (
+		body     = q.Payload
+		err      error
+		request  *http.Request
+		response *http.Response
 	)
-	q.Err = err
-	q.Response = response
-	q.Status = status
-	return q, err
+
+	urlValues := url.Values{}
+	if q.Form != nil {
+		for k, v := range q.Form {
+			urlValues.Add(k, v)
+		}
+		body = []byte(urlValues.Encode())
+	}
+
+	if q.Headers["Content-Encoding"] == "gzip" {
+		ctx, body, err = GZIP(ctx, body)
+		if err != nil {
+			q.Status, q.Err = -1, err
+			return q, err
+		}
+	}
+
+	var bodyBuf io.Reader
+	if body != nil {
+		bodyBuf = bytes.NewBuffer(body)
+	}
+	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, bodyBuf)
+	if err != nil {
+		q.Status, q.Err = -1, err
+		return q, err
+	}
+	request.Header.Set("Connection", "close")
+	for k, v := range q.Headers {
+		request.Header.Add(k, v)
+	}
+	_, request = HookRequestContext(ctx, request)
+
+	if q.client != nil {
+		response, err = q.client.Do(request)
+	} else {
+		response, err = HttpClient.Do(request)
+	}
+	if err != nil {
+		q.Status, q.Err = -1, err
+		return q, err
+	}
+
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		q.Status, q.Err = -1, err
+		return q, err
+	}
+	q.Status, q.Response = response.StatusCode, responseBody
+	return q, nil
 }
 
 // LogFields returns fields maps

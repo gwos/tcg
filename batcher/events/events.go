@@ -44,7 +44,9 @@ func (bld *EventsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 	for _, q := range qq {
 		p, err := json.Marshal(q)
 		if err == nil {
-			log.Debug().Msgf("batched %d events", len(q.Events))
+			log.Debug().
+				Interface("payloadLen", len(p)).
+				Msgf("batched %d events", len(q.Events))
 			output = append(output, p)
 			continue
 		}

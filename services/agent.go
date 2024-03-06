@@ -454,11 +454,13 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 			if err = p.Unmarshal(b); err != nil {
 				log.Warn().Err(err).Msg("could not unmarshal payload")
 			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "dispatch")
+			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "nats:dispatch")
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
-					tracing.TraceAttrPayloadLen(b),
+					tracing.TraceAttrPayloadDbg(p.Payload),
+					tracing.TraceAttrPayloadLen(p.Payload),
+					tracing.TraceAttrStr("type", p.Type.String()),
 					tracing.TraceAttrStr("durable", durable),
 					tracing.TraceAttrStr("subject", subj),
 				)
@@ -738,6 +740,7 @@ func (service *AgentService) initOTEL() {
 	if tp, err := config.GetConfig().InitTracerProvider(); err == nil {
 		service.tracerProvider = tp
 		otel.SetTracerProvider(tp)
+		tracing.IsDebugEnabled = logzer.IsDebugEnabled
 	}
 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(

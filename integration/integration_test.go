@@ -16,9 +16,9 @@ func TestIntegration(t *testing.T) {
 	defer cleanNats(t)
 	defer apiClient.RemoveHost(TestHostName)
 
-	setupIntegration(t, 5*time.Second)
+	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
 
-	rs := makeResource(3)
+	rs := makeResource(0, 3)
 	resources := new(transit.ResourcesWithServicesRequest)
 	resources.SetContext(*services.GetTransitService().MakeTracerContext())
 	resources.AddResource(*rs)

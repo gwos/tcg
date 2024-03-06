@@ -2,12 +2,13 @@ package tracing
 
 import (
 	"context"
-	"fmt"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var IsDebugEnabled = func() bool { return false }
 
 // TraceAttrOption defines option to set span attribute
 type TraceAttrOption func(span trace.Span)
@@ -24,6 +25,15 @@ func EndTraceSpan(span trace.Span, opts ...TraceAttrOption) {
 		optFn(span)
 	}
 	span.End()
+}
+
+// TraceAttrFnDbg sets an attribute with Function if Debug is enabled
+func TraceAttrFnDbg(k string, fn func() string) TraceAttrOption {
+	return func(span trace.Span) {
+		if IsDebugEnabled() {
+			span.SetAttributes(attribute.String(k, fn()))
+		}
+	}
 }
 
 // TraceAttrInt sets an int attribute
@@ -48,7 +58,29 @@ func TraceAttrEntrypoint(v string) TraceAttrOption {
 
 // TraceAttrError sets an error attribute
 func TraceAttrError(v error) TraceAttrOption {
-	return func(span trace.Span) { span.SetAttributes(attribute.String("error", fmt.Sprint(v))) }
+	return func(span trace.Span) {
+		if v == nil {
+			span.SetAttributes(attribute.Bool("err", false))
+			span.SetAttributes(attribute.String("error", ""))
+			return
+		}
+		span.SetAttributes(attribute.Bool("err", true))
+		span.SetAttributes(attribute.String("error", v.Error()))
+	}
+}
+
+// TraceAttrPayload sets a payload attribute
+func TraceAttrPayload(v []byte) TraceAttrOption {
+	return func(span trace.Span) { span.SetAttributes(attribute.String("payload", string(v))) }
+}
+
+// TraceAttrPayloadDbg sets a payload attribute if Debug is enabled
+func TraceAttrPayloadDbg(v []byte) TraceAttrOption {
+	return func(span trace.Span) {
+		if IsDebugEnabled() {
+			span.SetAttributes(attribute.String("payload", string(v)))
+		}
+	}
 }
 
 // TraceAttrPayloadLen sets a payloadLen attribute

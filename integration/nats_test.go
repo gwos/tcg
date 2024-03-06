@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -21,8 +20,14 @@ const (
 	TestHostName = "GW8_TCG_TEST_HOST"
 
 	TestMessagesCount         = 4
-	PerformanceServicesCount  = 2
-	PerformanceResourcesCount = 1000
+	PerformanceServicesCount  = 20
+	PerformanceResourcesCount = 50
+	PerformanceLoopMetrics    = 4
+
+	dynInventoryFalse = false
+	dynInventoryTrue  = true
+	natsAckWait5s     = time.Second * 5
+	natsAckWait30s    = time.Second * 30
 )
 
 var TestConfigDefaults = map[string]string{
@@ -44,7 +49,7 @@ var apiClient = new(APIClient)
 // TODO: TCG connects to Foundation as local connection
 func TestNatsQueue1(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, 5*time.Second)
+	setupIntegration(t, natsAckWait5s, dynInventoryTrue)
 
 	t.Log("Timeout all requests, messages will be stored in the queue")
 	httpClientTimeout0 := clients.HttpClient.Timeout
@@ -86,7 +91,7 @@ func TestNatsQueue1(t *testing.T) {
 // TODO: TCG connects to Foundation as remote connection
 func TestNatsQueue2(t *testing.T) {
 	defer cleanNats(t)
-	setupIntegration(t, 30*time.Second)
+	setupIntegration(t, natsAckWait30s, dynInventoryTrue)
 
 	t.Log("Timeout all requests, messages will be stored in the queue")
 	httpClientTimeout0 := clients.HttpClient.Timeout
@@ -135,7 +140,7 @@ func TestNatsPerformance(t *testing.T) {
 	defer cleanNats(t)
 	defer apiClient.RemoveHost(TestHostName)
 
-	setupIntegration(t, 30*time.Second)
+	setupIntegration(t, natsAckWait30s, dynInventoryFalse)
 	m0 := services.GetTransitService().Stats().MessagesSent.Value()
 
 	resources := make([]transit.MonitoredResource, 0, PerformanceResourcesCount)
@@ -143,7 +148,7 @@ func TestNatsPerformance(t *testing.T) {
 	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 
 	for i := 0; i < PerformanceResourcesCount; i++ {
-		rs := makeResource(PerformanceServicesCount)
+		rs := makeResource(i, PerformanceServicesCount)
 
 		resources = append(resources, *rs)
 		inventory.AddResource(rs.ToInventoryResource())
@@ -155,25 +160,26 @@ func TestNatsPerformance(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	for _, res := range resources {
-		request := transit.ResourcesWithServicesRequest{
-			Context:   services.GetTransitService().MakeTracerContext(),
-			Resources: []transit.MonitoredResource{res},
+	for i := 0; i < PerformanceLoopMetrics; i++ {
+		for _, res := range resources {
+			request := transit.ResourcesWithServicesRequest{
+				Context:   services.GetTransitService().MakeTracerContext(),
+				Resources: []transit.MonitoredResource{res},
+			}
+			payload, err := json.Marshal(request)
+			assert.NoError(t, err)
+			assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
 		}
-		payload, err := json.Marshal(request)
-		assert.NoError(t, err)
-		assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
+		time.Sleep(5 * time.Second)
 	}
 
-	time.Sleep(10 * time.Second)
-
-	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != PerformanceResourcesCount+1 {
+	if cnt, dc := PerformanceLoopMetrics*len(resources), services.GetTransitService().Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
-			dc, PerformanceResourcesCount+1)
+			dc, cnt)
 	}
 }
 
-func setupIntegration(t *testing.T, natsAckWait time.Duration) {
+func setupIntegration(t *testing.T, natsAckWait time.Duration, isDynamicInventory bool) {
 	for k, v := range TestConfigDefaults {
 		if _, ok := os.LookupEnv(k); !ok {
 			t.Setenv(k, v)
@@ -188,6 +194,7 @@ func setupIntegration(t *testing.T, natsAckWait time.Duration) {
 
 	cfg := config.GetConfig()
 	cfg.Connector.NatsAckWait = natsAckWait
+	cfg.GWConnections[0].IsDynamicInventory = isDynamicInventory
 
 	service := services.GetTransitService()
 	assert.NoError(t, service.StopNats())
@@ -200,7 +207,7 @@ func setupIntegration(t *testing.T, natsAckWait time.Duration) {
 
 func cleanNats(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopNats())
-	assert.NoError(t, os.RemoveAll(filepath.Join(config.GetConfig().Connector.NatsStoreDir, "jetstream")))
+	assert.NoError(t, services.GetTransitService().ResetNats())
 	assert.NoError(t, os.Remove(config.GetConfig().Connector.NatsStoreDir))
 	t.Log("[cleanNats]: ", services.GetTransitService().Status())
 }
@@ -220,19 +227,22 @@ func readFile(filePath string) ([]byte, error) {
 	return bb, nil
 }
 
-func makeResource(svcCount int) *transit.MonitoredResource {
+func makeResource(rsIdx, svcCount int) *transit.MonitoredResource {
 	rs := new(transit.MonitoredResource)
-	rs.Name = TestHostName
 	rs.Status = transit.HostUp
 	rs.Type = transit.ResourceTypeHost
 	rs.LastCheckTime = transit.NewTimestamp()
 	rs.NextCheckTime = transit.NewTimestamp()
 	*rs.NextCheckTime = rs.NextCheckTime.Add(time.Minute * 60)
+	rs.Name = TestHostName
+	if rsIdx > 0 {
+		rs.Name = fmt.Sprintf("%v_%v", TestHostName, rsIdx)
+	}
 
 	for i := 0; i < svcCount; i++ {
 		svc := new(transit.MonitoredService)
-		svc.Name = fmt.Sprintf("%s_SERVICE_%v", TestHostName, i)
-		svc.Owner = TestHostName
+		svc.Name = fmt.Sprintf("%v_SERVICE_%v", rs.Name, i)
+		svc.Owner = rs.Name
 		svc.Status = transit.ServiceOk
 		svc.Type = transit.ResourceTypeService
 		svc.LastCheckTime = transit.NewTimestamp()

@@ -61,7 +61,9 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 		q.Groups = packGroups(q.Groups)
 		p, err := json.Marshal(q)
 		if err == nil {
-			log.Debug().Msgf("batched %d resources", len(q.Resources))
+			log.Debug().
+				Interface("payloadLen", len(p)).
+				Msgf("batched %d resources", len(q.Resources))
 			output = append(output, p)
 			continue
 		}

@@ -220,11 +220,11 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 
     $ GOFLAGS="-count=1" \
         TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
-        TCG_JAEGERTRACING_AGENT=localhost:6831 \
-        TCG_CONNECTOR_LOGLEVEL=3 \
+        TCG_CONNECTOR_LOGCOLORS=TRUE TCG_CONNECTOR_LOGLEVEL=3 \
         TCG_CONNECTOR_AGENTID=TEST11 \
         TCG_TLS_CLIENT_INSECURE=TRUE \
-        go test -v ./integration/
+        OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+        go test -failfast -v ./integration/
 
 
 <a name="envvar"></a>

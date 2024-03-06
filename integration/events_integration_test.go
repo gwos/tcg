@@ -13,7 +13,7 @@ func TestEvents(t *testing.T) {
 	testMessage, err := readFile("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
-	setupIntegration(t, 5*time.Second)
+	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
 	defer cleanNats(t)
 
 	l0 := len(services.GetTransitService().Stats().LastErrors)

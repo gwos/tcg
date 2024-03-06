@@ -1,14 +1,16 @@
 package batcher
 
 import (
+	"bytes"
 	"context"
 	"math"
+	"reflect"
 	"sync"
 	"time"
 
+	"github.com/gwos/tcg/tracing"
 	"github.com/rs/zerolog/log"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // BatchBuilder defines builder interface
@@ -33,6 +35,10 @@ type Batcher struct {
 
 	builder BatchBuilder
 	handler BatchHandler
+
+	traceCtx   context.Context
+	traceSpan  trace.Span
+	tracerName string
 }
 
 // NewBatcher returns new instance
@@ -53,7 +59,10 @@ func NewBatcher(
 
 		builder: bb,
 		handler: bh,
+
+		tracerName: "batcher:" + reflect.TypeOf(bb).String(),
 	}
+	bt.traceCtx, bt.traceSpan = tracing.StartTraceSpan(context.Background(), bt.tracerName, "batching")
 
 	/* handle ticker */
 	go func() {
@@ -75,8 +84,19 @@ func NewBatcher(
 func (bt *Batcher) Add(p []byte) {
 	bt.mu.Lock()
 
+	// trace.SpanFromContext(bt.traceCtx).AddEvent("batcher:Add", trace.WithAttributes(
+	// 	attribute.Int("payloadLen", len(p)),
+	// 	attribute.String("payload", string(p)), // cannot wrap if debug
+	// ))
+	_, span := tracing.StartTraceSpan(bt.traceCtx, bt.tracerName, "batcher:Add")
+
 	bt.buf = append(bt.buf, p)
 	bt.bufSize += len(p)
+
+	tracing.EndTraceSpan(span,
+		tracing.TraceAttrPayloadDbg(p),
+		tracing.TraceAttrPayloadLen(p),
+	)
 
 	bt.mu.Unlock()
 	if bt.bufSize > bt.maxBytes {
@@ -96,17 +116,24 @@ func (bt *Batcher) Batch() {
 	bt.mu.Unlock()
 	if len(buf) > 0 {
 		func() {
+			var payloads [][]byte
 			/* wrap into closure for simple defer,
 			cannot use services package due to import cycle */
-			ctx, span := otel.GetTracerProvider().
-				Tracer("batcher").Start(context.Background(), "Batch:Build")
+			ctx, span := tracing.StartTraceSpan(bt.traceCtx, bt.tracerName, "batcher:Batch")
 			defer func() {
-				span.SetAttributes(attribute.Int("bufferSize", bufSize))
-				span.SetAttributes(attribute.Int("maxBytes", bt.maxBytes))
-				span.End()
+				tracing.EndTraceSpan(span,
+					tracing.TraceAttrInt("maxBytes", bt.maxBytes),
+					tracing.TraceAttrInt("bufferLen", len(buf)),
+					tracing.TraceAttrInt("bufferSize", bufSize),
+					tracing.TraceAttrFnDbg("buffer", func() string { return string(bytes.Join(buf, []byte("\n"))) }),
+					tracing.TraceAttrFnDbg("output", func() string { return string(bytes.Join(payloads, []byte("\n"))) }),
+					tracing.TraceAttrInt("outputLen", len(payloads)),
+				)
+				tracing.EndTraceSpan(bt.traceSpan)
+				bt.traceCtx, bt.traceSpan = tracing.StartTraceSpan(context.Background(), bt.tracerName, "batching")
 			}()
 
-			payloads := bt.builder.Build(buf, bt.maxBytes)
+			payloads = bt.builder.Build(buf, bt.maxBytes)
 			if len(payloads) > 0 {
 				for _, p := range payloads {
 					if len(p) > 0 {
@@ -123,7 +150,7 @@ func (bt *Batcher) Exit() {
 	bt.tickerExit <- true
 }
 
-// Reset applyes configuration
+// Reset applies configuration
 func (bt *Batcher) Reset(d time.Duration, maxBytes int) {
 	bt.Batch()
 	bt.maxBytes = maxBytes
