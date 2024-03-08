@@ -238,7 +238,7 @@ Defines the path to `libtransit.so` library in docker container and tests.
     $ export LIBTRANSIT=/path/to/libtransit.so
 
 
-### TCG
+### TCG config variables
 
 By default, the config file is looked for in the work directory as `tcg_config.yaml`.
 
@@ -248,6 +248,20 @@ The path to config file and any config option can be overridden with env vars:
     $ export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
 
 For more info see package `config` and tests.
+
+
+### Other variables
+
+There are additional variables supported:
+
+    * OTEL_EXPORTER_OTLP_ENDPOINT=http://jaegertracing:4317
+    * TCG_HTTP_CLIENT_TIMEOUT=10s
+    * TCG_HTTP_CLIENT_TIMEOUT_GW=120s
+    * TCG_SUPPRESS_DOWNTIMES=true
+    * TCG_SUPPRESS_EVENTS=true
+    * TCG_SUPPRESS_INVENTORY=true
+    * TCG_SUPPRESS_METRICS=true
+
 
 ## Run golangci-lint locally:
 
