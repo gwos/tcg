@@ -527,8 +527,6 @@ func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint
 	headers map[string]string, form map[string]string, payload []byte) (*Req, error) {
 
 	client.once.Do(func() {
-		client.mu.Lock()
-		defer client.mu.Unlock()
 		client.buildURIs()
 		client.setClient()
 	})
