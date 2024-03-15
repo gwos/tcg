@@ -171,7 +171,7 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 }
 
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
-	service.stats.exp.Add("sendEvents", 1)
+	service.stats.x.Add("sendEvents", 1)
 	var (
 		b   []byte
 		err error
@@ -268,7 +268,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
-	service.stats.exp.Add("sendMetrics", 1)
+	service.stats.x.Add("sendMetrics", 1)
 	var (
 		b   []byte
 		err error

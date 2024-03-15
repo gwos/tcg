@@ -88,11 +88,8 @@ func GetAgentService() *AgentService {
 		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
-			agentStatus: &AgentStatus{
-				Controller: StatusStopped,
-				Nats:       StatusStopped,
-				Transport:  StatusStopped,
-			},
+
+			agentStatus: NewAgentStatus(),
 			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
 			tracerCache: cache.New(-1, -1),
@@ -467,7 +464,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.stats.exp.Add("sentTo:"+durable, 1)
+				service.stats.x.Add("sentTo:"+durable, 1)
 				service.stats.BytesSent.Add(int64(len(p.Payload)))
 				service.stats.MessagesSent.Add(1)
 				if p.Type == typeMetrics {
@@ -490,7 +487,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 
 func (service *AgentService) config(data []byte) error {
 	// stop nats processing, allow nats reconfiguring
-	transportOn := service.agentStatus.Transport == StatusRunning
+	transportOn := service.agentStatus.Transport.Value() == StatusRunning
 	if err := service.stopNats(); err != nil {
 		log.Err(err).Msg("error stopping nats on processing config")
 	}
@@ -578,12 +575,12 @@ func (service *AgentService) resetNats() error {
 	if err := os.RemoveAll(filepath.Join(service.Connector.NatsStoreDir, "jetstream")); err != nil {
 		log.Warn().Err(err).Msgf("could not remove nats jetstream dir")
 	}
-	if st0.Nats == StatusRunning {
+	if st0.Nats.Value() == StatusRunning {
 		if err := service.startNats(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats")
 		}
 	}
-	if st0.Transport == StatusRunning {
+	if st0.Transport.Value() == StatusRunning {
 		if err := service.startTransport(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats dispatcher")
 		}
@@ -598,7 +595,7 @@ func (service *AgentService) startController() error {
 
 func (service *AgentService) stopController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	if service.agentStatus.Controller == StatusStopped {
+	if service.agentStatus.Controller.Value() == StatusStopped {
 		return nil
 	}
 	return GetController().stopController()
@@ -621,13 +618,13 @@ func (service *AgentService) startNats() error {
 		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
 	if err == nil {
-		service.agentStatus.Nats = StatusRunning
+		service.agentStatus.Nats.Set(StatusRunning)
 	}
 	return err
 }
 
 func (service *AgentService) stopNats() error {
-	if service.agentStatus.Nats == StatusStopped {
+	if service.agentStatus.Nats.Value() == StatusStopped {
 		return nil
 	}
 
@@ -635,7 +632,7 @@ func (service *AgentService) stopNats() error {
 	err := service.stopTransport()
 	// skip Stop Transport error checking
 	nats.StopServer()
-	service.agentStatus.Nats = StatusStopped
+	service.agentStatus.Nats.Set(StatusStopped)
 	return err
 }
 
@@ -662,7 +659,7 @@ func (service *AgentService) startTransport() error {
 	service.gwClients = gwClients
 	/* Process dispatcher */
 	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
-		service.agentStatus.Transport = StatusRunning
+		service.agentStatus.Transport.Set(StatusRunning)
 	} else {
 		return sdErr
 	}
@@ -670,13 +667,13 @@ func (service *AgentService) startTransport() error {
 }
 
 func (service *AgentService) stopTransport() error {
-	if service.agentStatus.Transport == StatusStopped {
+	if service.agentStatus.Transport.Value() == StatusStopped {
 		return nil
 	}
 	if err := nats.StopDispatcher(); err != nil {
 		return err
 	}
-	service.agentStatus.Transport = StatusStopped
+	service.agentStatus.Transport.Set(StatusStopped)
 	return nil
 }
 

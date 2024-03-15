@@ -66,7 +66,7 @@ FROM alpine:3.11 AS prod
 RUN apk add -u --no-cache \
         bash \
         ca-certificates openssl \
-        curl \
+        curl jq \
         libmcrypt \
         zlib \
     && update-ca-certificates

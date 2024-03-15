@@ -108,7 +108,7 @@ func (controller *Controller) startController() error {
 	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
-		controller.agentStatus.Controller = StatusRunning
+		controller.agentStatus.Controller.Set(StatusRunning)
 		for {
 			controller.srv = &http.Server{
 				Addr:         addr,
@@ -139,7 +139,7 @@ func (controller *Controller) startController() error {
 			idleTimer.Stop()
 			break
 		}
-		controller.agentStatus.Controller = StatusStopped
+		controller.agentStatus.Controller.Set(StatusStopped)
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
 	<-idleTimer.C
@@ -355,7 +355,7 @@ func (controller *Controller) resetNats(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == StatusRunning && status.task == nil {
+	if status.Transport.Value() == StatusRunning && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusRunning, 0})
 		return
 	}
@@ -379,7 +379,7 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == StatusStopped && status.task == nil {
+	if status.Transport.Value() == StatusStopped && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusStopped, 0})
 		return
 	}
@@ -425,7 +425,7 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
-	statusDTO := ConnectorStatusDTO{status.Transport, 0}
+	statusDTO := ConnectorStatusDTO{Status(status.Transport.Value()), 0}
 	if status.task != nil {
 		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
 	}
