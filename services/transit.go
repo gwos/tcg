@@ -35,6 +35,12 @@ type TransitService struct {
 	eventsBatcher  *batcher.Batcher
 	metricsBatcher *batcher.Batcher
 
+	inventoryKeeper struct {
+		sync.Mutex
+		TickerFn
+		buf []byte
+	}
+
 	suppressDowntimes bool
 	suppressEvents    bool
 	suppressInventory bool
@@ -63,6 +69,18 @@ func GetTransitService() *TransitService {
 			transitService.Connector.BatchMetrics,
 			transitService.Connector.BatchMaxBytes,
 		)
+
+		transitService.inventoryKeeper.TickerFn = *NewTickerFn(time.Second, func() {
+			p := &transitService.inventoryKeeper
+			p.Lock()
+			defer p.Unlock()
+			if len(p.buf) == 0 {
+				return
+			}
+			if err := nats.Publish(subjInventoryMetrics, p.buf); err == nil {
+				p.buf = nil
+			}
+		})
 
 		applySuppressEnv := func(b *bool, env, str string) {
 			v, err := strconv.ParseBool(os.Getenv(env))
@@ -329,6 +347,43 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	if err != nil {
 		return err
 	}
-	err = nats.Publish(subjInventoryMetrics, b)
-	return err
+
+	// Note. There is a corner case when Nats is not ready
+	// We can buffer inventory and send when ready
+	// err = nats.Publish(subjInventoryMetrics, b)
+	// return err
+	func() {
+		service.inventoryKeeper.Lock()
+		defer service.inventoryKeeper.Unlock()
+		service.inventoryKeeper.buf = b
+	}()
+	return nil
+}
+
+// TickerFn is wrapper for time.Ticker
+type TickerFn struct {
+	time.Ticker
+	Stop func()
+	done chan bool
+}
+
+func NewTickerFn(d time.Duration, fn func()) *TickerFn {
+	ticker := new(TickerFn)
+	ticker.Ticker = *time.NewTicker(d)
+	ticker.done = make(chan bool)
+	ticker.Stop = func() {
+		ticker.Ticker.Stop()
+		ticker.done <- true
+	}
+	go func() {
+		for {
+			select {
+			case <-ticker.done:
+				return
+			case <-ticker.C:
+				fn()
+			}
+		}
+	}()
+	return ticker
 }
