@@ -21,6 +21,8 @@ import (
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -590,7 +592,12 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 		}
 	}
 
-	pprofGroup := apiV1Group.Group("/debug/pprof")
+	/* public entrypoints */
+	apiV1Debug := router.Group("/api/v1/debug")
+	apiV1Debug.GET("/vars", gin.WrapH(expvar.Handler()))
+	apiV1Debug.GET("/metrics", gin.WrapH(promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})))
+
+	pprofGroup := apiV1Debug.Group("/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
 	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
 	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
@@ -603,6 +610,4 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	pprofGroup.GET("/heap", gin.WrapF(pprof.Handler("heap").ServeHTTP))
 	pprofGroup.GET("/mutex", gin.WrapF(pprof.Handler("mutex").ServeHTTP))
 	pprofGroup.GET("/threadcreate", gin.WrapF(pprof.Handler("threadcreate").ServeHTTP))
-
-	apiV1Group.GET("/debug/vars", gin.WrapH(expvar.Handler()))
 }

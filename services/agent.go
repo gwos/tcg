@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"os"
 	"os/signal"
@@ -25,6 +26,8 @@ import (
 	"github.com/gwos/tcg/tracing"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -102,6 +105,7 @@ func GetAgentService() *AgentService {
 
 		agentService.initTracerToken()
 		agentService.initOTEL()
+		agentService.initAPM()
 		agentService.handleTasks()
 		if AllowSignalHandlers {
 			agentService.hookInterrupt()
@@ -746,4 +750,34 @@ func (service *AgentService) initOTEL() {
 
 	clients.HookRequestContext = tracing.HookRequestContext
 	clients.GZIP = tracing.GZIP
+}
+
+// initAPM inits Prometheus metrics
+func (service *AgentService) initAPM() {
+	/*	exports := map[string]*prometheus.Desc{
+		"memstats": prometheus.NewDesc(
+			"expvar_memstats",
+			"All numeric memstats as one metric family. Not a good role-model, actually... ;-)",
+			[]string{"type"}, nil,
+		),
+		"lone-int": prometheus.NewDesc(
+			"expvar_lone_int",
+			"Just an expvar int as an example.",
+			nil, nil,
+		),
+		"http-request-map": prometheus.NewDesc(
+			"expvar_http_request_total",
+			"How many http requests processed, partitioned by status code and http method.",
+			[]string{"code", "method"}, nil,
+		),
+	}	*/
+
+	exports := make(map[string]*prometheus.Desc)
+	expvar.Do(func(kv expvar.KeyValue) {
+		exports[kv.Key] = prometheus.NewDesc("expvar_"+kv.Key, kv.Key, nil, nil)
+	})
+	expvarCollector := collectors.NewExpvarCollector(exports)
+	if err := prometheus.Register(expvarCollector); err != nil {
+		log.Warn().Err(err).Msg("could not register expvar collector")
+	}
 }
