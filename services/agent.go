@@ -57,6 +57,8 @@ type taskSubject string
 const (
 	taskConfig          taskSubject = "config"
 	taskExit            taskSubject = "exit"
+	taskPauseNats       taskSubject = "pauseNats"
+	taskUnpauseNats     taskSubject = "unpauseNats"
 	taskResetNats       taskSubject = "resetNats"
 	taskStartController taskSubject = "startController"
 	taskStopController  taskSubject = "stopController"
@@ -223,6 +225,14 @@ func (service *AgentService) ExitAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskExit)
 }
 
+func (service *AgentService) PauseNatsAsync() (*taskqueue.Task, error) {
+	return service.taskQueue.PushAsync(taskPauseNats)
+}
+
+func (service *AgentService) UnpauseNatsAsync() (*taskqueue.Task, error) {
+	return service.taskQueue.PushAsync(taskUnpauseNats)
+}
+
 // ResetNatsAsync implements AgentServices.ResetNatsAsync interface
 func (service *AgentService) ResetNatsAsync() (*taskqueue.Task, error) {
 	return service.taskQueue.PushAsync(taskResetNats)
@@ -261,6 +271,14 @@ func (service *AgentService) StopTransportAsync() (*taskqueue.Task, error) {
 // Exit implements AgentServices.Exit interface
 func (service *AgentService) Exit() error {
 	return service.taskQueue.PushSync(taskExit)
+}
+
+func (service *AgentService) PauseNats() error {
+	return service.taskQueue.PushSync(taskPauseNats)
+}
+
+func (service *AgentService) UnpauseNats() error {
+	return service.taskQueue.PushSync(taskUnpauseNats)
 }
 
 // ResetNats implements AgentServices.ResetNats interface
@@ -335,6 +353,10 @@ func (service *AgentService) handleTasks() {
 			err = service.config(task.Args[0].([]byte))
 		case taskExit:
 			err = service.exit()
+		case taskPauseNats:
+			err = service.pauseNats()
+		case taskUnpauseNats:
+			err = service.unpauseNats()
 		case taskResetNats:
 			err = service.resetNats()
 		case taskStartController:
@@ -360,6 +382,8 @@ func (service *AgentService) handleTasks() {
 		taskqueue.WithHandlers(map[taskqueue.Subject]taskqueue.Handler{
 			taskConfig:          hTask,
 			taskExit:            hTask,
+			taskPauseNats:       hTask,
+			taskUnpauseNats:     hTask,
 			taskResetNats:       hTask,
 			taskStartController: hTask,
 			taskStopController:  hTask,
@@ -441,20 +465,16 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 	return nats.DispatcherOption{
 		Durable: durable,
 		Subject: subj,
-		Handler: func(b []byte) error {
-			var err error
-			getCtx := func(sc trace.SpanContext) context.Context {
-				if sc.IsValid() {
-					return trace.ContextWithRemoteSpanContext(context.Background(), sc)
-				}
-				return context.Background()
-			}
-
+		Handler: func(ctx context.Context, b []byte) (err error) {
 			p := natsPayload{}
 			if err = p.Unmarshal(b); err != nil {
-				log.Warn().Err(err).Msg("could not unmarshal payload")
+				log.Err(err).Msg("could not unmarshal payload")
+				return
 			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "nats:dispatch")
+			if p.SpanContext.IsValid() {
+				ctx = trace.ContextWithRemoteSpanContext(ctx, p.SpanContext)
+			}
+			ctx, span := tracing.StartTraceSpan(ctx, "services", "nats:dispatch")
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
@@ -483,7 +503,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 				/* it looks like an issue with data */
 				log.Err(err).Msg("dispatcher got an issue with data")
 			}
-			return err
+			return
 		},
 	}
 }
@@ -491,6 +511,9 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 func (service *AgentService) config(data []byte) error {
 	// stop nats processing, allow nats reconfiguring
 	transportOn := service.agentStatus.Transport == StatusRunning
+	if err := service.pauseNats(); err != nil {
+		log.Err(err).Msg("error pausing nats on processing config")
+	}
 	if err := service.stopNats(); err != nil {
 		log.Err(err).Msg("error stopping nats on processing config")
 	}
@@ -530,6 +553,9 @@ func (service *AgentService) config(data []byte) error {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}
 	}
+	if err := service.unpauseNats(); err != nil {
+		log.Err(err).Msg("error unpausing nats on processing config")
+	}
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	return nil
@@ -568,6 +594,14 @@ func (service *AgentService) exit() error {
 	/* send quit signal */
 	service.quitChan <- struct{}{}
 	return nil
+}
+
+func (service *AgentService) pauseNats() error {
+	return nats.Pause()
+}
+
+func (service *AgentService) unpauseNats() error {
+	return nats.Unpause()
 }
 
 func (service *AgentService) resetNats() error {

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/config"
+	_ "github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
@@ -78,11 +79,11 @@ func TestNatsQueue1(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().StopTransport())
 	assert.NoError(t, services.GetTransitService().StartTransport())
 
-	time.Sleep(4 * time.Second)
+	time.Sleep(44 * time.Second) // > nats.retryDelays[x]
 
-	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc == 0 {
-		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %s",
-			dc, "'>0'")
+	if dc := services.GetTransitService().Stats().MessagesSent.Value() - m0; dc != TestMessagesCount {
+		t.Errorf("Messages should be delivered. deliveredCount = %v, want = %v",
+			dc, TestMessagesCount)
 	}
 }
 
@@ -149,6 +150,7 @@ func TestNatsPerformance(t *testing.T) {
 
 	for i := 0; i < PerformanceResourcesCount; i++ {
 		rs := makeResource(i, PerformanceServicesCount)
+		rs.SetProperty("__seq__", i)
 
 		resources = append(resources, *rs)
 		inventory.AddResource(rs.ToInventoryResource())
@@ -160,18 +162,32 @@ func TestNatsPerformance(t *testing.T) {
 
 	time.Sleep(5 * time.Second)
 
-	for i := 0; i < PerformanceLoopMetrics; i++ {
-		for _, res := range resources {
-			request := transit.ResourcesWithServicesRequest{
-				Context:   services.GetTransitService().MakeTracerContext(),
-				Resources: []transit.MonitoredResource{res},
+	t1 := time.Now()
+	go func(t *testing.T) {
+		for i := 0; i < PerformanceLoopMetrics; i++ {
+			for _, res := range resources {
+				request := transit.ResourcesWithServicesRequest{
+					Context:   services.GetTransitService().MakeTracerContext(),
+					Resources: []transit.MonitoredResource{res},
+				}
+				payload, err := json.Marshal(request)
+				assert.NoError(t, err)
+				assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
 			}
-			payload, err := json.Marshal(request)
-			assert.NoError(t, err)
-			assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), payload))
+			time.Sleep(5 * time.Second)
 		}
-		time.Sleep(5 * time.Second)
-	}
+		t.Logf("--nats published %v %v", time.Since(t1).Round(time.Millisecond).String(), len(resources))
+	}(t)
+
+	time.Sleep(20 * time.Millisecond)
+	_ = services.GetTransitService().PauseNats()
+	_ = services.GetTransitService().StopNats()
+	_ = services.GetTransitService().StartNats()
+	_ = services.GetTransitService().UnpauseNats()
+	t.Logf("--nats paused/re-started/unpaused %v", time.Since(t1).Round(time.Millisecond).String())
+
+	_ = services.GetTransitService().StartTransport()
+	time.Sleep(40 * time.Second)
 
 	if cnt, dc := PerformanceLoopMetrics*len(resources), services.GetTransitService().Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
 		t.Errorf("Messages should be delivered. deliveredCount = %d, want = %d",
@@ -180,6 +196,13 @@ func TestNatsPerformance(t *testing.T) {
 }
 
 func setupIntegration(t *testing.T, natsAckWait time.Duration, isDynamicInventory bool) {
+	// nats.RetryDelays = map[int]time.Duration{
+	// 	1: time.Second * 1,
+	// 	2: time.Second * 1,
+	// 	3: time.Second * 1,
+	// 	4: time.Second * 1,
+	// }
+
 	for k, v := range TestConfigDefaults {
 		if _, ok := os.LookupEnv(k); !ok {
 			t.Setenv(k, v)
