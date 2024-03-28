@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"os"
 	"os/signal"
@@ -25,6 +26,8 @@ import (
 	"github.com/gwos/tcg/tracing"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -88,11 +91,8 @@ func GetAgentService() *AgentService {
 		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
 			Connector: agentConnector,
-			agentStatus: &AgentStatus{
-				Controller: StatusStopped,
-				Nats:       StatusStopped,
-				Transport:  StatusStopped,
-			},
+
+			agentStatus: NewAgentStatus(),
 			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
 			quitChan:    make(chan struct{}, 1),
 			tracerCache: cache.New(-1, -1),
@@ -105,6 +105,7 @@ func GetAgentService() *AgentService {
 
 		agentService.initTracerToken()
 		agentService.initOTEL()
+		agentService.initProM()
 		agentService.handleTasks()
 		if AllowSignalHandlers {
 			agentService.hookInterrupt()
@@ -467,7 +468,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 			}()
 
 			if err = handler(ctx, p); err == nil {
-				service.stats.exp.Add("sentTo:"+durable, 1)
+				service.stats.x.Add("sentTo:"+durable, 1)
 				service.stats.BytesSent.Add(int64(len(p.Payload)))
 				service.stats.MessagesSent.Add(1)
 				if p.Type == typeMetrics {
@@ -490,7 +491,7 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 
 func (service *AgentService) config(data []byte) error {
 	// stop nats processing, allow nats reconfiguring
-	transportOn := service.agentStatus.Transport == StatusRunning
+	transportOn := service.agentStatus.Transport.Value() == StatusRunning
 	if err := service.stopNats(); err != nil {
 		log.Err(err).Msg("error stopping nats on processing config")
 	}
@@ -538,6 +539,7 @@ func (service *AgentService) config(data []byte) error {
 func (service *AgentService) exit() error {
 	GetTransitService().eventsBatcher.Exit()
 	GetTransitService().metricsBatcher.Exit()
+	GetTransitService().inventoryKeeper.Stop()
 
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
@@ -578,12 +580,12 @@ func (service *AgentService) resetNats() error {
 	if err := os.RemoveAll(filepath.Join(service.Connector.NatsStoreDir, "jetstream")); err != nil {
 		log.Warn().Err(err).Msgf("could not remove nats jetstream dir")
 	}
-	if st0.Nats == StatusRunning {
+	if st0.Nats.Value() == StatusRunning {
 		if err := service.startNats(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats")
 		}
 	}
-	if st0.Transport == StatusRunning {
+	if st0.Transport.Value() == StatusRunning {
 		if err := service.startTransport(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats dispatcher")
 		}
@@ -598,7 +600,7 @@ func (service *AgentService) startController() error {
 
 func (service *AgentService) stopController() error {
 	// NOTE: the service.agentStatus.Controller will be updated by controller itself
-	if service.agentStatus.Controller == StatusStopped {
+	if service.agentStatus.Controller.Value() == StatusStopped {
 		return nil
 	}
 	return GetController().stopController()
@@ -621,13 +623,13 @@ func (service *AgentService) startNats() error {
 		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
 	if err == nil {
-		service.agentStatus.Nats = StatusRunning
+		service.agentStatus.Nats.Set(StatusRunning)
 	}
 	return err
 }
 
 func (service *AgentService) stopNats() error {
-	if service.agentStatus.Nats == StatusStopped {
+	if service.agentStatus.Nats.Value() == StatusStopped {
 		return nil
 	}
 
@@ -635,7 +637,7 @@ func (service *AgentService) stopNats() error {
 	err := service.stopTransport()
 	// skip Stop Transport error checking
 	nats.StopServer()
-	service.agentStatus.Nats = StatusStopped
+	service.agentStatus.Nats.Set(StatusStopped)
 	return err
 }
 
@@ -662,7 +664,7 @@ func (service *AgentService) startTransport() error {
 	service.gwClients = gwClients
 	/* Process dispatcher */
 	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
-		service.agentStatus.Transport = StatusRunning
+		service.agentStatus.Transport.Set(StatusRunning)
 	} else {
 		return sdErr
 	}
@@ -670,13 +672,13 @@ func (service *AgentService) startTransport() error {
 }
 
 func (service *AgentService) stopTransport() error {
-	if service.agentStatus.Transport == StatusStopped {
+	if service.agentStatus.Transport.Value() == StatusStopped {
 		return nil
 	}
 	if err := nats.StopDispatcher(); err != nil {
 		return err
 	}
-	service.agentStatus.Transport = StatusStopped
+	service.agentStatus.Transport.Set(StatusStopped)
 	return nil
 }
 
@@ -748,4 +750,16 @@ func (service *AgentService) initOTEL() {
 
 	clients.HookRequestContext = tracing.HookRequestContext
 	clients.GZIP = tracing.GZIP
+}
+
+// initProM inits Prometheus metrics
+func (service *AgentService) initProM() {
+	exports := make(map[string]*prometheus.Desc)
+	expvar.Do(func(kv expvar.KeyValue) {
+		exports[kv.Key] = prometheus.NewDesc("expvar_"+kv.Key, kv.Key, nil, nil)
+	})
+	expvarCollector := collectors.NewExpvarCollector(exports)
+	if err := prometheus.Register(expvarCollector); err != nil {
+		log.Warn().Err(err).Msg("could not register expvar collector")
+	}
 }

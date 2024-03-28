@@ -16,6 +16,25 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+var (
+	// export debug info AgentStatus
+	xAgentStatusController = expvar.NewString("tcgAgentStatusController")
+	xAgentStatusTransport  = expvar.NewString("tcgAgentStatusTransport")
+	xAgentStatusNats       = expvar.NewString("tcgAgentStatusNats")
+
+	// export debug info Stats
+	xStatsBytesSent              = expvar.NewInt("tcgStatsBytesSent")
+	xStatsMetricsSent            = expvar.NewInt("tcgStatsMetricsSent")
+	xStatsMessagesSent           = expvar.NewInt("tcgStatsMessagesSent")
+	xStatsExecutionTimeInventory = expvar.NewInt("tcgStatsExecutionTimeInventory")
+	xStatsExecutionTimeMetrics   = expvar.NewInt("tcgStatsExecutionTimeMetrics")
+	xStatsLastEventsRun          = expvar.NewInt("tcgStatsLastAlertRun")
+	xStatsLastInventoryRun       = expvar.NewInt("tcgStatsLastInventoryRun")
+	xStatsLastMetricsRun         = expvar.NewInt("tcgStatsLastMetricsRun")
+	xStatsUpSince                = expvar.NewInt("tcgStatsUpSince")
+	xStats                       = expvar.NewMap("tcgStats")
+)
+
 // Define NATS subjects
 // group downtimes, events actions, and inventory with metrics
 // as try to keep the processing order.
@@ -30,15 +49,16 @@ const (
 // Status defines status value
 type Status string
 
-// Status
+// Status as untyped string constants to avoid conversions for expvar
 const (
-	StatusProcessing Status = "processing"
-	StatusRunning    Status = "running"
-	StatusStopped    Status = "stopped"
-	StatusUnknown    Status = "unknown"
+	StatusProcessing = "processing"
+	StatusRunning    = "running"
+	StatusStopped    = "stopped"
+	StatusUnknown    = "unknown"
 )
 
 // Stats defines TCG statistics
+// exports debug info
 type Stats struct {
 	BytesSent              *expvar.Int
 	MetricsSent            *expvar.Int
@@ -49,28 +69,28 @@ type Stats struct {
 	LastInventoryRun       *expvar.Int
 	LastMetricsRun         *expvar.Int
 	UpSince                *expvar.Int
-	// exp handles different counters for debug
-	exp *expvar.Map
+	// x handles different counters for debug
+	x *expvar.Map
 }
 
 func NewStats() *Stats {
 	p := &Stats{
-		BytesSent:              expvar.NewInt("tcgBytesSent"),
-		MetricsSent:            expvar.NewInt("tcgMetricsSent"),
-		MessagesSent:           expvar.NewInt("tcgMessagesSent"),
-		ExecutionTimeInventory: expvar.NewInt("tcgExecutionTimeInventory"),
-		ExecutionTimeMetrics:   expvar.NewInt("tcgExecutionTimeMetrics"),
-		LastEventsRun:          expvar.NewInt("tcgLastAlertRun"),
-		LastInventoryRun:       expvar.NewInt("tcgLastInventoryRun"),
-		LastMetricsRun:         expvar.NewInt("tcgLastMetricsRun"),
-		UpSince:                expvar.NewInt("tcgUpSince"),
-		exp:                    expvar.NewMap("tcgExp"),
+		BytesSent:              xStatsBytesSent,
+		MetricsSent:            xStatsMetricsSent,
+		MessagesSent:           xStatsMessagesSent,
+		ExecutionTimeInventory: xStatsExecutionTimeInventory,
+		ExecutionTimeMetrics:   xStatsExecutionTimeMetrics,
+		LastEventsRun:          xStatsLastEventsRun,
+		LastInventoryRun:       xStatsLastInventoryRun,
+		LastMetricsRun:         xStatsLastMetricsRun,
+		UpSince:                xStatsUpSince,
+		x:                      xStats,
 	}
 	p.LastEventsRun.Set(-1)
 	p.LastInventoryRun.Set(-1)
 	p.LastMetricsRun.Set(-1)
 	p.UpSince.Set(time.Now().UnixMilli())
-	p.exp.Set("uptime", expvar.Func(func() interface{} {
+	p.x.Set("uptime", expvar.Func(func() interface{} {
 		return time.Since(time.UnixMilli(p.UpSince.Value())).Round(time.Second).String()
 	}))
 	return p
@@ -145,11 +165,25 @@ func (p AgentStatsExt) MarshalJSON() ([]byte, error) {
 }
 
 // AgentStatus defines TCG Agent status
+// exports debug info
 type AgentStatus struct {
-	task       *taskqueue.Task
-	Controller Status
-	Nats       Status
-	Transport  Status
+	task *taskqueue.Task
+
+	Controller *expvar.String
+	Transport  *expvar.String
+	Nats       *expvar.String
+}
+
+func NewAgentStatus() *AgentStatus {
+	p := &AgentStatus{
+		Controller: xAgentStatusController,
+		Transport:  xAgentStatusTransport,
+		Nats:       xAgentStatusNats,
+	}
+	p.Controller.Set(StatusStopped)
+	p.Transport.Set(StatusStopped)
+	p.Nats.Set(StatusStopped)
+	return p
 }
 
 // ConnectorStatusDTO describes status

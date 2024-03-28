@@ -169,21 +169,21 @@ func DemandConfig(errBuf *C.char, errBufLen C.size_t) C.bool {
 //
 //export IsControllerRunning
 func IsControllerRunning() C.bool {
-	return services.GetTransitService().Status().Controller == services.StatusRunning
+	return services.GetTransitService().Status().Controller.Value() == services.StatusRunning
 }
 
 // IsNatsRunning is a C API for services.GetTransitService().Status().Nats
 //
 //export IsNatsRunning
 func IsNatsRunning() C.bool {
-	return services.GetTransitService().Status().Nats == services.StatusRunning
+	return services.GetTransitService().Status().Nats.Value() == services.StatusRunning
 }
 
 // IsTransportRunning is a C API for services.GetTransitService().Status().Transport
 //
 //export IsTransportRunning
 func IsTransportRunning() C.bool {
-	return services.GetTransitService().Status().Transport == services.StatusRunning
+	return services.GetTransitService().Status().Transport.Value() == services.StatusRunning
 }
 
 // RegisterListMetricsHandler is a C API for services.GetTransitService().RegisterListMetricsHandler

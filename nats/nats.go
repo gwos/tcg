@@ -3,6 +3,7 @@ package nats
 import (
 	"context"
 	"errors"
+	"expvar"
 	"fmt"
 	"os"
 	"strings"
@@ -28,6 +29,8 @@ var (
 
 	s        = new(state)
 	subjects = []string{"tcg.>"}
+
+	xClientURL = expvar.NewString("tcgNatsClientURL")
 )
 
 type state struct {
@@ -120,6 +123,7 @@ func StartServer(config Config) error {
 			}
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
+	xClientURL.Set(s.server.ClientURL())
 
 	nc, err := nats.Connect(s.server.ClientURL())
 	if err != nil {
@@ -286,6 +290,7 @@ func StopServer() {
 		s.server = nil
 	}
 	log.Info().Msg("nats stopped")
+	xClientURL.Set("")
 }
 
 // StartDispatcher connects to stan and adds durable subscriptions

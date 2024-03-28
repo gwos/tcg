@@ -57,6 +57,6 @@ func TestIntegration(t *testing.T) {
 	badPayload := bytes.ReplaceAll(resourcesPayload,
 		[]byte(`context`), []byte(`*ontex*`))
 	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload))
-	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats)
-	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport)
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats.Value())
+	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport.Value())
 }

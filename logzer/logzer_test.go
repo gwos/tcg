@@ -90,7 +90,7 @@ func TestLogRotate(t *testing.T) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	w := NewLoggerWriter(WithLogFile(&LogFile{
 		FilePath: logFile.Name(),
-		MaxSize:  200,
+		MaxSize:  180,
 		Rotate:   3,
 	}))
 	log.Logger = zerolog.New(w).
