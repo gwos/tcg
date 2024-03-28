@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"expvar"
 	"fmt"
 	"os"
 	"os/signal"
@@ -25,6 +26,8 @@ import (
 	"github.com/gwos/tcg/tracing"
 	"github.com/hashicorp/go-uuid"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -102,6 +105,7 @@ func GetAgentService() *AgentService {
 
 		agentService.initTracerToken()
 		agentService.initOTEL()
+		agentService.initProM()
 		agentService.handleTasks()
 		if AllowSignalHandlers {
 			agentService.hookInterrupt()
@@ -746,4 +750,16 @@ func (service *AgentService) initOTEL() {
 
 	clients.HookRequestContext = tracing.HookRequestContext
 	clients.GZIP = tracing.GZIP
+}
+
+// initProM inits Prometheus metrics
+func (service *AgentService) initProM() {
+	exports := make(map[string]*prometheus.Desc)
+	expvar.Do(func(kv expvar.KeyValue) {
+		exports[kv.Key] = prometheus.NewDesc("expvar_"+kv.Key, kv.Key, nil, nil)
+	})
+	expvarCollector := collectors.NewExpvarCollector(exports)
+	if err := prometheus.Register(expvarCollector); err != nil {
+		log.Warn().Err(err).Msg("could not register expvar collector")
+	}
 }
