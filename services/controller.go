@@ -21,6 +21,8 @@ import (
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -108,7 +110,7 @@ func (controller *Controller) startController() error {
 	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
-		controller.agentStatus.Controller = StatusRunning
+		controller.agentStatus.Controller.Set(StatusRunning)
 		for {
 			controller.srv = &http.Server{
 				Addr:         addr,
@@ -139,7 +141,7 @@ func (controller *Controller) startController() error {
 			idleTimer.Stop()
 			break
 		}
-		controller.agentStatus.Controller = StatusStopped
+		controller.agentStatus.Controller.Set(StatusStopped)
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
 	<-idleTimer.C
@@ -355,7 +357,7 @@ func (controller *Controller) resetNats(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) start(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == StatusRunning && status.task == nil {
+	if status.Transport.Value() == StatusRunning && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusRunning, 0})
 		return
 	}
@@ -379,7 +381,7 @@ func (controller *Controller) start(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) stop(c *gin.Context) {
 	status := controller.Status()
-	if status.Transport == StatusStopped && status.task == nil {
+	if status.Transport.Value() == StatusStopped && status.task == nil {
 		c.JSON(http.StatusOK, ConnectorStatusDTO{StatusStopped, 0})
 		return
 	}
@@ -425,7 +427,7 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
-	statusDTO := ConnectorStatusDTO{status.Transport, 0}
+	statusDTO := ConnectorStatusDTO{Status(status.Transport.Value()), 0}
 	if status.task != nil {
 		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
 	}
@@ -590,7 +592,12 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 		}
 	}
 
-	pprofGroup := apiV1Group.Group("/debug/pprof")
+	/* public entrypoints */
+	apiV1Debug := router.Group("/api/v1/debug")
+	apiV1Debug.GET("/vars", gin.WrapH(expvar.Handler()))
+	apiV1Debug.GET("/metrics", gin.WrapH(promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})))
+
+	pprofGroup := apiV1Debug.Group("/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
 	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
 	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
@@ -603,6 +610,4 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	pprofGroup.GET("/heap", gin.WrapF(pprof.Handler("heap").ServeHTTP))
 	pprofGroup.GET("/mutex", gin.WrapF(pprof.Handler("mutex").ServeHTTP))
 	pprofGroup.GET("/threadcreate", gin.WrapF(pprof.Handler("threadcreate").ServeHTTP))
-
-	apiV1Group.GET("/debug/vars", gin.WrapH(expvar.Handler()))
 }

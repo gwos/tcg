@@ -22,7 +22,7 @@ var (
 	}
 	formatter = &zerolog.ConsoleWriter{
 		Out:        os.Stdout,
-		NoColor:    false,
+		NoColor:    true,
 		TimeFormat: time.RFC3339,
 	}
 	filter = &FilterWriter{

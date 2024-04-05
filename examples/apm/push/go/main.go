@@ -3,11 +3,11 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/prometheus/common/expfmt"
 	"math/rand"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 )
 
 const (
@@ -106,7 +106,6 @@ func main() {
 	// Note that successTime is not registered.
 
 	pusher := push.New(prometheusConnectorUrl, "db_backup").Gatherer(registry)
-	pusher.Format(expfmt.FmtText)
 	pusher.Client(CustomHttpDoer{})
 
 	start := time.Now()
