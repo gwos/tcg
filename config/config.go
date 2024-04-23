@@ -51,6 +51,45 @@ func (l LogLevel) String() string {
 	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
 }
 
+type Nats struct {
+	// NatsAckWait is the time the NATS server will wait before resending a message
+	// Should be greater then the GWClient request duration
+	NatsAckWait time.Duration `yaml:"-"`
+	// designates the maximum number of outstanding acknowledgements
+	// (messages that have been delivered but not acknowledged)
+	// that NATS Streaming will allow for a given subscription.
+	// When this limit is reached, NATS Streaming will suspend delivery of messages
+	// to this subscription until the number of unacknowledged messages falls below the specified limit
+	NatsMaxInflight int `yaml:"-"`
+	// NatsMaxPubAcksInflight accepts number of unacknowledged messages
+	// that a publisher may have in-flight at any given time.
+	// When this maximum is reached, further async publish calls will block
+	// until the number of unacknowledged messages falls below the specified limit
+	NatsMaxPubAcksInflight int   `yaml:"-"`
+	NatsMaxPayload         int32 `yaml:"-"`
+	// NatsMonitorPort enables monitoring on http port useful for debug
+	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
+	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
+	NatsMonitorPort int    `yaml:"-"`
+	NatsStoreDir    string `yaml:"natsFilestoreDir"`
+	// NatsStoreType accepts "FILE"|"MEMORY"
+	NatsStoreType string `yaml:"natsStoreType"`
+	// How long messages are kept
+	NatsStoreMaxAge time.Duration `yaml:"natsStoreMaxAge"`
+	// How many bytes are allowed per-channel
+	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
+	// How many messages are allowed per-channel
+	NatsStoreMaxMsgs int64 `yaml:"natsStoreMaxMsgs"`
+	// NatsServerConfigFile is used to override yaml values for
+	// NATS server configuration (debug only).
+	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
+}
+
+// Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
+func (c Nats) Hashsum() ([]byte, error) {
+	return Hashsum(c)
+}
+
 // Connector defines TCG Connector configuration
 // see GetConfig() for defaults
 type Connector struct {
@@ -94,37 +133,7 @@ type Connector struct {
 	LogColors     bool     `yaml:"logColors"`
 	LogTimeFormat string   `yaml:"logTimeFormat"`
 
-	// NatsAckWait is the time the NATS server will wait before resending a message
-	// Should be greater then the GWClient request duration
-	NatsAckWait time.Duration `yaml:"-"`
-	// designates the maximum number of outstanding acknowledgements
-	// (messages that have been delivered but not acknowledged)
-	// that NATS Streaming will allow for a given subscription.
-	// When this limit is reached, NATS Streaming will suspend delivery of messages
-	// to this subscription until the number of unacknowledged messages falls below the specified limit
-	NatsMaxInflight int `yaml:"-"`
-	// NatsMaxPubAcksInflight accepts number of unacknowledged messages
-	// that a publisher may have in-flight at any given time.
-	// When this maximum is reached, further async publish calls will block
-	// until the number of unacknowledged messages falls below the specified limit
-	NatsMaxPubAcksInflight int   `yaml:"-"`
-	NatsMaxPayload         int32 `yaml:"-"`
-	// NatsMonitorPort enables monitoring on http port useful for debug
-	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
-	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
-	NatsMonitorPort int    `yaml:"-"`
-	NatsStoreDir    string `yaml:"natsFilestoreDir"`
-	// NatsStoreType accepts "FILE"|"MEMORY"
-	NatsStoreType string `yaml:"natsStoreType"`
-	// How long messages are kept
-	NatsStoreMaxAge time.Duration `yaml:"natsStoreMaxAge"`
-	// How many bytes are allowed per-channel
-	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
-	// How many messages are allowed per-channel
-	NatsStoreMaxMsgs int64 `yaml:"natsStoreMaxMsgs"`
-	// NatsServerConfigFile is used to override yaml values for
-	// NATS server configuration (debug only).
-	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
+	Nats `yaml:",inline"`
 
 	TransportStartRndDelay int `yaml:"-"`
 }
@@ -232,17 +241,19 @@ func defaults() Config {
 			LogLevel:               1,
 			LogColors:              false,
 			LogTimeFormat:          time.RFC3339,
-			NatsAckWait:            time.Second * 30,
-			NatsMaxInflight:        4,
-			NatsMaxPubAcksInflight: 4,
-			NatsMaxPayload:         1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
-			NatsMonitorPort:        0,
-			NatsStoreDir:           "natsstore",
-			NatsStoreType:          "FILE",
-			NatsStoreMaxAge:        time.Hour * 24 * 10,     // 10days
-			NatsStoreMaxBytes:      1024 * 1024 * 1024 * 20, // 20GB
-			NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
-			NatsServerConfigFile:   "",
+			Nats: Nats{
+				NatsAckWait:            time.Second * 30,
+				NatsMaxInflight:        4,
+				NatsMaxPubAcksInflight: 4,
+				NatsMaxPayload:         1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
+				NatsMonitorPort:        0,
+				NatsStoreDir:           "natsstore",
+				NatsStoreType:          "FILE",
+				NatsStoreMaxAge:        time.Hour * 24 * 10,     // 10days
+				NatsStoreMaxBytes:      1024 * 1024 * 1024 * 20, // 20GB
+				NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
+				NatsServerConfigFile:   "",
+			},
 			TransportStartRndDelay: 60,
 		},
 		// create disabled connections to support partial setting with struct-path
@@ -464,6 +475,11 @@ func (cfg *Config) IsConfiguringPMC() bool {
 func (cfg Config) InitTracerProvider() (*tracesdk.TracerProvider, error) {
 	return initOTLP(fmt.Sprintf("%s:%s:%s",
 		cfg.Connector.AppType, cfg.Connector.AppName, cfg.Connector.AgentID))
+}
+
+// Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
+func (cfg Config) Hashsum() ([]byte, error) {
+	return Hashsum(cfg)
 }
 
 func (cfg Config) initLogger() {

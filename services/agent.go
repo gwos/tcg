@@ -492,10 +492,15 @@ func (service *AgentService) makeDispatcherOption(durable, subj string, handler 
 }
 
 func (service *AgentService) config(data []byte) error {
+	natsChk0, err := service.Connector.Nats.Hashsum()
+	if err != nil {
+		log.Err(err).Msg("error getting nats config checksum")
+	}
+
 	// stop nats processing, allow nats reconfiguring
-	transportOn := service.agentStatus.Transport.Value() == StatusRunning
-	if err := service.stopNats(); err != nil {
-		log.Err(err).Msg("error stopping nats on processing config")
+	isTransportRunning := service.agentStatus.Transport.Value() == StatusRunning
+	if err := service.stopTransport(); err != nil {
+		log.Err(err).Msg("error stopping transport on processing config")
 	}
 
 	// TODO: add logic to avoid processing previous inventory in case of callback fails
@@ -525,10 +530,22 @@ func (service *AgentService) config(data []byte) error {
 		service.tracerProvider.ForceFlush(context.Background())
 	}
 	service.initOTEL()
-	// configure nats service and start nats processing if enabled
-	if err := service.startNats(); err != nil {
-		log.Err(err).Msg("error starting nats on processing config")
-	} else if service.Connector.Enabled && transportOn {
+
+	// check nats configuration
+	natsChk, err := service.Connector.Nats.Hashsum()
+	if err != nil {
+		log.Err(err).Msg("error getting nats config checksum")
+	}
+	if !bytes.Equal(natsChk0, natsChk) {
+		// configure nats service and start nats processing if enabled
+		if err := service.stopNats(); err != nil {
+			log.Err(err).Msg("error stopping nats on processing config")
+		}
+		if err := service.startNats(); err != nil {
+			log.Err(err).Msg("error starting nats on processing config")
+		}
+	}
+	if service.Connector.Enabled && isTransportRunning {
 		if err := service.startTransport(); err != nil {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}

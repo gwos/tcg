@@ -1,18 +1,17 @@
 package connectors
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/gwos/tcg/tracing"
@@ -586,23 +585,7 @@ func Name(defaultName string, customName string) string {
 }
 
 // Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
-func Hashsum(args ...interface{}) ([]byte, error) {
-	var b bytes.Buffer
-	for _, arg := range args {
-		s, err := json.Marshal(arg)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := b.Write(s); err != nil {
-			return nil, err
-		}
-	}
-	h := fnv.New128()
-	if _, err := h.Write(b.Bytes()); err != nil {
-		return nil, err
-	}
-	return h.Sum(nil), nil
-}
+var Hashsum = config.Hashsum
 
 // MaxDuration returns maximum value
 func MaxDuration(x time.Duration, rest ...time.Duration) time.Duration {
