@@ -81,11 +81,9 @@ func Start() error {
 	// delay transport on application startup
 	go func() {
 		td := services.GetTransitService().TransportStartRndDelay
-		if td > 0 {
-			upSince := services.GetTransitService().Stats().UpSince.Value()
-			if time.Since(time.UnixMilli(upSince)).Round(time.Second) < 8 {
-				time.Sleep(DefaultCheckInterval + time.Second*time.Duration(rand.Intn(td)))
-			}
+		upSince := services.GetTransitService().Stats().UpSince.Value()
+		if td > 0 && time.Since(time.UnixMilli(upSince)).Round(time.Second) < 8 {
+			time.Sleep(DefaultCheckInterval + time.Second*time.Duration(rand.Intn(td)))
 		}
 		_ = services.GetTransitService().StartTransport()
 	}()
