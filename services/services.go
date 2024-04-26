@@ -186,6 +186,11 @@ func NewAgentStatus() *AgentStatus {
 	return p
 }
 
+func (p AgentStatus) String() string {
+	return fmt.Sprintf("[Nats:%v Transport:%v Controller:%v]",
+		p.Nats.Value(), p.Transport.Value(), p.Controller.Value())
+}
+
 // ConnectorStatusDTO describes status
 type ConnectorStatusDTO struct {
 	Status Status `json:"connectorStatus"`

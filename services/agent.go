@@ -318,19 +318,21 @@ func (service *AgentService) handleTasks() {
 	hDebug := func(tt []taskqueue.Task) {
 		log.Error().
 			Interface("lastTasks", tt).
-			Msgf("task queue")
+			Msg("task queue")
 	}
 	hAlarm := func(task *taskqueue.Task) error {
 		log.Error().Msgf("task queue timed over: %s", task.Subject)
 		return nil
 	}
 	hTask := func(task *taskqueue.Task) error {
-		log.Debug().
-			Interface("Subject", task.Subject).
-			Uint8("Idx", task.Idx).
-			Msg("task queue")
 		service.agentStatus.task = task
 		var err error
+
+		defer func() {
+			log.Debug().Err(err).Stringer("agentStatus", service.agentStatus).Msgf("task queue: done: (%v)%v", task.Idx, task.Subject)
+		}()
+		log.Debug().Stringer("agentStatus", service.agentStatus).Msgf("task queue: task: (%v)%v", task.Idx, task.Subject)
+
 		switch task.Subject {
 		case taskConfig:
 			err = service.config(task.Args[0].([]byte))
