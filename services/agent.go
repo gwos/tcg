@@ -592,19 +592,22 @@ func (service *AgentService) exit() error {
 }
 
 func (service *AgentService) resetNats() error {
-	st0 := *(service.agentStatus)
+	isNatsRunning, isTransportRunning :=
+		service.agentStatus.Nats.Value() == StatusRunning,
+		service.agentStatus.Transport.Value() == StatusRunning
+
 	if err := service.stopNats(); err != nil {
 		log.Warn().Err(err).Msg("could not stop nats")
 	}
 	if err := os.RemoveAll(filepath.Join(service.Connector.NatsStoreDir, "jetstream")); err != nil {
 		log.Warn().Err(err).Msgf("could not remove nats jetstream dir")
 	}
-	if st0.Nats.Value() == StatusRunning {
+	if isNatsRunning {
 		if err := service.startNats(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats")
 		}
 	}
-	if st0.Transport.Value() == StatusRunning {
+	if isTransportRunning {
 		if err := service.startTransport(); err != nil {
 			log.Warn().Err(err).Msg("could not start nats dispatcher")
 		}
