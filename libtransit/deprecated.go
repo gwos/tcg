@@ -2,12 +2,6 @@ package main
 
 /*
 #include <stdbool.h>
-
-typedef bool (*demandConfigHandler) ();
-
-static bool invokeDemandConfigHandler(demandConfigHandler fn) {
-	return fn();
-}
 */
 import "C"
 import (
@@ -34,24 +28,6 @@ func GetAgentIdentity(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.
 	}
 	bufStr(buf, bufLen, string(res))
 	return true
-}
-
-// Deprecated: Use RegisterConfigHandler instead
-// RegisterDemandConfigHandler is a C API for setting callback
-//
-//export RegisterDemandConfigHandler
-func RegisterDemandConfigHandler(fn C.demandConfigHandler) {
-	services.GetTransitService().RegisterConfigHandler(func([]byte) {
-		C.invokeDemandConfigHandler(fn)
-	})
-}
-
-// Deprecated: Use RemoveConfigHandler instead
-// RemoveDemandConfigHandler is a C API for removing callback
-//
-//export RemoveDemandConfigHandler
-func RemoveDemandConfigHandler() {
-	services.GetTransitService().RemoveConfigHandler()
 }
 
 // Deprecated: Use Send instead

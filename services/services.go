@@ -204,8 +204,6 @@ type AgentServices interface {
 	MakeTracerContext() *transit.TracerContext
 	RegisterConfigHandler(func([]byte))
 	RemoveConfigHandler()
-	RegisterDemandConfigHandler(func() bool)
-	RemoveDemandConfigHandler()
 	RegisterExitHandler(func())
 	RemoveExitHandler()
 	Stats() Stats
