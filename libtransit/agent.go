@@ -42,17 +42,6 @@ func init() {
 func main() {
 }
 
-// min returns minimum value
-func min(x int, rest ...int) int {
-	m := x
-	for _, y := range rest[:] {
-		if m > y {
-			m = y
-		}
-	}
-	return m
-}
-
 // bufStr puts Go string into C buffer
 func bufStr(buf *C.char, bufLen C.size_t, str string) {
 	NulTermLen := 1
