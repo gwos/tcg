@@ -1,4 +1,4 @@
-package main
+package apm
 
 import (
 	"context"
@@ -20,7 +20,7 @@ var (
 	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
-func main() {
+func Main() {
 	services.GetController().RegisterEntrypoints(initializeEntrypoints())
 
 	transitService := services.GetTransitService()
