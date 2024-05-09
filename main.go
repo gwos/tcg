@@ -8,6 +8,13 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors/apm"
+	"github.com/gwos/tcg/connectors/checker"
+	"github.com/gwos/tcg/connectors/elastic"
+	"github.com/gwos/tcg/connectors/k8s"
+	"github.com/gwos/tcg/connectors/nsca"
+	"github.com/gwos/tcg/connectors/office"
+	"github.com/gwos/tcg/connectors/server"
+	"github.com/gwos/tcg/connectors/snmp"
 )
 
 const (
@@ -38,10 +45,23 @@ func main() {
 	appName := config.GetConfig().Connector.AppName
 
 	switch {
-	case matchCmd(CmdAPM, appName) ||
-		matchCmd(CmdAPM, args0bs):
-		apm.Main()
-
+	case matchCmd(CmdAPM, appName) || matchCmd(CmdAPM, args0bs):
+		apm.Run()
+	case matchCmd(CmdChecker, appName) || matchCmd(CmdChecker, args0bs):
+		checker.Run()
+	case matchCmd(CmdElastic, appName) || matchCmd(CmdElastic, args0bs):
+		elastic.Run()
+	case matchCmd(CmdK8S, appName) || matchCmd(CmdK8S, args0bs) ||
+		matchCmd(CmdK8Sa, appName) || matchCmd(CmdK8Sa, args0bs):
+		k8s.Run()
+	case matchCmd(CmdNSCA, appName) || matchCmd(CmdNSCA, args0bs):
+		nsca.Run()
+	case matchCmd(CmdOffice, appName) || matchCmd(CmdOffice, args0bs):
+		office.Run()
+	case matchCmd(CmdServer, appName) || matchCmd(CmdServer, args0bs):
+		server.Run()
+	case matchCmd(CmdSNMP, appName) || matchCmd(CmdSNMP, args0bs):
+		snmp.Run()
 	default:
 		panic("main: unknown command:" +
 			" args0bs=" + args0bs + " appName=" + appName)
