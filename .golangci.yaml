@@ -21,7 +21,6 @@ linters:
   disable-all: false
   enable:
     - bodyclose
-    - deadcode
     - dogsled
     - dupl
     - errcheck
@@ -33,12 +32,10 @@ linters:
     - misspell
     - prealloc
     - staticcheck
-    - structcheck
     - stylecheck
     - unconvert
 # TODO:    - unparam
     - unused
-    - varcheck
     - whitespace
 # TODO:    - gocognit
 # TODO:    - gocyclo
