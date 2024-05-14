@@ -26,6 +26,7 @@ const (
 var (
 	ErrNATS       = fmt.Errorf("nats error")
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
+	ErrPayloadLim = fmt.Errorf("%w: payload oversized limit", ErrNATS)
 
 	s        = new(state)
 	subjects = []string{"tcg.>"}
@@ -303,14 +304,14 @@ func StartDispatcher(options []DispatcherOption) error {
 	defer d.Unlock()
 
 	if d.server == nil {
-		err := fmt.Errorf("%v: unavailable", ErrNATS)
-		log.Warn().Err(err).Msg("nats dispatcher failed")
+		err := fmt.Errorf("%w: unavailable", ErrNATS)
+		log.Err(err).Msg("nats dispatcher failed")
 		return err
 	}
 	if d.ncDispatcher == nil {
 		nc, err := nats.Connect(s.server.ClientURL())
 		if err != nil {
-			log.Warn().Err(err).Msg("nats dispatcher failed Connect")
+			log.Err(err).Msg("nats dispatcher failed Connect")
 			return err
 		}
 		d.ncDispatcher = nc
@@ -349,22 +350,24 @@ func StopDispatcher() error {
 // Publish adds message in queue
 func Publish(subject string, msg []byte) error {
 	if len(msg) > int(s.config.MaxPayload) {
-		return fmt.Errorf("%v: payload too big for limit %v: %v",
-			subject, s.config.MaxPayload, len(msg))
+		err := fmt.Errorf("%w: %v / %v / %v",
+			ErrPayloadLim, subject, s.config.MaxPayload, len(msg))
+		log.Err(err).Msg("nats publisher failed")
+		return err
 	}
 
 	s.Lock()
 	defer s.Unlock()
 
 	if s.server == nil {
-		err := fmt.Errorf("%v: unavailable", ErrNATS)
-		log.Warn().Err(err).Msg("nats publisher failed")
+		err := fmt.Errorf("%w: unavailable", ErrNATS)
+		log.Err(err).Msg("nats publisher failed")
 		return err
 	}
 	if s.ncPublisher == nil {
 		nc, err := nats.Connect(s.server.ClientURL())
 		if err != nil {
-			log.Warn().Err(err).Msg("nats publisher failed Connect")
+			log.Err(err).Msg("nats publisher failed Connect")
 			return err
 		}
 		s.ncPublisher = nc
