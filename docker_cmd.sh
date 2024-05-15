@@ -20,22 +20,29 @@ if ls /usr/local/groundwork/config/cacerts/*.pem > /dev/null 2>&1; then
     update-ca-certificates
 fi
 
-connector=$1
+
+cmd=${1//-connector/}
 fs_app=/app
 fs_var=/tcg
 
-if ! [ -x "${fs_app}/${connector}/${connector}" ]; then
-    echo "CONNECTOR NOT FOUND: ${fs_app}/${connector}/${connector}"
-    exit 1
-fi
+[ ! -x "${fs_app}/tcg-${cmd}" ] \
+    && echo "CONNECTOR NOT FOUND: ${fs_app}/tcg-${cmd}" \
+    && exit 1
 
-if ! [ -f "${fs_var}/${connector}/tcg_config.yaml" ]; then
-    mkdir -p "${fs_var}/${connector}"
-    cp "${fs_app}/${connector}/tcg_config.yaml" "${fs_var}/${connector}/tcg_config.yaml" || exit 1
-fi
+[ -d "${fs_var}/${cmd}-connector" ] && [ ! -d "${fs_var}/${cmd}" ] \
+    && echo "CONNECTOR COMPAT: ${cmd}-connector" \
+    && ln -s "${fs_var}/${cmd}-connector" "${fs_var}/${cmd}"
 
-cd "${fs_var}/${connector}" || exit 1
+[ -d "${fs_var}/kubernetes-connector" ] && [ ! -d "${fs_var}/k8s" ] \
+    && echo "CONNECTOR COMPAT: k8s" \
+    && ln -s "${fs_var}/kubernetes-connector" "${fs_var}/k8s"
+
+[ ! -f "${fs_var}/${cmd}/tcg_config.yaml" ] \
+    && mkdir -p "${fs_var}/${cmd}" \
+    && cp "${fs_app}/${cmd}/tcg_config.yaml" "${fs_var}/${cmd}"
+
+cd "${fs_var}/${cmd}" \
+    && exec "${fs_app}/tcg-${cmd}"
 
 # NOTE: do exec to replace shell process
 # so application will receive OS signals
-exec "${fs_app}/${connector}/${connector}"
