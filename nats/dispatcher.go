@@ -57,7 +57,7 @@ func (d *natsDispatcher) Flush() {
 	d.retries.Flush()
 }
 
-func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) {
+func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 	js, err := d.ncDispatcher.JetStream(
 		nats.DirectGet(),
 	)
@@ -107,7 +107,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DispatcherOption) 
 	go d.fetch(ctx, opt, sub)
 }
 
-func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *nats.Subscription) {
+func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Subscription) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -154,7 +154,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DispatcherOption, sub *n
 	}
 }
 
-func (d *natsDispatcher) processMsg(ctx context.Context, opt DispatcherOption, msg *nats.Msg) *dispatcherRetry {
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
 		log.Warn().Err(err).Interface("msg", *msg).
