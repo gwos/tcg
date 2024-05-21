@@ -24,6 +24,8 @@ const (
 )
 
 var (
+	DecodeHeadersMsg = nats.DecodeHeadersMsg
+
 	ErrNATS       = fmt.Errorf("nats error")
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 	ErrPayloadLim = fmt.Errorf("%w: payload oversized limit", ErrNATS)
@@ -61,8 +63,8 @@ type Config struct {
 	ConfigFile string
 }
 
-// DispatcherOption defines subscription
-type DispatcherOption struct {
+// DurableCfg defines subscription
+type DurableCfg struct {
 	Durable string
 	Subject string
 	Handler func([]byte) error
@@ -295,7 +297,7 @@ func StopServer() {
 }
 
 // StartDispatcher connects to stan and adds durable subscriptions
-func StartDispatcher(options []DispatcherOption) error {
+func StartDispatcher(options []DurableCfg) error {
 	if err := StopDispatcher(); err != nil {
 		return err
 	}
@@ -347,11 +349,11 @@ func StopDispatcher() error {
 	return nil
 }
 
-// Publish adds message in queue
-func Publish(subject string, msg []byte) error {
-	if len(msg) > int(s.config.MaxPayload) {
+// Publish adds payload in queue with optional key-value headers
+func Publish(subj string, data []byte, headers ...string) error {
+	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
-			ErrPayloadLim, subject, s.config.MaxPayload, len(msg))
+			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
 		log.Err(err).Msg("nats publisher failed")
 		return err
 	}
@@ -373,5 +375,14 @@ func Publish(subject string, msg []byte) error {
 		s.ncPublisher = nc
 	}
 
-	return s.ncPublisher.Publish(subject, msg)
+	if len(headers) < 2 {
+		return s.ncPublisher.Publish(subj, data)
+	}
+
+	msg := nats.NewMsg(subj)
+	msg.Data = data
+	for i := 0; i < len(headers); i += 2 {
+		msg.Header.Set(headers[i], headers[i+1])
+	}
+	return s.ncPublisher.PublishMsg(msg)
 }

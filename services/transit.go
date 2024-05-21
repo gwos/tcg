@@ -11,7 +11,7 @@ import (
 	"github.com/gwos/tcg/batcher"
 	"github.com/gwos/tcg/batcher/events"
 	"github.com/gwos/tcg/batcher/metrics"
-	"github.com/gwos/tcg/nats"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/tracing"
 	"github.com/rs/zerolog/log"
 )
@@ -39,6 +39,7 @@ type TransitService struct {
 		sync.Mutex
 		TickerFn
 		buf []byte
+		hdr []string
 	}
 
 	suppressDowntimes bool
@@ -77,8 +78,10 @@ func GetTransitService() *TransitService {
 			if len(p.buf) == 0 {
 				return
 			}
-			if err := nats.Publish(subjInventoryMetrics, p.buf); err == nil {
-				p.buf = nil
+			// TODO: store as file
+			err := Put2Nats(context.TODO(), subjInventoryMetrics, p.buf, p.hdr...)
+			if err == nil {
+				p.buf, p.hdr = nil, nil
 			}
 		})
 
@@ -122,26 +125,21 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 		return nil
 	}
 
-	var (
-		b   []byte
-		err error
-	)
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("ClearInDowntime failed")
+		}
 	}()
 
-	b, err = natsPayload{span.SpanContext(), payload, typeClearInDowntime}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjDowntimes, b)
+	err = Put2Nats(ctx, subjDowntimes, payload,
+		clients.HdrPayloadType, typeClearInDowntime.String())
 	return err
 }
 
@@ -151,26 +149,21 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 		return nil
 	}
 
-	var (
-		b   []byte
-		err error
-	)
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("ClearInDowntime failed")
+		}
 	}()
 
-	b, err = natsPayload{span.SpanContext(), payload, typeSetInDowntime}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjDowntimes, b)
+	err = Put2Nats(ctx, subjDowntimes, payload,
+		clients.HdrPayloadType, typeSetInDowntime.String())
 	return err
 }
 
@@ -190,26 +183,22 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendEvents", 1)
-	var (
-		b   []byte
-		err error
-	)
+
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("sendEvents failed")
+		}
 	}()
 
-	b, err = natsPayload{span.SpanContext(), payload, typeEvents}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjEvents, b)
+	err = Put2Nats(ctx, subjEvents, payload,
+		clients.HdrPayloadType, typeEvents.String())
 	return err
 }
 
@@ -219,26 +208,21 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 		return nil
 	}
 
-	var (
-		b   []byte
-		err error
-	)
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("SendEventsAck failed")
+		}
 	}()
 
-	b, err = natsPayload{span.SpanContext(), payload, typeEventsAck}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjEvents, b)
+	err = Put2Nats(ctx, subjEvents, payload,
+		clients.HdrPayloadType, typeEventsAck.String())
 	return err
 }
 
@@ -248,26 +232,21 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 		return nil
 	}
 
-	var (
-		b   []byte
-		err error
-	)
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("SendEventsUnack failed")
+		}
 	}()
 
-	b, err = natsPayload{span.SpanContext(), payload, typeEventsUnack}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjEvents, b)
+	err = Put2Nats(ctx, subjEvents, payload,
+		clients.HdrPayloadType, typeEventsUnack.String())
 	return err
 }
 
@@ -287,31 +266,35 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendMetrics", 1)
-	var (
-		b   []byte
-		err error
-	)
+
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
-	_, span2 := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+	var err error
 	defer func() {
-		tracing.EndTraceSpan(span2,
+		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
 		)
-		tracing.EndTraceSpan(span)
+		if err != nil {
+			log.Err(err).Msg("sendMetrics failed")
+		}
 	}()
 
-	payload, err = service.mixTracerContext(payload)
-	if err != nil {
-		return err
+	payload, todoTracerCtx := service.mixTracerContext(payload)
+	headers := []string{clients.HdrPayloadType, typeMetrics.String()}
+	if todoTracerCtx {
+		headers = append(headers, clients.HdrTodoTracerCtx)
 	}
-	b, err = natsPayload{span.SpanContext(), payload, typeMetrics}.Marshal()
-	if err != nil {
-		return err
-	}
-	err = nats.Publish(subjInventoryMetrics, b)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload,
+		headers...)
 	return err
+
+	// b, err = natsPayload{span.SpanContext(), payload, typeMetrics}.Marshal()
+	// if err != nil {
+	// 	return err
+	// }
+	// err = nats.Publish(subjInventoryMetrics, b)
+	// return err
 }
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
@@ -319,35 +302,26 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	if service.suppressInventory {
 		return nil
 	}
-
 	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
-	var (
-		b   []byte
-		err error
-	)
-	ctx, span1 := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
-	_, span := tracing.StartTraceSpan(ctx, "services", "nats:publish")
+
+	_, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
-			tracing.TraceAttrPayloadDbg(b),
-			tracing.TraceAttrPayloadLen(b),
-		)
-		tracing.EndTraceSpan(span1,
 			tracing.TraceAttrPayloadDbg(payload),
 			tracing.TraceAttrPayloadLen(payload),
 		)
+		if err != nil {
+			log.Err(err).Msg("SynchronizeInventory failed")
+		}
 	}()
 
-	payload, err = service.mixTracerContext(payload)
-	if err != nil {
-		return err
+	payload, todoTracerCtx := service.mixTracerContext(payload)
+	headers := []string{clients.HdrPayloadType, typeInventory.String()}
+	if todoTracerCtx {
+		headers = append(headers, clients.HdrTodoTracerCtx)
 	}
-	b, err = natsPayload{span.SpanContext(), payload, typeInventory}.Marshal()
-	if err != nil {
-		return err
-	}
-
 	// Note. There is a corner case when Nats is not ready
 	// We can buffer inventory and send when ready
 	// err = nats.Publish(subjInventoryMetrics, b)
@@ -355,7 +329,7 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	func() {
 		service.inventoryKeeper.Lock()
 		defer service.inventoryKeeper.Unlock()
-		service.inventoryKeeper.buf = b
+		service.inventoryKeeper.buf, service.inventoryKeeper.hdr = payload, headers
 	}()
 	return nil
 }
