@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Main() {
+func Run() {
 	var (
 		entries        = initializeEntrypoints()
 		controller     = services.GetController()

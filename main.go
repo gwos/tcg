@@ -8,8 +8,10 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors/apm"
+	"github.com/gwos/tcg/connectors/azure"
 	"github.com/gwos/tcg/connectors/checker"
 	"github.com/gwos/tcg/connectors/elastic"
+	"github.com/gwos/tcg/connectors/events"
 	"github.com/gwos/tcg/connectors/k8s"
 	"github.com/gwos/tcg/connectors/nsca"
 	"github.com/gwos/tcg/connectors/office"
@@ -28,6 +30,7 @@ const (
 	CmdOffice  = "office"
 	CmdServer  = "server"
 	CmdSNMP    = "snmp"
+	CmdAzure   = "azure"
 )
 
 var cmdRe = regexp.MustCompile(`^(tcg[_-])?(?P<cmdName>.+?)([_-]connector)?$`)
@@ -62,6 +65,10 @@ func main() {
 		server.Run()
 	case matchCmd(CmdSNMP, appName) || matchCmd(CmdSNMP, args0bs):
 		snmp.Run()
+	case matchCmd(CmdEvents, appName) || matchCmd(CmdEvents, args0bs):
+		events.Run()
+	case matchCmd(CmdAzure, appName) || matchCmd(CmdAzure, args0bs):
+		azure.Run()
 	default:
 		panic("main: unknown command:" +
 			" args0bs=" + args0bs + " appName=" + appName)
