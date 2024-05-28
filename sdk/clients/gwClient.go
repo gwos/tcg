@@ -492,7 +492,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	for i := 0; i < len(additionalHeaders); i += 2 {
+	for i := 0; i < len(additionalHeaders)-1; i += 2 {
 		k, v := additionalHeaders[i], additionalHeaders[i+1]
 		headers[k] = v
 	}
