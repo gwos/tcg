@@ -2,9 +2,7 @@ package azure
 
 import (
 	"context"
-	"encoding/json"
 	"os"
-	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/gwos/tcg/connectors"
@@ -14,34 +12,13 @@ import (
 )
 
 const (
+	defaultHostGroupName        = "AZURE"
+	defaultHostGroupDescription = ""
+
 	envAzureTenantID     = "AZURE_TENANT_ID"
 	envAzureClientID     = "AZURE_CLIENT_ID"
 	envAzureClientSecret = "AZURE_CLIENT_SECRET"
 )
-
-type ExtConfig struct {
-	AzureTenantID       string `json:"azureTenantId"`
-	AzureClientID       string `json:"azureClientId"`
-	AzureClientSecret   string `json:"azureClientSecret"`
-	AzureSubscriptionID string `json:"azureSubscriptionId"`
-
-	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
-	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
-}
-
-// UnmarshalJSON implements json.Unmarshaler.
-func (cfg *ExtConfig) UnmarshalJSON(input []byte) error {
-	type plain ExtConfig
-	c := plain(*cfg)
-	if err := json.Unmarshal(input, &c); err != nil {
-		return err
-	}
-	if c.CheckInterval != cfg.CheckInterval {
-		c.CheckInterval = c.CheckInterval * time.Minute
-	}
-	*cfg = ExtConfig(c)
-	return nil
-}
 
 func collectMetrics() {
 	if extConfig.AzureTenantID == "" || extConfig.AzureClientID == "" ||
@@ -59,15 +36,17 @@ func collectMetrics() {
 		return
 	}
 
-	resources, err := utils.ResourcesList(cred, extConfig.AzureSubscriptionID)
+	allResources, err := utils.ResourcesList(cred, extConfig.AzureSubscriptionID)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get azure resources")
 		return
 	}
+	targetResources := utils.FilterResources(allResources, extConfig.GWMapping.Host)
 
 	monitoredResources := make([]transit.MonitoredResource, 0)
-	for _, resource := range resources {
-		definitions, err := utils.MetricsDefinitionsList(cred, extConfig.AzureSubscriptionID, resource)
+	monitoredResourcesRef := make([]transit.ResourceRef, 0)
+	for _, resource := range targetResources {
+		allDefinitions, err := utils.MetricsDefinitionsList(cred, extConfig.AzureSubscriptionID, resource)
 		if err != nil {
 			log.Error().Err(err).
 				Str("resource_id", *resource.ID).
@@ -75,26 +54,18 @@ func collectMetrics() {
 				Msg("failed to get metrics definitions")
 			continue
 		}
+		targetDefinitions := utils.FilterDefinitions(allDefinitions, extConfig.GWMapping.Service)
 
-		metrics, err := utils.MetricsList(cred, extConfig.AzureSubscriptionID, resource, definitions)
+		metrics, err := utils.MetricsList(cred, extConfig.AzureSubscriptionID, resource, targetDefinitions)
 		if err != nil {
 			continue
 		}
 
 		var services []transit.MonitoredService
 		for _, metric := range metrics {
-			value := metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Average
-			if value == nil {
-				var zero float64 = 0
-				value = &zero
-			}
-			mb := connectors.MetricBuilder{
-				Name:       *metric.Value[0].Name.Value,
-				CustomName: *metric.Value[0].Name.Value,
-				Value:      value,
-				UnitType:   transit.UnitCounter,
-			}
-			service, err := connectors.BuildServiceForMetric(*resource.Name, mb)
+			metricBuilder := utils.CreateMetricBuilder(metric)
+
+			service, err := connectors.BuildServiceForMetric(*resource.Name, metricBuilder)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to build service for metric")
 				continue
@@ -113,9 +84,17 @@ func collectMetrics() {
 		}
 
 		monitoredResources = append(monitoredResources, *monitoredResource)
+		monitoredResourcesRef = append(
+			monitoredResourcesRef,
+			connectors.CreateResourceRef(*resource.Name, "", transit.ResourceTypeHost),
+		)
 	}
 
-	if err = connectors.SendMetrics(context.Background(), monitoredResources, nil); err != nil {
+	resourceGroups := []transit.ResourceGroup{
+		connectors.CreateResourceGroup(defaultHostGroupName, defaultHostGroupDescription, transit.HostGroup, monitoredResourcesRef),
+	}
+
+	if err = connectors.SendMetrics(context.Background(), monitoredResources, &resourceGroups); err != nil {
 		log.Error().Err(err).Msg("failed to send metrics")
 	}
 }

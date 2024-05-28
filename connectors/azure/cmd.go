@@ -5,7 +5,6 @@ import (
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
-	"github.com/gwos/tcg/connectors/azure/utils"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
@@ -16,8 +15,6 @@ var (
 	monitorConnection = &transit.MonitorConnection{
 		Extensions: extConfig,
 	}
-	_                 = &transit.MetricsProfile{}
-	_                 = &transit.Mappings{}
 	ctxCancel, cancel = context.WithCancel(context.Background())
 )
 
@@ -62,12 +59,9 @@ func configHandler(data []byte) {
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
-	var err error
-	_, err = utils.UnmarshalMappings(data)
-	if err != nil {
-		log.Err(err).Msg("failed to parse config")
-		return
-	}
+
+	tExt.GWMapping.Prepare()
+
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())

@@ -1,27 +1,29 @@
 package utils
 
 import (
-	"encoding/json"
-	"regexp"
-
-	"github.com/gwos/tcg/sdk/transit"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+	"github.com/gwos/tcg/sdk/mapping"
 )
 
-// UnmarshalMappings decodes the input bytes into a transit.Mappings struct
-func UnmarshalMappings(input []byte) (*transit.Mappings, error) {
-	var connector struct {
-		Mappings transit.Mappings `json:"mappings"`
+func FilterResources(
+	resources []*armresources.GenericResourceExpanded,
+	mappings mapping.Mappings,
+) []*armresources.GenericResourceExpanded {
+	result := make([]*armresources.GenericResourceExpanded, 0)
+	for _, resource := range resources {
+		if mappings.MatchString(*resource.Name) {
+			result = append(result, resource)
+		}
 	}
-	if err := json.Unmarshal(input, &connector); err != nil {
-		return nil, err
-	}
+	return result
+}
 
-	for i, mapping := range connector.Mappings.HostLabel {
-		connector.Mappings.HostLabel[i].Regexp = regexp.MustCompile(mapping.Source)
+func FilterDefinitions(definitions []string, mappings mapping.Mappings) []string {
+	result := make([]string, 0)
+	for _, definition := range definitions {
+		if mappings.MatchString(definition) {
+			result = append(result, definition)
+		}
 	}
-	for i, mapping := range connector.Mappings.ServiceLabel {
-		connector.Mappings.ServiceLabel[i].Regexp = regexp.MustCompile(mapping.Source)
-	}
-
-	return &connector.Mappings, nil
+	return result
 }
