@@ -381,7 +381,7 @@ func Publish(subj string, data []byte, headers ...string) error {
 
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	for i := 0; i < len(headers); i += 2 {
+	for i := 0; i < len(headers)-1; i += 2 {
 		msg.Header.Set(headers[i], headers[i+1])
 	}
 	return s.ncPublisher.PublishMsg(msg)
