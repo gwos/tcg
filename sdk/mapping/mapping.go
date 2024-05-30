@@ -113,3 +113,16 @@ func (p Mappings) Compile() error {
 	}
 	return nil
 }
+
+func (p Mappings) MatchString(str string) bool {
+	if len(p) == 0 {
+		return true
+	}
+	for i := range p {
+		matches := p[i].matcher.FindAllStringSubmatchIndex(str, -1)
+		if matches != nil {
+			return true
+		}
+	}
+	return false
+}
