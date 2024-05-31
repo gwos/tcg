@@ -322,18 +322,30 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 
 // SynchronizeInventory calls API
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
-	headers := []header{}
+	headers := []string{}
+	hdrCompressed := ""
+	if h := ctx.Value(CtxHeaders); h != nil {
+		if h, ok := h.(interface{ Get(string) string }); ok {
+			if hdrCompressed = h.Get(HdrCompressed); hdrCompressed != "" {
+				headers = append(headers, "Content-Encoding", hdrCompressed)
+			}
+		}
+	}
 	mergeParam := make(map[string]string)
 	mergeHosts := true
 	if client.GWConnection != nil {
-		if client.GWConnection.HTTPEncode {
-			headers = append(headers, header{"Content-Encoding", "gzip"})
-		}
 		mergeHosts = client.GWConnection.MergeHosts
+		if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+			var err error
+			if ctx, payload, err = GZIP(ctx, payload); err != nil {
+				return nil, err
+			}
+			headers = append(headers, "Content-Encoding", "gzip")
+		}
 	}
 	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		headers = append(headers, header{"HostNamePrefix", client.ResourceNamePrefix})
+		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSynchronizeInventory, BuildQueryParams(mergeParam),
 		payload, headers...)
@@ -341,16 +353,29 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 
 // SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
-	headers := []header{}
-	if client.GWConnection != nil && client.GWConnection.HTTPEncode {
-		headers = append(headers, header{"Content-Encoding", "gzip"})
+	headers := []string{}
+	hdrCompressed := ""
+	if h := ctx.Value(CtxHeaders); h != nil {
+		if h, ok := h.(interface{ Get(string) string }); ok {
+			if hdrCompressed = h.Get(HdrCompressed); hdrCompressed != "" {
+				headers = append(headers, "Content-Encoding", hdrCompressed)
+			}
+		}
+	}
+	if client.GWConnection != nil && client.GWConnection.HTTPEncode &&
+		hdrCompressed == "" {
+		var err error
+		if ctx, payload, err = GZIP(ctx, payload); err != nil {
+			return nil, err
+		}
+		headers = append(headers, "Content-Encoding", "gzip")
 	}
 	entrypoint := GWEntrypointSendResourceWithMetrics
 	if client.IsDynamicInventory {
 		entrypoint = GWEntrypointSendResourceWithMetricsDynamic
 	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		headers = append(headers, header{"HostNamePrefix", client.ResourceNamePrefix})
+		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
 	return client.sendRequest(ctx, http.MethodPost, entrypoint, "", payload, headers...)
 }
@@ -359,7 +384,7 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendRequest(ctx, http.MethodPost, GWEntrypointClearInDowntime, "", payload,
-			header{"HostNamePrefix", client.ResourceNamePrefix},
+			"HostNamePrefix", client.ResourceNamePrefix,
 		)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointClearInDowntime, "", payload)
@@ -369,7 +394,7 @@ func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]
 func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendRequest(ctx, http.MethodPost, GWEntrypointSetInDowntime, "", payload,
-			header{"HostNamePrefix", client.ResourceNamePrefix},
+			"HostNamePrefix", client.ResourceNamePrefix,
 		)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSetInDowntime, "", payload)
@@ -379,7 +404,7 @@ func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]by
 func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte, error) {
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEvents, "", payload,
-			header{"HostNamePrefix", client.ResourceNamePrefix},
+			"HostNamePrefix", client.ResourceNamePrefix,
 		)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEvents, "", payload)
@@ -389,7 +414,7 @@ func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte,
 func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]byte, error) {
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEventsAck, "", payload,
-			header{"HostNamePrefix", client.ResourceNamePrefix},
+			"HostNamePrefix", client.ResourceNamePrefix,
 		)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEventsAck, "", payload)
@@ -399,7 +424,7 @@ func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]by
 func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error) {
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEventsUnack, "", payload,
-			header{"HostNamePrefix", client.ResourceNamePrefix},
+			"HostNamePrefix", client.ResourceNamePrefix,
 		)
 	}
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSendEventsUnack, "", payload)
@@ -458,13 +483,8 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	return &gwHostGroups, nil
 }
 
-type header struct {
-	key   string
-	value string
-}
-
 func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,
-	payload []byte, additionalHeaders ...header) ([]byte, error) {
+	payload []byte, additionalHeaders ...string) ([]byte, error) {
 
 	headers := map[string]string{
 		"Accept":         "application/json",
@@ -472,8 +492,9 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token,
 	}
-	for _, h := range additionalHeaders {
-		headers[h.key] = h.value
+	for i := 0; i < len(additionalHeaders)-1; i += 2 {
+		k, v := additionalHeaders[i], additionalHeaders[i+1]
+		headers[k] = v
 	}
 
 	req, err := client.doReq(ctx, httpMethod, entrypoint, queryStr, headers, nil, payload)

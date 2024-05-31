@@ -136,14 +136,6 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 		body = []byte(urlValues.Encode())
 	}
 
-	if q.Headers["Content-Encoding"] == "gzip" {
-		ctx, body, err = GZIP(ctx, body)
-		if err != nil {
-			q.Status, q.Err = -1, err
-			return q, err
-		}
-	}
-
 	var bodyBuf io.Reader
 	if body != nil {
 		bodyBuf = bytes.NewBuffer(body)
@@ -198,7 +190,9 @@ func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]by
 			fields["form"] = q.Form
 		}
 		if len(q.Payload) > 0 {
-			if bytes.HasPrefix(q.Payload, []byte(`{`)) {
+			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
+				fields["payload"] = "encoded:" + v
+			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 				rawJSON["payload"] = q.Payload
 			} else {
 				fields["payload"] = string(q.Payload)
@@ -240,7 +234,9 @@ func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[stri
 		fields["form"] = q.Form
 	}
 	if len(q.Payload) > 0 {
-		if bytes.HasPrefix(q.Payload, []byte(`{`)) {
+		if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
+			fields["payload"] = "encoded:" + v
+		} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 			rawJSON["payload"] = q.Payload
 		} else {
 			fields["payload"] = string(q.Payload)

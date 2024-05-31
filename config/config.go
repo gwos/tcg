@@ -65,8 +65,9 @@ type Nats struct {
 	// that a publisher may have in-flight at any given time.
 	// When this maximum is reached, further async publish calls will block
 	// until the number of unacknowledged messages falls below the specified limit
-	NatsMaxPubAcksInflight int   `yaml:"-"`
-	NatsMaxPayload         int32 `yaml:"-"`
+	NatsMaxPubAcksInflight int `yaml:"-"`
+	// NatsMaxPayload         int32 `yaml:"-"`
+	NatsMaxPayload int32 `yaml:"natsMaxPayload"` // enabling for testing oversized payloads
 	// NatsMonitorPort enables monitoring on http port useful for debug
 	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
 	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring

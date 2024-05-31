@@ -278,14 +278,14 @@ func (t payloadType) String() string {
 	return t.all()[t]
 }
 
-func (t *payloadType) FromString(s string) error {
+func (t *payloadType) FromStr(s string) (*payloadType, error) {
 	for i, v := range t.all() {
 		if s == v {
 			*t = payloadType(i)
-			return nil
+			return t, nil
 		}
 	}
-	return fmt.Errorf("unknown payload type")
+	return nil, fmt.Errorf("unknown payload type")
 }
 
 type natsPayload struct {
@@ -412,7 +412,7 @@ func (p *natsPayload) unmarshalV2(input []byte) error {
 		return err
 	}
 	var pt payloadType
-	if err := pt.FromString(p2.Type); err != nil {
+	if _, err := pt.FromStr(p2.Type); err != nil {
 		return err
 	}
 	*p = natsPayload{

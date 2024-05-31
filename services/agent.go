@@ -5,13 +5,10 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"expvar"
-	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -20,7 +17,6 @@ import (
 	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
-	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/taskqueue"
 	"github.com/gwos/tcg/tracing"
@@ -32,7 +28,6 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // AgentService implements AgentServices interface
@@ -112,15 +107,7 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Str("AgentID", agentService.AgentID).
-			Str("AppType", agentService.AppType).
-			Str("AppName", agentService.AppName).
-			Str("BatchEvents", agentService.BatchEvents.String()).
-			Str("BatchMetrics", agentService.BatchMetrics.String()).
-			Int("BatchMaxBytes", agentService.BatchMaxBytes).
-			Str("ControllerAddr", agentService.ControllerAddr).
-			Str("DSClient", agentService.dsClient.HostName).
-			Msg("starting with config")
+			Msgf("starting with config: %+v", agentService.Connector)
 	})
 
 	return agentService
@@ -375,122 +362,6 @@ func (service *AgentService) handleTasks() {
 	)
 }
 
-func (service *AgentService) makeDispatcherOptions() []nats.DispatcherOption {
-	var dispatcherOptions = make([]nats.DispatcherOption, 0, len(service.gwClients))
-	for _, gwClient := range service.gwClients {
-		// TODO: filter the message by rules per gwClient
-		gwClient := gwClient /* hold loop var copy */
-		dispatcherOptions = append(
-			dispatcherOptions,
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjDowntimes, gwClient.HostName),
-				subjDowntimes,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeClearInDowntime:
-						_, err = gwClient.ClearInDowntime(ctx, p.Payload)
-					case typeSetInDowntime:
-						_, err = gwClient.SetInDowntime(ctx, p.Payload)
-					default:
-						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjDowntimes)
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjEvents, gwClient.HostName),
-				subjEvents,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeEvents:
-						_, err = gwClient.SendEvents(ctx, p.Payload)
-					case typeEventsAck:
-						_, err = gwClient.SendEventsAck(ctx, p.Payload)
-					case typeEventsUnack:
-						_, err = gwClient.SendEventsUnack(ctx, p.Payload)
-					default:
-						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjEvents)
-					}
-					return err
-				},
-			),
-			service.makeDispatcherOption(
-				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClient.HostName),
-				subjInventoryMetrics,
-				func(ctx context.Context, p natsPayload) error {
-					var err error
-					switch p.Type {
-					case typeInventory:
-						_, err = gwClient.SynchronizeInventory(ctx, service.fixTracerContext(p.Payload))
-					case typeMetrics:
-						_, err = gwClient.SendResourcesWithMetrics(ctx, service.fixTracerContext(p.Payload))
-					default:
-						err = fmt.Errorf("%w: failed to process payload type %s:%s", nats.ErrDispatcher, p.Type, subjInventoryMetrics)
-					}
-					return err
-				},
-			),
-		)
-	}
-	return dispatcherOptions
-}
-
-func (service *AgentService) makeDispatcherOption(durable, subj string, handler func(context.Context, natsPayload) error) nats.DispatcherOption {
-	for _, s := range []string{"/", ".", "*", ">"} {
-		durable = strings.ReplaceAll(durable, s, "")
-	}
-	return nats.DispatcherOption{
-		Durable: durable,
-		Subject: subj,
-		Handler: func(b []byte) error {
-			var err error
-			getCtx := func(sc trace.SpanContext) context.Context {
-				if sc.IsValid() {
-					return trace.ContextWithRemoteSpanContext(context.Background(), sc)
-				}
-				return context.Background()
-			}
-
-			p := natsPayload{}
-			if err = p.Unmarshal(b); err != nil {
-				log.Warn().Err(err).Msg("could not unmarshal payload")
-			}
-			ctx, span := tracing.StartTraceSpan(getCtx(p.SpanContext), "services", "nats:dispatch")
-			defer func() {
-				tracing.EndTraceSpan(span,
-					tracing.TraceAttrError(err),
-					tracing.TraceAttrPayloadDbg(p.Payload),
-					tracing.TraceAttrPayloadLen(p.Payload),
-					tracing.TraceAttrStr("type", p.Type.String()),
-					tracing.TraceAttrStr("durable", durable),
-					tracing.TraceAttrStr("subject", subj),
-				)
-			}()
-
-			if err = handler(ctx, p); err == nil {
-				service.stats.x.Add("sentTo:"+durable, 1)
-				service.stats.BytesSent.Add(int64(len(p.Payload)))
-				service.stats.MessagesSent.Add(1)
-				if p.Type == typeMetrics {
-					service.stats.MetricsSent.Add(1)
-				}
-			}
-			if errors.Is(err, tcgerr.ErrUnauthorized) {
-				/* it looks like an issue with credentialed user
-				so, wait for configuration update */
-				log.Err(err).Msg("dispatcher got an issue with credentialed user, wait for configuration update")
-				_ = service.StopTransport()
-			} else if errors.Is(err, tcgerr.ErrUndecided) {
-				/* it looks like an issue with data */
-				log.Err(err).Msg("dispatcher got an issue with data")
-			}
-			return err
-		},
-	}
-}
-
 func (service *AgentService) config(data []byte) error {
 	natsChk0, err := service.Connector.Nats.Hashsum()
 	if err != nil {
@@ -685,7 +556,7 @@ func (service *AgentService) startTransport() error {
 	}
 	service.gwClients = gwClients
 	/* Process dispatcher */
-	if sdErr := nats.StartDispatcher(service.makeDispatcherOptions()); sdErr == nil {
+	if sdErr := nats.StartDispatcher(makeSubscriptions(gwClients)); sdErr == nil {
 		service.agentStatus.Transport.Set(StatusRunning)
 	} else {
 		return sdErr
@@ -705,19 +576,27 @@ func (service *AgentService) stopTransport() error {
 }
 
 // mixTracerContext adds `context` field if absent
-func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, error) {
+func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool) {
 	if !bytes.Contains(payloadJSON, []byte(`"context":`)) ||
 		!bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
-		ctxJSON, err := json.Marshal(service.MakeTracerContext())
+
+		tc, todoTracerCtx := service.MakeTracerContext(), false
+		ctxJSON, err := json.Marshal(tc)
 		if err != nil {
-			return nil, err
+			log.Err(err).Msg("could not mixTracerContext")
+			return payloadJSON, false
 		}
+		if tc.AgentID == traceOnDemandAgentID ||
+			tc.AppType == traceOnDemandAppType {
+			todoTracerCtx = true
+		}
+
 		l := bytes.LastIndexByte(payloadJSON, byte('}'))
 		return bytes.Join([][]byte{
 			payloadJSON[:l], []byte(`,"context":`), ctxJSON, []byte(`}`),
-		}, []byte(``)), nil
+		}, []byte(``)), todoTracerCtx
 	}
-	return payloadJSON, nil
+	return payloadJSON, false
 }
 
 // fixTracerContext replaces placeholders
