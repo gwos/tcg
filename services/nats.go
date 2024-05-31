@@ -63,14 +63,12 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 	return nats.DurableCfg{
 		Durable: durable,
 		Subject: subj,
-		Handler: func(b []byte) error {
-			headers, err := nats.DecodeHeadersMsg(b)
-			if err != nil {
-				log.Err(err).Msg("dispatcher got an issue with data headers")
-				return err
-			}
+		Handler: func(msg nats.NatsMsg) error {
 			var (
 				ctx     context.Context
+				err     error
+				data    = msg.Data
+				headers = msg.Header
 				sCtxCfg = trace.SpanContextConfig{}
 				spanID  []byte
 				traceID []byte
@@ -78,8 +76,8 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 			)
 			/* try to process as legacy flow with wrapped payload */
 			p := natsPayload{}
-			if err = p.Unmarshal(b); err == nil {
-				b = p.Payload
+			if err = p.Unmarshal(data); err == nil {
+				data = p.Payload
 				ctx = getCtx(p.SpanContext)
 				if pType, t := p.Type.String(), headers.Get(clients.HdrPayloadType); t == "" {
 					headers.Set(clients.HdrPayloadType, pType)
@@ -106,16 +104,16 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 			defer func() {
 				tracing.EndTraceSpan(span,
 					tracing.TraceAttrError(err),
-					tracing.TraceAttrPayloadLen(b),
+					tracing.TraceAttrPayloadLen(data),
 					tracing.TraceAttrStr("type", headers.Get(clients.HdrPayloadType)),
 					tracing.TraceAttrStr("durable", durable),
 					tracing.TraceAttrStr("subject", subj),
 				)
 			}()
 
-			if err = handleWithCtx(ctx, b); err == nil {
+			if err = handleWithCtx(ctx, data); err == nil {
 				agentService.stats.x.Add("sentTo:"+durable, 1)
-				agentService.stats.BytesSent.Add(int64(len(b)))
+				agentService.stats.BytesSent.Add(int64(len(data)))
 				agentService.stats.MessagesSent.Add(1)
 				if pType, err := new(payloadType).FromStr(headers.Get(clients.HdrPayloadType)); err == nil &&
 					*pType == typeMetrics {

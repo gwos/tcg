@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gwos/tcg/sdk/clients"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/nats-io/nats.go"
 	"github.com/patrickmn/go-cache"
@@ -166,7 +167,11 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *na
 		if zerolog.GlobalLevel() <= zerolog.DebugLevel ||
 			(len(a) > 0 && a[0]) {
 			return func(e *zerolog.Event) {
-				e.RawJSON("nats.msg.data", msg.Data)
+				if h := msg.Header.Get(clients.HdrCompressed); h == "" {
+					e.RawJSON("nats.msg.data", msg.Data)
+				} else {
+					e.Str("nats.msg.data", "encoded:"+h)
+				}
 				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
 				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
 				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
@@ -184,7 +189,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *na
 		}
 	}
 
-	err = opt.Handler(msg.Data)
+	err = opt.Handler(NatsMsg{msg})
 	if err == nil {
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).
