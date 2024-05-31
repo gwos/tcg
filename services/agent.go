@@ -107,15 +107,7 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Str("AgentID", agentService.AgentID).
-			Str("AppType", agentService.AppType).
-			Str("AppName", agentService.AppName).
-			Str("BatchEvents", agentService.BatchEvents.String()).
-			Str("BatchMetrics", agentService.BatchMetrics.String()).
-			Int("BatchMaxBytes", agentService.BatchMaxBytes).
-			Str("ControllerAddr", agentService.ControllerAddr).
-			Str("DSClient", agentService.dsClient.HostName).
-			Msg("starting with config")
+			Msgf("starting with config: %+v", agentService.Connector)
 	})
 
 	return agentService

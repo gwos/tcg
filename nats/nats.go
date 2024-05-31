@@ -24,8 +24,6 @@ const (
 )
 
 var (
-	DecodeHeadersMsg = nats.DecodeHeadersMsg
-
 	ErrNATS       = fmt.Errorf("nats error")
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 	ErrPayloadLim = fmt.Errorf("%w: payload oversized limit", ErrNATS)
@@ -67,7 +65,11 @@ type Config struct {
 type DurableCfg struct {
 	Durable string
 	Subject string
-	Handler func([]byte) error
+	Handler func(msg NatsMsg) error
+}
+
+type NatsMsg struct {
+	*nats.Msg
 }
 
 // StartServer runs NATS
