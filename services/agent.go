@@ -577,9 +577,7 @@ func (service *AgentService) stopTransport() error {
 
 // mixTracerContext adds `context` field if absent
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool) {
-	if !bytes.Contains(payloadJSON, []byte(`"context":`)) ||
-		!bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
-
+	if !bytes.Contains(payloadJSON, []byte(`"context":`)) || !bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
 		tc, todoTracerCtx := service.MakeTracerContext(), false
 		ctxJSON, err := json.Marshal(tc)
 		if err != nil {
