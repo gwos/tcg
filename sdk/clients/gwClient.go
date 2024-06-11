@@ -19,6 +19,25 @@ import (
 
 const EnvHttpClientTimeoutGW = "TCG_HTTP_CLIENT_TIMEOUT_GW"
 
+var HttpClientGW = func() *http.Client {
+	c := new(http.Client)
+	*c = *HttpClient
+	c.Timeout = func() time.Duration {
+		if s, ok := os.LookupEnv(EnvHttpClientTimeoutGW); ok {
+			if v, err := time.ParseDuration(s); err == nil {
+				return v
+			}
+		}
+		if s, ok := os.LookupEnv(EnvHttpClientTimeout); ok {
+			if v, err := time.ParseDuration(s); err == nil {
+				return v
+			}
+		}
+		return time.Second * 40 // 40s by default
+	}()
+	return c
+}()
+
 // GWEntrypoint defines entrypoint
 type GWEntrypoint string
 
@@ -547,10 +566,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,
 	headers map[string]string, form map[string]string, payload []byte) (*Req, error) {
 
-	client.once.Do(func() {
-		client.buildURIs()
-		client.setClient()
-	})
+	client.once.Do(func() { client.buildURIs() })
 
 	return (&Req{
 		URL:     client.uris[entrypoint] + queryStr,
@@ -558,25 +574,7 @@ func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint
 		Headers: headers,
 		Form:    form,
 		Payload: payload,
-	}).SetClient(client.httpClient).SendWithContext(ctx)
-}
-
-func (client *GWClient) setClient() {
-	client.httpClient = new(http.Client)
-	*client.httpClient = *HttpClient
-	client.httpClient.Timeout = func() time.Duration {
-		if s, ok := os.LookupEnv(EnvHttpClientTimeoutGW); ok {
-			if v, err := time.ParseDuration(s); err == nil {
-				return v
-			}
-		}
-		if s, ok := os.LookupEnv(EnvHttpClientTimeout); ok {
-			if v, err := time.ParseDuration(s); err == nil {
-				return v
-			}
-		}
-		return time.Second * 40 // 40s by default
-	}()
+	}).SetClient(HttpClientGW).SendWithContext(ctx)
 }
 
 func (client *GWClient) buildURIs() {

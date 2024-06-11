@@ -45,13 +45,13 @@ func (bld *EventsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 		p, err := json.Marshal(q)
 		if err == nil {
 			log.Debug().
-				Interface("payloadLen", len(p)).
+				Any("payloadLen", len(p)).
 				Msgf("batched %d events", len(q.Events))
 			output = append(output, p)
 			continue
 		}
 		log.Err(err).
-			Interface("events", q).
+			Any("events", q).
 			Msg("could not marshal events")
 	}
 	return output

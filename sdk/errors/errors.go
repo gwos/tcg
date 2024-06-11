@@ -94,5 +94,7 @@ func IsErrorTimedOut(err error) bool {
 			return true
 		}
 	}
-	return strings.Contains(strings.ToLower(err.Error()), "timeout")
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "deadline") ||
+		strings.Contains(s, "timeout")
 }

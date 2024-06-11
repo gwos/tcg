@@ -6,6 +6,7 @@ var CtxHeaders = CtxKey("headers")
 
 const (
 	HdrCompressed     = "compressed"
+	HdrPayloadLen     = "payloadLen"
 	HdrPayloadType    = "payloadType"
 	HdrSpanSpanID     = "spanSpanID"
 	HdrSpanTraceID    = "spanTraceID"

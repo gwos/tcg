@@ -4,19 +4,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"runtime"
 	"testing"
 	"time"
 
+	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIntegration(t *testing.T) {
-	defer cleanNats(t)
-	defer apiClient.RemoveHost(TestHostName)
-
 	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
+	apiClient.RemoveAgent(services.GetTransitService().AgentID)
+	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
+	defer cleanNats(t)
 
 	rs := makeResource(0, 3)
 	resources := new(transit.ResourcesWithServicesRequest)
@@ -32,31 +36,117 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Log("Check for host availability in the database")
-	time.Sleep(1 * time.Second)
-	assert.NoError(t, apiClient.CheckHostExist(TestHostName, false, "irrelevant"))
+	assert.NoError(t, apiClient.CheckHostExist(rs.Name, false, "irrelevant"))
 
 	t.Log("Send SynchronizeInventory request to GroundWork Foundation")
 	assert.NoError(t, services.GetTransitService().SynchronizeInventory(context.Background(), inventoryPayload))
 
 	time.Sleep(5 * time.Second)
 	t.Log("Check for host availability in the database")
-	time.Sleep(1 * time.Second)
-	assert.NoError(t, apiClient.CheckHostExist(TestHostName, true, "PENDING"))
+	assert.NoError(t, apiClient.CheckHostExist(rs.Name, true, "PENDING"))
 
 	t.Log("Send ResourcesWithMetrics request to GroundWork Foundation")
 	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), resourcesPayload))
 
 	time.Sleep(5 * time.Second)
-
 	t.Log("Check for host availability in the database")
-	time.Sleep(1 * time.Second)
-	assert.NoError(t, apiClient.CheckHostExist(TestHostName, true, "UP"))
+	assert.NoError(t, apiClient.CheckHostExist(rs.Name, true, "UP"))
 
 	t.Log("Send bad ResourcesWithMetrics payload to GroundWork Foundation")
 	/* expect foundation error, processing should not stop */
-	badPayload := bytes.ReplaceAll(resourcesPayload,
-		[]byte(`context`), []byte(`*ontex*`))
+	badPayload := bytes.ReplaceAll(resourcesPayload, []byte(`context`), []byte(`*ontex*`))
 	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload))
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats.Value())
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport.Value())
+}
+
+func BenchmarkE2E(b *testing.B) {
+	setupIntegration(b, natsAckWait30s, dynInventoryFalse)
+	apiClient.RemoveAgent(services.GetTransitService().AgentID)
+
+	defer printMemStats()
+	defer cleanNats(b)
+	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
+
+	cfg := config.GetConfig()
+	gwClient := &clients.GWClient{
+		AppName:      cfg.Connector.AppName,
+		AppType:      cfg.Connector.AppType,
+		GWConnection: (*clients.GWConnection)(cfg.GWConnections[0]),
+	}
+	transitService := services.GetTransitService()
+
+	resources := make([]transit.MonitoredResource, 0, TestResourcesCount)
+	inventory := new(transit.InventoryRequest)
+	inventory.SetContext(*transitService.MakeTracerContext())
+	group := transit.ResourceGroup{
+		Description: testName,
+		GroupName:   testName,
+		Type:        transit.HostGroup,
+	}
+
+	for i := 0; i < TestResourcesCount; i++ {
+		rs := makeResource(i, TestServicesCount)
+		resources = append(resources, *rs)
+		inventory.AddResource(rs.ToInventoryResource())
+		group.AddResource(rs.ToResourceRef())
+	}
+	inventory.AddResourceGroup(group)
+	// payload, err := json.Marshal(inventory)
+	payload, err := json.MarshalIndent(inventory, " ", " ") // enlarge payload
+	assert.NoError(b, err)
+
+	// Benchmark sending data to Backend with/without NATS: TestFlagClient
+	b.Run("send.data", func(b *testing.B) {
+		printMemStats()
+
+		if TestFlagClient {
+			_, err := gwClient.SynchronizeInventory(context.Background(), payload)
+			assert.NoError(b, err)
+		} else {
+			assert.NoError(b, transitService.SynchronizeInventory(context.Background(), payload))
+		}
+		time.Sleep(5 * time.Second)
+		m0 := transitService.Stats().MessagesSent.Value()
+
+		for _, res := range resources {
+			request := transit.ResourcesWithServicesRequest{
+				Context:   transitService.MakeTracerContext(),
+				Resources: []transit.MonitoredResource{res},
+			}
+			payload, err := json.Marshal(request)
+			assert.NoError(b, err)
+
+			if TestFlagClient {
+				_, err := gwClient.SendResourcesWithMetrics(context.Background(), payload)
+				assert.NoError(b, err)
+			} else {
+				assert.NoError(b, transitService.SendResourceWithMetrics(context.Background(), payload))
+			}
+		}
+		time.Sleep(5 * time.Second) // time for batcher + dispatcher
+		printMemStats()
+		printTcgStats()
+
+		if services.GetTransitService().BatchMaxBytes == 0 {
+			if cnt, dc := b.N*TestResourcesCount*len(resources), transitService.Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
+				b.Errorf("Messages should be delivered. deliveredCount = %d, want = %d  %v",
+					dc, cnt, m0)
+			}
+		}
+	})
+
+}
+
+// inspired by expvar.Handler() implementation
+func memstats() any {
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	return *stats
+}
+func printMemStats() {
+	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
+}
+func printTcgStats() {
+	println("\n~", time.Now().Format(time.DateTime), "TCG_STATS", fmt.Sprintf("%+v", services.GetTransitService().Stats()))
 }
