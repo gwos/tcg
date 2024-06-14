@@ -660,6 +660,10 @@ func (service *AgentService) initOTEL() {
 
 // initProM inits Prometheus metrics
 func (service *AgentService) initProM() {
+	if !service.Connector.ExportProm {
+		log.Debug().Msg("export Prometheus metrics is not configured")
+		return
+	}
 	exports := make(map[string]*prometheus.Desc)
 	expvar.Do(func(kv expvar.KeyValue) {
 		exports[kv.Key] = prometheus.NewDesc("expvar_"+kv.Key, kv.Key, nil, nil)
