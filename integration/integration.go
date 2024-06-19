@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -102,6 +103,8 @@ func cleanNats(t testing.TB) {
 	service := services.GetTransitService()
 	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.ResetNats())
+	_ = os.Remove(filepath.Join(service.NatsStoreDir, "inventory.json"))
+	_ = os.Remove(filepath.Join(service.NatsStoreDir, "inventory1.json"))
 	assert.NoError(t, os.Remove(service.NatsStoreDir))
 	t.Log("[cleanNats]: ", service.Status())
 }
