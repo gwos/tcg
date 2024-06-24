@@ -12,6 +12,7 @@ import (
 type ExtConfig struct {
 	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
 	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
+	HostGroup     string                    `json:"customHostGroup"`
 
 	AzureTenantID       string `json:"azureTenantId"`
 	AzureClientID       string `json:"azureClientId"`

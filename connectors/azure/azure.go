@@ -90,8 +90,12 @@ func collectMetrics() {
 		)
 	}
 
+	if extConfig.HostGroup == "" {
+		extConfig.HostGroup = defaultHostGroupName
+	}
+
 	resourceGroups := []transit.ResourceGroup{
-		connectors.CreateResourceGroup(defaultHostGroupName, defaultHostGroupDescription, transit.HostGroup, monitoredResourcesRef),
+		connectors.CreateResourceGroup(extConfig.HostGroup, defaultHostGroupDescription, transit.HostGroup, monitoredResourcesRef),
 	}
 
 	if err = connectors.SendMetrics(context.Background(), monitoredResources, &resourceGroups); err != nil {
