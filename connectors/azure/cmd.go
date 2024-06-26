@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"time"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
@@ -9,6 +10,8 @@ import (
 	"github.com/gwos/tcg/services"
 	"github.com/rs/zerolog/log"
 )
+
+const defaultCheckInterval = time.Minute
 
 var (
 	extConfig         = &ExtConfig{}
@@ -34,7 +37,7 @@ func Run() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, collectMetrics)
+	connectors.StartPeriodic(ctxCancel, defaultCheckInterval, collectMetrics)
 
 	/* return on quit signal */
 	<-transitService.Quit()
@@ -44,7 +47,7 @@ func configHandler(data []byte) {
 	log.Info().Msg("configuration received")
 
 	tExt := &ExtConfig{
-		CheckInterval: connectors.DefaultCheckInterval,
+		CheckInterval: defaultCheckInterval,
 	}
 	tMonConn := &transit.MonitorConnection{Extensions: tExt}
 	tMetProf := &transit.MetricsProfile{}
@@ -66,5 +69,5 @@ func configHandler(data []byte) {
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	services.GetTransitService().RegisterExitHandler(cancel)
-	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, collectMetrics)
+	connectors.StartPeriodic(ctxCancel, defaultCheckInterval, collectMetrics)
 }

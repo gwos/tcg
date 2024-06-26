@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/monitor/armmonitor"
@@ -23,9 +24,15 @@ func MetricsList(
 	}
 
 	result := make([]armmonitor.MetricsClientListResponse, 0)
+	timespan := fmt.Sprintf(
+		"%s/%s",
+		time.Now().Add(-time.Minute).Format("2006-01-02T15:04:05"),
+		time.Now().Format("2006-01-02T15:04:05"),
+	)
 	for _, definition := range definitions {
 		metric, err := client.List(context.Background(), *resource.ID, &armmonitor.MetricsClientListOptions{
 			Metricnames: &definition,
+			Timespan:    &timespan,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to list metrics: %w", err)
@@ -43,8 +50,19 @@ func CreateMetricBuilder(metric armmonitor.MetricsClientListResponse) connectors
 	var value float64 = 0
 	if len(metric.Value[0].Timeseries) == 0 || len(metric.Value[0].Timeseries[0].Data) == 0 {
 		value = 0
-	} else if metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Average != nil {
-		value = *metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Average
+	} else {
+		if metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Maximum != nil {
+			value = *metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Maximum
+		}
+		if metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Total != nil {
+			value = *metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Total
+		}
+		if metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Average != nil {
+			value = *metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Average
+		}
+		if metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Count != nil {
+			value = *metric.Value[0].Timeseries[0].Data[len(metric.Value[0].Timeseries[0].Data)-1].Count
+		}
 	}
 	return connectors.MetricBuilder{
 		Name:       *metric.Value[0].Name.Value,
