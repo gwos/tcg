@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"expvar"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -304,7 +305,7 @@ func (service *AgentService) Status() AgentStatus {
 func (service *AgentService) handleTasks() {
 	hDebug := func(tt []taskqueue.Task) {
 		log.Error().
-			Interface("lastTasks", tt).
+			Any("lastTasks", tt).
 			Msg("task queue")
 	}
 	hAlarm := func(task *taskqueue.Task) error {
@@ -649,12 +650,20 @@ func (service *AgentService) initOTEL() {
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{}, propagation.Baggage{}))
 
-	clients.HookRequestContext = tracing.HookRequestContext
+	nestedHook := clients.HookRequestContext
+	clients.HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
+		ctx, req = nestedHook(ctx, req)
+		return tracing.HookRequestContext(ctx, req)
+	}
 	clients.GZIP = tracing.GZIP
 }
 
 // initProM inits Prometheus metrics
 func (service *AgentService) initProM() {
+	if !service.Connector.ExportProm {
+		log.Debug().Msg("export Prometheus metrics is not configured")
+		return
+	}
 	exports := make(map[string]*prometheus.Desc)
 	expvar.Do(func(kv expvar.KeyValue) {
 		exports[kv.Key] = prometheus.NewDesc("expvar_"+kv.Key, kv.Key, nil, nil)

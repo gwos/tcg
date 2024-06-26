@@ -33,19 +33,23 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...strin
 		clients.HdrSpanTraceFlags, span.SpanContext().TraceFlags().String(),
 	)
 
-	err = nats.Publish(subj, payload, headers...)
-	if err != nil && errors.Is(err, nats.ErrPayloadLim) {
+	if len(payload) > int(agentService.NatsMaxPayload) {
+		n0 := len(payload)
 		_, payload, err = clients.GZIP(ctx, payload)
 		if err != nil {
 			return err
 		}
-		err = nats.Publish(subj, payload, append(headers, clients.HdrCompressed, "gzip")...)
-		if err != nil && errors.Is(err, nats.ErrPayloadLim) {
-			err = fmt.Errorf("%w / gzip compressed", err)
+		if len(payload) > int(agentService.NatsMaxPayload) {
+			err = fmt.Errorf("%w: %v / %v / %v / %v / gzip compressed",
+				nats.ErrPayloadLim, subj, agentService.NatsMaxPayload, n0, len(payload))
 			return err
 		}
+		headers = append(headers, clients.HdrCompressed, "gzip",
+			clients.HdrPayloadLen, fmt.Sprint(n0))
 	}
+	headers = append(headers, clients.HdrPayloadLen, fmt.Sprint(len(payload)))
 
+	err = nats.Publish(subj, payload, headers...)
 	return err
 }
 

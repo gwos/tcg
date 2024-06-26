@@ -595,7 +595,13 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	/* public entrypoints */
 	apiV1Debug := router.Group("/api/v1/debug")
 	apiV1Debug.GET("/vars", gin.WrapH(expvar.Handler()))
-	apiV1Debug.GET("/metrics", gin.WrapH(promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{})))
+	apiV1Debug.GET("/metrics", func() gin.HandlerFunc {
+		if !controller.Connector.ExportProm {
+			msg := "export Prometheus metrics is not configured"
+			return func(c *gin.Context) { c.AbortWithStatusJSON(http.StatusServiceUnavailable, msg) }
+		}
+		return gin.WrapH(promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{}))
+	}())
 
 	pprofGroup := apiV1Debug.Group("/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))

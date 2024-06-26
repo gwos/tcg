@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -10,10 +11,12 @@ import (
 )
 
 func TestEvents(t *testing.T) {
-	testMessage, err := readFile("fixtures/sendEvents.json")
+	testMessage, err := os.ReadFile("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
 	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
+	apiClient.RemoveAgent(services.GetTransitService().AgentID)
+	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)
 
 	l0 := len(services.GetTransitService().Stats().LastErrors)

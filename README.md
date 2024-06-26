@@ -204,9 +204,10 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
     
 ### Run integration tests:
 
->For integration tests you must provide environment variables for Groundwork Connection.
+>For integration tests you must provide environment variables for Groundwork Connection. Also have to deal with TLS certs: get it in local trust storage or suppress check.
 
     $ TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
+        TCG_TLS_CLIENT_INSECURE=TRUE \
         go test -v ./integration/
 
 
@@ -225,6 +226,17 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
         TCG_TLS_CLIENT_INSECURE=TRUE \
         OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
         go test -failfast -v ./integration/
+
+    $ GOFLAGS="-count=1" \
+        TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
+        TCG_CONNECTOR_LOGCOLORS=TRUE TCG_CONNECTOR_LOGLEVEL=2 \
+        TCG_TLS_CLIENT_INSECURE=TRUE \
+        __OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 \
+        TEST_RESOURCES_COUNT=40 TEST_SERVICES_COUNT=200  \
+        TCG_HTTP_CLIENT_TIMEOUT_GW=120s \
+        TCG_CONNECTOR_BATCHMETRICS=1s TCG_CONNECTOR_BATCHMAXBYTES=102400 \
+        go test -benchtime=10x -benchmem -run=^$ -bench ^BenchmarkE2E$  ./integration/ \
+        | grep _STATS
 
 
 <a name="envvar"></a>

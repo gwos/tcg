@@ -62,13 +62,13 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 		p, err := json.Marshal(q)
 		if err == nil {
 			log.Debug().
-				Interface("payloadLen", len(p)).
+				Any("payloadLen", len(p)).
 				Msgf("batched %d resources", len(q.Resources))
 			output = append(output, p)
 			continue
 		}
 		log.Err(err).
-			Interface("resources", q).
+			Any("resources", q).
 			Msg("could not marshal resources")
 	}
 	return output

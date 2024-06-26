@@ -111,7 +111,7 @@ func StartServer(config Config) error {
 		} else {
 			log.Warn().
 				Err(err).
-				Interface("natsOpts", *opts).
+				Any("natsOpts", *opts).
 				Msg("nats failed NewServer")
 			return err
 		}
@@ -124,7 +124,7 @@ func StartServer(config Config) error {
 	log.Info().
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.Interface("natsOpts", *opts)
+				e.Any("natsOpts", *opts)
 			}
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
@@ -214,22 +214,22 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 		u, errUsage := disk.Usage(s.config.StoreDir)
 		if errUsage != nil {
 			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", errUsage).
+				Any("config", *newCfg).
+				Any("diskUsage", errUsage).
 				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
 			return err
 		}
 		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
 			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", u).
+				Any("config", *newCfg).
+				Any("diskUsage", u).
 				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
 			return err
 		}
 		if u.Free < 1024*1024 {
 			log.Err(err).
-				Interface("config", *newCfg).
-				Interface("diskUsage", u).
+				Any("config", *newCfg).
+				Any("diskUsage", u).
 				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
 			return err
 		}
@@ -239,16 +239,16 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 		newCfg.MaxBytes = mb
 		_, err2 := fn(newCfg)
 		log.Err(err2).
-			Interface("originalError", err).
-			Interface("originalConfig", origCfg).
-			Interface("reducedMaxBytes", mb).
-			Interface("disk.Free", u.Free).
+			Any("originalError", err).
+			Any("originalConfig", origCfg).
+			Any("reducedMaxBytes", mb).
+			Any("disk.Free", u.Free).
 			Msgf("nats retrying %v with smaller storage", fnDesc)
 		return err2
 	}
 
 	log.Err(err).
-		Interface("config", *newCfg).
+		Any("config", *newCfg).
 		Msgf("nats %v", fnDesc)
 	return err
 }
@@ -384,7 +384,7 @@ func Publish(subj string, data []byte, headers ...string) error {
 	msg := nats.NewMsg(subj)
 	msg.Data = data
 	for i := 0; i < len(headers)-1; i += 2 {
-		msg.Header.Set(headers[i], headers[i+1])
+		msg.Header.Add(headers[i], headers[i+1])
 	}
 	return s.ncPublisher.PublishMsg(msg)
 }

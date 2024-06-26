@@ -137,6 +137,8 @@ type Connector struct {
 	Nats `yaml:",inline"`
 
 	TransportStartRndDelay int `yaml:"-"`
+
+	ExportProm bool `yaml:"exportProm"`
 }
 
 // ConnectorDTO defines TCG Connector configuration

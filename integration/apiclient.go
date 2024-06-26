@@ -60,7 +60,7 @@ func (c *APIClient) CheckHostExist(host string, mustExist bool, mustHasStatus st
 		return nil
 	}
 	if !(mustExist && statusCode == 200) {
-		return fmt.Errorf("status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 404)
+		return fmt.Errorf("status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 200)
 	}
 
 	response := new(struct {
@@ -83,5 +83,12 @@ func (c *APIClient) RemoveHost(hostname string) {
 	code, bb, err := c.SendRequest(http.MethodDelete, "/api/hosts/"+hostname, nil, nil, nil)
 	if err != nil || code != 200 {
 		stdlog.Printf("could not remove host: %v [%v] %v", err, code, string(bb))
+	}
+}
+
+func (c *APIClient) RemoveAgent(agentID string) {
+	code, bb, err := c.SendRequest(http.MethodDelete, "/api/agents/"+agentID, nil, nil, nil)
+	if err != nil || code != 200 {
+		stdlog.Printf("could not remove agent: %v [%v] %v", err, code, string(bb))
 	}
 }

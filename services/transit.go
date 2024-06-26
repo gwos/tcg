@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"time"
@@ -78,9 +79,7 @@ func GetTransitService() *TransitService {
 			if len(p.buf) == 0 {
 				return
 			}
-			// TODO: store as file
-			err := Put2Nats(context.TODO(), subjInventoryMetrics, p.buf, p.hdr...)
-			if err == nil {
+			if err := Put2Nats(context.TODO(), subjInventoryMetrics, p.buf, p.hdr...); err == nil {
 				p.buf, p.hdr = nil, nil
 			}
 		})
@@ -326,11 +325,18 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	// We can buffer inventory and send when ready
 	// err = nats.Publish(subjInventoryMetrics, b)
 	// return err
-	func() {
+	func(payload []byte, headers []string) {
 		service.inventoryKeeper.Lock()
 		defer service.inventoryKeeper.Unlock()
 		service.inventoryKeeper.buf, service.inventoryKeeper.hdr = payload, headers
-	}()
+
+		f0 := filepath.Join(service.NatsStoreDir, "inventory.json")
+		f1 := filepath.Join(service.NatsStoreDir, "inventory1.json")
+		_, _ = os.MkdirAll(service.NatsStoreDir, 0777), os.Rename(f0, f1)
+		if err := os.WriteFile(f0, payload, 0666); err != nil {
+			log.Err(err).Msg("could not store inventory file")
+		}
+	}(payload, headers)
 	return nil
 }
 

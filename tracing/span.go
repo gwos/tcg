@@ -77,7 +77,7 @@ func TraceAttrPayload(v []byte) TraceAttrOption {
 // TraceAttrPayloadDbg sets a payload attribute if Debug is enabled
 func TraceAttrPayloadDbg(v []byte) TraceAttrOption {
 	return func(span trace.Span) {
-		if IsDebugEnabled() {
+		if IsDebugEnabled() && len(v) < 1024*1024 {
 			span.SetAttributes(attribute.String("payload", string(v)))
 		}
 	}
