@@ -17,7 +17,7 @@ import (
 type BatchBuilder interface {
 	// Build builds the batch payloads
 	// it's possible that not all input payloads can be combined into one
-	Build(input [][]byte, maxBytes int) [][]byte
+	Build(buf *[][]byte, maxBytes int)
 }
 
 // BatchHandler defines handler
@@ -116,7 +116,6 @@ func (bt *Batcher) Batch() {
 	bt.mu.Unlock()
 	if len(buf) > 0 {
 		func() {
-			var payloads [][]byte
 			/* wrap into closure for simple defer,
 			cannot use services package due to import cycle */
 			ctx, span := tracing.StartTraceSpan(bt.traceCtx, bt.tracerName, "batcher:Batch")
@@ -126,16 +125,16 @@ func (bt *Batcher) Batch() {
 					tracing.TraceAttrInt("bufferLen", len(buf)),
 					tracing.TraceAttrInt("bufferSize", bufSize),
 					tracing.TraceAttrFnDbg("buffer", func() string { return string(bytes.Join(buf, []byte("\n"))) }),
-					tracing.TraceAttrFnDbg("output", func() string { return string(bytes.Join(payloads, []byte("\n"))) }),
-					tracing.TraceAttrInt("outputLen", len(payloads)),
+					// tracing.TraceAttrFnDbg("output", func() string { return string(bytes.Join(payloads, []byte("\n"))) }),
+					// tracing.TraceAttrInt("outputLen", len(payloads)),
 				)
 				tracing.EndTraceSpan(bt.traceSpan)
 				bt.traceCtx, bt.traceSpan = tracing.StartTraceSpan(context.Background(), bt.tracerName, "batching")
 			}()
 
-			payloads = bt.builder.Build(buf, bt.maxBytes)
-			if len(payloads) > 0 {
-				for _, p := range payloads {
+			bt.builder.Build(&buf, bt.maxBytes)
+			if len(buf) > 0 {
+				for _, p := range buf {
 					if len(p) > 0 {
 						_ = bt.handler(ctx, p)
 					}

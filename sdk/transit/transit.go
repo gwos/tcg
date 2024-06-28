@@ -583,7 +583,10 @@ func (p *TracerContext) SetContext(c TracerContext) {
 		p.Version = c.Version
 	}
 	if c.TimeStamp != nil {
-		p.TimeStamp = c.TimeStamp
+		if p.TimeStamp == nil {
+			p.TimeStamp = NewTimestamp()
+		}
+		*p.TimeStamp = *c.TimeStamp
 	}
 }
 
