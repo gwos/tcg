@@ -2,7 +2,10 @@ package events
 
 import (
 	"encoding/json"
+	"fmt"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +23,11 @@ func TestBuild(t *testing.T) {
 		[]byte(`{"events":[{"host":"host11","device":"new_device","service":"http_alive","monitorStatus":"UP","severity":"SERIOUS","textMessage":"This is a serious Nagios Message on Device 127.0.0.1 - 0","lastInsertDate":"1370195732000","reportDate":"1579703726166","appType":"NAGIOS","monitorServer":"localhost"}]}`),
 		[]byte(`{"events":[{"host":"host12","device":"127.0.0.1","service":"test","monitorStatus":"UP","severity":"SERIOUS","textMessage":"This is a serious Nagios Message on Device 127.0.0.1 - 0","lastInsertDate":"1370195732000","reportDate":"1579703726166","appType":"NAGIOS","monitorServer":"localhost"}]}`),
 	}
+
+	printMemStats()
 	output := mbb.Build(input, 1024)
+	printMemStats()
+
 	qq := make([]transit.GroundworkEventsRequest, 0)
 	for _, p := range output {
 		q := new(transit.GroundworkEventsRequest)
@@ -33,4 +40,14 @@ func TestBuild(t *testing.T) {
 	assert.Equal(t, 1, len(qq[1].Events))
 	assert.Equal(t, 2, len(qq[2].Events))
 	assert.Equal(t, "host11", qq[2].Events[0].Host)
+}
+
+// inspired by expvar.Handler() implementation
+func memstats() any {
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	return *stats
+}
+func printMemStats() {
+	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
 }
