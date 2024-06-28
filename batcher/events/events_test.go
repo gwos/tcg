@@ -13,7 +13,7 @@ import (
 
 func TestBuild(t *testing.T) {
 	mbb := new(EventsBatchBuilder)
-	input := [][]byte{
+	buf := [][]byte{
 		[]byte(`{"events":[
 			{"host":"host1","device":"127.0.0.1","service":"http_alive","monitorStatus":"UP","severity":"SERIOUS","textMessage":"This is a serious Nagios Message on Device 127.0.0.1 - 0","lastInsertDate":"1370195732000","reportDate":"1579703726166","appType":"NAGIOS","monitorServer":"localhost"},
 			{"host":"host2","device":"127.0.0.2","service":"test","monitorStatus":"UP","severity":"SERIOUS","textMessage":"This is a serious Nagios Message on Device 127.0.0.1 - 0","lastInsertDate":"1370195732000","reportDate":"1579703726166","appType":"NAGIOS","monitorServer":"localhost"},
@@ -25,11 +25,11 @@ func TestBuild(t *testing.T) {
 	}
 
 	printMemStats()
-	output := mbb.Build(input, 1024)
+	mbb.Build(&buf, 1024)
 	printMemStats()
 
 	qq := make([]transit.GroundworkEventsRequest, 0)
-	for _, p := range output {
+	for _, p := range buf {
 		q := new(transit.GroundworkEventsRequest)
 		assert.NoError(t, json.Unmarshal(p, q))
 		qq = append(qq, *q)

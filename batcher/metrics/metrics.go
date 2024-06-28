@@ -14,18 +14,19 @@ type MetricsBatchBuilder struct{}
 
 // Build builds the batch payloads for HostUnchanged and not empty
 // splits incoming payloads bigger than maxBytes
-func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
+func (bld *MetricsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 	// counter, batched request, and accum
 	c, bq := 0, transit.ResourcesWithServicesRequest{}
 	qq := make([]transit.ResourcesWithServicesRequest, 0)
+	var q transit.ResourcesWithServicesRequest
 
-	for _, p := range input {
+	for _, p := range *buf {
 		if len(p) > maxBytes {
-			qq = append(qq, xxl2qq(p, maxBytes)...)
+			xxl2qq(&qq, p, maxBytes)
 			continue
 		}
 
-		q := transit.ResourcesWithServicesRequest{}
+		q = transit.ResourcesWithServicesRequest{}
 		if err := json.Unmarshal(p, &q); err != nil {
 			log.Err(err).
 				RawJSON("payload", p).
@@ -34,7 +35,7 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 		}
 
 		// in case of not HostUnchanged stop combining, put bq and q into accum
-		if hasStatus(q) {
+		if hasStatus(&q) {
 			if len(bq.Resources) > 0 {
 				qq = append(qq, bq)
 				c, bq = 0, transit.ResourcesWithServicesRequest{}
@@ -52,29 +53,29 @@ func (bld *MetricsBatchBuilder) Build(input [][]byte, maxBytes int) [][]byte {
 			c, bq = 0, transit.ResourcesWithServicesRequest{}
 		}
 	}
+	*buf = (*buf)[:0]
+
 	if len(bq.Resources) > 0 {
 		qq = append(qq, bq)
 	}
 
-	output := make([][]byte, 0, len(qq))
 	for _, q := range qq {
-		q.Groups = packGroups(q.Groups)
+		packGroups(&q.Groups)
 		p, err := json.Marshal(q)
 		if err == nil {
 			log.Debug().
-				Any("payloadLen", len(p)).
+				Int("payloadLen", len(p)).
 				Msgf("batched %d resources", len(q.Resources))
-			output = append(output, p)
+			*buf = append(*buf, p)
 			continue
 		}
 		log.Err(err).
 			Any("resources", q).
 			Msg("could not marshal resources")
 	}
-	return output
 }
 
-func hasStatus(q transit.ResourcesWithServicesRequest) bool {
+func hasStatus(q *transit.ResourcesWithServicesRequest) bool {
 	for _, res := range q.Resources {
 		if res.Status != transit.HostUnchanged {
 			return true
@@ -83,14 +84,13 @@ func hasStatus(q transit.ResourcesWithServicesRequest) bool {
 	return false
 }
 
-func xxl2qq(p []byte, maxBytes int) []transit.ResourcesWithServicesRequest {
-	qq := make([]transit.ResourcesWithServicesRequest, 0)
-	q := transit.ResourcesWithServicesRequest{}
+func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, p []byte, maxBytes int) {
+	var q transit.ResourcesWithServicesRequest
 	if err := json.Unmarshal(p, &q); err != nil {
 		log.Err(err).
 			RawJSON("payload", p).
 			Msg("could not unmarshal metrics payload for batch")
-		return qq
+		return
 	}
 
 	/* split big payload for parts contained ~lim metrics */
@@ -101,58 +101,47 @@ func xxl2qq(p []byte, maxBytes int) []transit.ResourcesWithServicesRequest {
 		}
 	}
 	lim := cnt/(len(p)/maxBytes+1) + 1
-	log.Debug().Msgf("#MetricsBatchBuilder maxBytes:len(p):cnt:lim %v:%v:%v:%v",
+	log.Debug().Msgf("#MetricsBatchBuilder maxBytes/len(p)/cnt/lim %v/%v/%v/%v",
 		maxBytes, len(p), cnt, lim)
 
-	// counter and accum
-	c, rr := 0, make([]transit.MonitoredResource, 0)
+	c, x := 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
 	for _, res := range q.Resources {
 		pr := res
-		pr.Services = make([]transit.MonitoredService, 0)
+		pr.Services = nil
 
 		for i, svc := range res.Services {
 			pr.Services = append(pr.Services, svc)
 			c += len(svc.Metrics)
 
 			if c >= lim && i < len(res.Services)-1 {
-				rr = append(rr, pr)
-				x := transit.ResourcesWithServicesRequest{
-					Groups:    q.Groups,
-					Resources: rr,
-				}
+				x.Resources = append(x.Resources, pr)
 				x.SetContext(*q.Context)
-				qq = append(qq, x)
+				*qq = append(*qq, x)
 
-				c, rr = 0, make([]transit.MonitoredResource, 0)
+				c, x = 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
 				pr = res
-				pr.Services = make([]transit.MonitoredService, 0)
+				pr.Services = nil
 			}
 		}
-		rr = append(rr, pr)
+		x.Resources = append(x.Resources, pr)
 	}
 
-	if len(rr) > 0 {
-		x := transit.ResourcesWithServicesRequest{
-			Groups:    q.Groups,
-			Resources: rr,
-		}
+	if len(x.Resources) > 0 {
 		x.SetContext(*q.Context)
-		qq = append(qq, x)
+		*qq = append(*qq, x)
 	}
 
-	for i := range qq {
-		t := qq[i].Context.TraceToken
+	for i := range *qq {
+		t := (*qq)[i].Context.TraceToken
 		if len(t) > 14 {
-			t = fmt.Sprintf("%s-%04d-%s", t[:8], i, t[14:])
-			qq[i].Context.TraceToken = t
+			(*qq)[i].Context.TraceToken = fmt.Sprintf("%s-%04d-%s", t[:8], i, t[14:])
 		}
 	}
-	return qq
 }
 
-func packGroups(input []transit.ResourceGroup) []transit.ResourceGroup {
-	if len(input) == 0 {
-		return nil
+func packGroups(groups *[]transit.ResourceGroup) {
+	if len(*groups) == 0 {
+		return
 	}
 
 	type RG struct {
@@ -161,7 +150,7 @@ func packGroups(input []transit.ResourceGroup) []transit.ResourceGroup {
 	}
 
 	m := make(map[string]RG)
-	for _, g := range input {
+	for _, g := range *groups {
 		gk := strings.Join([]string{string(g.Type), g.GroupName}, ":")
 		if _, ok := m[gk]; !ok {
 			m[gk] = RG{ResourceGroup: g, resources: make(map[string]transit.ResourceRef)}
@@ -173,8 +162,8 @@ func packGroups(input []transit.ResourceGroup) []transit.ResourceGroup {
 		}
 		m[gk] = rg
 	}
+	*groups = (*groups)[:0]
 
-	output := make([]transit.ResourceGroup, 0)
 	for _, rg := range m {
 		g := rg.ResourceGroup
 		if len(rg.resources) > 0 {
@@ -183,8 +172,6 @@ func packGroups(input []transit.ResourceGroup) []transit.ResourceGroup {
 				g.Resources = append(g.Resources, r)
 			}
 		}
-		output = append(output, g)
+		*groups = append(*groups, g)
 	}
-
-	return output
 }
