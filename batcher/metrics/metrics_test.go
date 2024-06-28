@@ -3,8 +3,10 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
@@ -95,7 +97,11 @@ func TestBuild(t *testing.T) {
 			[]byte(`{"context":{"agentId":"2a728b11-3359-49b2-8611-98854927af2c","appType":"NAGIOS","timeStamp":"1676911783386","traceToken":"2a728b11-3359-49b2-8611-98854927af2c","version":"1.0.0"},"groups":[{"groupName":"HHostGroup11","resources":[{"name":"a-test-1","type":"host"}],"type":"HostGroup"}],"resources":[{"name":"a-test-1","services":[{"lastCheckTime":"1676911783000","lastPluginOutput":"WARNING: Stale Status","name":"linux_load_997","nextCheckTime":"1676911771000","properties":{"CheckType":{"doubleValue":0.0,"integerValue":0,"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"doubleValue":0.0,"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"doubleValue":0.0,"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.0053230000000000005,"integerValue":0,"valueType":"DoubleType"}},"status":"SERVICE_WARNING","type":"hypervisor"}],"status":"HOST_UNCHANGED","type":"host"}]}`),
 			[]byte(`{"context":{"agentId":"2a728b11-3359-49b2-8611-98854927af2c","appType":"NAGIOS","timeStamp":"1676911783397","traceToken":"2a728b11-3359-49b2-8611-98854927af2c","version":"1.0.0"},"groups":[{"groupName":"HHostGroup11","resources":[{"name":"a-test-1","type":"host"}],"type":"HostGroup"}],"resources":[{"name":"a-test-1","services":[{"lastCheckTime":"1676911783000","lastPluginOutput":"WARNING: Stale Status","name":"linux_load_998","nextCheckTime":"1676911771000","properties":{"CheckType":{"doubleValue":0.0,"integerValue":0,"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"doubleValue":0.0,"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"doubleValue":0.0,"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.0064409999999999997,"integerValue":0,"valueType":"DoubleType"}},"status":"SERVICE_WARNING","type":"hypervisor"}],"status":"HOST_UNCHANGED","type":"host"}]}`),
 		}
+
+		printMemStats()
 		output := mbb.Build(input, 1024)
+		printMemStats()
+
 		qq := make([]transit.ResourcesWithServicesRequest, 0)
 		for _, p := range output {
 			// t.Logf("\n\n%s\n", p)
@@ -166,4 +172,14 @@ func BenchmarkUpdateToken(b *testing.B) {
 	})
 
 	/* looking for alternatives */
+}
+
+// inspired by expvar.Handler() implementation
+func memstats() any {
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	return *stats
+}
+func printMemStats() {
+	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
 }
