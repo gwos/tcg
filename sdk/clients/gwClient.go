@@ -43,20 +43,20 @@ type GWEntrypoint string
 
 // GWEntrypoint
 const (
-	GWEntrypointAuthenticatePassword           GWEntrypoint = "/api/users/authenticatePassword"
-	GWEntrypointConnect                        GWEntrypoint = "/api/auth/login"
-	GWEntrypointDisconnect                     GWEntrypoint = "/api/auth/logout"
-	GWEntrypointClearInDowntime                GWEntrypoint = "/api/biz/clearindowntime"
-	GWEntrypointSetInDowntime                  GWEntrypoint = "/api/biz/setindowntime"
-	GWEntrypointSendEvents                     GWEntrypoint = "/api/events"
-	GWEntrypointSendEventsAck                  GWEntrypoint = "/api/events/ack"
-	GWEntrypointSendEventsUnack                GWEntrypoint = "/api/events/unack"
-	GWEntrypointSendResourceWithMetrics        GWEntrypoint = "/api/monitoring"
-	GWEntrypointSendResourceWithMetricsDynamic GWEntrypoint = "/api/monitoring?dynamic=true"
-	GWEntrypointSynchronizeInventory           GWEntrypoint = "/api/synchronizer"
-	GWEntrypointServices                       GWEntrypoint = "/api/services"
-	GWEntrypointHostgroups                     GWEntrypoint = "/api/hostgroups"
-	GWEntrypointValidateToken                  GWEntrypoint = "/api/auth/validatetoken"
+	GWEntrypointAuthenticatePassword       GWEntrypoint = "/api/users/authenticatePassword"
+	GWEntrypointConnect                    GWEntrypoint = "/api/auth/login"
+	GWEntrypointDisconnect                 GWEntrypoint = "/api/auth/logout"
+	GWEntrypointClearInDowntime            GWEntrypoint = "/api/biz/clearindowntime"
+	GWEntrypointSetInDowntime              GWEntrypoint = "/api/biz/setindowntime"
+	GWEntrypointSendEvents                 GWEntrypoint = "/api/events"
+	GWEntrypointSendEventsAck              GWEntrypoint = "/api/events/ack"
+	GWEntrypointSendEventsUnack            GWEntrypoint = "/api/events/unack"
+	GWEntrypointSendResourceWithMetrics    GWEntrypoint = "/api/monitoring"
+	GWEntrypointSendResourceWithMetricsDyn GWEntrypoint = "/api/monitoring?dynamic=true"
+	GWEntrypointSynchronizeInventory       GWEntrypoint = "/api/synchronizer"
+	GWEntrypointServices                   GWEntrypoint = "/api/services"
+	GWEntrypointHostgroups                 GWEntrypoint = "/api/hostgroups"
+	GWEntrypointValidateToken              GWEntrypoint = "/api/auth/validatetoken"
 )
 
 // GWConnection defines Groundwork Connection configuration
@@ -106,10 +106,22 @@ type GWClient struct {
 	mu   sync.Mutex
 	once sync.Once
 
-	httpClient *http.Client
-
 	token string
-	uris  map[GWEntrypoint]string
+
+	uriAuthenticatePassword       string
+	uriConnect                    string
+	uriDisconnect                 string
+	uriClearInDowntime            string
+	uriSetInDowntime              string
+	uriSendEvents                 string
+	uriSendEventsAck              string
+	uriSendEventsUnack            string
+	uriSendResourceWithMetrics    string
+	uriSendResourceWithMetricsDyn string
+	uriSynchronizeInventory       string
+	uriServices                   string
+	uriHostgroups                 string
+	uriValidateToken              string
 }
 
 // Connect calls API
@@ -391,7 +403,7 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 	}
 	entrypoint := GWEntrypointSendResourceWithMetrics
 	if client.IsDynamicInventory {
-		entrypoint = GWEntrypointSendResourceWithMetricsDynamic
+		entrypoint = GWEntrypointSendResourceWithMetricsDyn
 	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
@@ -568,8 +580,40 @@ func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint
 
 	client.once.Do(func() { client.buildURIs() })
 
+	var uri string
+	switch entrypoint {
+	case GWEntrypointAuthenticatePassword:
+		uri = client.uriAuthenticatePassword
+	case GWEntrypointConnect:
+		uri = client.uriConnect
+	case GWEntrypointDisconnect:
+		uri = client.uriDisconnect
+	case GWEntrypointClearInDowntime:
+		uri = client.uriClearInDowntime
+	case GWEntrypointSetInDowntime:
+		uri = client.uriSetInDowntime
+	case GWEntrypointSendEvents:
+		uri = client.uriSendEvents
+	case GWEntrypointSendEventsAck:
+		uri = client.uriSendEventsAck
+	case GWEntrypointSendEventsUnack:
+		uri = client.uriSendEventsUnack
+	case GWEntrypointSendResourceWithMetrics:
+		uri = client.uriSendResourceWithMetrics
+	case GWEntrypointSendResourceWithMetricsDyn:
+		uri = client.uriSendResourceWithMetricsDyn
+	case GWEntrypointServices:
+		uri = client.uriServices
+	case GWEntrypointSynchronizeInventory:
+		uri = client.uriSynchronizeInventory
+	case GWEntrypointHostgroups:
+		uri = client.uriHostgroups
+	case GWEntrypointValidateToken:
+		uri = client.uriValidateToken
+	}
+
 	return (&Req{
-		URL:     client.uris[entrypoint] + queryStr,
+		URL:     uri + queryStr,
 		Method:  httpMethod,
 		Headers: headers,
 		Form:    form,
@@ -578,29 +622,32 @@ func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint
 }
 
 func (client *GWClient) buildURIs() {
-	client.uris = make(map[GWEntrypoint]string)
-	client.uris[GWEntrypointAuthenticatePassword] = buildURI(client.GWConnection.HostName, GWEntrypointAuthenticatePassword)
-	client.uris[GWEntrypointConnect] = buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-	client.uris[GWEntrypointDisconnect] = buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
-	client.uris[GWEntrypointClearInDowntime] = buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
-	client.uris[GWEntrypointSetInDowntime] = buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
-	client.uris[GWEntrypointSendEvents] = buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
-	client.uris[GWEntrypointSendEventsAck] = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
-	client.uris[GWEntrypointSendEventsUnack] = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
-	client.uris[GWEntrypointSendResourceWithMetrics] = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
-	client.uris[GWEntrypointSendResourceWithMetricsDynamic] = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
-	client.uris[GWEntrypointServices] = buildURI(client.GWConnection.HostName, GWEntrypointServices)
-	client.uris[GWEntrypointSynchronizeInventory] = buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
-	client.uris[GWEntrypointHostgroups] = buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
-	client.uris[GWEntrypointValidateToken] = buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
+	var b strings.Builder
+	client.uriAuthenticatePassword = buildURI(&b, client.GWConnection.HostName, GWEntrypointAuthenticatePassword)
+	client.uriConnect = buildURI(&b, client.GWConnection.HostName, GWEntrypointConnect)
+	client.uriDisconnect = buildURI(&b, client.GWConnection.HostName, GWEntrypointDisconnect)
+	client.uriClearInDowntime = buildURI(&b, client.GWConnection.HostName, GWEntrypointClearInDowntime)
+	client.uriSetInDowntime = buildURI(&b, client.GWConnection.HostName, GWEntrypointSetInDowntime)
+	client.uriSendEvents = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEvents)
+	client.uriSendEventsAck = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEventsAck)
+	client.uriSendEventsUnack = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEventsUnack)
+	client.uriSendResourceWithMetrics = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
+	client.uriSendResourceWithMetricsDyn = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDyn)
+	client.uriSynchronizeInventory = buildURI(&b, client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+	client.uriServices = buildURI(&b, client.GWConnection.HostName, GWEntrypointServices)
+	client.uriHostgroups = buildURI(&b, client.GWConnection.HostName, GWEntrypointHostgroups)
+	client.uriValidateToken = buildURI(&b, client.GWConnection.HostName, GWEntrypointValidateToken)
 }
 
-func buildURI(hostname string, entrypoint GWEntrypoint) string {
-	s := strings.TrimSuffix(strings.TrimRight(hostname, "/"), "/api")
-	if !strings.HasPrefix(s, "http") {
-		s = "https://" + s
+func buildURI(b *strings.Builder, hostname string, entrypoint GWEntrypoint) string {
+	b.Reset()
+	if !strings.HasPrefix(hostname, "http") {
+		_, _ = b.WriteString("https://")
 	}
-	return fmt.Sprintf("%s/%s", s, strings.TrimLeft(string(entrypoint), "/"))
+	fmt.Fprintf(b, "%s/%s",
+		strings.TrimSuffix(strings.TrimRight(hostname, "/"), "/api"),
+		strings.TrimLeft(string(entrypoint), "/"))
+	return b.String()
 }
 
 // obj defines a short alias
