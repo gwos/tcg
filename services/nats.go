@@ -169,15 +169,6 @@ func makeSubscriptions(gwClients []*clients.GWClient) []nats.DurableCfg {
 
 func adaptClient(gwClient *clients.GWClient) func(context.Context, []byte) error {
 	return func(ctx context.Context, p []byte) error {
-		pTypeHandlers := map[payloadType]func(context.Context, []byte) ([]byte, error){
-			typeEvents:          gwClient.SendEvents,
-			typeEventsAck:       gwClient.SendEventsAck,
-			typeEventsUnack:     gwClient.SendEventsUnack,
-			typeClearInDowntime: gwClient.ClearInDowntime,
-			typeSetInDowntime:   gwClient.SetInDowntime,
-			typeInventory:       gwClient.SynchronizeInventory,
-			typeMetrics:         gwClient.SendResourcesWithMetrics,
-		}
 		var pType payloadType
 		if h := ctx.Value(clients.CtxHeaders); h != nil {
 			if h, ok := h.(interface{ Get(string) string }); ok {
@@ -190,10 +181,27 @@ func adaptClient(gwClient *clients.GWClient) func(context.Context, []byte) error
 				}
 			}
 		}
-		if fn, ok := pTypeHandlers[pType]; ok {
-			_, err := fn(ctx, p)
-			return err
+
+		var fn func(context.Context, []byte) ([]byte, error)
+		switch pType {
+		case typeEvents:
+			fn = gwClient.SendEvents
+		case typeEventsAck:
+			fn = gwClient.SendEventsAck
+		case typeEventsUnack:
+			fn = gwClient.SendEventsUnack
+		case typeClearInDowntime:
+			fn = gwClient.ClearInDowntime
+		case typeSetInDowntime:
+			fn = gwClient.SetInDowntime
+		case typeInventory:
+			fn = gwClient.SynchronizeInventory
+		case typeMetrics:
+			fn = gwClient.SendResourcesWithMetrics
+		default:
+			return fmt.Errorf("%w: unknown payload type: %v", nats.ErrDispatcher, pType)
 		}
-		return fmt.Errorf("%w: unknown payload type: %v", nats.ErrDispatcher, pType)
+		_, err := fn(ctx, p)
+		return err
 	}
 }
