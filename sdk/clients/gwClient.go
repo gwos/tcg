@@ -93,7 +93,9 @@ type GWHostGroups struct {
 // GWServices defines collection
 type GWServices struct {
 	Services []struct {
-		HostName string `json:"hostName"`
+		Description string `json:"description"`
+		HostName    string `json:"hostName"`
+		// skip other fields as not used for today
 	} `json:"services"`
 }
 
@@ -462,7 +464,7 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 }
 
 // GetServicesByAgent calls API
-func (client *GWClient) GetServicesByAgent(agentID string) (*GWServices, error) {
+func (client *GWClient) GetServicesByAgent(agentID string, gwServices *GWServices) error {
 	params := make(map[string]string)
 	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
@@ -470,21 +472,20 @@ func (client *GWClient) GetServicesByAgent(agentID string) (*GWServices, error) 
 	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointServices, BuildQueryParams(params), nil)
 	if err != nil {
 		logper.Error(obj{"error": err}, "could not get GW services")
-		return nil, err
+		return err
 	}
-	var gwServices GWServices
-	err = json.Unmarshal(response, &gwServices)
+	err = json.Unmarshal(response, gwServices)
 	if err != nil {
 		logper.Error(obj{"error": err}, "could not parse received GW services")
-		return nil, err
+		return err
 	}
-	return &gwServices, nil
+	return nil
 }
 
-// GetHostGroupsByHostNamesAndAppType calls API
-func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) (*GWHostGroups, error) {
+// GetHostGroupsByAppTypeAndHostNames calls API
+func (client *GWClient) GetHostGroupsByAppTypeAndHostNames(appType string, hostNames []string, gwHostGroups *GWHostGroups) error {
 	if len(hostNames) == 0 {
-		return nil, errors.New("unable to get host groups of host: host names are not provided")
+		return errors.New("unable to get host groups of host: host names are not provided")
 	}
 	query := "( hosts.hostName in ("
 	for i, hostName := range hostNames {
@@ -503,15 +504,14 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointHostgroups, BuildQueryParams(params), nil)
 	if err != nil {
 		logper.Error(obj{"error": err}, "could not get GW host groups")
-		return nil, err
+		return err
 	}
-	var gwHostGroups GWHostGroups
-	err = json.Unmarshal(response, &gwHostGroups)
+	err = json.Unmarshal(response, gwHostGroups)
 	if err != nil {
 		logper.Error(obj{"error": err}, "could not parse received GW host groups")
-		return nil, err
+		return err
 	}
-	return &gwHostGroups, nil
+	return nil
 }
 
 func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,

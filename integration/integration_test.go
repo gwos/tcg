@@ -22,6 +22,11 @@ func TestIntegration(t *testing.T) {
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)
 
+	group := transit.ResourceGroup{
+		Description: testName,
+		GroupName:   testName,
+		Type:        transit.HostGroup,
+	}
 	rs := makeResource(0, 3)
 	resources := new(transit.ResourcesWithServicesRequest)
 	resources.SetContext(*services.GetTransitService().MakeTracerContext())
@@ -29,6 +34,8 @@ func TestIntegration(t *testing.T) {
 	inventory := new(transit.InventoryRequest)
 	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 	inventory.AddResource(rs.ToInventoryResource())
+	group.AddResource(rs.ToResourceRef())
+	inventory.AddResourceGroup(group)
 
 	inventoryPayload, err := json.Marshal(inventory)
 	assert.NoError(t, err)
@@ -58,6 +65,27 @@ func TestIntegration(t *testing.T) {
 	assert.NoError(t, services.GetTransitService().SendResourceWithMetrics(context.Background(), badPayload))
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Nats.Value())
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport.Value())
+
+	cfg := config.GetConfig()
+	gwClient := &clients.GWClient{
+		AppName:      cfg.Connector.AppName,
+		AppType:      cfg.Connector.AppType,
+		GWConnection: (*clients.GWConnection)(cfg.GWConnections[0]),
+	}
+
+	t.Log("Test GWClient.GetServicesByAgent")
+	gwServices := new(clients.GWServices)
+	assert.NoError(t, gwClient.GetServicesByAgent(cfg.Connector.AgentID, gwServices))
+	assert.Equal(t, 3, len(gwServices.Services))
+	assert.Equal(t, "host0.test.tcg.gw8", gwServices.Services[0].HostName)
+
+	t.Log("Test GWClient.GetHostGroupsByAppTypeAndHostNames")
+	gwHostGroups := new(clients.GWHostGroups)
+	assert.NoError(t, gwClient.GetHostGroupsByAppTypeAndHostNames(cfg.Connector.AppType, []string{"host0.test.tcg.gw8"}, gwHostGroups))
+	assert.Equal(t, 1, len(gwHostGroups.HostGroups))
+	assert.Equal(t, 1, len(gwHostGroups.HostGroups[0].Hosts))
+	assert.Equal(t, "host0.test.tcg.gw8", gwHostGroups.HostGroups[0].Hosts[0].HostName)
+	assert.Equal(t, testName, gwHostGroups.HostGroups[0].Name)
 }
 
 func BenchmarkE2E(b *testing.B) {

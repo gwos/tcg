@@ -249,8 +249,9 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 			log.Err(err).Msg("could not connect to GW to get hosts to initialize state")
 			continue
 		}
-		gwServices, err := gwClient.GetServicesByAgent(agentID)
-		if err != nil || gwServices == nil {
+		gwServices := new(clients.GWServices)
+		err = gwClient.GetServicesByAgent(agentID, gwServices)
+		if err != nil {
 			log.Error().Err(err).
 				Msg("could not get GW hosts to initialize state")
 			continue
@@ -267,8 +268,9 @@ func initGwHosts(appType string, agentID string, gwConnections config.GWConnecti
 		}
 
 		if len(hostNames) > 0 {
-			gwHostGroups, err := gwClient.GetHostGroupsByHostNamesAndAppType(hostNames, appType)
-			if err != nil || gwHostGroups == nil {
+			gwHostGroups := new(clients.GWHostGroups)
+			err := gwClient.GetHostGroupsByAppTypeAndHostNames(appType, hostNames, gwHostGroups)
+			if err != nil {
 				log.Error().Err(err).
 					Msg("could not get GW host groups to initialize state")
 				continue
