@@ -500,11 +500,12 @@ func receiverHandler(c *gin.Context) {
 
 func pull(resources []Resource) {
 	for index, resource := range resources {
-		req, err := (&clients.Req{
+		req := clients.Req{
 			URL:     resource.URL,
 			Method:  http.MethodGet,
 			Headers: resource.Headers,
-		}).Send()
+		}
+		err := req.Send()
 
 		if err != nil {
 			logper.Error(req, "could not pull data from resource")

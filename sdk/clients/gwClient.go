@@ -162,7 +162,9 @@ func (client *GWClient) connectLocal() (string, error) {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointConnect, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointConnect, "",
 		headers, formValues, nil)
 
 	switch {
@@ -213,7 +215,9 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		"Content-Type":  "application/json",
 		"GWOS-APP-NAME": client.AppName,
 	}
-	req, err := client.doReq(context.Background(), http.MethodPut, GWEntrypointAuthenticatePassword, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
 		headers, nil, payload)
 
 	switch {
@@ -277,7 +281,9 @@ func (client *GWClient) Disconnect() error {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointDisconnect, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointDisconnect, "",
 		headers, formValues, nil)
 
 	switch {
@@ -326,7 +332,9 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointValidateToken, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointValidateToken, "",
 		headers, formValues, nil)
 
 	if err == nil {
@@ -528,7 +536,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		headers[k] = v
 	}
 
-	req, err := client.doReq(ctx, httpMethod, entrypoint, queryStr, headers, nil, payload)
+	var req Req
+	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == 401 {
 		logper.Debug(nil, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {
@@ -536,7 +545,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 			return nil, err
 		}
 		req.Headers["GWOS-API-TOKEN"] = client.token
-		req, err = req.SendWithContext(ctx)
+		err = req.SendWithContext(ctx)
 	}
 
 	switch {
@@ -575,8 +584,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 	return req.Response, nil
 }
 
-func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,
-	headers map[string]string, form map[string]string, payload []byte) (*Req, error) {
+func (client *GWClient) doReq(ctx context.Context, req *Req, httpMethod string, entrypoint GWEntrypoint, queryStr string,
+	headers map[string]string, form map[string]string, payload []byte) error {
 
 	client.once.Do(func() { client.buildURIs() })
 
@@ -612,13 +621,14 @@ func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint
 		uri = client.uriValidateToken
 	}
 
-	return (&Req{
+	*req = Req{
 		URL:     uri + queryStr,
 		Method:  httpMethod,
 		Headers: headers,
 		Form:    form,
 		Payload: payload,
-	}).SetClient(HttpClientGW).SendWithContext(ctx)
+	}
+	return req.SetClient(HttpClientGW).SendWithContext(ctx)
 }
 
 func (client *GWClient) buildURIs() {

@@ -66,14 +66,15 @@ func SendRequest(httpMethod string, requestURL string,
 func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, body []byte) (int, []byte, error) {
 
-	req, err := (&Req{
+	req := Req{
 		URL:     requestURL,
 		Method:  httpMethod,
 		Headers: headers,
 		Form:    formValues,
 		Payload: body,
-	}).SendWithContext(ctx)
-	return req.Status, req.Response, err
+	}
+	_ = req.SendWithContext(ctx)
+	return req.Status, req.Response, req.Err
 }
 
 // BuildQueryParams makes the query parameters string
@@ -115,12 +116,12 @@ func (q *Req) SetClient(c *http.Client) *Req {
 }
 
 // Send sends request
-func (q *Req) Send() (*Req, error) {
+func (q *Req) Send() error {
 	return q.SendWithContext(context.Background())
 }
 
 // SendWithContext sends request
-func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
+func (q *Req) SendWithContext(ctx context.Context) error {
 	var (
 		body     = q.Payload
 		err      error
@@ -143,7 +144,7 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, bodyBuf)
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 	request.Header.Set("Connection", "close")
 	for k, v := range q.Headers {
@@ -158,17 +159,17 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 	}
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 
 	defer response.Body.Close()
 	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 	q.Status, q.Response = response.StatusCode, responseBody
-	return q, nil
+	return nil
 }
 
 // LogFields returns fields maps

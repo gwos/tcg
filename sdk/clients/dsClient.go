@@ -48,12 +48,13 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 		Host:   client.HostName,
 		Path:   DSEntrypointValidateToken,
 	}
-	req, err := (&Req{
+	req := Req{
 		URL:     entrypoint.String(),
 		Method:  http.MethodPost,
 		Headers: headers,
 		Form:    formValues,
-	}).Send()
+	}
+	err := req.Send()
 
 	if err == nil {
 		if req.Status == 201 {
@@ -90,11 +91,12 @@ func (client *DSClient) Reload(agentID string) error {
 		Host:   client.HostName,
 		Path:   strings.ReplaceAll(DSEntrypointReload, ":agentID", agentID),
 	}
-	req, err := (&Req{
+	req := Req{
 		URL:     entrypoint.String(),
 		Method:  http.MethodPost,
 		Headers: headers,
-	}).Send()
+	}
+	err := req.Send()
 
 	if err == nil {
 		if req.Status == 201 {
