@@ -377,10 +377,13 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 	if client.GWConnection != nil {
 		mergeHosts = client.GWConnection.MergeHosts
 		if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+			var buf bytes.Buffer
 			var err error
-			if ctx, payload, err = GZIP(ctx, payload); err != nil {
+			ctx, err = GZIP(ctx, &buf, payload)
+			if err != nil {
 				return nil, err
 			}
+			payload = buf.Bytes()
 			headers = append(headers, "Content-Encoding", "gzip")
 		}
 	}
@@ -403,12 +406,14 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 			}
 		}
 	}
-	if client.GWConnection != nil && client.GWConnection.HTTPEncode &&
-		hdrCompressed == "" {
+	if client.GWConnection != nil &&
+		client.GWConnection.HTTPEncode && hdrCompressed == "" {
+		var buf bytes.Buffer
 		var err error
-		if ctx, payload, err = GZIP(ctx, payload); err != nil {
+		if ctx, err = GZIP(ctx, &buf, payload); err != nil {
 			return nil, err
 		}
+		payload = buf.Bytes()
 		headers = append(headers, "Content-Encoding", "gzip")
 	}
 	entrypoint := GWEntrypointSendResourceWithMetrics

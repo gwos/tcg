@@ -48,12 +48,11 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 	return ctx, req
 }
 
-var GZIP = func(ctx context.Context, p []byte) (context.Context, []byte, error) {
-	buf := &bytes.Buffer{}
-	gw := gzip.NewWriter(buf)
+var GZIP = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
+	gw := gzip.NewWriter(w)
 	_, err := gw.Write(p)
 	_ = gw.Close()
-	return ctx, buf.Bytes(), err
+	return ctx, err
 }
 
 // SendRequest wraps HTTP methods

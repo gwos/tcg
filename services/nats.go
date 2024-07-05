@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"errors"
@@ -35,15 +36,17 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...strin
 
 	if len(payload) > int(agentService.NatsMaxPayload) {
 		n0 := len(payload)
-		_, payload, err = clients.GZIP(ctx, payload)
+		buf := new(bytes.Buffer)
+		_, err = clients.GZIP(ctx, buf, payload)
 		if err != nil {
 			return err
 		}
-		if len(payload) > int(agentService.NatsMaxPayload) {
+		if buf.Len() > int(agentService.NatsMaxPayload) {
 			err = fmt.Errorf("%w: %v / %v / %v / %v / gzip compressed",
-				nats.ErrPayloadLim, subj, agentService.NatsMaxPayload, n0, len(payload))
+				nats.ErrPayloadLim, subj, agentService.NatsMaxPayload, n0, buf.Len())
 			return err
 		}
+		payload = buf.Bytes()
 		headers = append(headers, clients.HdrCompressed, "gzip",
 			clients.HdrPayloadLen, fmt.Sprint(n0))
 	}
