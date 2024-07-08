@@ -5,13 +5,16 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
 
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/logper"
 )
 
@@ -209,8 +212,56 @@ func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]by
 	return
 }
 
-func (q Req) Details() ReqDetails {
+func (q Req) DetailsX() ReqDetails {
 	return (ReqDetails)(q)
+}
+
+func (q Req) Details() []slog.Attr {
+	return q.logAttrs(true)
+}
+
+func (q Req) LogAttrs() []slog.Attr {
+	return q.logAttrs(false)
+}
+
+func (q Req) logAttrs(forceDetails bool) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("url", q.URL),
+		slog.String("method", q.Method),
+		slog.Int("status", q.Status),
+	}
+	if q.Err != nil {
+		attrs = append(attrs, slog.String("error", q.Err.Error()))
+	}
+	if q.Status >= 400 || forceDetails ||
+		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
+		if len(q.Headers) > 0 {
+			attrs = append(attrs, slog.Any("headers", slog.AnyValue(q.Headers)))
+		}
+		if len(q.Form) > 0 {
+			attrs = append(attrs, slog.Any("form", q.Form))
+		}
+		if len(q.Payload) > 0 {
+			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
+				attrs = append(attrs, slog.String("payload", "encoded:"+v))
+			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
+				attrs = append(attrs, slog.Any("payload", json.RawMessage(q.Payload)))
+			} else {
+				attrs = append(attrs, slog.String("payload", string(q.Payload)))
+			}
+		}
+		if len(q.Response) > 0 {
+			if bytes.HasPrefix(q.Response, []byte(`{`)) {
+				attrs = append(attrs, slog.Any("response", json.RawMessage(q.Response)))
+			} else {
+				attrs = append(attrs, slog.String("response", string(q.Response)))
+			}
+		}
+	}
+
+	// TODO: prepare wrapped attrs to avoid unnecessary work in disabled log calls.
+	// https://pkg.go.dev/log/slog#hdr-Performance_considerations
+	return attrs
 }
 
 // ReqDetails defines an alias for logging with forced details

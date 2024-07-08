@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/sdk/clients"
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/logper"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog"
@@ -511,6 +513,9 @@ func (cfg Config) initLogger() {
 	log.Logger = zerolog.New(w).
 		With().Timestamp().Caller().
 		Logger()
+	/* adapt SDK logger */
+	sdklog.Logger = slog.New((&logzer.SLogHandler{CallerSkipFrame: 3}).WithGroup("__sdklog__"))
+
 	/* set wrapped logger */
 	liblogger = zerolog.New(w).
 		With().Timestamp().CallerWithSkipFrameCount(4).

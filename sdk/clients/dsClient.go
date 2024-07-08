@@ -1,12 +1,15 @@
 package clients
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/logper"
 )
 
@@ -31,6 +34,7 @@ type DSClient struct {
 // ValidateToken calls API
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
+		sdklog.Logger.Info("DSClient is not configured")
 		logper.Info(nil, "DSClient is not configured")
 		return nil
 	}
@@ -59,19 +63,23 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if err == nil {
 		if req.Status == 201 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
+				sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "validate token", req.LogAttrs()...)
 				logper.Debug(req, "validate token")
 				return nil
 			}
 			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 			logper.Warn(req, "could not validate token")
 			return eee
 		}
 		eee := fmt.Errorf(string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not validate token")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.Details()...)
+		logper.Warn(req.DetailsX(), "could not validate token")
 		return eee
 	}
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 	logper.Warn(req, "could not validate token")
 	return err
 }
@@ -79,6 +87,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 // Reload calls API
 func (client *DSClient) Reload(agentID string) error {
 	if len(client.HostName) == 0 {
+		sdklog.Logger.Info("DSClient is not configured")
 		logper.Info(nil, "DSClient is not configured")
 		return nil
 	}
@@ -100,18 +109,22 @@ func (client *DSClient) Reload(agentID string) error {
 
 	if err == nil {
 		if req.Status == 201 {
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "request for reload", req.LogAttrs()...)
 			logper.Debug(req, "request for reload")
 			return nil
 		}
 		eee := fmt.Errorf(string(req.Response))
 		if req.Status == 404 {
 			req.Err = eee
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)
 			logper.Warn(req, "could not request for reload: check AgentID")
 		}
 		req.Err = eee
-		logper.Warn(req.Details(), "could not request for reload")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload", req.Details()...)
+		logper.Warn(req.DetailsX(), "could not request for reload")
 		return eee
 	}
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload", req.LogAttrs()...)
 	logper.Warn(req, "could not request for reload")
 	return err
 }
