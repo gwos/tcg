@@ -15,7 +15,6 @@ import (
 	"time"
 
 	sdklog "github.com/gwos/tcg/sdk/log"
-	"github.com/gwos/tcg/sdk/logper"
 )
 
 const (
@@ -174,48 +173,6 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	return nil
 }
 
-// LogFields returns fields maps
-func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
-	rawJSON = map[string][]byte{}
-	fields = map[string]interface{}{
-		"url":    q.URL,
-		"method": q.Method,
-		"status": q.Status,
-	}
-	if q.Err != nil {
-		fields["error"] = q.Err
-	}
-	if q.Status >= 400 || logper.IsDebugEnabled() {
-		if len(q.Headers) > 0 {
-			fields["headers"] = q.Headers
-		}
-		if len(q.Form) > 0 {
-			fields["form"] = q.Form
-		}
-		if len(q.Payload) > 0 {
-			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-				fields["payload"] = "encoded:" + v
-			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-				rawJSON["payload"] = q.Payload
-			} else {
-				fields["payload"] = string(q.Payload)
-			}
-		}
-		if len(q.Response) > 0 {
-			if bytes.HasPrefix(q.Response, []byte(`{`)) {
-				rawJSON["response"] = q.Response
-			} else {
-				fields["response"] = string(q.Response)
-			}
-		}
-	}
-	return
-}
-
-func (q Req) DetailsX() ReqDetails {
-	return (ReqDetails)(q)
-}
-
 func (q Req) Details() []slog.Attr {
 	return q.logAttrs(true)
 }
@@ -262,43 +219,4 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 	// TODO: prepare wrapped attrs to avoid unnecessary work in disabled log calls.
 	// https://pkg.go.dev/log/slog#hdr-Performance_considerations
 	return attrs
-}
-
-// ReqDetails defines an alias for logging with forced details
-type ReqDetails Req
-
-// LogFields returns fields maps
-func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
-	rawJSON = map[string][]byte{}
-	fields = map[string]interface{}{
-		"url":    q.URL,
-		"method": q.Method,
-		"status": q.Status,
-	}
-	if q.Err != nil {
-		fields["error"] = q.Err
-	}
-	if len(q.Headers) > 0 {
-		fields["headers"] = q.Headers
-	}
-	if len(q.Form) > 0 {
-		fields["form"] = q.Form
-	}
-	if len(q.Payload) > 0 {
-		if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-			fields["payload"] = "encoded:" + v
-		} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-			rawJSON["payload"] = q.Payload
-		} else {
-			fields["payload"] = string(q.Payload)
-		}
-	}
-	if len(q.Response) > 0 {
-		if bytes.HasPrefix(q.Response, []byte(`{`)) {
-			rawJSON["response"] = q.Response
-		} else {
-			fields["response"] = string(q.Response)
-		}
-	}
-	return
 }
