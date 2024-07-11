@@ -107,7 +107,8 @@ type Req struct {
 	Status   int
 	URL      string
 
-	client *http.Client
+	client   *http.Client
+	duration time.Duration
 }
 
 // SetClient sets http.Client to use
@@ -153,11 +154,13 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	}
 	_, request = HookRequestContext(ctx, request)
 
+	t0 := time.Now()
 	if q.client != nil {
 		response, err = q.client.Do(request)
 	} else {
 		response, err = HttpClient.Do(request)
 	}
+	q.duration = time.Since(t0).Truncate(1 * time.Millisecond)
 	if err != nil {
 		q.Status, q.Err = -1, err
 		return err
@@ -186,6 +189,7 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 		slog.String("url", q.URL),
 		slog.String("method", q.Method),
 		slog.Int("status", q.Status),
+		slog.Duration("duration", q.duration),
 	}
 	if q.Err != nil {
 		attrs = append(attrs, slog.String("error", q.Err.Error()))

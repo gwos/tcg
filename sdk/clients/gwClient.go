@@ -264,11 +264,7 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	if sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, fmt.Sprintf("authenticate password: userName: %s", user.Name), req.LogAttrs()...)
-	} else {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "authenticate password", req.LogAttrs()...)
-	}
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "authenticate password", req.LogAttrs()...)
 	return user.AccessToken, nil
 }
 
