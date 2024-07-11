@@ -416,8 +416,13 @@ func (service *AgentService) config(data []byte) error {
 		if err := service.startNats(); err != nil {
 			log.Err(err).Msg("error starting nats on processing config")
 		}
-	}
-	if service.Connector.Enabled && isTransportRunning {
+		// config changed, so starting
+		if service.Connector.Enabled {
+			if err := service.startTransport(); err != nil {
+				log.Err(err).Msg("error starting nats dispatcher on processing config")
+			}
+		}
+	} else if service.Connector.Enabled && isTransportRunning {
 		if err := service.startTransport(); err != nil {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}
