@@ -485,12 +485,15 @@ func (cfg Config) Hashsum() ([]byte, error) {
 }
 
 func (cfg Config) initLogger() {
+	lvl := [...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]
 	opts := []logzer.Option{
-		logzer.WithCondense(cfg.Connector.LogCondense),
 		logzer.WithLastErrors(10),
-		logzer.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
+		logzer.WithLevel(lvl),
 		logzer.WithColors(cfg.Connector.LogColors),
 		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
+	}
+	if cfg.Connector.LogCondense != 0 && lvl != zerolog.DebugLevel {
+		opts = append(opts, logzer.WithCondense(cfg.Connector.LogCondense))
 	}
 	if cfg.Connector.LogFile != "" {
 		opts = append(opts, logzer.WithLogFile(&logzer.LogFile{
