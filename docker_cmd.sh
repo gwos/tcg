@@ -41,8 +41,32 @@ fs_var=/tcg
     && mkdir -p "${fs_var}/${cmd}" \
     && cp "${fs_app}/${cmd}/tcg_config.yaml" "${fs_var}/${cmd}"
 
-cd "${fs_var}/${cmd}" \
-    && exec "${fs_app}/tcg-${cmd}"
+cd "${fs_var}/${cmd}"
 
-# NOTE: do exec to replace shell process
-# so application will receive OS signals
+check_leader() {
+  sleep 10s
+  while true; do
+    leader_status=$(docker ps -f name=leader --format '{{.Status}}')
+    if [[ ${leader_status} != *"Up"* ]]; then
+      exit
+    fi
+    sleep 5s
+  done
+}
+
+check_leader &
+check_pid=$!
+
+"${fs_app}/tcg-${cmd}" &
+cmd_pid=$!
+
+wait -n
+
+if ! kill -0 $check_pid 2>/dev/null; then
+  echo "Leader is down, exiting..."
+  exit 137
+fi
+
+if ! kill -0 $cmd_pid 2>/dev/null; then
+  exit
+fi
