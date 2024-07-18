@@ -1,13 +1,15 @@
 package clients
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 // Define entrypoints for DSOperations
@@ -31,7 +33,7 @@ type DSClient struct {
 // ValidateToken calls API
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		logper.Info(nil, "DSClient is not configured")
+		sdklog.Logger.Info("DSClient is not configured")
 		return nil
 	}
 
@@ -48,37 +50,38 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 		Host:   client.HostName,
 		Path:   DSEntrypointValidateToken,
 	}
-	req, err := (&Req{
+	req := Req{
 		URL:     entrypoint.String(),
 		Method:  http.MethodPost,
 		Headers: headers,
 		Form:    formValues,
-	}).Send()
+	}
+	err := req.Send()
 
 	if err == nil {
 		if req.Status == 201 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				logper.Debug(req, "validate token")
+				sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "validate token", req.LogAttrs()...)
 				return nil
 			}
 			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
-			logper.Warn(req, "could not validate token")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 			return eee
 		}
 		eee := fmt.Errorf(string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not validate token")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.Details()...)
 		return eee
 	}
-	logper.Warn(req, "could not validate token")
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 	return err
 }
 
 // Reload calls API
 func (client *DSClient) Reload(agentID string) error {
 	if len(client.HostName) == 0 {
-		logper.Info(nil, "DSClient is not configured")
+		sdklog.Logger.Info("DSClient is not configured")
 		return nil
 	}
 	headers := map[string]string{
@@ -90,27 +93,28 @@ func (client *DSClient) Reload(agentID string) error {
 		Host:   client.HostName,
 		Path:   strings.ReplaceAll(DSEntrypointReload, ":agentID", agentID),
 	}
-	req, err := (&Req{
+	req := Req{
 		URL:     entrypoint.String(),
 		Method:  http.MethodPost,
 		Headers: headers,
-	}).Send()
+	}
+	err := req.Send()
 
 	if err == nil {
 		if req.Status == 201 {
-			logper.Debug(req, "request for reload")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "request for reload", req.LogAttrs()...)
 			return nil
 		}
 		eee := fmt.Errorf(string(req.Response))
 		if req.Status == 404 {
 			req.Err = eee
-			logper.Warn(req, "could not request for reload: check AgentID")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)
 		}
 		req.Err = eee
-		logper.Warn(req.Details(), "could not request for reload")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload", req.Details()...)
 		return eee
 	}
-	logper.Warn(req, "could not request for reload")
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload", req.LogAttrs()...)
 	return err
 }
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strconv"
@@ -14,7 +15,7 @@ import (
 	"time"
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 const EnvHttpClientTimeoutGW = "TCG_HTTP_CLIENT_TIMEOUT_GW"
@@ -43,20 +44,20 @@ type GWEntrypoint string
 
 // GWEntrypoint
 const (
-	GWEntrypointAuthenticatePassword           GWEntrypoint = "/api/users/authenticatePassword"
-	GWEntrypointConnect                        GWEntrypoint = "/api/auth/login"
-	GWEntrypointDisconnect                     GWEntrypoint = "/api/auth/logout"
-	GWEntrypointClearInDowntime                GWEntrypoint = "/api/biz/clearindowntime"
-	GWEntrypointSetInDowntime                  GWEntrypoint = "/api/biz/setindowntime"
-	GWEntrypointSendEvents                     GWEntrypoint = "/api/events"
-	GWEntrypointSendEventsAck                  GWEntrypoint = "/api/events/ack"
-	GWEntrypointSendEventsUnack                GWEntrypoint = "/api/events/unack"
-	GWEntrypointSendResourceWithMetrics        GWEntrypoint = "/api/monitoring"
-	GWEntrypointSendResourceWithMetricsDynamic GWEntrypoint = "/api/monitoring?dynamic=true"
-	GWEntrypointSynchronizeInventory           GWEntrypoint = "/api/synchronizer"
-	GWEntrypointServices                       GWEntrypoint = "/api/services"
-	GWEntrypointHostgroups                     GWEntrypoint = "/api/hostgroups"
-	GWEntrypointValidateToken                  GWEntrypoint = "/api/auth/validatetoken"
+	GWEntrypointAuthenticatePassword       GWEntrypoint = "/api/users/authenticatePassword"
+	GWEntrypointConnect                    GWEntrypoint = "/api/auth/login"
+	GWEntrypointDisconnect                 GWEntrypoint = "/api/auth/logout"
+	GWEntrypointClearInDowntime            GWEntrypoint = "/api/biz/clearindowntime"
+	GWEntrypointSetInDowntime              GWEntrypoint = "/api/biz/setindowntime"
+	GWEntrypointSendEvents                 GWEntrypoint = "/api/events"
+	GWEntrypointSendEventsAck              GWEntrypoint = "/api/events/ack"
+	GWEntrypointSendEventsUnack            GWEntrypoint = "/api/events/unack"
+	GWEntrypointSendResourceWithMetrics    GWEntrypoint = "/api/monitoring"
+	GWEntrypointSendResourceWithMetricsDyn GWEntrypoint = "/api/monitoring?dynamic=true"
+	GWEntrypointSynchronizeInventory       GWEntrypoint = "/api/synchronizer"
+	GWEntrypointServices                   GWEntrypoint = "/api/services"
+	GWEntrypointHostgroups                 GWEntrypoint = "/api/hostgroups"
+	GWEntrypointValidateToken              GWEntrypoint = "/api/auth/validatetoken"
 )
 
 // GWConnection defines Groundwork Connection configuration
@@ -93,7 +94,9 @@ type GWHostGroups struct {
 // GWServices defines collection
 type GWServices struct {
 	Services []struct {
-		HostName string `json:"hostName"`
+		Description string `json:"description"`
+		HostName    string `json:"hostName"`
+		// skip other fields as not used for today
 	} `json:"services"`
 }
 
@@ -106,10 +109,22 @@ type GWClient struct {
 	mu   sync.Mutex
 	once sync.Once
 
-	httpClient *http.Client
-
 	token string
-	uris  map[GWEntrypoint]string
+
+	uriAuthenticatePassword       string
+	uriConnect                    string
+	uriDisconnect                 string
+	uriClearInDowntime            string
+	uriSetInDowntime              string
+	uriSendEvents                 string
+	uriSendEventsAck              string
+	uriSendEventsUnack            string
+	uriSendResourceWithMetrics    string
+	uriSendResourceWithMetricsDyn string
+	uriSynchronizeInventory       string
+	uriServices                   string
+	uriHostgroups                 string
+	uriValidateToken              string
 }
 
 // Connect calls API
@@ -148,12 +163,14 @@ func (client *GWClient) connectLocal() (string, error) {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointConnect, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointConnect, "",
 		headers, formValues, nil)
 
 	switch {
 	case err != nil:
-		logper.Error(req, "could not connect local groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not connect local groundwork", req.LogAttrs()...)
 		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -163,28 +180,28 @@ func (client *GWClient) connectLocal() (string, error) {
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not connect local groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not connect local groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not connect local groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not connect local groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.Details()...)
 		return "", eee
 	}
-	logper.Debug(req, "connect local groundwork")
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
 	return string(req.Response), nil
 }
 
@@ -199,12 +216,14 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		"Content-Type":  "application/json",
 		"GWOS-APP-NAME": client.AppName,
 	}
-	req, err := client.doReq(context.Background(), http.MethodPut, GWEntrypointAuthenticatePassword, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
 		headers, nil, payload)
 
 	switch {
 	case err != nil:
-		logper.Error(req, "could not authenticate password")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not authenticate password", req.LogAttrs()...)
 		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -214,25 +233,25 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not authenticate password")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not authenticate password")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not authenticate password")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not authenticate password")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.Details()...)
 		return "", eee
 	}
 
@@ -242,14 +261,10 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	}
 	user := UserResponse{AccessToken: ""}
 	if err := json.Unmarshal(req.Response, &user); err != nil {
-		logper.Warn(req.Details(), "could not authenticate password: parsingError: %s", err)
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	if logper.IsDebugEnabled() {
-		logper.Debug(req, "authenticate password: userName: %s", user.Name)
-	} else {
-		logper.Debug(req, "authenticate password")
-	}
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "authenticate password", req.LogAttrs()...)
 	return user.AccessToken, nil
 }
 
@@ -263,12 +278,14 @@ func (client *GWClient) Disconnect() error {
 		"Accept":       "text/plain",
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointDisconnect, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointDisconnect, "",
 		headers, formValues, nil)
 
 	switch {
 	case err != nil:
-		logper.Error(req, "could not disconnect groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not disconnect groundwork", req.LogAttrs()...)
 		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -277,28 +294,28 @@ func (client *GWClient) Disconnect() error {
 	case req.Status == 401:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not disconnect groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not disconnect groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not disconnect groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not disconnect groundwork")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.Details()...)
 		return eee
 	}
-	logper.Debug(req, "disconnect groundwork")
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "disconnect groundwork", req.LogAttrs()...)
 	return nil
 }
 
@@ -312,27 +329,29 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"gwos-app-name":  appName,
 		"gwos-api-token": apiToken,
 	}
-	req, err := client.doReq(context.Background(), http.MethodPost, GWEntrypointValidateToken, "",
+
+	var req Req
+	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointValidateToken, "",
 		headers, formValues, nil)
 
 	if err == nil {
 		if req.Status == 200 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				logper.Debug(req, "validate groundwork token")
+				sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "validate groundwork token", req.LogAttrs()...)
 				return nil
 			}
 			eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
-			logper.Warn(req, "could not validate groundwork token")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate groundwork token", req.LogAttrs()...)
 			return eee
 		}
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not validate groundwork token")
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate groundwork token", req.Details()...)
 		return eee
 	}
 
-	logper.Error(req, "could not validate groundwork token")
+	sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not validate groundwork token", req.LogAttrs()...)
 	if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
@@ -355,10 +374,13 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 	if client.GWConnection != nil {
 		mergeHosts = client.GWConnection.MergeHosts
 		if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+			var buf bytes.Buffer
 			var err error
-			if ctx, payload, err = GZIP(ctx, payload); err != nil {
+			ctx, err = GZIP(ctx, &buf, payload)
+			if err != nil {
 				return nil, err
 			}
+			payload = buf.Bytes()
 			headers = append(headers, "Content-Encoding", "gzip")
 		}
 	}
@@ -381,17 +403,19 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 			}
 		}
 	}
-	if client.GWConnection != nil && client.GWConnection.HTTPEncode &&
-		hdrCompressed == "" {
+	if client.GWConnection != nil &&
+		client.GWConnection.HTTPEncode && hdrCompressed == "" {
+		var buf bytes.Buffer
 		var err error
-		if ctx, payload, err = GZIP(ctx, payload); err != nil {
+		if ctx, err = GZIP(ctx, &buf, payload); err != nil {
 			return nil, err
 		}
+		payload = buf.Bytes()
 		headers = append(headers, "Content-Encoding", "gzip")
 	}
 	entrypoint := GWEntrypointSendResourceWithMetrics
 	if client.IsDynamicInventory {
-		entrypoint = GWEntrypointSendResourceWithMetricsDynamic
+		entrypoint = GWEntrypointSendResourceWithMetricsDyn
 	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
@@ -450,29 +474,28 @@ func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]
 }
 
 // GetServicesByAgent calls API
-func (client *GWClient) GetServicesByAgent(agentID string) (*GWServices, error) {
+func (client *GWClient) GetServicesByAgent(agentID string, gwServices *GWServices) error {
 	params := make(map[string]string)
 	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
 
 	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointServices, BuildQueryParams(params), nil)
 	if err != nil {
-		logper.Error(obj{"error": err}, "could not get GW services")
-		return nil, err
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not get GW services", slog.String("error", err.Error()))
+		return err
 	}
-	var gwServices GWServices
-	err = json.Unmarshal(response, &gwServices)
+	err = json.Unmarshal(response, gwServices)
 	if err != nil {
-		logper.Error(obj{"error": err}, "could not parse received GW services")
-		return nil, err
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not parse received GW services", slog.String("error", err.Error()))
+		return err
 	}
-	return &gwServices, nil
+	return nil
 }
 
-// GetHostGroupsByHostNamesAndAppType calls API
-func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, appType string) (*GWHostGroups, error) {
+// GetHostGroupsByAppTypeAndHostNames calls API
+func (client *GWClient) GetHostGroupsByAppTypeAndHostNames(appType string, hostNames []string, gwHostGroups *GWHostGroups) error {
 	if len(hostNames) == 0 {
-		return nil, errors.New("unable to get host groups of host: host names are not provided")
+		return errors.New("unable to get host groups of host: host names are not provided")
 	}
 	query := "( hosts.hostName in ("
 	for i, hostName := range hostNames {
@@ -490,16 +513,15 @@ func (client *GWClient) GetHostGroupsByHostNamesAndAppType(hostNames []string, a
 
 	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointHostgroups, BuildQueryParams(params), nil)
 	if err != nil {
-		logper.Error(obj{"error": err}, "could not get GW host groups")
-		return nil, err
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not get GW host groups", slog.String("error", err.Error()))
+		return err
 	}
-	var gwHostGroups GWHostGroups
-	err = json.Unmarshal(response, &gwHostGroups)
+	err = json.Unmarshal(response, gwHostGroups)
 	if err != nil {
-		logper.Error(obj{"error": err}, "could not parse received GW host groups")
-		return nil, err
+		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not parse received GW host groups", slog.String("error", err.Error()))
+		return err
 	}
-	return &gwHostGroups, nil
+	return nil
 }
 
 func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,
@@ -516,20 +538,21 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		headers[k] = v
 	}
 
-	req, err := client.doReq(ctx, httpMethod, entrypoint, queryStr, headers, nil, payload)
+	var req Req
+	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == 401 {
-		logper.Debug(nil, "could not send request: reconnecting")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {
-			logper.Error(obj{"error": err}, "could not send request: could not reconnect")
+			sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request: could not reconnect", slog.String("error", err.Error()))
 			return nil, err
 		}
 		req.Headers["GWOS-API-TOKEN"] = client.token
-		req, err = req.SendWithContext(ctx)
+		err = req.SendWithContext(ctx)
 	}
 
 	switch {
 	case err != nil:
-		logper.Error(req, "could not send request")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request", req.LogAttrs()...)
 		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -538,70 +561,104 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 	case req.Status == 401:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not send request")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not send request", req.LogAttrs()...)
 		return nil, eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not send request")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not send request", req.LogAttrs()...)
 		return nil, eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		logper.Warn(req, "could not send request")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not send request", req.LogAttrs()...)
 		return nil, eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		logper.Warn(req.Details(), "could not send request")
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not send request", req.Details()...)
 		return nil, eee
 	}
-	logper.Debug(req, "send request")
+
+	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "send request", req.LogAttrs()...)
 	return req.Response, nil
 }
 
-func (client *GWClient) doReq(ctx context.Context, httpMethod string, entrypoint GWEntrypoint, queryStr string,
-	headers map[string]string, form map[string]string, payload []byte) (*Req, error) {
+func (client *GWClient) doReq(ctx context.Context, req *Req, httpMethod string, entrypoint GWEntrypoint, queryStr string,
+	headers map[string]string, form map[string]string, payload []byte) error {
 
 	client.once.Do(func() { client.buildURIs() })
 
-	return (&Req{
-		URL:     client.uris[entrypoint] + queryStr,
+	var uri string
+	switch entrypoint {
+	case GWEntrypointAuthenticatePassword:
+		uri = client.uriAuthenticatePassword
+	case GWEntrypointConnect:
+		uri = client.uriConnect
+	case GWEntrypointDisconnect:
+		uri = client.uriDisconnect
+	case GWEntrypointClearInDowntime:
+		uri = client.uriClearInDowntime
+	case GWEntrypointSetInDowntime:
+		uri = client.uriSetInDowntime
+	case GWEntrypointSendEvents:
+		uri = client.uriSendEvents
+	case GWEntrypointSendEventsAck:
+		uri = client.uriSendEventsAck
+	case GWEntrypointSendEventsUnack:
+		uri = client.uriSendEventsUnack
+	case GWEntrypointSendResourceWithMetrics:
+		uri = client.uriSendResourceWithMetrics
+	case GWEntrypointSendResourceWithMetricsDyn:
+		uri = client.uriSendResourceWithMetricsDyn
+	case GWEntrypointServices:
+		uri = client.uriServices
+	case GWEntrypointSynchronizeInventory:
+		uri = client.uriSynchronizeInventory
+	case GWEntrypointHostgroups:
+		uri = client.uriHostgroups
+	case GWEntrypointValidateToken:
+		uri = client.uriValidateToken
+	}
+
+	*req = Req{
+		URL:     uri + queryStr,
 		Method:  httpMethod,
 		Headers: headers,
 		Form:    form,
 		Payload: payload,
-	}).SetClient(HttpClientGW).SendWithContext(ctx)
+	}
+	return req.SetClient(HttpClientGW).SendWithContext(ctx)
 }
 
 func (client *GWClient) buildURIs() {
-	client.uris = make(map[GWEntrypoint]string)
-	client.uris[GWEntrypointAuthenticatePassword] = buildURI(client.GWConnection.HostName, GWEntrypointAuthenticatePassword)
-	client.uris[GWEntrypointConnect] = buildURI(client.GWConnection.HostName, GWEntrypointConnect)
-	client.uris[GWEntrypointDisconnect] = buildURI(client.GWConnection.HostName, GWEntrypointDisconnect)
-	client.uris[GWEntrypointClearInDowntime] = buildURI(client.GWConnection.HostName, GWEntrypointClearInDowntime)
-	client.uris[GWEntrypointSetInDowntime] = buildURI(client.GWConnection.HostName, GWEntrypointSetInDowntime)
-	client.uris[GWEntrypointSendEvents] = buildURI(client.GWConnection.HostName, GWEntrypointSendEvents)
-	client.uris[GWEntrypointSendEventsAck] = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsAck)
-	client.uris[GWEntrypointSendEventsUnack] = buildURI(client.GWConnection.HostName, GWEntrypointSendEventsUnack)
-	client.uris[GWEntrypointSendResourceWithMetrics] = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
-	client.uris[GWEntrypointSendResourceWithMetricsDynamic] = buildURI(client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDynamic)
-	client.uris[GWEntrypointServices] = buildURI(client.GWConnection.HostName, GWEntrypointServices)
-	client.uris[GWEntrypointSynchronizeInventory] = buildURI(client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
-	client.uris[GWEntrypointHostgroups] = buildURI(client.GWConnection.HostName, GWEntrypointHostgroups)
-	client.uris[GWEntrypointValidateToken] = buildURI(client.GWConnection.HostName, GWEntrypointValidateToken)
+	var b strings.Builder
+	client.uriAuthenticatePassword = buildURI(&b, client.GWConnection.HostName, GWEntrypointAuthenticatePassword)
+	client.uriConnect = buildURI(&b, client.GWConnection.HostName, GWEntrypointConnect)
+	client.uriDisconnect = buildURI(&b, client.GWConnection.HostName, GWEntrypointDisconnect)
+	client.uriClearInDowntime = buildURI(&b, client.GWConnection.HostName, GWEntrypointClearInDowntime)
+	client.uriSetInDowntime = buildURI(&b, client.GWConnection.HostName, GWEntrypointSetInDowntime)
+	client.uriSendEvents = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEvents)
+	client.uriSendEventsAck = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEventsAck)
+	client.uriSendEventsUnack = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendEventsUnack)
+	client.uriSendResourceWithMetrics = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendResourceWithMetrics)
+	client.uriSendResourceWithMetricsDyn = buildURI(&b, client.GWConnection.HostName, GWEntrypointSendResourceWithMetricsDyn)
+	client.uriSynchronizeInventory = buildURI(&b, client.GWConnection.HostName, GWEntrypointSynchronizeInventory)
+	client.uriServices = buildURI(&b, client.GWConnection.HostName, GWEntrypointServices)
+	client.uriHostgroups = buildURI(&b, client.GWConnection.HostName, GWEntrypointHostgroups)
+	client.uriValidateToken = buildURI(&b, client.GWConnection.HostName, GWEntrypointValidateToken)
 }
 
-func buildURI(hostname string, entrypoint GWEntrypoint) string {
-	s := strings.TrimSuffix(strings.TrimRight(hostname, "/"), "/api")
-	if !strings.HasPrefix(s, "http") {
-		s = "https://" + s
+func buildURI(b *strings.Builder, hostname string, entrypoint GWEntrypoint) string {
+	b.Reset()
+	if !strings.HasPrefix(hostname, "http") {
+		_, _ = b.WriteString("https://")
 	}
-	return fmt.Sprintf("%s/%s", s, strings.TrimLeft(string(entrypoint), "/"))
+	fmt.Fprintf(b, "%s/%s",
+		strings.TrimSuffix(strings.TrimRight(hostname, "/"), "/api"),
+		strings.TrimLeft(string(entrypoint), "/"))
+	return b.String()
 }
-
-// obj defines a short alias
-type obj map[string]interface{}

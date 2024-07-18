@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -15,7 +16,7 @@ import (
 	"github.com/golang/snappy"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	dto "github.com/prometheus/client_model/go"
@@ -500,18 +501,19 @@ func receiverHandler(c *gin.Context) {
 
 func pull(resources []Resource) {
 	for index, resource := range resources {
-		req, err := (&clients.Req{
+		req := clients.Req{
 			URL:     resource.URL,
 			Method:  http.MethodGet,
 			Headers: resource.Headers,
-		}).Send()
+		}
+		err := req.Send()
 
 		if err != nil {
-			logper.Error(req, "could not pull data from resource")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not pull data from resource", req.LogAttrs()...)
 			continue
 		}
 		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
-			logper.Error(req.Details(), "could not pull data from resource")
+			sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not pull data from resource", req.Details()...)
 			continue
 		}
 

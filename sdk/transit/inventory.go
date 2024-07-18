@@ -3,7 +3,7 @@ package transit
 import (
 	"fmt"
 
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 type BaseInfo struct {
@@ -45,8 +45,8 @@ func (p *BaseInfo) SetDescription(s string) {
 func (p *BaseInfo) SetProperty(k string, v interface{}) {
 	t := NewTypedValue(v)
 	if t == nil {
-		logper.Error(nil, "could not set property %s on %s: unsupported value type: %T",
-			k, p.Name, v)
+		sdklog.Logger.Error(fmt.Sprintf("could not set property %s on %s: unsupported value type: %T",
+			k, p.Name, v))
 		return
 	}
 	if p.Properties == nil {

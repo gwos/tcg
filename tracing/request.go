@@ -1,9 +1,9 @@
 package tracing
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
+	"io"
 	"net/http"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace"
@@ -15,23 +15,21 @@ func HookRequestContext(ctx context.Context, req *http.Request) (context.Context
 	return ctx, req
 }
 
-func GZIP(ctx context.Context, p []byte) (context.Context, []byte, error) {
+func GZIP(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
 	var (
-		err    error
-		output []byte
+		err error
+		n   int
 	)
 	ctx, span := StartTraceSpan(ctx, "request", "gzip")
 	defer func() {
 		EndTraceSpan(span,
 			TraceAttrError(err),
 			TraceAttrInt("inputLen", len(p)),
-			TraceAttrInt("outputLen", len(output)),
+			TraceAttrInt("outputLen", n),
 		)
 	}()
-	buf := &bytes.Buffer{}
-	gw := gzip.NewWriter(buf)
-	_, err = gw.Write(p)
+	gw := gzip.NewWriter(w)
+	n, err = gw.Write(p)
 	_ = gw.Close()
-	output = buf.Bytes()
-	return ctx, output, err
+	return ctx, err
 }

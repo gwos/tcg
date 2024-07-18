@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path"
 	"strings"
@@ -11,7 +12,7 @@ import (
 
 	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/sdk/clients"
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -22,8 +23,6 @@ import (
 var (
 	once sync.Once
 	cfg  *Config
-
-	liblogger zerolog.Logger
 )
 
 const (
@@ -486,12 +485,15 @@ func (cfg Config) Hashsum() ([]byte, error) {
 }
 
 func (cfg Config) initLogger() {
+	lvl := [...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]
 	opts := []logzer.Option{
-		logzer.WithCondense(cfg.Connector.LogCondense),
 		logzer.WithLastErrors(10),
-		logzer.WithLevel([...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]),
+		logzer.WithLevel(lvl),
 		logzer.WithColors(cfg.Connector.LogColors),
 		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
+	}
+	if cfg.Connector.LogCondense != 0 && lvl != zerolog.DebugLevel {
+		opts = append(opts, logzer.WithCondense(cfg.Connector.LogCondense))
 	}
 	if cfg.Connector.LogFile != "" {
 		opts = append(opts, logzer.WithLogFile(&logzer.LogFile{
@@ -511,44 +513,6 @@ func (cfg Config) initLogger() {
 	log.Logger = zerolog.New(w).
 		With().Timestamp().Caller().
 		Logger()
-	/* set wrapped logger */
-	liblogger = zerolog.New(w).
-		With().Timestamp().CallerWithSkipFrameCount(4).
-		Logger()
-
-	logper.SetLogger(
-		func(fields interface{}, format string, a ...interface{}) {
-			log2zerolog(zerolog.ErrorLevel, fields, format, a...)
-		},
-		func(fields interface{}, format string, a ...interface{}) {
-			log2zerolog(zerolog.WarnLevel, fields, format, a...)
-		},
-		func(fields interface{}, format string, a ...interface{}) {
-			log2zerolog(zerolog.InfoLevel, fields, format, a...)
-		},
-		func(fields interface{}, format string, a ...interface{}) {
-			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				log2zerolog(zerolog.DebugLevel, fields, format, a...)
-			}
-		},
-		func() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel },
-	)
-}
-
-func log2zerolog(lvl zerolog.Level, fields interface{}, format string, a ...interface{}) {
-	e := liblogger.WithLevel(lvl)
-	if ff, ok := fields.(interface {
-		LogFields() (map[string]interface{}, map[string][]byte)
-	}); ok {
-		m1, m2 := ff.LogFields()
-		e.Fields(m1)
-		for k, v := range m2 {
-			e.RawJSON(k, v)
-		}
-	} else if _, ok := fields.(map[string]interface{}); ok {
-		e.Fields(fields)
-	} else if _, ok := fields.([]interface{}); ok {
-		e.Fields(fields)
-	}
-	e.Msgf(format, a...)
+	/* adapt SDK logger */
+	sdklog.Logger = slog.New((&logzer.SLogHandler{CallerSkipFrame: 3}))
 }

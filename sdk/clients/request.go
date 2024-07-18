@@ -5,14 +5,16 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/gwos/tcg/sdk/logper"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 const (
@@ -48,12 +50,11 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 	return ctx, req
 }
 
-var GZIP = func(ctx context.Context, p []byte) (context.Context, []byte, error) {
-	buf := &bytes.Buffer{}
-	gw := gzip.NewWriter(buf)
+var GZIP = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
+	gw := gzip.NewWriter(w)
 	_, err := gw.Write(p)
 	_ = gw.Close()
-	return ctx, buf.Bytes(), err
+	return ctx, err
 }
 
 // SendRequest wraps HTTP methods
@@ -66,14 +67,15 @@ func SendRequest(httpMethod string, requestURL string,
 func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, body []byte) (int, []byte, error) {
 
-	req, err := (&Req{
+	req := Req{
 		URL:     requestURL,
 		Method:  httpMethod,
 		Headers: headers,
 		Form:    formValues,
 		Payload: body,
-	}).SendWithContext(ctx)
-	return req.Status, req.Response, err
+	}
+	_ = req.SendWithContext(ctx)
+	return req.Status, req.Response, req.Err
 }
 
 // BuildQueryParams makes the query parameters string
@@ -105,7 +107,8 @@ type Req struct {
 	Status   int
 	URL      string
 
-	client *http.Client
+	client   *http.Client
+	duration time.Duration
 }
 
 // SetClient sets http.Client to use
@@ -115,12 +118,12 @@ func (q *Req) SetClient(c *http.Client) *Req {
 }
 
 // Send sends request
-func (q *Req) Send() (*Req, error) {
+func (q *Req) Send() error {
 	return q.SendWithContext(context.Background())
 }
 
 // SendWithContext sends request
-func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
+func (q *Req) SendWithContext(ctx context.Context) error {
 	var (
 		body     = q.Payload
 		err      error
@@ -143,7 +146,7 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, bodyBuf)
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 	request.Header.Set("Connection", "close")
 	for k, v := range q.Headers {
@@ -151,103 +154,73 @@ func (q *Req) SendWithContext(ctx context.Context) (*Req, error) {
 	}
 	_, request = HookRequestContext(ctx, request)
 
+	t0 := time.Now()
 	if q.client != nil {
 		response, err = q.client.Do(request)
 	} else {
 		response, err = HttpClient.Do(request)
 	}
+	q.duration = time.Since(t0).Truncate(1 * time.Millisecond)
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 
 	defer response.Body.Close()
 	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
 		q.Status, q.Err = -1, err
-		return q, err
+		return err
 	}
 	q.Status, q.Response = response.StatusCode, responseBody
-	return q, nil
+	return nil
 }
 
-// LogFields returns fields maps
-func (q Req) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
-	rawJSON = map[string][]byte{}
-	fields = map[string]interface{}{
-		"url":    q.URL,
-		"method": q.Method,
-		"status": q.Status,
+func (q Req) Details() []slog.Attr {
+	return q.logAttrs(true)
+}
+
+func (q Req) LogAttrs() []slog.Attr {
+	return q.logAttrs(false)
+}
+
+func (q Req) logAttrs(forceDetails bool) []slog.Attr {
+	attrs := []slog.Attr{
+		slog.String("url", q.URL),
+		slog.String("method", q.Method),
+		slog.Int("status", q.Status),
+		slog.Duration("duration", q.duration),
 	}
 	if q.Err != nil {
-		fields["error"] = q.Err
+		attrs = append(attrs, slog.String("error", q.Err.Error()))
 	}
-	if q.Status >= 400 || logper.IsDebugEnabled() {
+	if q.Status >= 400 || forceDetails ||
+		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
 		if len(q.Headers) > 0 {
-			fields["headers"] = q.Headers
+			attrs = append(attrs, slog.Any("headers", slog.AnyValue(q.Headers)))
 		}
 		if len(q.Form) > 0 {
-			fields["form"] = q.Form
+			attrs = append(attrs, slog.Any("form", q.Form))
 		}
 		if len(q.Payload) > 0 {
 			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-				fields["payload"] = "encoded:" + v
+				attrs = append(attrs, slog.String("payload", "encoded:"+v))
 			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-				rawJSON["payload"] = q.Payload
+				attrs = append(attrs, slog.Any("payload", json.RawMessage(q.Payload)))
 			} else {
-				fields["payload"] = string(q.Payload)
+				attrs = append(attrs, slog.String("payload", string(q.Payload)))
 			}
 		}
 		if len(q.Response) > 0 {
 			if bytes.HasPrefix(q.Response, []byte(`{`)) {
-				rawJSON["response"] = q.Response
+				attrs = append(attrs, slog.Any("response", json.RawMessage(q.Response)))
 			} else {
-				fields["response"] = string(q.Response)
+				attrs = append(attrs, slog.String("response", string(q.Response)))
 			}
 		}
 	}
-	return
-}
 
-func (q Req) Details() ReqDetails {
-	return (ReqDetails)(q)
-}
-
-// ReqDetails defines an alias for logging with forced details
-type ReqDetails Req
-
-// LogFields returns fields maps
-func (q ReqDetails) LogFields() (fields map[string]interface{}, rawJSON map[string][]byte) {
-	rawJSON = map[string][]byte{}
-	fields = map[string]interface{}{
-		"url":    q.URL,
-		"method": q.Method,
-		"status": q.Status,
-	}
-	if q.Err != nil {
-		fields["error"] = q.Err
-	}
-	if len(q.Headers) > 0 {
-		fields["headers"] = q.Headers
-	}
-	if len(q.Form) > 0 {
-		fields["form"] = q.Form
-	}
-	if len(q.Payload) > 0 {
-		if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-			fields["payload"] = "encoded:" + v
-		} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-			rawJSON["payload"] = q.Payload
-		} else {
-			fields["payload"] = string(q.Payload)
-		}
-	}
-	if len(q.Response) > 0 {
-		if bytes.HasPrefix(q.Response, []byte(`{`)) {
-			rawJSON["response"] = q.Response
-		} else {
-			fields["response"] = string(q.Response)
-		}
-	}
-	return
+	// TODO: prepare wrapped attrs to avoid unnecessary work in disabled log calls.
+	// https://pkg.go.dev/log/slog#hdr-Performance_considerations
+	return attrs
 }
