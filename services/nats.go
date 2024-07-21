@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/gwos/tcg/nats"
@@ -81,16 +82,39 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 				traceID []byte
 				trFlags []byte
 			)
+
+			// no os.Stderr under Nagios process
+			fname := func() string {
+				if s, ok := os.LookupEnv("_LOG_"); ok {
+					return s
+				}
+				return "/proc/self/fd/2"
+			}()
+
+			f, _ := os.OpenFile(fname, os.O_RDWR|os.O_APPEND, 0666)
+			defer f.Close()
+			fmt.Fprintln(f, "__NATS Handler__")
+			log.Debug().Msg("__NATS Handler__")
+
 			/* try to process as legacy flow with wrapped payload */
 			p := natsPayload{}
 			if err = p.Unmarshal(data); err == nil {
+				log.Debug().Msg("__legacy flow with wrapped payload__")
+				fmt.Fprintln(f, "__legacy flow with wrapped payload__")
+
 				data = p.Payload
 				ctx = getCtx(p.SpanContext)
 				if pType, t := p.Type.String(), headers.Get(clients.HdrPayloadType); t == "" {
 					headers.Set(clients.HdrPayloadType, pType)
 				}
+
+				log.Debug().Msg("__legacy flow with wrapped payload__done")
+				fmt.Fprintln(f, "__legacy flow with wrapped payload__done")
 			} else {
 				/* try to process as latest flow with headers */
+				log.Debug().Msg("__latest flow with headers__")
+				fmt.Fprintln(f, "__latest flow with headers__")
+
 				if s, t, tf := headers.Get(clients.HdrSpanSpanID), headers.Get(clients.HdrSpanTraceID),
 					headers.Get(clients.HdrSpanTraceFlags); s != "" && t != "" {
 					if spanID, err = hex.DecodeString(s); err == nil {
@@ -104,7 +128,13 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 					}
 					ctx = getCtx(trace.NewSpanContext(sCtxCfg))
 				}
+
+				log.Debug().Msg("__latest flow with headers__done")
+				fmt.Fprintln(f, "__latest flow with headers__done")
 			}
+			log.Debug().Msgf("__headers__ %+v \n", headers)
+			fmt.Fprintf(f, "__headers__ %+v \n", headers)
+
 			ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
 
 			ctx, span := tracing.StartTraceSpan(ctx, "services", "nats:dispatch")
@@ -118,6 +148,9 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 				)
 			}()
 
+			log.Debug().Msg("__handleWithCtx__")
+			fmt.Fprintln(f, "__handleWithCtx__")
+
 			if err = handleWithCtx(ctx, data); err == nil {
 				agentService.stats.x.Add("sentTo:"+durable, 1)
 				agentService.stats.BytesSent.Add(int64(len(data)))
@@ -127,6 +160,9 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 					agentService.stats.MetricsSent.Add(1)
 				}
 			}
+
+			log.Debug().Msgf("__handleWithCtx__done %+v \n", err)
+			fmt.Fprintf(f, "__handleWithCtx__done %+v \n", err)
 
 			if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user
