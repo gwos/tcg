@@ -20,7 +20,7 @@ require (
 	github.com/gosnmp/gosnmp v1.37.0
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/markel1974/gokuery v1.0.3
-	github.com/nats-io/nats-server/v2 v2.10.17
+	github.com/nats-io/nats-server/v2 v2.10.18
 	github.com/nats-io/nats.go v1.36.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/prometheus/alertmanager v0.27.0
