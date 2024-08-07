@@ -89,6 +89,7 @@ func StartServer(config Config) error {
 			return err
 		}
 	} else {
+		opts.NoSigs = true
 		opts.HTTPHost = "127.0.0.1"
 		opts.HTTPPort = config.MonitorPort
 		opts.Host = "127.0.0.1"
