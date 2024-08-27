@@ -77,7 +77,7 @@ func (connector *SnmpConnector) LoadConfig(config ExtConfig) error {
 
 func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
 	[]transit.ResourceGroup, error) {
-	if connector.config.Views != nil && len(connector.config.Views) > 0 {
+	if len(connector.config.Views) > 0 {
 		devices, err := connector.nediClient.GetDevices()
 		if err != nil {
 			log.Err(err).Msg("could not get devices")
@@ -133,7 +133,7 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 }
 
 func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
-	log.Info().Msg("========= starting collection of interface metrics...")
+	log.Debug().Msg("========= starting collection of interface metrics...")
 	for deviceName, device := range connector.mState.devices {
 		interfaces, err := connector.nediClient.GetDeviceInterfaces(deviceName)
 		if err != nil {
@@ -142,7 +142,7 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 		}
 
 		if len(interfaces) == 0 {
-			log.Info().Msgf("no interfaces of device '%s' found", deviceName)
+			log.Debug().Msgf("no interfaces of device '%s' found", deviceName)
 			continue
 		}
 
@@ -194,7 +194,7 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 		connector.mState.devices[deviceName] = device
 		connector.mState.Unlock()
 	}
-	log.Info().Msg("========= ending collection of interface metrics...")
+	log.Debug().Msg("========= ending collection of interface metrics...")
 }
 
 func (connector *SnmpConnector) listSuggestions(view string, name string) []string {
