@@ -71,7 +71,7 @@ COPY --from=build /app /
 FROM alpine:3.11 AS prod
 # update zlib to fix CVE
 RUN apk add -u --no-cache \
-        bash \
+        bash coreutils \
         ca-certificates openssl \
         curl jq \
         libmcrypt \
