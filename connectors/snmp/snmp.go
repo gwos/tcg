@@ -93,7 +93,9 @@ func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, [
 			if secData != nil {
 				deviceExt.SecData = secData
 			}
+			connector.mState.Lock()
 			connector.mState.devices[device.Name] = deviceExt
+			connector.mState.Unlock()
 		}
 	}
 
@@ -144,14 +146,13 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 			continue
 		}
 
-		device.Interfaces = make(map[int]InterfaceExt)
+		interfacesMap := make(map[int]InterfaceExt)
 		for _, iFace := range interfaces {
-			device.Interfaces[iFace.Index] = InterfaceExt{
+			interfacesMap[iFace.Index] = InterfaceExt{
 				Interface: iFace,
 				Metrics:   make(map[string]InterfaceMetric),
 			}
 		}
-		connector.mState.devices[deviceName] = device
 
 		if device.SecData == nil {
 			log.Error().Msgf("security data for device '%s' not found: skipping", deviceName)
@@ -174,19 +175,24 @@ func (connector *SnmpConnector) collectInterfacesMetrics(mibs []string) {
 						snmpValue.Name, idxMix)
 					continue
 				}
-				if iFace, has := device.Interfaces[idx]; has {
+				if iFace, has := interfacesMap[idx]; has {
 					metric := InterfaceMetric{
 						Key:   data.SnmpMetric.Key,
 						Mib:   data.SnmpMetric.Mib,
 						Value: snmpValue.Value,
 					}
 					iFace.Metrics[metric.Mib] = metric
-					device.Interfaces[idx] = iFace
+					interfacesMap[idx] = iFace
 				} else {
 					log.Warn().Msgf("interface of index '%d' for device '%s' not found", idx, deviceName)
 				}
 			}
 		}
+
+		connector.mState.Lock()
+		device.Interfaces = interfacesMap
+		connector.mState.devices[deviceName] = device
+		connector.mState.Unlock()
 	}
 	log.Info().Msg("========= ending collection of interface metrics...")
 }

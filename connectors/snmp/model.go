@@ -3,6 +3,7 @@ package snmp
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gwos/tcg/connectors"
@@ -20,6 +21,7 @@ const FiveMinutes = 300
 var previousValueCache = cache.New(-1, -1)
 
 type MonitoringState struct {
+	sync.Mutex
 	// [deviceName]Device
 	devices map[string]DeviceExt
 }
