@@ -1,16 +1,6 @@
 run:
-  go: '1.23'
-  skip-dirs:
-    - vendor
-    - bin
-    - var
-    - tmp
-    - gotocjson
-    - libtransit
-    - deprecated
-    - connectors/nsca
-  skip-files:
-    - \.pb\.go$
+  # Default: use Go version from the go.mod file, fallback on the env var `GOVERSION`, fallback on 1.17
+  # go: '1.23'
   modules-download-mode: readonly
 
 govet:
@@ -53,6 +43,17 @@ linters:
 
 issues:
   # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-dirs:
+    - vendor
+    - bin
+    - var
+    - tmp
+    - gotocjson
+    - libtransit
+    - deprecated
+    - connectors/nsca
+  exclude-files:
+    - \.pb\.go$
   exclude-rules:
     - path: _test\.go
       linters:
