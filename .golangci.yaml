@@ -1,5 +1,5 @@
 run:
-  go: '1.22'
+  go: '1.23'
   skip-dirs:
     - vendor
     - bin
@@ -34,11 +34,11 @@ linters:
     - staticcheck
     - stylecheck
     - unconvert
-# TODO:    - unparam
+    # TODO:    - unparam
     - unused
     - whitespace
-# TODO:    - gocognit
-# TODO:    - gocyclo
+  # TODO:    - gocognit
+  # TODO:    - gocyclo
   disable:
     - depguard
     - gochecknoglobals

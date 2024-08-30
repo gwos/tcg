@@ -2,7 +2,7 @@
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
 #
-FROM golang:1.22-bullseye AS build-libtransit
+FROM golang:1.23-bullseye AS build-libtransit
 ARG TRAVIS_TAG=
 ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 WORKDIR /go/src/
@@ -24,7 +24,7 @@ RUN make clean && make \
 FROM scratch AS export-libtransit
 COPY --from=build-libtransit /go/src/build /
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.23-alpine AS build
 ARG TRAVIS_TAG=
 ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 WORKDIR /go/src/
@@ -71,7 +71,7 @@ COPY --from=build /app /
 FROM alpine:3.11 AS prod
 # update zlib to fix CVE
 RUN apk add -u --no-cache \
-        bash \
+        bash coreutils \
         ca-certificates openssl \
         curl jq \
         libmcrypt \
