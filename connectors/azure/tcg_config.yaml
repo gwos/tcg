@@ -1,7 +1,7 @@
 connector:
   agentId: ""
-  appName: AZURE
-  appType: AZURE
+  appName: TCG-AZURE
+  appType: TCG-AZURE
   controllerAddr: 0.0.0.0:8099
   natsFilestoreDir: natsstore
   natsStoreType: FILE
