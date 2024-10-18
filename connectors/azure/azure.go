@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultHostGroupName        = "AZURE"
+	defaultHostGroupName        = "TCG-AZURE"
 	defaultHostGroupDescription = ""
 
 	envAzureTenantID     = "AZURE_TENANT_ID"
