@@ -189,7 +189,7 @@ func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error 
 			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
 		}
 		var encrypted []byte
-		fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
+		_, _ = fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
 		decrypted, err := Decrypt(encrypted, []byte(s))
 		if err != nil {
 			return err

@@ -1,3 +1,5 @@
+//go:build !codeanalysis
+
 package checker
 
 import (

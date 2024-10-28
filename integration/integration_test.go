@@ -163,7 +163,6 @@ func BenchmarkE2E(b *testing.B) {
 			}
 		}
 	})
-
 }
 
 // inspired by expvar.Handler() implementation

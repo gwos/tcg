@@ -1,3 +1,5 @@
+//go:build !codeanalysis
+
 package main
 
 import (
@@ -10,6 +12,7 @@ import (
 	"github.com/gwos/tcg/connectors/apm"
 	"github.com/gwos/tcg/connectors/azure"
 	"github.com/gwos/tcg/connectors/checker"
+	"github.com/gwos/tcg/connectors/databricks"
 	"github.com/gwos/tcg/connectors/elastic"
 	"github.com/gwos/tcg/connectors/events"
 	"github.com/gwos/tcg/connectors/k8s"
@@ -20,17 +23,18 @@ import (
 )
 
 const (
-	CmdAPM     = "apm"
-	CmdChecker = "checker"
-	CmdElastic = "elastic"
-	CmdEvents  = "events"
-	CmdK8S     = "k8s"
-	CmdK8Sa    = "kubernetes"
-	CmdNSCA    = "nsca"
-	CmdOffice  = "office"
-	CmdServer  = "server"
-	CmdSNMP    = "snmp"
-	CmdAzure   = "azure"
+	CmdAPM        = "apm"
+	CmdChecker    = "checker"
+	CmdElastic    = "elastic"
+	CmdEvents     = "events"
+	CmdK8S        = "k8s"
+	CmdK8Sa       = "kubernetes"
+	CmdNSCA       = "nsca"
+	CmdOffice     = "office"
+	CmdServer     = "server"
+	CmdSNMP       = "snmp"
+	CmdAzure      = "azure"
+	CmdDatabricks = "databricks"
 )
 
 var cmdRe = regexp.MustCompile(`^(tcg[_-])?(?P<cmdName>.+?)([_-]connector)?$`)
@@ -69,6 +73,8 @@ func main() {
 		events.Run()
 	case matchCmd(CmdAzure, appName) || matchCmd(CmdAzure, args0bs):
 		azure.Run()
+	case matchCmd(CmdDatabricks, appName) || matchCmd(CmdDatabricks, args0bs):
+		databricks.Run()
 	default:
 		panic("main: unknown command:" +
 			" args0bs=" + args0bs + " appName=" + appName)
