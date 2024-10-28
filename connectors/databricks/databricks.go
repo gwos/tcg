@@ -81,14 +81,32 @@ func getJobsResources(databricksClient *client.DatabricksClient, from time.Time,
 			var metricBuilders []connectors.MetricBuilder
 			for _, run := range runs {
 				if !slices.Contains([]string{"QUEUED", "PENDING", "RUNNING", "TERMINATING"}, run.Status.State) {
-					metricBuilders = append(metricBuilders, connectors.MetricBuilder{
-						Name:           "run_latency_seconds",
-						CustomName:     "run_latency_seconds",
-						Value:          run.RunDuration,
-						UnitType:       transit.UnitCounter,
-						StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime)},
-						EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime)},
-					})
+					metricBuilders = append(metricBuilders, []connectors.MetricBuilder{
+						{
+							Name:           "run_latency_seconds",
+							CustomName:     "run_latency_seconds",
+							Value:          0,
+							UnitType:       transit.UnitCounter,
+							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime).Add(-time.Millisecond)},
+							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.StartTime)},
+						},
+						{
+							Name:           "run_latency_seconds",
+							CustomName:     "run_latency_seconds",
+							Value:          run.RunDuration,
+							UnitType:       transit.UnitCounter,
+							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime)},
+							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime)},
+						},
+						{
+							Name:           "run_latency_seconds",
+							CustomName:     "run_latency_seconds",
+							Value:          0,
+							UnitType:       transit.UnitCounter,
+							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.EndTime)},
+							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime).Add(time.Millisecond)},
+						},
+					}...)
 				} else {
 					currentActiveJobsRuns[run.JobID] = run.RunID
 				}
