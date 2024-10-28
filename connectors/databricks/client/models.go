@@ -7,8 +7,8 @@ type RunsResponse struct {
 }
 
 type Run struct {
-	JobID   string `json:"job_id,"`
-	RunID   string `json:"run_id"`
+	JobID   int64  `json:"job_id,"`
+	RunID   int64  `json:"run_id"`
 	RunName string `json:"run_name"`
 	Status  struct {
 		State              string `json:"state,omitempty"` // BLOCKED | PENDING | QUEUED | RUNNING | TERMINATING | TERMINATED

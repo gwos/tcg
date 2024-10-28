@@ -21,7 +21,7 @@ var (
 	ctxCancel, cancel = context.WithCancel(context.Background())
 
 	lastRunTimeTo  = time.Now().Add(-time.Hour * 744)
-	activeJobsRuns = make(map[string]string) // nolint:unused
+	activeJobsRuns = make(map[int64]int64) // nolint:unused
 )
 
 func Run() {

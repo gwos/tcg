@@ -18,9 +18,9 @@ func New(url, token string) *DatabricksClient {
 	}
 }
 
-func (d *DatabricksClient) GetJobsLatency(from, to time.Time) (map[string][]Run, error) {
+func (d *DatabricksClient) GetJobsLatency(from, to time.Time) (map[int64][]Run, error) {
 	var (
-		result = make(map[string][]Run)
+		result = make(map[int64][]Run)
 
 		hasMore       = true
 		nextPageToken = ""

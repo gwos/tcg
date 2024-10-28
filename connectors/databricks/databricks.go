@@ -19,7 +19,7 @@ const (
 
 func collectMetrics() {
 	if extConfig.DatabricksURL == "" || extConfig.DatabricksAccessToken == "" {
-		log.Error().
+		log.Debug().
 			Str("databricks_url", extConfig.DatabricksURL).
 			Str("databricks_access_token", extConfig.DatabricksAccessToken).
 			Msg("databricks auth data is missing")
@@ -40,6 +40,7 @@ func collectMetrics() {
 			Str("databricks_url", extConfig.DatabricksURL).
 			Str("databricks_access_token", extConfig.DatabricksAccessToken).
 			Msg("failed to get jobs resource")
+		return
 	}
 
 	monitoredResources = append(monitoredResources, *jobsResource)
@@ -66,7 +67,7 @@ func collectMetrics() {
 func getJobsResources(databricksClient *client.DatabricksClient, from time.Time, to time.Time) (*transit.MonitoredResource, error) {
 	var (
 		hostName              = "jobs"
-		currentActiveJobsRuns = make(map[string]string)
+		currentActiveJobsRuns = make(map[int64]int64)
 	)
 
 	jobsRuns, err := databricksClient.GetJobsLatency(from, to)
