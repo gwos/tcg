@@ -6,10 +6,11 @@ import (
 	"slices"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/databricks/client"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -78,45 +79,56 @@ func getJobsResources(databricksClient *client.DatabricksClient, from time.Time,
 	var services []transit.MonitoredService
 	for _, runs := range jobsRuns {
 		if len(runs) > 0 {
-			var metricBuilders []connectors.MetricBuilder
 			for _, run := range runs {
 				if !slices.Contains([]string{"QUEUED", "PENDING", "RUNNING", "TERMINATING"}, run.Status.State) {
-					metricBuilders = append(metricBuilders, []connectors.MetricBuilder{
-						{
-							Name:           "run_latency_seconds",
-							CustomName:     "run_latency_seconds",
-							Value:          0.0,
-							UnitType:       transit.UnitCounter,
-							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime).Add(-(2 * time.Second))},
-							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.StartTime).Add(-time.Second)},
-						},
-						{
-							Name:           "run_latency_seconds",
-							CustomName:     "run_latency_seconds",
-							Value:          run.RunDuration / 1000,
-							UnitType:       transit.UnitCounter,
-							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime)},
-							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime)},
-						},
-						{
-							Name:           "run_latency_seconds",
-							CustomName:     "run_latency_seconds",
-							Value:          0.0,
-							UnitType:       transit.UnitCounter,
-							StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.EndTime).Add(time.Second)},
-							EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime).Add(2 * time.Second)},
-						},
-					}...)
+					service0, err := connectors.BuildServiceForMetric(hostName, connectors.MetricBuilder{
+						Name:           "latency_seconds",
+						CustomName:     "latency_seconds",
+						Value:          0,
+						Graphed:        true,
+						StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime).Add(-2 * time.Minute)},
+						EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.StartTime).Add(-time.Minute)},
+					})
+					if err != nil {
+						log.Error().Err(err).Str("job_name", run.RunName).Msg("failed to build service for metric")
+						continue
+					}
+					service0.Name = run.RunName
+
+					metricBuilder := connectors.MetricBuilder{
+						Name:           "latency_seconds",
+						CustomName:     "latency_seconds",
+						Value:          run.RunDuration / 1000,
+						Graphed:        true,
+						StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.StartTime)},
+						EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime)},
+					}
+					service1, err := connectors.BuildServiceForMetric(hostName, metricBuilder)
+					if err != nil {
+						log.Error().Err(err).Str("job_name", run.RunName).Msg("failed to build service for metric")
+						continue
+					}
+					service1.Name = run.RunName
+
+					service2, err := connectors.BuildServiceForMetric(hostName, connectors.MetricBuilder{
+						Name:           "latency_seconds",
+						CustomName:     "latency_seconds",
+						Value:          0,
+						Graphed:        true,
+						StartTimestamp: &transit.Timestamp{Time: time.UnixMilli(run.EndTime).Add(time.Minute)},
+						EndTimestamp:   &transit.Timestamp{Time: time.UnixMilli(run.EndTime).Add(2 * time.Minute)},
+					})
+					if err != nil {
+						log.Error().Err(err).Str("job_name", run.RunName).Msg("failed to build service for metric")
+						continue
+					}
+					service2.Name = run.RunName
+
+					services = append(services, *service0, *service1, *service2)
 				} else {
 					currentActiveJobsRuns[run.JobID] = run.RunID
 				}
 			}
-			service, err := connectors.BuildServiceForMultiMetric(hostName, runs[0].RunName, runs[0].RunName, metricBuilders)
-			if err != nil {
-				log.Error().Err(err).Str("job_name", runs[0].RunName).Msg("failed to build service for multi metric")
-				continue
-			}
-			services = append(services, *service)
 		}
 	}
 
