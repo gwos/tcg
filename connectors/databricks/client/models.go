@@ -2,8 +2,8 @@ package client
 
 type RunsResponse struct {
 	Runs          []Run  `json:"runs"`
-	NextPageToken string `json:"nextPageToken,omitempty"`
-	HasMore       bool   `json:"has_more"`
+	NextPageToken string `json:"next_page_token,omitempty"`
+	HasMore       bool   `json:"has_more,omitempty"`
 }
 
 type Run struct {
@@ -21,4 +21,21 @@ type Run struct {
 	RunDuration float64 `json:"run_duration,omitempty"`
 	StartTime   int64   `json:"start_time,omitempty"`
 	EndTime     int64   `json:"end_time,omitempty"`
+}
+
+type ClustersResponse struct {
+	Clusters      []Cluster `json:"clusters"`
+	NextPageToken string    `json:"next_page_token,omitempty"`
+	HasMore       bool      `json:"has_more,omitempty"`
+}
+
+type Cluster struct {
+	Name              string `json:"cluster_name,omitempty"`
+	State             string `json:"state,omitempty"` // PENDING | RUNNING | RESTARTING | RESIZING | TERMINATING | TERMINATED | ERROR | UNKNOWN
+	StateMessage      string `json:"state_message,omitempty"`
+	TerminationReason struct {
+		Code       string                 `json:"code"`
+		Type       string                 `json:"type"`
+		Parameters map[string]interface{} `json:"parameters,omitempty"`
+	} `json:"termination_reason,omitempty"`
 }
