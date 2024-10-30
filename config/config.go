@@ -384,7 +384,7 @@ func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
 	} */
 
 	switch cfg.Connector.AppType {
-	case "CHECKER", "APM", "EVENTS", "TCG-AZURE":
+	case "CHECKER", "APM", "EVENTS", "TCGAZURE":
 		cfg.Connector.IsDynamicInventory = true
 	default:
 		cfg.Connector.IsDynamicInventory = false
