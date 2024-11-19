@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func (d *DatabricksClient) GetJobsLatency(from, to time.Time) (map[int64][]Run, error) {
+func (d *DatabricksClient) GetJobsRuns(from, to time.Time) (map[int64][]Run, error) {
 	var (
 		result = make(map[int64][]Run)
 

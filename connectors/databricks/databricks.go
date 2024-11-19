@@ -34,7 +34,7 @@ func collectMetrics() {
 	monitoredResources := make([]transit.MonitoredResource, 0)
 	monitoredResourcesRef := make([]transit.ResourceRef, 0)
 
-	jobsResource, err := utils.GetJobsResource(databricksClient, from, to)
+	jobsResources, err := utils.GetJobsResources(databricksClient, from, to)
 	if err != nil {
 		log.Error().Err(err).
 			Str("databricks_url", extConfig.DatabricksURL).
@@ -42,8 +42,10 @@ func collectMetrics() {
 			Msg("failed to get jobs resource")
 		return
 	}
+	log.Error().Interface("jobs_resources", jobsResources).Msg("DEBUG")
+	monitoredResources = append(monitoredResources, jobsResources...)
 
-	clusterResource, err := utils.GetClustersResource(databricksClient)
+	clustersResources, err := utils.GetClustersResource(databricksClient)
 	if err != nil {
 		log.Error().Err(err).
 			Str("databricks_url", extConfig.DatabricksURL).
@@ -51,13 +53,14 @@ func collectMetrics() {
 			Msg("failed to get clusters resource")
 		return
 	}
+	monitoredResources = append(monitoredResources, clustersResources...)
 
-	monitoredResources = append(monitoredResources, *jobsResource, *clusterResource)
-	monitoredResourcesRef = append(
-		monitoredResourcesRef,
-		connectors.CreateResourceRef(jobsResource.Name, "", transit.ResourceTypeHost),
-		connectors.CreateResourceRef(clusterResource.Name, "", transit.ResourceTypeHost),
-	)
+	for _, resource := range monitoredResources {
+		monitoredResourcesRef = append(
+			monitoredResourcesRef,
+			connectors.CreateResourceRef(resource.Name, "", transit.ResourceTypeHost),
+		)
+	}
 
 	lastRunTimeTo = to
 
