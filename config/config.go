@@ -189,7 +189,7 @@ func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error 
 			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
 		}
 		var encrypted []byte
-		fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
+		_, _ = fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
 		decrypted, err := Decrypt(encrypted, []byte(s))
 		if err != nil {
 			return err
@@ -384,7 +384,7 @@ func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
 	} */
 
 	switch cfg.Connector.AppType {
-	case "CHECKER", "APM", "EVENTS", "AZURE":
+	case "CHECKER", "APM", "EVENTS", "AZURE", "DATABRICKS":
 		cfg.Connector.IsDynamicInventory = true
 	default:
 		cfg.Connector.IsDynamicInventory = false
