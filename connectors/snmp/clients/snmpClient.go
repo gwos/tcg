@@ -2,6 +2,7 @@ package clients
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -107,17 +108,16 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 		return nil, errors.New("no metrics (mibs) provided")
 	}
 
-	log.Info().Msgf("------ starting SNMP metric gathering for target '%s'", target)
+	log.Debug().Msgf("------ starting SNMP metric gathering for target '%s'", target)
 	goSnmp, err := setup(target, secData)
 	if err != nil {
 		log.Err(err).Msg("SNMP setup failed")
-		return nil, errors.New("SNMP setup failed")
+		return nil, fmt.Errorf("SNMP setup failed: %w", err)
 	}
 
-	err = goSnmp.Connect()
-	if err != nil {
+	if err := goSnmp.Connect(); err != nil {
 		log.Err(err).Msg("SNMP connect failed")
-		return nil, errors.New("SNMP connect failed")
+		return nil, fmt.Errorf("SNMP connect failed: %w", err)
 	}
 	defer goSnmp.Conn.Close()
 
@@ -125,9 +125,9 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 	for _, mib := range mibs {
 		mibData, e := getSnmpData(mib, goSnmp) // go get the snmp
 		if e != nil {
+			// reconnect in case of error
 			goSnmp.Conn.Close()
-			err = goSnmp.Connect()
-			if err != nil {
+			if err := goSnmp.Connect(); err != nil {
 				log.Err(err).Msg("SNMP connect failed")
 			}
 			log.Err(e).Msgf("could not get data for target '%s' + mib '%s'", target, mib)
@@ -137,7 +137,7 @@ func (client *SnmpClient) GetSnmpData(mibs []string, target string, secData *uti
 			data = append(data, *mibData)
 		}
 	}
-	log.Info().Msgf("------ completed for target '%s'", target)
+	log.Debug().Msgf("------ completed for target '%s'", target)
 	return data, nil
 }
 
@@ -150,11 +150,9 @@ func setup(target string, secData *utils.SecurityData) (*snmp.GoSNMP, error) {
 }
 
 func setupV2c(target string, community *utils.SecurityData) (*snmp.GoSNMP, error) {
-	err := validate(target, community)
-
-	if err != nil {
+	if err := validate(target, community); err != nil {
 		log.Err(err).Msg("could not setup snmp v2c")
-		return nil, errors.New("validation failed")
+		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
 	return &snmp.GoSNMP{
@@ -169,10 +167,9 @@ func setupV2c(target string, community *utils.SecurityData) (*snmp.GoSNMP, error
 }
 
 func setupV3(target string, community *utils.SecurityData) (*snmp.GoSNMP, error) {
-	err := validate(target, community)
-	if err != nil {
+	if err := validate(target, community); err != nil {
 		log.Err(err).Msg("could not setup snmp v3")
-		return nil, errors.New("validation failed")
+		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 
 	var msgFlags snmp.SnmpV3MsgFlags
@@ -261,7 +258,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 		return nil, errors.New("missing mib")
 	}
 
-	log.Info().Msgf("-- start getting MIB: %s", mib)
+	log.Debug().Msgf("-- start getting MIB: %s", mib)
 
 	snmpMetric := AvailableMetrics[mib]
 	if snmpMetric == nil {
@@ -280,19 +277,17 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	data.SnmpMetric = *snmpMetric
 
 	walkHandler := func(dataUnit snmp.SnmpPDU) error {
-		log.Info().Msgf("-- walk Handler: data unit name: '%s', value: '%s'",
-			dataUnit.Name, dataUnit.Value)
-		var val SnmpValue
-		val.Name = dataUnit.Name
+		dbg := log.Debug().Interface("SnmpPDU", dataUnit)
+		val := SnmpValue{Name: dataUnit.Name}
 		switch v := dataUnit.Value.(type) {
 		case uint:
 			val.Value = int64(v)
-			log.Info().Msgf("*** parsed value for %s: %d", val.Name, val.Value)
+			dbg.Interface("val", val).Msg("walkHandler: parsed")
 		case uint64:
 			val.Value = int64(v)
-			log.Info().Msgf("*** parsed value for %s: %d", val.Name, val.Value)
+			dbg.Interface("val", val).Msg("walkHandler: parsed")
 		default:
-			log.Warn().Msgf("value '%s' of unsupported type for %s", v, dataUnit.Name)
+			dbg.Msgf("walkHandler: unsupported type %T", v)
 		}
 		data.Values = append(data.Values, val)
 		return nil
@@ -303,7 +298,7 @@ func getSnmpData(mib string, goSnmp *snmp.GoSNMP) (*SnmpMetricData, error) {
 	if err != nil {
 		return nil, err
 	} else {
-		log.Info().Msgf("-- end getting MIB: %s", mib)
+		log.Debug().Msgf("-- end getting MIB: %s", mib)
 	}
 
 	return &data, nil
