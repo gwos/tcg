@@ -2267,9 +2267,8 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 	if err := json.Unmarshal(devicesJSON, &state.devices); err != nil {
 		return nil, nil, nil, err
 	}
-	lastOK := float64(time.Now().Unix())
 	for k, d := range state.devices {
-		d.LastOK = lastOK
+		d.LastOK = time.Now().Unix()
 		state.devices[k] = d
 	}
 

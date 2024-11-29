@@ -176,12 +176,11 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	return mServices
 }
 
-func calculateHostStatus(lastOk float64) transit.MonitorStatus {
+func calculateHostStatus(lastOk int64) transit.MonitorStatus {
 	now := time.Now().Unix() // in seconds
-	if (float64(now) - lastOk) < FiveMinutes {
+	if (now - lastOk) < FiveMinutes {
 		return transit.HostUp
 	}
-
 	return transit.HostUnreachable
 }
 

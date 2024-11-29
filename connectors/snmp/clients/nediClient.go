@@ -38,14 +38,14 @@ type Device struct {
 	Name      string
 	IP        string
 	Community string
-	LastOK    float64
+	LastOK    int64
 }
 
 type Monitoring struct {
 	Name   string
 	IP     string
 	Device string
-	LastOK float64
+	LastOK int64
 }
 
 type Interface struct {
@@ -331,7 +331,7 @@ func (client *NediClient) getMonitoredDevices() (map[string]Monitoring, error) {
 		var monitor Monitoring
 		monitor.Name = fields[colName].(string)
 		monitor.Device = fields[colDevice].(string)
-		monitor.LastOK = fields[colLastOK].(float64)
+		monitor.LastOK = int64(fields[colLastOK].(float64))
 
 		ip := fields[colMonIP]
 		ipVal, err := getInt(ip)
