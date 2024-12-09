@@ -368,7 +368,7 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 	return nil
 }
 
-func (cfg *Config) loadDynamicInventoryFlag(data []byte) error {
+func (cfg *Config) loadDynamicInventoryFlag(_ []byte) error {
 	/* TODO: Support dynamic flag in UI
 	var s struct {
 		Connection struct {
@@ -514,5 +514,5 @@ func (cfg Config) initLogger() {
 		With().Timestamp().Caller().
 		Logger()
 	/* adapt SDK logger */
-	sdklog.Logger = slog.New((&logzer.SLogHandler{CallerSkipFrame: 3}))
+	sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
 }

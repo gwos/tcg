@@ -175,7 +175,7 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		if err := doStream(js, nil, &sc); err != nil {
 			return err
 		}
-	} else if err != nil {
+	} else {
 		log.Err(err).Msg("nats failed StreamInfo")
 		return err
 	}
