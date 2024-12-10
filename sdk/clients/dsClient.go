@@ -23,7 +23,7 @@ const (
 type DSConnection struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
-	HostName string `yaml:"hostName"`
+	HostName string `env:"HOSTNAME" yaml:"hostName"`
 }
 
 // DSClient implements DS API operations

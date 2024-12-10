@@ -9,6 +9,7 @@ require (
 	github.com/PaesslerAG/gval v1.2.2
 	github.com/PaesslerAG/jsonpath v0.1.1
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751
+	github.com/caarlos0/env/v11 v11.2.2
 	github.com/elastic/go-elasticsearch/v7 v7.17.10
 	github.com/gin-contrib/cors v1.7.2
 	github.com/gin-contrib/sessions v1.0.1

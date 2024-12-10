@@ -62,23 +62,23 @@ const (
 
 // GWConnection defines Groundwork Connection configuration
 type GWConnection struct {
-	ID int `yaml:"id"`
+	ID int `env:"ID" yaml:"id"`
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
-	HostName            string `yaml:"hostName"`
-	UserName            string `yaml:"userName"`
-	Password            string `yaml:"password"`
-	Enabled             bool   `yaml:"enabled"`
-	IsChild             bool   `yaml:"isChild"`
-	DisplayName         string `yaml:"displayName"`
-	MergeHosts          bool   `yaml:"mergeHosts"`
-	LocalConnection     bool   `yaml:"localConnection"`
-	DeferOwnership      string `yaml:"deferOwnership"`
-	PrefixResourceNames bool   `yaml:"prefixResourceNames"`
-	ResourceNamePrefix  string `yaml:"resourceNamePrefix"`
-	SendAllInventory    bool   `yaml:"sendAllInventory"`
-	IsDynamicInventory  bool   `yaml:"-"`
-	HTTPEncode          bool   `yaml:"-"`
+	HostName            string `env:"HOSTNAME" yaml:"hostName"`
+	UserName            string `env:"USERNAME" yaml:"userName"`
+	Password            string `env:"PASSWORD" yaml:"password"`
+	Enabled             bool   `env:"ENABLED" yaml:"enabled"`
+	IsChild             bool   `env:"ISCHILD" yaml:"isChild"`
+	DisplayName         string `env:"DISPLAYNAME" yaml:"displayName"`
+	MergeHosts          bool   `env:"MERGEHOSTS" yaml:"mergeHosts"`
+	LocalConnection     bool   `env:"LOCALCONNECTION" yaml:"localConnection"`
+	DeferOwnership      string `env:"DEFEROWNERSHIP" yaml:"deferOwnership"`
+	PrefixResourceNames bool   `env:"PREFIXRESOURCENAMES" yaml:"prefixResourceNames"`
+	ResourceNamePrefix  string `env:"RESOURCENAMEPREFIX" yaml:"resourceNamePrefix"`
+	SendAllInventory    bool   `env:"SENDALLINVENTORY" yaml:"sendAllInventory"`
+	IsDynamicInventory  bool   `env:"ISDYNAMICINVENTORY" yaml:"-"`
+	HTTPEncode          bool   `env:"HTTPENCODE" yaml:"-"`
 }
 
 // GWHostGroups defines collection

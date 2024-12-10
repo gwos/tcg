@@ -53,36 +53,35 @@ func (l LogLevel) String() string {
 type Nats struct {
 	// NatsAckWait is the time the NATS server will wait before resending a message
 	// Should be greater then the GWClient request duration
-	NatsAckWait time.Duration `yaml:"-"`
+	NatsAckWait time.Duration `env:"NATSACKWAIT" yaml:"-"`
 	// designates the maximum number of outstanding acknowledgements
 	// (messages that have been delivered but not acknowledged)
 	// that NATS Streaming will allow for a given subscription.
 	// When this limit is reached, NATS Streaming will suspend delivery of messages
 	// to this subscription until the number of unacknowledged messages falls below the specified limit
-	NatsMaxInflight int `yaml:"-"`
+	NatsMaxInflight int `env:"NATSMAXINFLIGHT" yaml:"-"`
 	// NatsMaxPubAcksInflight accepts number of unacknowledged messages
 	// that a publisher may have in-flight at any given time.
 	// When this maximum is reached, further async publish calls will block
 	// until the number of unacknowledged messages falls below the specified limit
-	NatsMaxPubAcksInflight int `yaml:"-"`
-	// NatsMaxPayload         int32 `yaml:"-"`
-	NatsMaxPayload int32 `yaml:"natsMaxPayload"` // enabling for testing oversized payloads
+	NatsMaxPubAcksInflight int   `env:"NATSMAXPUBACKSINFLIGHT" yaml:"-"`
+	NatsMaxPayload         int32 `env:"NATSMAXPAYLOAD" yaml:"-"`
 	// NatsMonitorPort enables monitoring on http port useful for debug
 	// curl 'localhost:8222/streaming/channelsz?limit=0&offset=0&subs=1'
 	// More info: https://docs.nats.io/nats-streaming-concepts/monitoring
-	NatsMonitorPort int    `yaml:"-"`
-	NatsStoreDir    string `yaml:"natsFilestoreDir"`
+	NatsMonitorPort int    `env:"NATSMONITORPORT" yaml:"-"`
+	NatsStoreDir    string `env:"NATSSTOREDIR" yaml:"natsFilestoreDir"`
 	// NatsStoreType accepts "FILE"|"MEMORY"
-	NatsStoreType string `yaml:"natsStoreType"`
+	NatsStoreType string `env:"NATSSTORETYPE" yaml:"natsStoreType"`
 	// How long messages are kept
-	NatsStoreMaxAge time.Duration `yaml:"natsStoreMaxAge"`
+	NatsStoreMaxAge time.Duration `env:"NATSSTOREMAXAGE" yaml:"natsStoreMaxAge"`
 	// How many bytes are allowed per-channel
-	NatsStoreMaxBytes int64 `yaml:"natsStoreMaxBytes"`
+	NatsStoreMaxBytes int64 `env:"NATSSTOREMAXBYTES" yaml:"natsStoreMaxBytes"`
 	// How many messages are allowed per-channel
-	NatsStoreMaxMsgs int64 `yaml:"natsStoreMaxMsgs"`
+	NatsStoreMaxMsgs int64 `env:"NATSSTOREMAXMSGS" yaml:"natsStoreMaxMsgs"`
 	// NatsServerConfigFile is used to override yaml values for
 	// NATS server configuration (debug only).
-	NatsServerConfigFile string `yaml:"natsServerConfigFile"`
+	NatsServerConfigFile string `env:"NATSSERVERCONFIGFILE" yaml:"natsServerConfigFile"`
 }
 
 // Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
@@ -95,49 +94,49 @@ func (c Nats) Hashsum() ([]byte, error) {
 type Connector struct {
 	transit.AgentIdentity `yaml:",inline"`
 
-	BatchEvents   time.Duration `yaml:"batchEvents"`
-	BatchMetrics  time.Duration `yaml:"batchMetrics"`
-	BatchMaxBytes int           `yaml:"batchMaxBytes"`
+	BatchEvents   time.Duration `env:"BATCHEVENTS" yaml:"batchEvents"`
+	BatchMetrics  time.Duration `env:"BATCHMETRICS" yaml:"batchMetrics"`
+	BatchMaxBytes int           `env:"BATCHMAXBYTES" yaml:"batchMaxBytes"`
 
 	// ControllerAddr accepts value for combined "host:port"
 	// used as `http.Server{Addr}`
-	ControllerAddr     string `yaml:"controllerAddr"`
-	ControllerCertFile string `yaml:"controllerCertFile"`
-	ControllerKeyFile  string `yaml:"controllerKeyFile"`
+	ControllerAddr     string `env:"CONTROLLERADDR" yaml:"controllerAddr"`
+	ControllerCertFile string `env:"CONTROLLERCERTFILE" yaml:"controllerCertFile"`
+	ControllerKeyFile  string `env:"CONTROLLERKEYFILE" yaml:"controllerKeyFile"`
 	// ControllerPin accepts value from environment
 	// provides local access for debug
-	ControllerPin string `yaml:"-"`
+	ControllerPin string `env:"CONTROLLERPIN" yaml:"-"`
 	// Custom HTTP configuration
-	ControllerReadTimeout  time.Duration `yaml:"-"`
-	ControllerWriteTimeout time.Duration `yaml:"-"`
-	ControllerStartTimeout time.Duration `yaml:"-"`
-	ControllerStopTimeout  time.Duration `yaml:"-"`
+	ControllerReadTimeout  time.Duration `env:"CONTROLLERREADTIMEOUT" yaml:"-"`
+	ControllerWriteTimeout time.Duration `env:"CONTROLLERWRITETIMEOUT" yaml:"-"`
+	ControllerStartTimeout time.Duration `env:"CONTROLLERSTARTTIMEOUT" yaml:"-"`
+	ControllerStopTimeout  time.Duration `env:"CONTROLLERSTOPTIMEOUT" yaml:"-"`
 
-	Enabled            bool   `yaml:"enabled"`
-	InstallationMode   string `yaml:"installationMode,omitempty"`
-	IsDynamicInventory bool   `yaml:"-"`
+	Enabled            bool   `env:"ENABLED" yaml:"enabled"`
+	InstallationMode   string `env:"INSTALLATIONMODE" yaml:"installationMode,omitempty"`
+	IsDynamicInventory bool   `env:"ISDYNAMICINVENTORY" yaml:"-"`
 	// GWEncode defines using HTTPEncode in Groundwork client: child|force|off
 	// enabled for child by default
-	GWEncode string `yaml:"-"`
+	GWEncode string `env:"GWENCODE" yaml:"-"`
 
 	// LogCondense accepts time duration for condensing similar records
 	// if 0 turn off condensing
-	LogCondense time.Duration `yaml:"logCondense"`
+	LogCondense time.Duration `env:"LOGCONDENSE" yaml:"logCondense"`
 	// LogFile accepts file path to log in addition to stdout
-	LogFile        string `yaml:"logFile"`
-	LogFileMaxSize int64  `yaml:"logFileMaxSize"`
+	LogFile        string `env:"LOGFILE" yaml:"logFile"`
+	LogFileMaxSize int64  `env:"LOGFILEMAXSIZE" yaml:"logFileMaxSize"`
 	// Log files are rotated count times before being removed.
 	// If count is 0, old versions are removed rather than rotated.
-	LogFileRotate int      `yaml:"logFileRotate"`
-	LogLevel      LogLevel `yaml:"logLevel"`
-	LogColors     bool     `yaml:"logColors"`
-	LogTimeFormat string   `yaml:"logTimeFormat"`
+	LogFileRotate int      `env:"LOGFILEROTATE" yaml:"logFileRotate"`
+	LogLevel      LogLevel `env:"LOGLEVEL" yaml:"logLevel"`
+	LogColors     bool     `env:"LOGCOLORS" yaml:"logColors"`
+	LogTimeFormat string   `env:"LOGTIMEFORMAT" yaml:"logTimeFormat"`
 
 	Nats `yaml:",inline"`
 
-	TransportStartRndDelay int `yaml:"-"`
+	TransportStartRndDelay int `env:"TRANSPORTSTARTRNDDELAY" yaml:"-"`
 
-	ExportProm bool `yaml:"exportProm"`
+	ExportProm bool `env:"EXPORTPROM" yaml:"exportProm"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -231,9 +230,9 @@ func (cc *GWConnections) UnmarshalYAML(value *yaml.Node) error {
 
 // Config defines TCG Agent configuration
 type Config struct {
-	Connector     Connector     `yaml:"connector"`
-	DSConnection  DSConnection  `yaml:"dsConnection"`
-	GWConnections GWConnections `yaml:"gwConnections"`
+	Connector     Connector     `envPrefix:"CONNECTOR_" yaml:"connector"`
+	DSConnection  DSConnection  `envPrefix:"DSCONNECTION_" yaml:"dsConnection"`
+	GWConnections GWConnections `envPrefix:"GWCONNECTIONS_" yaml:"gwConnections"`
 }
 
 func defaults() Config {
@@ -303,14 +302,7 @@ func GetConfig() *Config {
 					Msg("could not parse config")
 			}
 		}
-		if data, err := yaml.Marshal(cfg); err == nil {
-			data = applyEnv(data)
-			if err := yaml.Unmarshal(data, cfg); err != nil {
-				log.Err(err).
-					Str("configData", string(data)).
-					Msg("could not apply env vars")
-			}
-		} else {
+		if err := applyEnv(cfg); err != nil {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
@@ -447,10 +439,8 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 				Msg("could not write config")
 		}
 		/* load environment */
-		output = applyEnv(output)
-		if err := yaml.Unmarshal(output, newCfg); err != nil {
-			log.Err(err).
-				Str("configData", string(output)).
+		if err := applyEnv(newCfg); err != nil {
+			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
 	}
