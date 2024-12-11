@@ -104,7 +104,7 @@ type GWServices struct {
 type GWClient struct {
 	AppName string
 	AppType string
-	*GWConnection
+	GWConnection
 
 	mu   sync.Mutex
 	once sync.Once
@@ -164,8 +164,8 @@ func (client *GWClient) connectLocal() (string, error) {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	var req Req
-	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointConnect, "",
+	req := new(Req)
+	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointConnect, "",
 		headers, formValues, nil)
 
 	switch {
@@ -217,8 +217,8 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		"GWOS-APP-NAME": client.AppName,
 	}
 
-	var req Req
-	err := client.doReq(context.Background(), &req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
+	req := new(Req)
+	err := client.doReq(context.Background(), req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
 		headers, nil, payload)
 
 	switch {
@@ -279,8 +279,8 @@ func (client *GWClient) Disconnect() error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	var req Req
-	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointDisconnect, "",
+	req := new(Req)
+	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointDisconnect, "",
 		headers, formValues, nil)
 
 	switch {
@@ -330,8 +330,8 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"gwos-api-token": apiToken,
 	}
 
-	var req Req
-	err := client.doReq(context.Background(), &req, http.MethodPost, GWEntrypointValidateToken, "",
+	req := new(Req)
+	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointValidateToken, "",
 		headers, formValues, nil)
 
 	if err == nil {
@@ -370,19 +370,16 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 		}
 	}
 	mergeParam := make(map[string]string)
-	mergeHosts := true
-	if client.GWConnection != nil {
-		mergeHosts = client.GWConnection.MergeHosts
-		if client.GWConnection.HTTPEncode && hdrCompressed == "" {
-			var buf bytes.Buffer
-			var err error
-			ctx, err = GZIP(ctx, &buf, payload)
-			if err != nil {
-				return nil, err
-			}
-			payload = buf.Bytes()
-			headers = append(headers, "Content-Encoding", "gzip")
+	mergeHosts := client.GWConnection.MergeHosts
+	if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+		var buf bytes.Buffer
+		var err error
+		ctx, err = GZIP(ctx, &buf, payload)
+		if err != nil {
+			return nil, err
 		}
+		payload = buf.Bytes()
+		headers = append(headers, "Content-Encoding", "gzip")
 	}
 	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
@@ -403,8 +400,7 @@ func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []
 			}
 		}
 	}
-	if client.GWConnection != nil &&
-		client.GWConnection.HTTPEncode && hdrCompressed == "" {
+	if client.GWConnection.HTTPEncode && hdrCompressed == "" {
 		var buf bytes.Buffer
 		var err error
 		if ctx, err = GZIP(ctx, &buf, payload); err != nil {
@@ -538,8 +534,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		headers[k] = v
 	}
 
-	var req Req
-	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
+	req := new(Req)
+	err := client.doReq(ctx, req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == 401 {
 		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {

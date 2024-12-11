@@ -158,49 +158,59 @@ type ConnectorDTO struct {
 // DSConnection defines DalekServices Connection configuration
 type DSConnection clients.DSConnection
 
+// AsClient returns as clients type
+func (c *DSConnection) AsClient() clients.DSConnection {
+	return (clients.DSConnection)(*c)
+}
+
 // GWConnection defines Groundwork Connection configuration
 type GWConnection clients.GWConnection
 
+// AsClient returns as clients type
+func (c *GWConnection) AsClient() clients.GWConnection {
+	return (clients.GWConnection)(*c)
+}
+
 // MarshalYAML implements yaml.Marshaler interface
 // overrides the password field
-func (con GWConnection) MarshalYAML() (interface{}, error) {
+func (c GWConnection) MarshalYAML() (interface{}, error) {
 	type plain GWConnection
-	c := plain(con)
+	p := plain(c)
 	if s := os.Getenv(SecKeyEnv); s != "" {
-		encrypted, err := Encrypt([]byte(c.Password), []byte(s))
+		encrypted, err := Encrypt([]byte(p.Password), []byte(s))
 		if err != nil {
 			return nil, err
 		}
-		c.Password = fmt.Sprintf("%s%x", SecVerPrefix, encrypted)
+		p.Password = fmt.Sprintf("%s%x", SecVerPrefix, encrypted)
 	}
-	return c, nil
+	return p, nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 // overrides the password field
-func (con *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (c *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type plain GWConnection
-	if err := unmarshal((*plain)(con)); err != nil {
+	if err := unmarshal((*plain)(c)); err != nil {
 		return err
 	}
-	if strings.HasPrefix(con.Password, SecVerPrefix) {
+	if strings.HasPrefix(c.Password, SecVerPrefix) {
 		s := os.Getenv(SecKeyEnv)
 		if s == "" {
 			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
 		}
 		var encrypted []byte
-		fmt.Sscanf(con.Password, SecVerPrefix+"%x", &encrypted)
+		fmt.Sscanf(c.Password, SecVerPrefix+"%x", &encrypted)
 		decrypted, err := Decrypt(encrypted, []byte(s))
 		if err != nil {
 			return err
 		}
-		con.Password = string(decrypted)
+		c.Password = string(decrypted)
 	}
 	return nil
 }
 
 // GWConnections defines a set of configurations
-type GWConnections []*GWConnection
+type GWConnections []GWConnection
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 // Applies decode to items in collection for setting only fields present in yaml.
@@ -212,7 +222,7 @@ func (cc *GWConnections) UnmarshalYAML(value *yaml.Node) error {
 		if len(*cc) < i+1 {
 			*cc = append(*cc, GWConnections{{}}...)
 		}
-		if err := node.Decode((*cc)[i]); err != nil {
+		if err := node.Decode(&(*cc)[i]); err != nil {
 			return err
 		}
 	}
@@ -355,13 +365,13 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 		log.Err(err).Msg("could not parse advanced")
 		return err
 	}
-	for _, c := range cfg.GWConnections {
-		c.PrefixResourceNames = false
-		c.ResourceNamePrefix = ""
+	for i := range cfg.GWConnections {
+		cfg.GWConnections[i].PrefixResourceNames = false
+		cfg.GWConnections[i].ResourceNamePrefix = ""
 		for _, p := range s.Advanced.Prefixes {
-			if c.ID == p.GWConnectionID && p.Prefix != "" {
-				c.PrefixResourceNames = true
-				c.ResourceNamePrefix = p.Prefix
+			if cfg.GWConnections[i].ID == p.GWConnectionID && p.Prefix != "" {
+				cfg.GWConnections[i].PrefixResourceNames = true
+				cfg.GWConnections[i].ResourceNamePrefix = p.Prefix
 			}
 		}
 	}

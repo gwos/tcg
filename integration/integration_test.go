@@ -67,10 +67,10 @@ func TestIntegration(t *testing.T) {
 	assert.Equal(t, services.StatusRunning, services.GetTransitService().Status().Transport.Value())
 
 	cfg := config.GetConfig()
-	gwClient := &clients.GWClient{
+	gwClient := clients.GWClient{
 		AppName:      cfg.Connector.AppName,
 		AppType:      cfg.Connector.AppType,
-		GWConnection: (*clients.GWConnection)(cfg.GWConnections[0]),
+		GWConnection: cfg.GWConnections[0].AsClient(),
 	}
 
 	t.Log("Test GWClient.GetServicesByAgent")
@@ -97,10 +97,10 @@ func BenchmarkE2E(b *testing.B) {
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 
 	cfg := config.GetConfig()
-	gwClient := &clients.GWClient{
+	gwClient := clients.GWClient{
 		AppName:      cfg.Connector.AppName,
 		AppType:      cfg.Connector.AppType,
-		GWConnection: (*clients.GWConnection)(cfg.GWConnections[0]),
+		GWConnection: cfg.GWConnections[0].AsClient(),
 	}
 	transitService := services.GetTransitService()
 

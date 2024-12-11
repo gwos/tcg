@@ -13,7 +13,7 @@ func init() {
 	config.GetConfig().Connector.ControllerAddr = ":11099"
 	config.GetConfig().Connector.NatsStoreType = "MEMORY"
 	config.GetConfig().Connector.NatsStoreMaxBytes = 1024000
-	config.GetConfig().GWConnections = []*config.GWConnection{
+	config.GetConfig().GWConnections = []config.GWConnection{
 		{
 			Enabled:         true,
 			LocalConnection: false,

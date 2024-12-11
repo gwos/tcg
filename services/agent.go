@@ -36,8 +36,8 @@ type AgentService struct {
 	*config.Connector
 
 	agentStatus *AgentStatus
-	dsClient    *clients.DSClient
-	gwClients   []*clients.GWClient
+	dsClient    clients.DSClient
+	gwClients   []clients.GWClient
 	quitChan    chan struct{}
 	taskQueue   *taskqueue.TaskQueue
 
@@ -84,12 +84,11 @@ var agentService *AgentService
 // GetAgentService implements Singleton pattern
 func GetAgentService() *AgentService {
 	onceAgentService.Do(func() {
-		agentConnector := &config.GetConfig().Connector
 		agentService = &AgentService{
-			Connector: agentConnector,
+			Connector: &config.GetConfig().Connector,
 
 			agentStatus: NewAgentStatus(),
-			dsClient:    &clients.DSClient{DSConnection: (*clients.DSConnection)(&config.GetConfig().DSConnection)},
+			dsClient:    clients.DSClient{DSConnection: config.GetConfig().DSConnection.AsClient()},
 			quitChan:    make(chan struct{}, 1),
 			tracerCache: cache.New(-1, -1),
 
@@ -382,6 +381,7 @@ func (service *AgentService) config(data []byte) error {
 		log.Err(err).Msg("error on processing connector config")
 		return err
 	}
+	service.dsClient = clients.DSClient{DSConnection: config.GetConfig().DSConnection.AsClient()}
 	log.Debug().
 		Str("AgentID", service.AgentID).
 		Str("AppType", service.AppType).
@@ -541,28 +541,25 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
-	cons := make([]*config.GWConnection, 0)
-	for _, c := range config.GetConfig().GWConnections {
+	/* Process clients */
+	gwClients := make([]clients.GWClient, 0, len(config.GetConfig().GWConnections))
+	for i := range config.GetConfig().GWConnections {
+		c := config.GetConfig().GWConnections[i].AsClient()
 		if c.Enabled {
-			cons = append(cons, c)
+			gwClients = append(gwClients, clients.GWClient{
+				AppName:      service.AppName,
+				AppType:      service.AppType,
+				GWConnection: c,
+			})
 		}
 	}
-	if len(cons) == 0 {
+	if len(gwClients) == 0 {
 		log.Warn().Msg("empty GWConnections")
 		return nil
 	}
-	/* Process clients */
-	gwClients := make([]*clients.GWClient, len(cons))
-	for i := range cons {
-		gwClients[i] = &clients.GWClient{
-			AppName:      service.AppName,
-			AppType:      service.AppType,
-			GWConnection: (*clients.GWConnection)(cons[i]),
-		}
-	}
 	service.gwClients = gwClients
 	/* Process dispatcher */
-	if sdErr := nats.StartDispatcher(makeSubscriptions(gwClients)); sdErr == nil {
+	if sdErr := nats.StartDispatcher(makeSubscriptions(service.gwClients)); sdErr == nil {
 		service.agentStatus.Transport.Set(StatusRunning)
 	} else {
 		return sdErr

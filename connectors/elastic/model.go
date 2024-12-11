@@ -242,7 +242,7 @@ func initGwHosts(agentID, appName, appType string, gwConnections config.GWConnec
 		gwClient := clients.GWClient{
 			AppName:      appName,
 			AppType:      appType,
-			GWConnection: (*clients.GWConnection)(gwConnection),
+			GWConnection: gwConnection.AsClient(),
 		}
 		err := gwClient.Connect()
 		if err != nil {
