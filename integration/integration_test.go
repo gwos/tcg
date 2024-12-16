@@ -30,7 +30,7 @@ func TestIntegration(t *testing.T) {
 	rs := makeResource(0, 3)
 	resources := new(transit.ResourcesWithServicesRequest)
 	resources.SetContext(*services.GetTransitService().MakeTracerContext())
-	resources.AddResource(*rs)
+	resources.AddResource(rs)
 	inventory := new(transit.InventoryRequest)
 	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 	inventory.AddResource(rs.ToInventoryResource())
@@ -104,29 +104,11 @@ func BenchmarkE2E(b *testing.B) {
 	}
 	transitService := services.GetTransitService()
 
-	resources := make([]transit.MonitoredResource, 0, TestResourcesCount)
-	inventory := new(transit.InventoryRequest)
-	inventory.SetContext(*transitService.MakeTracerContext())
-	group := transit.ResourceGroup{
-		Description: testName,
-		GroupName:   testName,
-		Type:        transit.HostGroup,
-	}
-
-	for i := 0; i < TestResourcesCount; i++ {
-		rs := makeResource(i, TestServicesCount)
-		resources = append(resources, *rs)
-		inventory.AddResource(rs.ToInventoryResource())
-		group.AddResource(rs.ToResourceRef())
-	}
-	inventory.AddResourceGroup(group)
-	// payload, err := json.Marshal(inventory)
-	payload, err := json.MarshalIndent(inventory, " ", " ") // enlarge payload
-	assert.NoError(b, err)
-
 	// Benchmark sending data to Backend with/without NATS: TestFlagClient
 	b.Run("send.data", func(b *testing.B) {
 		printMemStats()
+		payload, err := inventoryRequest(TestResourcesCount, TestServicesCount)
+		assert.NoError(b, err)
 
 		if TestFlagClient {
 			_, err := gwClient.SynchronizeInventory(context.Background(), payload)
@@ -137,7 +119,7 @@ func BenchmarkE2E(b *testing.B) {
 		time.Sleep(5 * time.Second)
 		m0 := transitService.Stats().MessagesSent.Value()
 
-		for _, res := range resources {
+		for _, res := range resources(TestResourcesCount, TestServicesCount) {
 			request := transit.ResourcesWithServicesRequest{
 				Context:   transitService.MakeTracerContext(),
 				Resources: []transit.MonitoredResource{res},
@@ -153,17 +135,44 @@ func BenchmarkE2E(b *testing.B) {
 			}
 		}
 		time.Sleep(5 * time.Second) // time for batcher + dispatcher
+		runtime.GC()
 		printMemStats()
 		printTcgStats()
 
-		if services.GetTransitService().BatchMaxBytes == 0 {
-			if cnt, dc := b.N*TestResourcesCount*len(resources), transitService.Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
+		if transitService.BatchMaxBytes == 0 {
+			if cnt, dc := b.N*TestResourcesCount*TestResourcesCount, transitService.Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
 				b.Errorf("Messages should be delivered. deliveredCount = %d, want = %d  %v",
 					dc, cnt, m0)
 			}
 		}
 	})
 
+}
+
+func resources(countHst, countSvc int) []transit.MonitoredResource {
+	rr := make([]transit.MonitoredResource, 0, countHst)
+	for i := 0; i < countHst; i++ {
+		rs := makeResource(i, countSvc)
+		rr = append(rr, rs)
+	}
+	return rr
+}
+
+func inventoryRequest(countHst, countSvc int) ([]byte, error) {
+	inventory := new(transit.InventoryRequest)
+	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
+	group := transit.ResourceGroup{
+		Description: testName,
+		GroupName:   testName,
+		Type:        transit.HostGroup,
+	}
+	for _, rs := range resources(countHst, countSvc) {
+		inventory.AddResource(rs.ToInventoryResource())
+		group.AddResource(rs.ToResourceRef())
+	}
+	inventory.AddResourceGroup(group)
+
+	return json.MarshalIndent(inventory, " ", " ") // enlarge payload
 }
 
 // inspired by expvar.Handler() implementation

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/config"
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
 	"github.com/stretchr/testify/assert"
@@ -39,12 +41,14 @@ var TestConfigDefaults = map[string]string{
 
 var (
 	TestFlagClient     = false
+	TestFlagLogger     = false
 	TestLoopMetrics    = 4
 	TestMessagesCount  = 4
 	TestResourcesCount = 20
 	TestServicesCount  = 50
 
 	_ = lookupEnv("TEST_FLAG_CLIENT", &TestFlagClient)
+	_ = lookupEnv("TEST_FLAG_LOGGER", &TestFlagLogger)
 	_ = lookupEnv("TEST_LOOP_METRICS", &TestLoopMetrics)
 	_ = lookupEnv("TEST_MESSAGES_COUNT", &TestMessagesCount)
 	_ = lookupEnv("TEST_RESOURCES_COUNT", &TestResourcesCount)
@@ -90,6 +94,14 @@ func setupIntegration(t testing.TB, natsAckWait time.Duration, isDynamicInventor
 	cfg.Connector.NatsAckWait = natsAckWait
 	cfg.GWConnections[0].IsDynamicInventory = isDynamicInventory
 
+	if TestFlagLogger {
+		// test for memory usage without zerolog integration leyer in clients
+		sdklog.Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			AddSource: true,
+			Level:     slog.LevelDebug,
+		}).WithGroup("tcg.sdk"))
+	}
+
 	service := services.GetTransitService()
 	assert.NoError(t, service.StopNats())
 	assert.NoError(t, service.StartNats())
@@ -109,7 +121,7 @@ func cleanNats(t testing.TB) {
 	t.Log("[cleanNats]: ", service.Status())
 }
 
-func makeResource(rsIdx, svcCount int) *transit.MonitoredResource {
+func makeResource(rsIdx, svcCount int) transit.MonitoredResource {
 	rs := new(transit.MonitoredResource)
 	rs.Status = transit.HostUp
 	rs.Type = transit.ResourceTypeHost
@@ -148,7 +160,7 @@ func makeResource(rsIdx, svcCount int) *transit.MonitoredResource {
 		rs.Services = append(rs.Services, *svc)
 	}
 
-	return rs
+	return *rs
 }
 
 func randStrs(x ...int) []string {
