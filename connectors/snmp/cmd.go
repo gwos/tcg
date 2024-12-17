@@ -113,6 +113,10 @@ func configHandler(data []byte) {
 	if err == nil {
 		cfgChksum = chk
 	}
+
+	/* Force sending inventory */
+	invChksum = nil
+
 	/* Restart periodic loop */
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
