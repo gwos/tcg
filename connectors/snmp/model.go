@@ -20,6 +20,11 @@ const FiveMinutes = 300
 // PreviousValueCache cache to handle "Delta" metrics
 var previousValueCache = cache.New(-1, -1)
 
+type cachedMetric struct {
+	InterfaceMetric
+	ts int64
+}
+
 type MonitoringState struct {
 	sync.Mutex
 	// [deviceName]Device
@@ -79,60 +84,60 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	}
 
 	timestamp := transit.NewTimestamp()
+	ts := timestamp.Unix()
 	for _, iFace := range device.Interfaces {
-		var bytesInPrev, bytesOutPrev, bytesInX64Prev, bytesOutX64Prev int64 = -1, -1, -1, -1
-		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfInOctets)); ok {
-			bytesInPrev = val.(int64)
-		}
-		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfOutOctets)); ok {
-			bytesOutPrev = val.(int64)
-		}
-		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCInOctets)); ok {
-			bytesInX64Prev = val.(int64)
-		}
-		if val, ok := previousValueCache.Get(fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, clients.IfHCOutOctets)); ok {
-			bytesOutX64Prev = val.(int64)
+		var metricsBuilder []connectors.MetricBuilder
+
+		for key := range clients.NonMibMetrics {
+			if metricDefinition, has := metricDefinitions[key]; has {
+				metricBuilder := makeMetricBuilder(metricDefinition, key, timestamp)
+
+				switch key {
+				case clients.BytesPerSecondIn:
+					if prev, ok := previousValueCache.Get(makeCK(device.Name, iFace.Name, clients.IfHCInOctets)); ok {
+						prev := prev.(cachedMetric)
+						v := (iFace.Metrics[clients.IfHCInOctets].Value - prev.Value) / (ts - prev.ts)
+						metricBuilder.Value = v
+						metricsBuilder = append(metricsBuilder, metricBuilder)
+					} else if prev, ok := previousValueCache.Get(makeCK(device.Name, iFace.Name, clients.IfInOctets)); ok {
+						prev := prev.(cachedMetric)
+						v := (iFace.Metrics[clients.IfInOctets].Value - prev.Value) / (ts - prev.ts)
+						metricBuilder.Value = v
+						metricsBuilder = append(metricsBuilder, metricBuilder)
+					}
+
+				case clients.BytesPerSecondOut:
+					if prev, ok := previousValueCache.Get(makeCK(device.Name, iFace.Name, clients.IfHCOutOctets)); ok {
+						prev := prev.(cachedMetric)
+						v := (iFace.Metrics[clients.IfHCOutOctets].Value - prev.Value) / (ts - prev.ts)
+						metricBuilder.Value = v
+						metricsBuilder = append(metricsBuilder, metricBuilder)
+					} else if prev, ok := previousValueCache.Get(makeCK(device.Name, iFace.Name, clients.IfOutOctets)); ok {
+						prev := prev.(cachedMetric)
+						v := (iFace.Metrics[clients.IfOutOctets].Value - prev.Value) / (ts - prev.ts)
+						metricBuilder.Value = v
+						metricsBuilder = append(metricsBuilder, metricBuilder)
+					}
+				}
+			}
 		}
 
-		var metricsBuilder []connectors.MetricBuilder
 		for mib, metric := range iFace.Metrics {
 			if metricDefinition, has := metricDefinitions[metric.Mib]; has {
-				var unitType transit.UnitType
-				var value interface{}
+				metricBuilder := makeMetricBuilder(metricDefinition, metric.Key, timestamp)
 
-				unitType = transit.UnitCounter
-				value = metric.Value
-
-				switch mib {
-				case clients.IfInOctets, clients.IfOutOctets, clients.IfHCInOctets, clients.IfHCOutOctets:
-					value = metric.Value * 8
-				}
-
-				metricBuilder := connectors.MetricBuilder{
-					Name:           metric.Key,
-					CustomName:     metricDefinition.CustomName,
-					ComputeType:    metricDefinition.ComputeType,
-					Expression:     metricDefinition.Expression,
-					UnitType:       unitType,
-					Warning:        metricDefinition.WarningThreshold,
-					Critical:       metricDefinition.CriticalThreshold,
-					StartTimestamp: timestamp,
-					EndTimestamp:   timestamp,
-					Graphed:        metricDefinition.Graphed,
-
-					Value: nil,
-				}
-
-				ck := fmt.Sprintf("%s:%s:%s", device.Name, iFace.Name, mib)
-				isDelta, isPreviousPresent, valueToSet := calculateValue(metricDefinition.MetricType, unitType,
-					ck, value)
-
-				if !isDelta || (isDelta && isPreviousPresent) {
-					metricBuilder.Value = valueToSet
+				ck := makeCK(device.Name, iFace.Name, mib)
+				if isDelta(metricDefinition.MetricType) {
+					if prev, ok := previousValueCache.Get(ck); ok {
+						metricBuilder.Value = metric.Value - prev.(cachedMetric).Value
+						metricsBuilder = append(metricsBuilder, metricBuilder)
+					}
+				} else {
+					metricBuilder.Value = metric.Value
 					metricsBuilder = append(metricsBuilder, metricBuilder)
 				}
 
-				previousValueCache.SetDefault(ck, metric.Value)
+				previousValueCache.SetDefault(ck, cachedMetric{metric, ts})
 
 				// log.Debug().
 				// 	Interface("_ck", ck).
@@ -141,21 +146,6 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 				// 	Interface("_valueToSet", valueToSet).
 				// 	Interface("metricsBuilder", metricsBuilder).
 				// 	Msg("__ ck")
-			}
-		}
-
-		for key := range clients.NonMibMetrics {
-			if metricDefinition, has := metricDefinitions[key]; has {
-				switch key {
-				case clients.BytesPerSecondIn:
-					metricBuilder := calculateBytesPerSecond(key, metricDefinition,
-						iFace.Metrics[clients.IfInOctets].Value*8, iFace.Metrics[clients.IfHCInOctets].Value*8, bytesInPrev, bytesInX64Prev, timestamp)
-					metricsBuilder = append(metricsBuilder, metricBuilder)
-				case clients.BytesPerSecondOut:
-					metricBuilder := calculateBytesPerSecond(key, metricDefinition,
-						iFace.Metrics[clients.IfOutOctets].Value*8, iFace.Metrics[clients.IfHCOutOctets].Value*8, bytesOutPrev, bytesOutX64Prev, timestamp)
-					metricsBuilder = append(metricsBuilder, metricBuilder)
-				}
 			}
 		}
 
@@ -186,39 +176,23 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 	return mServices
 }
 
-func calculateHostStatus(lastOk float64) transit.MonitorStatus {
+func calculateHostStatus(lastOk int64) transit.MonitorStatus {
 	now := time.Now().Unix() // in seconds
-	if (float64(now) - lastOk) < FiveMinutes {
+	if (now - lastOk) < FiveMinutes {
 		return transit.HostUp
 	}
-
 	return transit.HostUnreachable
 }
 
-func calculateValue(metricKind transit.MetricKind, unitType transit.UnitType,
-	metricName string, currentValue interface{}) (bool, bool, interface{}) {
-	if strings.EqualFold(string(metricKind), string(transit.Delta)) {
-		if previousValue, present := previousValueCache.Get(metricName); present {
-			switch unitType {
-			case transit.UnitCounter:
-				previousValueCache.SetDefault(metricName, currentValue.(int64))
-				currentValue = currentValue.(int64) - previousValue.(int64)
-			}
-			return true, true, currentValue.(int64)
-		}
-		return true, false, currentValue.(int64)
-	}
-	return false, false, currentValue.(int64)
+func isDelta(k transit.MetricKind) bool {
+	return strings.EqualFold(string(k), string(transit.Delta))
 }
 
-func calculateBytesPerSecond(metricName string, metricDefinition transit.MetricDefinition, current, currentX64, previous,
-	previousX64 int64, timestamp *transit.Timestamp) connectors.MetricBuilder {
-	seconds := int(connectors.CheckInterval.Seconds())
-	result := (current - previous) / int64(seconds)
-	if currentX64 > 0 && previousX64 > 0 {
-		result = (currentX64 - previousX64) / int64(seconds)
-	}
+func makeCK(deviceName, iFaceName, mib string) string {
+	return fmt.Sprintf("%s:%s:%s", deviceName, iFaceName, mib)
+}
 
+func makeMetricBuilder(metricDefinition transit.MetricDefinition, metricName string, timestamp *transit.Timestamp) connectors.MetricBuilder {
 	return connectors.MetricBuilder{
 		Name:           metricName,
 		CustomName:     metricDefinition.CustomName,
@@ -230,7 +204,16 @@ func calculateBytesPerSecond(metricName string, metricDefinition transit.MetricD
 		StartTimestamp: timestamp,
 		EndTimestamp:   timestamp,
 		Graphed:        metricDefinition.Graphed,
-
-		Value: result,
 	}
 }
+
+/**
+## [Consider SNMP Counters: Frequently Asked Questions](https://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/26007-faq-snmpcounter.html)
+
+Q. When do 64-bit counters be used?
+	A. [RFC 2233](https://www.ietf.org/rfc/rfc2233.txt)  adopted expanded 64-bit counters for high capacity interfaces in which 32-bit counters do not provide enough capacity and wrap too fast.
+
+> [!Note]
+> Cisco IOS Software does not support 64-bit counters for interface speeds of less than 20 Mbps.
+> This means that 64-bit counters are not supported on 10 Mb Ethernet ports. Only 100 Mb Fast-Ethernet and other high speed ports support 64-bit counters.
+*/
