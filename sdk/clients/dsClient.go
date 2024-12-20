@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	tcgerr "github.com/gwos/tcg/sdk/errors"
 	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
@@ -22,12 +23,12 @@ const (
 type DSConnection struct {
 	// HostName accepts value for combined "host:port"
 	// used as `url.URL{HostName}`
-	HostName string `yaml:"hostName"`
+	HostName string `env:"HOSTNAME" yaml:"hostName"`
 }
 
 // DSClient implements DS API operations
 type DSClient struct {
-	*DSConnection
+	DSConnection
 }
 
 // ValidateToken calls API
@@ -64,12 +65,12 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 				sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "validate token", req.LogAttrs()...)
 				return nil
 			}
-			eee := fmt.Errorf("invalid gwos-app-name or gwos-api-token")
+			eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 			return eee
 		}
-		eee := fmt.Errorf(string(req.Response))
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate token", req.Details()...)
 		return eee
@@ -105,7 +106,7 @@ func (client *DSClient) Reload(agentID string) error {
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "request for reload", req.LogAttrs()...)
 			return nil
 		}
-		eee := fmt.Errorf(string(req.Response))
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		if req.Status == 404 {
 			req.Err = eee
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)

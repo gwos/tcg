@@ -50,6 +50,7 @@ type ExtConfig struct {
 	HostGroupField        string              `json:"hostGroupLabelPath"`
 	GroupNameByUser       bool                `json:"hostGroupNameByUser"`
 	CheckInterval         time.Duration       `json:"checkIntervalMinutes"`
+	AppName               string
 	AppType               string
 	AgentID               string
 	GWConnections         config.GWConnections

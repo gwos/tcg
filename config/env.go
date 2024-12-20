@@ -1,13 +1,11 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
-	"github.com/rs/zerolog/log"
+	"github.com/caarlos0/env/v11"
 	"github.com/spf13/pflag"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -49,79 +47,6 @@ func applyFlags() {
 	}
 }
 
-func applyEnv(yamldoc []byte) []byte {
-	node := new(yaml.Node)
-	if err := yaml.Unmarshal(yamldoc, node); err != nil {
-		log.Err(err).
-			Str("yamldoc", string(yamldoc)).
-			Msg("could not parse yaml")
-		return yamldoc
-	}
-
-	scalars := map[string]*yaml.Node{}
-	nodescan(node, scalars, []string{})
-
-	for _, env := range os.Environ() {
-		if !strings.HasPrefix(env, EnvPrefix) ||
-			strings.HasPrefix(env, ConfigEnv) {
-			continue
-		}
-
-		pair := strings.SplitN(strings.TrimPrefix(env, EnvPrefix), "=", 2)
-		if len(pair) != 2 {
-			log.Warn().
-				Str("env", env).
-				Msg("could not parse env")
-			continue
-		}
-
-		var key, val = pair[0], pair[1]
-		n := scalars[key]
-		if n == nil {
-			// log.Debug().
-			// 	Interface("scalars", scalars). // TODO: remove
-			// 	Str("env", env).
-			// 	Msg("could not apply env: not found node")
-			continue
-		}
-		if n.ShortTag() == "!!null" {
-			n.SetString("")
-		}
-		n.Value = val
-	}
-
-	bb, err := yaml.Marshal(node)
-	if err != nil {
-		log.Warn().Err(err).
-			Msg("could not encode updated yaml")
-		return yamldoc
-	}
-	return bb
-}
-
-func nodescan(node *yaml.Node, scalars map[string]*yaml.Node, path []string) {
-	var childName string
-	for i, n := range node.Content {
-		if node.Kind == yaml.SequenceNode {
-			childName = fmt.Sprintf("%d", i)
-
-			switch n.Kind {
-			case yaml.ScalarNode:
-				scalars[strings.ToUpper(strings.Trim(strings.Join(append(path, childName), "_"), "_"))] = n
-			case yaml.MappingNode, yaml.SequenceNode:
-				nodescan(n, scalars, append(path, childName))
-			}
-		} else {
-			switch n.Kind {
-			case yaml.ScalarNode:
-				if i%2 == 0 {
-					childName = n.Value
-				} else {
-					scalars[strings.ToUpper(strings.Trim(strings.Join(append(path, childName), "_"), "_"))] = n
-				}
-			case yaml.MappingNode, yaml.SequenceNode:
-				nodescan(n, scalars, append(path, childName))
-			}
-		}
-	}
+func applyEnv(cfg *Config) error {
+	return env.ParseWithOptions(cfg, env.Options{Prefix: EnvPrefix})
 }

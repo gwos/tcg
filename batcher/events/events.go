@@ -39,7 +39,7 @@ func (bld *EventsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 			c, bq = 0, transit.GroundworkEventsRequest{}
 		}
 	}
-	*buf = (*buf)[:0]
+	*buf = make([][]byte, 0)
 
 	if len(bq.Events) > 0 {
 		qq = append(qq, bq)

@@ -20,14 +20,15 @@ type APIClient struct {
 
 func (c *APIClient) SendRequest(httpMethod string, requestURL string, headers map[string]string, formValues map[string]string, byteBody []byte) (int, []byte, error) {
 	c.once.Do(func() {
-		gwClient := new(clients.GWClient)
-		gwClient.AppName = config.GetConfig().Connector.AppName
-		gwClient.AppType = config.GetConfig().Connector.AppType
-		gwClient.GWConnection = (*clients.GWConnection)(config.GetConfig().GWConnections[0])
+		gwClient := clients.GWClient{
+			AppName:      config.GetConfig().Connector.AppName,
+			AppType:      config.GetConfig().Connector.AppType,
+			GWConnection: config.GetConfig().GWConnections[0].AsClient(),
+		}
 		if err := gwClient.Connect(); err != nil {
 			panic("aborting: " + err.Error())
 		}
-		token := reflect.ValueOf(gwClient).Elem().FieldByName("token").String()
+		token := reflect.ValueOf(&gwClient).Elem().FieldByName("token").String()
 		c.headers = map[string]string{
 			"Accept":         "application/json",
 			"GWOS-APP-NAME":  gwClient.AppName,

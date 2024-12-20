@@ -66,7 +66,7 @@ func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClien
 		if cfg.GWConnections == nil || len(cfg.GWConnections) == 0 {
 			log.Error().Msg("could not get GW hosts to initialize state: GW connections are not set")
 		} else {
-			gwHosts := initGwHosts(cfg.AppType, cfg.AgentID, cfg.GWConnections)
+			gwHosts := initGwHosts(cfg.AgentID, cfg.AppName, cfg.AppType, cfg.GWConnections)
 			if gwHosts != nil {
 				currentState.Hosts = gwHosts
 			} else {
@@ -235,14 +235,14 @@ func (monitoringState *MonitoringState) buildGroups() map[string]map[string]stru
 	return groups
 }
 
-func initGwHosts(appType string, agentID string, gwConnections config.GWConnections) map[string]monitoringHost {
+func initGwHosts(agentID, appName, appType string, gwConnections config.GWConnections) map[string]monitoringHost {
 	gwHosts := make(map[string]monitoringHost)
 
 	for _, gwConnection := range gwConnections {
 		gwClient := clients.GWClient{
-			AppName:      appType,
+			AppName:      appName,
 			AppType:      appType,
-			GWConnection: (*clients.GWConnection)(gwConnection),
+			GWConnection: gwConnection.AsClient(),
 		}
 		err := gwClient.Connect()
 		if err != nil {

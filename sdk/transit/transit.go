@@ -719,9 +719,9 @@ func (metricDefinition MetricDefinition) String() string {
 
 // AgentIdentity defines TCG Agent Identity
 type AgentIdentity struct {
-	AgentID string `json:"agentId" yaml:"agentId"`
-	AppName string `json:"appName" yaml:"appName"`
-	AppType string `json:"appType" yaml:"appType"`
+	AgentID string `env:"AGENTID" json:"agentId" yaml:"agentId"`
+	AppName string `env:"APPNAME" json:"appName" yaml:"appName"`
+	AppType string `env:"APPTYPE" json:"appType" yaml:"appType"`
 }
 
 func CalculateResourceStatus(services []MonitoredService) MonitorStatus {

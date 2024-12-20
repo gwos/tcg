@@ -43,7 +43,7 @@ func login(tenantID, clientID, clientSecret, resource string) (str string, err e
 	}
 
 	form := url.Values{
-		"grant_type":    []string{"client_credentials"},
+		"grant_type":    []string{auth.GrantType},
 		"client_secret": []string{auth.ClientSecret},
 		"client_id":     []string{auth.ClientID},
 		"resource":      []string{auth.Resource},

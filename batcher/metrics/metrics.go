@@ -53,7 +53,7 @@ func (bld *MetricsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 			c, bq = 0, transit.ResourcesWithServicesRequest{}
 		}
 	}
-	*buf = (*buf)[:0]
+	*buf = make([][]byte, 0)
 
 	if len(bq.Resources) > 0 {
 		qq = append(qq, bq)
@@ -162,7 +162,7 @@ func packGroups(groups *[]transit.ResourceGroup) {
 		}
 		m[gk] = rg
 	}
-	*groups = (*groups)[:0]
+	*groups = make([]transit.ResourceGroup, 0)
 
 	for _, rg := range m {
 		g := rg.ResourceGroup

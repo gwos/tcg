@@ -125,25 +125,23 @@ func (q *Req) Send() error {
 // SendWithContext sends request
 func (q *Req) SendWithContext(ctx context.Context) error {
 	var (
-		body     = q.Payload
+		body     io.Reader
 		err      error
 		request  *http.Request
 		response *http.Response
 	)
 
-	urlValues := url.Values{}
 	if q.Form != nil {
+		urlValues := url.Values{}
 		for k, v := range q.Form {
 			urlValues.Add(k, v)
 		}
-		body = []byte(urlValues.Encode())
+		body = bytes.NewBuffer([]byte(urlValues.Encode()))
+	} else if q.Payload != nil {
+		body = bytes.NewBuffer(q.Payload)
 	}
 
-	var bodyBuf io.Reader
-	if body != nil {
-		bodyBuf = bytes.NewBuffer(body)
-	}
-	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, bodyBuf)
+	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, body)
 	if err != nil {
 		q.Status, q.Err = -1, err
 		return err

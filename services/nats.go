@@ -145,10 +145,11 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 	}
 }
 
-func makeSubscriptions(gwClients []*clients.GWClient) []nats.DurableCfg {
+func makeSubscriptions(gwClients []clients.GWClient) []nats.DurableCfg {
 	var subs = make([]nats.DurableCfg, 0, len(gwClients))
-	for _, gwClient := range gwClients {
-		gwClient := gwClient /* hold loop var copy */
+	for i := range gwClients {
+		// gwClient := gwClient /* hold loop var copy */
+		gwClient := &gwClients[i]
 		subs = append(subs,
 			makeDurable(
 				fmt.Sprintf("#%s#%s#", subjDowntimes, gwClient.HostName),
