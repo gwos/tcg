@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"expvar"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -541,6 +542,16 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
+	if service.Connector.AgentID == traceOnDemandAgentID ||
+		service.Connector.AppType == traceOnDemandAppType ||
+		len(service.Connector.AgentID) == 0 ||
+		len(service.Connector.AppType) == 0 {
+
+		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
+			service.Connector.AppType, service.Connector.AgentID)
+		log.Err(err).Msg("could not start")
+		return err
+	}
 	/* Process clients */
 	gwClients := make([]clients.GWClient, 0, len(config.GetConfig().GWConnections))
 	for i := range config.GetConfig().GWConnections {
@@ -580,28 +591,41 @@ func (service *AgentService) stopTransport() error {
 
 // mixTracerContext adds `context` field if absent
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool) {
-	if !bytes.Contains(payloadJSON, []byte(`"context":`)) || !bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
-		tc, todoTracerCtx := service.MakeTracerContext(), false
-		ctxJSON, err := json.Marshal(tc)
-		if err != nil {
-			log.Err(err).Msg("could not mixTracerContext")
-			return payloadJSON, false
-		}
-		if tc.AgentID == traceOnDemandAgentID ||
-			tc.AppType == traceOnDemandAppType {
-			todoTracerCtx = true
-		}
-
-		l := bytes.LastIndexByte(payloadJSON, byte('}'))
-		return bytes.Join([][]byte{
-			payloadJSON[:l], []byte(`,"context":`), ctxJSON, []byte(`}`),
-		}, []byte(``)), todoTracerCtx
+	if bytes.Contains(payloadJSON, []byte(`"context":`)) &&
+		bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
+		return payloadJSON, false
 	}
-	return payloadJSON, false
+
+	tc, todoTracerCtx := service.MakeTracerContext(), false
+	ctxJSON, err := json.Marshal(tc)
+	if err != nil {
+		log.Err(err).Msg("could not mixTracerContext")
+		return payloadJSON, false
+	}
+	if tc.AgentID == traceOnDemandAgentID ||
+		tc.AppType == traceOnDemandAppType {
+		todoTracerCtx = true
+	}
+
+	l := bytes.LastIndexByte(payloadJSON, byte('}'))
+	return bytes.Join([][]byte{
+		payloadJSON[:l], []byte(`,"context":`), ctxJSON, []byte(`}`),
+	}, []byte(``)), todoTracerCtx
 }
 
 // fixTracerContext replaces placeholders
 func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
+	if service.Connector.AgentID == traceOnDemandAgentID ||
+		service.Connector.AppType == traceOnDemandAppType ||
+		len(service.Connector.AgentID) == 0 ||
+		len(service.Connector.AppType) == 0 {
+
+		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
+			service.Connector.AppType, service.Connector.AgentID)
+		log.Err(err).Msg("could not fixTracerContext")
+		return payloadJSON
+	}
+
 	return bytes.ReplaceAll(
 		bytes.ReplaceAll(
 			payloadJSON,

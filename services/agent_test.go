@@ -38,7 +38,6 @@ func TestAgentService(t *testing.T) {
 	})
 
 	t.Run("NATS", func(t *testing.T) {
-		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "333_222_111_000")
 		assert.NoError(t, GetAgentService().StartNats())
 		assert.NoError(t, GetAgentService().StopNats())
 		assert.NoError(t, GetAgentService().StartNats())
@@ -46,7 +45,8 @@ func TestAgentService(t *testing.T) {
 	})
 
 	t.Run("Transport", func(t *testing.T) {
-		t.Setenv("TCG_CONNECTOR_NATSSTOREMAXBYTES", "333_222_111_000")
+		GetAgentService().Connector.AgentID = "TESTAGENTID"
+		GetAgentService().Connector.AppType = "TESTAPPTYPE"
 		assert.NoError(t, GetAgentService().StartNats())
 		assert.NoError(t, GetAgentService().StartTransport())
 		assert.NoError(t, GetAgentService().StopTransport())
@@ -83,7 +83,7 @@ func TestAgentService(t *testing.T) {
 }`)
 
 		agentService := GetAgentService()
-		assert.Equal(t, "", agentService.Connector.AgentID)
+		assert.Equal(t, "TESTAGENTID", agentService.Connector.AgentID)
 		assert.NoError(t, agentService.config(dto))
 		assert.Equal(t, "99998888-7777-6666-a3b0-b14622f7dd39", agentService.Connector.AgentID)
 		assert.Equal(t, "gw-host-xxx", agentService.dsClient.HostName)
