@@ -98,15 +98,12 @@ func configHandler(data []byte) {
 	tExt.Views[ViewNodes] = buildNodeMetricsMap(tMetProf.Metrics)
 	tExt.Views[ViewPods] = buildPodMetricsMap(tMetProf.Metrics)
 
-	gwConnections := config.GetConfig().GWConnections
-	if len(gwConnections) > 0 {
-		for _, conn := range gwConnections {
-			if conn.DeferOwnership != "" {
-				ownership := transit.HostOwnershipType(gwConnections[0].DeferOwnership)
-				if ownership != "" {
-					tExt.Ownership = ownership
-					break
-				}
+	for _, conn := range config.GetConfig().GWConnections {
+		if conn.DeferOwnership != "" {
+			ownership := transit.HostOwnershipType(conn.DeferOwnership)
+			if ownership != "" {
+				tExt.Ownership = ownership
+				break
 			}
 		}
 	}

@@ -154,7 +154,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 	}
 }
 
-func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
+func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
 		log.Warn().Err(err).Any("msg", *msg).
