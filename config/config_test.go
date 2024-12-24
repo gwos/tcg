@@ -44,7 +44,7 @@ dsConnection:  # empty set
 	assert.Equal(t, false, cfg.Connector.Enabled)
 	assert.Equal(t, 111, cfg.Connector.BatchMaxBytes)
 	assert.Equal(t, LogLevel(2), cfg.Connector.LogLevel)
-	// assert.Equal(t, "localhost:3001", cfg.DSConnection.HostName)
+	assert.Equal(t, "localhost:3001", cfg.DSConnection.HostName)
 	assert.Equal(t, "SEC RET", cfg.GWConnections[0].Password)
 	assert.Equal(t, "SEC_RET", cfg.GWConnections[1].Password)
 }

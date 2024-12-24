@@ -15,7 +15,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v4/disk"
 )
 
 // Define NATS IDs
@@ -175,7 +175,7 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		if err := doStream(js, nil, &sc); err != nil {
 			return err
 		}
-	} else if err != nil {
+	} else {
 		log.Err(err).Msg("nats failed StreamInfo")
 		return err
 	}
