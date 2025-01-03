@@ -18,15 +18,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	dynInventoryFalse = false
-	dynInventoryTrue  = true
-	natsAckWait5s     = time.Second * 5
-	natsAckWait30s    = time.Second * 30
-
-	testName = "test.tcg.gw8"
-)
-
 var TestConfigDefaults = map[string]string{
 	"TCG_CONNECTOR_AGENTID":          "INTEGRATION-TEST",
 	"TCG_CONNECTOR_APPNAME":          "INTEGRATION-TEST",
@@ -40,15 +31,19 @@ var TestConfigDefaults = map[string]string{
 }
 
 var (
+	TestEntityName     = "test.tcg.gw8"
 	TestFlagClient     = false
 	TestFlagLogger     = false
+	TestKeepInventory  = false
 	TestLoopMetrics    = 4
 	TestMessagesCount  = 4
 	TestResourcesCount = 20
 	TestServicesCount  = 50
 
+	_ = lookupEnv("TEST_ENTITY_NAME", &TestEntityName)
 	_ = lookupEnv("TEST_FLAG_CLIENT", &TestFlagClient)
 	_ = lookupEnv("TEST_FLAG_LOGGER", &TestFlagLogger)
+	_ = lookupEnv("TEST_KEEP_INVENTORY", &TestKeepInventory)
 	_ = lookupEnv("TEST_LOOP_METRICS", &TestLoopMetrics)
 	_ = lookupEnv("TEST_MESSAGES_COUNT", &TestMessagesCount)
 	_ = lookupEnv("TEST_RESOURCES_COUNT", &TestResourcesCount)
@@ -75,9 +70,23 @@ func lookupEnv(env string, arg any) bool {
 	return false
 }
 
+type Option string
+type OV struct {
+	Key   Option
+	Value any
+}
+
+const (
+	dynInventory  Option = "dynInventory"
+	natsAckWait   Option = "natsAckWait"
+	hgPrefix      Option = "hgroupPrefix"
+	hostPrefix    Option = "hostPrefix"
+	servicePrefix Option = "servicePrefix"
+)
+
 var apiClient = new(APIClient)
 
-func setupIntegration(t testing.TB, natsAckWait time.Duration, isDynamicInventory bool) {
+func setupIntegration(t testing.TB, opts ...OV) {
 	for k, v := range TestConfigDefaults {
 		if _, ok := os.LookupEnv(k); !ok {
 			t.Setenv(k, v)
@@ -91,8 +100,16 @@ func setupIntegration(t testing.TB, natsAckWait time.Duration, isDynamicInventor
 	}
 
 	cfg := config.GetConfig()
-	cfg.Connector.NatsAckWait = natsAckWait
-	cfg.GWConnections[0].IsDynamicInventory = isDynamicInventory
+	cfg.GWConnections[0].DeferOwnership = string(transit.Take)
+
+	for _, o := range opts {
+		switch o.Key {
+		case dynInventory:
+			cfg.GWConnections[0].IsDynamicInventory = o.Value.(bool)
+		case natsAckWait:
+			cfg.Connector.NatsAckWait = o.Value.(time.Duration)
+		}
+	}
 
 	if TestFlagLogger {
 		// test for memory usage without zerolog integration leyer in clients
@@ -121,21 +138,31 @@ func cleanNats(t testing.TB) {
 	t.Log("[cleanNats]: ", service.Status())
 }
 
-func makeResource(rsIdx, svcCount int) transit.MonitoredResource {
+func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
+	hPrefix, sPrefix := "host", "service"
+	for _, o := range opts {
+		switch o.Key {
+		case hostPrefix:
+			hPrefix = fmt.Sprintf("%v", o.Value)
+		case servicePrefix:
+			sPrefix = fmt.Sprintf("%v", o.Value)
+		}
+	}
+
 	rs := new(transit.MonitoredResource)
 	rs.Status = transit.HostUp
 	rs.Type = transit.ResourceTypeHost
 	rs.LastCheckTime = transit.NewTimestamp()
 	rs.NextCheckTime = transit.NewTimestamp()
 	*rs.NextCheckTime = rs.NextCheckTime.Add(time.Minute * 60)
-	rs.Name = fmt.Sprintf("host%v.%v", rsIdx, testName)
+	rs.Name = fmt.Sprintf("%v.%v.%v", hPrefix, rsIdx, TestEntityName)
 	rs.Device = rs.Name
 	rs.Description = strings.Join(
 		append([]string{strings.ToUpper(rs.Name)}, randStrs(rsIdx)...), " ")
 
 	for i := 0; i < svcCount; i++ {
 		svc := new(transit.MonitoredService)
-		svc.Name = fmt.Sprintf("service%v.%v", i, rs.Name)
+		svc.Name = fmt.Sprintf("%v.%v.%v", sPrefix, i, rs.Name)
 		svc.Owner = rs.Name
 		svc.Status = transit.ServiceOk
 		svc.Type = transit.ResourceTypeService

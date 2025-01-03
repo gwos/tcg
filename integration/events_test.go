@@ -14,7 +14,7 @@ func TestEvents(t *testing.T) {
 	testMessage, err := os.ReadFile("fixtures/sendEvents.json")
 	assert.NoError(t, err)
 
-	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
+	setupIntegration(t)
 	apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)
