@@ -1,15 +1,17 @@
 package integration
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	stdlog "log"
+	"log/slog"
 	"net/http"
 	"reflect"
 	"sync"
 
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 type APIClient struct {
@@ -52,9 +54,9 @@ func (c *APIClient) CheckHostExist(host string, mustExist bool, mustHasStatus st
 		return err
 	}
 	if statusCode == 200 {
-		stdlog.Print(" -> Host exists")
+		sdklog.Logger.LogAttrs(context.TODO(), slog.LevelWarn, " -> Host exists")
 	} else {
-		stdlog.Print(" -> Host doesn't exist")
+		sdklog.Logger.LogAttrs(context.TODO(), slog.LevelWarn, " -> Host doesn't exist")
 	}
 
 	if !mustExist && statusCode == 404 {
@@ -83,13 +85,19 @@ func (c *APIClient) CheckHostExist(host string, mustExist bool, mustHasStatus st
 func (c *APIClient) RemoveHost(hostname string) {
 	code, bb, err := c.SendRequest(http.MethodDelete, "/api/hosts/"+hostname, nil, nil, nil)
 	if err != nil || code != 200 {
-		stdlog.Printf("could not remove host: %v [%v] %v", err, code, string(bb))
+		sdklog.Logger.LogAttrs(context.TODO(), slog.LevelError, "could not remove host",
+			slog.Any("error", err), slog.Int("code", code), slog.String("response", string(bb)))
 	}
 }
 
 func (c *APIClient) RemoveAgent(agentID string) {
+	if TestKeepInventory {
+		sdklog.Logger.LogAttrs(context.TODO(), slog.LevelWarn, "skip removing agent due to TestKeepInventory flag")
+		return
+	}
 	code, bb, err := c.SendRequest(http.MethodDelete, "/api/agents/"+agentID, nil, nil, nil)
 	if err != nil || code != 200 {
-		stdlog.Printf("could not remove agent: %v [%v] %v", err, code, string(bb))
+		sdklog.Logger.LogAttrs(context.TODO(), slog.LevelError, "could not remove agent",
+			slog.Any("error", err), slog.Int("code", code), slog.String("response", string(bb)))
 	}
 }
