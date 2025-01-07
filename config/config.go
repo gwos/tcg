@@ -23,6 +23,17 @@ import (
 var (
 	once sync.Once
 	cfg  *Config
+
+	// Suppress provides ability to globally suppress the submission of all data.
+	// Not for any production use-case, but strictly troubleshooting:
+	// this would be useful in troubleshooting to isolate synch issues to malformed perf data
+	// (which is a really common problem)
+	Suppress struct {
+		Downtimes bool `env:"SUPPRESS_DOWNTIMES"`
+		Events    bool `env:"SUPPRESS_EVENTS"`
+		Inventory bool `env:"SUPPRESS_INVENTORY"`
+		Metrics   bool `env:"SUPPRESS_METRICS"`
+	}
 )
 
 const (
@@ -302,10 +313,20 @@ func GetConfig() *Config {
 					Msg("could not parse config")
 			}
 		}
-		if err := applyEnv(cfg); err != nil {
+		if err := applyEnv(cfg, &Suppress); err != nil {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
+
+		logSuppress := func(b bool, str string) {
+			if b {
+				log.Error().Msgf("TCG will suppress %v due to env var is active", str)
+			}
+		}
+		logSuppress(Suppress.Downtimes, "Downtimes")
+		logSuppress(Suppress.Events, "Events")
+		logSuppress(Suppress.Inventory, "Inventory")
+		logSuppress(Suppress.Metrics, "Metrics")
 
 		/* init logger and flush buffer */
 		cfg.initLogger()

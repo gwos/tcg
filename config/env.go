@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"strings"
 
@@ -47,6 +48,15 @@ func applyFlags() {
 	}
 }
 
-func applyEnv(cfg *Config) error {
-	return env.ParseWithOptions(cfg, env.Options{Prefix: EnvPrefix})
+func applyEnv(v ...interface{}) error {
+	var ee []error
+	for i := range v {
+		if err := env.ParseWithOptions(v[i], env.Options{Prefix: EnvPrefix}); err != nil {
+			ee = append(ee, err)
+		}
+	}
+	if len(ee) > 0 {
+		return errors.Join(ee...)
+	}
+	return nil
 }
