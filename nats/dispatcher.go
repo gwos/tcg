@@ -17,12 +17,8 @@ var (
 	dispatcher     *natsDispatcher
 	onceDispatcher sync.Once
 
-	retryDelays = map[int]time.Duration{
-		1: time.Second * 30,
-		2: time.Minute * 1,
-		3: time.Minute * 5,
-		4: time.Minute * 20,
-	}
+	// RetryDelays is overridden from config package
+	RetryDelays = []time.Duration{time.Second * 30, time.Minute * 1, time.Minute * 5, time.Minute * 20}
 )
 
 type dispatcherRetry struct {
@@ -148,7 +144,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 		if delayRetry != nil {
 			select {
 			case <-ctx.Done(): // context cancelled
-			case <-time.After(retryDelays[delayRetry.Retry]): // delay ended
+			case <-time.After(RetryDelays[delayRetry.Retry]): // delay ended
 			}
 		}
 	}
@@ -204,7 +200,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 	retry := &dispatcherRetry{
 		Timestamp: time.Now().UTC(),
 		LastError: err,
-		Retry:     1,
+		Retry:     0,
 	}
 	if lastRetry, ok := d.retries.Get(opt.Durable); ok {
 		lastRetry := lastRetry.(dispatcherRetry)
@@ -213,7 +209,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 		}
 	}
 
-	if retry.Retry >= len(retryDelays) {
+	if retry.Retry >= len(RetryDelays) {
 		d.retries.Delete(opt.Durable)
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).

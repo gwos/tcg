@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/logzer"
+	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/transit"
@@ -145,6 +146,8 @@ type Connector struct {
 
 	Nats `yaml:",inline"`
 
+	RetryDelays []time.Duration `env:"RETRYDELAYS" yaml:"-"`
+
 	TransportStartRndDelay int `env:"TRANSPORTSTARTRNDDELAY" yaml:"-"`
 
 	ExportProm bool `env:"EXPORTPROM" yaml:"exportProm"`
@@ -276,6 +279,8 @@ func defaults() Config {
 				NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
 				NatsServerConfigFile:   "",
 			},
+			RetryDelays: []time.Duration{time.Second * 30, time.Second * 30, time.Second * 30, time.Second * 30, time.Second * 30,
+				time.Second * 30, time.Second * 30, time.Second * 30, time.Minute * 1, time.Minute * 5, time.Minute * 20},
 			TransportStartRndDelay: 60,
 		},
 		// create disabled connections to support partial setting with struct-path
@@ -327,6 +332,8 @@ func GetConfig() *Config {
 		logSuppress(Suppress.Events, "Events")
 		logSuppress(Suppress.Inventory, "Inventory")
 		logSuppress(Suppress.Metrics, "Metrics")
+
+		nats.RetryDelays = cfg.Connector.RetryDelays
 
 		/* init logger and flush buffer */
 		cfg.initLogger()
