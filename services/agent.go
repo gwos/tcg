@@ -108,7 +108,12 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Msgf("starting with config: %+v", agentService.Connector)
+			Any("connector", agentService.Connector).
+			Any("suppress", config.Suppress).
+			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
+			Dur("httpClientTimeout", clients.HttpClient.Timeout).
+			Dur("httpClientTimeoutGW", clients.HttpClientGW.Timeout).
+			Msg("starting with config")
 	})
 
 	return agentService
