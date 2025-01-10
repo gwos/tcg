@@ -17,6 +17,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type TransitOperation string
+
+const (
+	TOpClearInDowntime TransitOperation = "downtime-clear"
+	TOpSetInDowntime   TransitOperation = "downtime-set"
+	TOpSendEvents      TransitOperation = "events"
+	TOpSendEventsAck   TransitOperation = "events-ack"
+	TOpSendEventsUnack TransitOperation = "events-unack"
+	TOpSendMetrics     TransitOperation = "metrics"
+	TOpSyncInventory   TransitOperation = "inventory"
+)
+
 // TransitService implements AgentServices, TransitServices interfaces
 type TransitService struct {
 	*AgentService
@@ -90,9 +102,28 @@ func (service *TransitService) RemoveListMetricsHandler() {
 	service.listMetricsHandler = defaultListMetricsHandler
 }
 
+func (service *TransitService) exportTransit(op TransitOperation, payload []byte) error {
+	if len(service.Connector.ExportTransitDir) == 0 {
+		return nil
+	}
+	if err := os.MkdirAll(service.Connector.ExportTransitDir, 0777); err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
+	}
+	if err := os.WriteFile(
+		filepath.Join(service.Connector.ExportTransitDir,
+			time.Now().UTC().Format(time.RFC3339Nano)+"-"+string(op)+".json"),
+		payload, 0664,
+	); err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
+	}
+	return nil
+}
+
 // ClearInDowntime implements TransitServices.ClearInDowntime interface
 func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -104,6 +135,8 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 			log.Err(err).Msg("ClearInDowntime failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpClearInDowntime, payload)
 
 	if config.Suppress.Downtimes {
 		tracing.TraceAttrStr("suppress", "downtimes")(span)
@@ -117,7 +150,7 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
 func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error {
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -129,6 +162,8 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 			log.Err(err).Msg("ClearInDowntime failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpSetInDowntime, payload)
 
 	if config.Suppress.Downtimes {
 		tracing.TraceAttrStr("suppress", "downtimes")(span)
@@ -142,6 +177,8 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
+	_ = service.exportTransit(TOpSendEvents, payload)
+
 	if config.Suppress.Events {
 		return nil
 	}
@@ -157,7 +194,7 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendEvents", 1)
 
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEvents))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -177,7 +214,7 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 
 // SendEventsAck implements TransitServices.SendEventsAck interface
 func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error {
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsAck))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -189,6 +226,8 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 			log.Err(err).Msg("SendEventsAck failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpSendEventsAck, payload)
 
 	if config.Suppress.Events {
 		tracing.TraceAttrStr("suppress", "events")(span)
@@ -202,7 +241,7 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 
 // SendEventsUnack implements TransitServices.SendEventsUnack interface
 func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error {
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsUnack))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -214,6 +253,8 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 			log.Err(err).Msg("SendEventsUnack failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpSendEventsUnack, payload)
 
 	if config.Suppress.Events {
 		tracing.TraceAttrStr("suppress", "events")(span)
@@ -227,6 +268,8 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
+	_ = service.exportTransit(TOpSendMetrics, payload)
+
 	if config.Suppress.Metrics {
 		return nil
 	}
@@ -242,7 +285,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendMetrics", 1)
 
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendMetrics))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -274,7 +317,7 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
 func (service *TransitService) SynchronizeInventory(ctx context.Context, payload []byte) error {
-	_, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -286,6 +329,8 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 			log.Err(err).Msg("SynchronizeInventory failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpSyncInventory, payload)
 
 	if config.Suppress.Inventory {
 		tracing.TraceAttrStr("suppress", "inventory")(span)

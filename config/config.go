@@ -150,7 +150,9 @@ type Connector struct {
 
 	TransportStartRndDelay int `env:"TRANSPORTSTARTRNDDELAY" yaml:"-"`
 
-	ExportProm bool `env:"EXPORTPROM" yaml:"exportProm"`
+	ExportProm bool `env:"EXPORTPROM" yaml:"-"`
+
+	ExportTransitDir string `env:"EXPORTTRANSITDIR" yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration

@@ -199,6 +199,78 @@ func (controller *Controller) config(c *gin.Context) {
 	c.JSON(http.StatusOK, ConnectorStatusDTO{StatusProcessing, task.Idx})
 }
 
+// @Description The following API endpoint can be used to send Downtimes to Foundation.
+// @Tags    downtimes
+// @Accept  json
+// @Produce json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /downtime-clear [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) clearInDowntime(c *gin.Context) {
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpClearInDowntime))
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
+		)
+	}()
+
+	payload, err = c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.ClearInDowntime(ctx, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+// @Description The following API endpoint can be used to send Downtimes to Foundation.
+// @Tags    downtimes
+// @Accept  json
+// @Produce json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /downtime-set [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) setInDowntime(c *gin.Context) {
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSetInDowntime))
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
+		)
+	}()
+
+	payload, err = c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.SetInDowntime(ctx, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
 // @Description The following API endpoint can be used to send Alerts to Foundation.
 // @Tags    alert, event
 // @Accept  json
@@ -208,12 +280,12 @@ func (controller *Controller) config(c *gin.Context) {
 // @Router  /events [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
-func (controller *Controller) events(c *gin.Context) {
+func (controller *Controller) sendEvents(c *gin.Context) {
 	var (
 		err     error
 		payload []byte
 	)
-	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSendEvents))
 	defer func() {
 		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
@@ -244,12 +316,12 @@ func (controller *Controller) events(c *gin.Context) {
 // @Router  /events-ack [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
-func (controller *Controller) eventsAck(c *gin.Context) {
+func (controller *Controller) sendEventsAck(c *gin.Context) {
 	var (
 		err     error
 		payload []byte
 	)
-	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSendEventsAck))
 	defer func() {
 		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
@@ -280,12 +352,12 @@ func (controller *Controller) eventsAck(c *gin.Context) {
 // @Router  /events-unack [post]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
-func (controller *Controller) eventsUnack(c *gin.Context) {
+func (controller *Controller) sendEventsUnack(c *gin.Context) {
 	var (
 		err     error
 		payload []byte
 	)
-	ctx, span := tracing.StartTraceSpan(context.Background(), "services", "eventsUnack")
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSendEventsUnack))
 	defer func() {
 		tracing.EndTraceSpan(span,
 			tracing.TraceAttrError(err),
@@ -300,6 +372,78 @@ func (controller *Controller) eventsUnack(c *gin.Context) {
 		return
 	}
 	err = controller.SendEventsUnack(ctx, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+// @Description The following API endpoint can be used to send Inventory to Foundation.
+// @Tags    inventory
+// @Accept  json
+// @Produce json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /inventory [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) syncInventory(c *gin.Context) {
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSyncInventory))
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
+		)
+	}()
+
+	payload, err = c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.SynchronizeInventory(ctx, payload)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, nil)
+}
+
+// @Description The following API endpoint can be used to send Metrics to Foundation.
+// @Tags    metrics
+// @Accept  json
+// @Produce json
+// @Success 200
+// @Failure 401 {string} string "Unauthorized"
+// @Router  /metrics [post]
+// @Param   GWOS-APP-NAME    header    string     true        "Auth header"
+// @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
+func (controller *Controller) sendMetrics(c *gin.Context) {
+	var (
+		err     error
+		payload []byte
+	)
+	ctx, span := tracing.StartTraceSpan(c.Request.Context(), "controller", string(TOpSendMetrics))
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadLen(payload),
+			tracing.TraceAttrEntrypoint(c.FullPath()),
+		)
+	}()
+
+	payload, err = c.GetRawData()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+	err = controller.SendResourceWithMetrics(ctx, payload)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err.Error())
 		return
@@ -568,9 +712,13 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.Use(controller.checkAccess)
 
 	apiV1Group.POST("/config", controller.config)
-	apiV1Group.POST("/events", controller.events)
-	apiV1Group.POST("/events-ack", controller.eventsAck)
-	apiV1Group.POST("/events-unack", controller.eventsUnack)
+	apiV1Group.POST("/downtime-clear", controller.clearInDowntime)
+	apiV1Group.POST("/downtime-set", controller.setInDowntime)
+	apiV1Group.POST("/events", controller.sendEvents)
+	apiV1Group.POST("/events-ack", controller.sendEventsAck)
+	apiV1Group.POST("/events-unack", controller.sendEventsUnack)
+	apiV1Group.POST("/inventory", controller.syncInventory)
+	apiV1Group.POST("/metrics", controller.sendMetrics)
 	apiV1Group.GET("/metrics", controller.listMetrics)
 	apiV1Group.POST("/reset-nats", controller.resetNats)
 	apiV1Group.POST("/start", controller.start)
