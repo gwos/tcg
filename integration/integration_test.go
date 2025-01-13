@@ -167,7 +167,6 @@ func BenchmarkE2E(b *testing.B) {
 			}
 		}
 	})
-
 }
 
 func resources(countHst, countSvc int, opts ...OV) []transit.MonitoredResource {
