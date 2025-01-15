@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	stdlog "log"
 	"log/slog"
 	"os"
 	"path"
@@ -547,4 +548,7 @@ func (cfg Config) initLogger() {
 		Logger()
 	/* adapt SDK logger */
 	sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
+	/* set as standard logger output */
+	stdlog.SetFlags(0)
+	stdlog.SetOutput(log.Logger)
 }

@@ -87,14 +87,12 @@ func (controller *Controller) startController() error {
 		return nil
 	}
 
-	var addr string
-	if strings.HasPrefix(controller.Connector.ControllerAddr, ":") {
-		addr = "localhost" + controller.Connector.ControllerAddr
-	} else {
-		addr = controller.Connector.ControllerAddr
-	}
 	certFile := controller.Connector.ControllerCertFile
 	keyFile := controller.Connector.ControllerKeyFile
+	addr := controller.Connector.ControllerAddr
+	if strings.HasPrefix(addr, ":") {
+		addr = "0.0.0.0" + addr
+	}
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -111,13 +109,13 @@ func (controller *Controller) startController() error {
 	go func() {
 		t0 := time.Now()
 		controller.agentStatus.Controller.Set(StatusRunning)
+		controller.srv = &http.Server{
+			Addr:         addr,
+			Handler:      router,
+			ReadTimeout:  controller.Connector.ControllerReadTimeout,
+			WriteTimeout: controller.Connector.ControllerWriteTimeout,
+		}
 		for {
-			controller.srv = &http.Server{
-				Addr:         addr,
-				Handler:      router,
-				ReadTimeout:  controller.Connector.ControllerReadTimeout,
-				WriteTimeout: controller.Connector.ControllerWriteTimeout,
-			}
 			var err error
 			if certFile != "" && keyFile != "" {
 				log.Info().Msgf("controller starts listen TLS: %s", addr)
@@ -127,21 +125,20 @@ func (controller *Controller) startController() error {
 				err = controller.srv.ListenAndServe()
 			}
 			/* getting here after http.Server exit */
-			controller.srv = nil
 			/* catch the "bind: address already in use" error */
 			if err != nil && tcgerr.IsErrorAddressInUse(err) &&
 				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
 				log.Warn().Err(err).Msg("controller retrying http.Server start")
-				idleTimer.Reset(startRetryDelay * 2)
 				time.Sleep(startRetryDelay)
+				idleTimer.Reset(startRetryDelay * 2)
 				continue
 			} else if err != nil && err != http.ErrServerClosed {
 				log.Err(err).Msg("controller got http.Server error")
 			}
-			idleTimer.Stop()
 			break
 		}
 		controller.agentStatus.Controller.Set(StatusStopped)
+		controller.srv = nil
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
 	<-idleTimer.C
