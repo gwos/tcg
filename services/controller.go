@@ -7,10 +7,12 @@ import (
 	"expvar"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/pprof"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -27,6 +29,7 @@ import (
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"golang.org/x/crypto/blake2b"
+	"golang.org/x/sys/unix"
 )
 
 // Controller implements AgentServices, Controllers interface
@@ -115,14 +118,37 @@ func (controller *Controller) startController() error {
 			ReadTimeout:  controller.Connector.ControllerReadTimeout,
 			WriteTimeout: controller.Connector.ControllerWriteTimeout,
 		}
+		lc := net.ListenConfig{
+			Control: func(network, address string, c syscall.RawConn) error {
+				var opErr error
+				if err := c.Control(func(fd uintptr) {
+					opErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+				}); err != nil {
+					return err
+				}
+				return opErr
+			},
+		}
+
 		for {
 			var err error
+			var l net.Listener
 			if certFile != "" && keyFile != "" {
 				log.Info().Msgf("controller starts listen TLS: %s", addr)
-				err = controller.srv.ListenAndServeTLS(certFile, keyFile)
+				// err = controller.srv.ListenAndServeTLS(certFile, keyFile)
+				// using listener with configured socket options SO_REUSEPORT to prevent
+				// "bind: address already in use" error on stop-start controller
+				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
+					err = controller.srv.ServeTLS(l, certFile, keyFile)
+				}
 			} else {
 				log.Info().Msgf("controller starts listen: %s", addr)
-				err = controller.srv.ListenAndServe()
+				// err = controller.srv.ListenAndServe()
+				// using listener with configured socket options SO_REUSEPORT to prevent
+				// "bind: address already in use" error on stop-start controller
+				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
+					err = controller.srv.Serve(l)
+				}
 			}
 			/* getting here after http.Server exit */
 			/* catch the "bind: address already in use" error */
