@@ -399,6 +399,10 @@ func (service *AgentService) config(data []byte) error {
 		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
 
+	if !service.Connector.Enabled {
+		log.Error().Msg("could not start nats dispatcher as connector is disabled")
+	}
+
 	// ensure nested services properly initialized
 	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)
 	GetTransitService().metricsBatcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
