@@ -726,10 +726,6 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	swaggerURL := ginSwagger.URL("http://" + addr + "/swagger/doc.json")
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, swaggerURL))
 
-	/* public entrypoints */
-	apiV1Identity := router.Group("/api/v1/identity")
-	apiV1Identity.GET("", controller.agentIdentity)
-
 	/* private entrypoints */
 	apiV1Group := router.Group("/api/v1")
 	apiV1Group.Use(controller.checkAccess)
@@ -746,9 +742,6 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	apiV1Group.POST("/reset-nats", controller.resetNats)
 	apiV1Group.POST("/start", controller.start)
 	apiV1Group.POST("/stop", controller.stop)
-	apiV1Group.GET("/stats", controller.stats)
-	apiV1Group.GET("/status", controller.status)
-	apiV1Group.GET("/version", controller.version)
 
 	for _, entrypoint := range entrypoints {
 		switch entrypoint.Method {
@@ -764,6 +757,11 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	}
 
 	/* public entrypoints */
+	router.GET("/api/v1/identity", controller.agentIdentity)
+	router.GET("/api/v1/stats", controller.stats)
+	router.GET("/api/v1/status", controller.status)
+	router.GET("/api/v1/version", controller.version)
+
 	apiV1Debug := router.Group("/api/v1/debug")
 	apiV1Debug.GET("/vars", gin.WrapH(expvar.Handler()))
 	apiV1Debug.GET("/metrics", func() gin.HandlerFunc {
