@@ -157,16 +157,16 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 			switch iFace.Status {
 			case 0:
 				mService.Status = transit.ServiceWarning
-				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is DOWN"
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is DOWN" + mService.LastPluginOutput
 			case 1:
 				mService.Status = transit.ServiceUnscheduledCritical
-				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is UP"
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is UP" + mService.LastPluginOutput
 			case 2:
 				mService.Status = transit.ServiceWarning
-				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is DOWN"
+				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is DOWN" + mService.LastPluginOutput
 			case 3:
 				mService.Status = transit.ServiceOk
-				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP"
+				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP" + mService.LastPluginOutput
 			case -1:
 			}
 			mServices = append(mServices, *mService)

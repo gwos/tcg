@@ -415,6 +415,12 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 		}
 		timeSeries = append(timeSeries, *metric)
 	}
+	service, err := CreateService(serviceName, hostName, timeSeries)
+	if err != nil {
+		log.Err(err).Msgf("could not create service %s:%s", hostName, serviceName)
+	}
+	addServiceStatusText("", service)
+
 	return CreateService(serviceName, hostName, timeSeries)
 }
 
@@ -726,10 +732,15 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 		log.Error().Msg("service is nil")
 		return statusText
 	}
-	if len(service.Metrics) == 1 {
+
+	for _, metric := range service.Metrics {
+		mValText, err := getValueText(metric.Value)
+		if err != nil {
+			log.Warn().Err(err).Msgf("could not get metric %s value for service %s", metric.MetricName, service.Name)
+			continue
+		}
 		wt := noneThresholdText
 		crt := noneThresholdText
-		metric := service.Metrics[0]
 		if metric.Thresholds != nil {
 			for _, th := range metric.Thresholds {
 				thresholdType := th.SampleType
@@ -749,20 +760,65 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 					}
 				}
 			}
+			metricVal, err := strconv.ParseFloat(mValText, 64)
+			if err != nil {
+				log.Warn().Err(err).Msgf("could not parse metric value %s for service %s", mValText, service.Name)
+				continue
+			}
+
 			var thText string
 			if noneThresholdText != wt && noneThresholdText != crt {
-				thText = strings.ReplaceAll(" [W/C={w}/{cr}]", "{w}", wt)
-				thText = strings.ReplaceAll(thText, "{cr}", crt)
+				wtVal, err := strconv.ParseFloat(wt, 64)
+				if err != nil {
+					log.Warn().Err(err).Msgf("could not parse warning threshold value %s for service %s", wt, service.Name)
+					continue
+				}
+				crtVal, err := strconv.ParseFloat(crt, 64)
+				if err != nil {
+					log.Warn().Err(err).Msgf("could not parse critical threshold value %s for service %s", crt, service.Name)
+					continue
+				}
+
+				if metricVal >= wtVal && metricVal >= crtVal {
+					thText = strings.ReplaceAll(" | [{name}] [W/C={w}/{cr}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(thText, "{w}", wt)
+					thText = strings.ReplaceAll(thText, "{cr}", crt)
+				} else {
+					if metricVal >= wtVal {
+						thText = strings.ReplaceAll(" | [{name}] [WARN={w}]", "{name}", metric.MetricName)
+						thText = strings.ReplaceAll(thText, "{w}", wt)
+					}
+					if metricVal >= crtVal {
+						thText = strings.ReplaceAll(" | [{name}] [CRITICAL={cr}]", "{name}", metric.MetricName)
+						thText = strings.ReplaceAll(thText, "{w}", wt)
+					}
+				}
 			} else if noneThresholdText != wt {
-				thText = strings.ReplaceAll(" [WARN={w}]", "{w}", wt)
+				wtVal, err := strconv.ParseFloat(wt, 64)
+				if err != nil {
+					log.Warn().Err(err).Msgf("could not parse warning threshold value %s for service %s", wt, service.Name)
+					continue
+				}
+
+				if metricVal >= wtVal {
+					thText = strings.ReplaceAll(" | [{name}] [WARN={w}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(thText, "{w}", wt)
+				}
 			} else if noneThresholdText != crt {
-				thText = strings.ReplaceAll(" [CRITICAL={cr}]", "{cr}", crt)
+				crtVal, err := strconv.ParseFloat(crt, 64)
+				if err != nil {
+					log.Warn().Err(err).Msgf("could not parse critical threshold value %s for service %s", crt, service.Name)
+					continue
+				}
+				if metricVal >= crtVal {
+					thText = strings.ReplaceAll(" | [{name}] [CRITICAL={cr}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(thText, "{w}", wt)
+				}
 			}
 			statusText = statusText + thText
 		}
-	} else {
-		log.Warn().Msg("not supported for service with more than one metric")
 	}
+
 	return statusText
 }
 
