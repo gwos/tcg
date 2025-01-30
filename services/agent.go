@@ -546,7 +546,6 @@ func (service *AgentService) startTransport() error {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-
 		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not start")
@@ -619,7 +618,6 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-
 		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not fixTracerContext")

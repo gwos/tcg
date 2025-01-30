@@ -175,7 +175,11 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 				mService.LastPluginOutput = "Interface Operational and Administrative states are UNKNOWN"
 			}
 			if thresholdMessage != "" {
-				mService.LastPluginOutput += fmt.Sprintf(" | %s", thresholdMessage)
+				if mService.LastPluginOutput != "" {
+					mService.LastPluginOutput += fmt.Sprintf(" | %s", thresholdMessage)
+				} else {
+					mService.LastPluginOutput = thresholdMessage
+				}
 			}
 			mServices = append(mServices, *mService)
 		}
