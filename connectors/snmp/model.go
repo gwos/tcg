@@ -154,6 +154,7 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 			log.Err(err).Msgf("could not create monitored service '%s:%s'", device.Name, iFace.Name)
 		}
 		if mService != nil {
+			fmt.Println(mService.LastPluginOutput)
 			switch iFace.Status {
 			case 0:
 				mService.Status = transit.ServiceWarning
