@@ -421,7 +421,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 	}
 	addServiceStatusText("", service)
 
-	return CreateService(serviceName, hostName, timeSeries)
+	return service, nil
 }
 
 // CreateService makes node
@@ -782,17 +782,20 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 				}
 
 				if metricVal >= wtVal && metricVal >= crtVal {
-					thText = strings.ReplaceAll(" | [{name}] [W/C={w}/{cr}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(" | [{name}] [VAL={val}] [W/C={w}/{cr}]", "{name}", metric.MetricName)
 					thText = strings.ReplaceAll(thText, "{w}", wt)
 					thText = strings.ReplaceAll(thText, "{cr}", crt)
+					thText = strings.ReplaceAll(thText, "{val}", mValText)
 				} else {
 					if metricVal >= wtVal {
-						thText = strings.ReplaceAll(" | [{name}] [WARN={w}]", "{name}", metric.MetricName)
+						thText = strings.ReplaceAll(" | [{name}] [VAL={val}] [WARN={w}] ", "{name}", metric.MetricName)
 						thText = strings.ReplaceAll(thText, "{w}", wt)
+						thText = strings.ReplaceAll(thText, "{val}", mValText)
 					}
 					if metricVal >= crtVal {
-						thText = strings.ReplaceAll(" | [{name}] [CRITICAL={cr}]", "{name}", metric.MetricName)
+						thText = strings.ReplaceAll(" | [{name}] [VAL={val}] [CRITICAL={cr}]", "{name}", metric.MetricName)
 						thText = strings.ReplaceAll(thText, "{w}", wt)
+						thText = strings.ReplaceAll(thText, "{val}", mValText)
 					}
 				}
 			} else if noneThresholdText != wt {
@@ -804,8 +807,9 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 				}
 
 				if metricVal >= wtVal {
-					thText = strings.ReplaceAll(" | [{name}] [WARN={w}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(" | [{name}] [VAL={val}] [WARN={w}]", "{name}", metric.MetricName)
 					thText = strings.ReplaceAll(thText, "{w}", wt)
+					thText = strings.ReplaceAll(thText, "{val}", mValText)
 				}
 			} else if noneThresholdText != crt {
 				fmt.Println("==== HERE 3")
@@ -815,8 +819,9 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 					continue
 				}
 				if metricVal >= crtVal {
-					thText = strings.ReplaceAll(" | [{name}] [CRITICAL={cr}]", "{name}", metric.MetricName)
+					thText = strings.ReplaceAll(" | [{name}] [VAL={val}] [CRITICAL={cr}]", "{name}", metric.MetricName)
 					thText = strings.ReplaceAll(thText, "{w}", wt)
+					thText = strings.ReplaceAll(thText, "{val}", mValText)
 				}
 			}
 			statusText = statusText + thText
