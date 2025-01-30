@@ -108,7 +108,12 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Msgf("starting with config: %+v", agentService.Connector)
+			Any("connector", agentService.Connector).
+			Any("suppress", config.Suppress).
+			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
+			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
+			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
+			Msg("starting with config")
 	})
 
 	return agentService
@@ -394,6 +399,10 @@ func (service *AgentService) config(data []byte) error {
 		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
 
+	if !service.Connector.Enabled {
+		log.Error().Msg("could not start nats dispatcher as connector is disabled")
+	}
+
 	// ensure nested services properly initialized
 	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)
 	GetTransitService().metricsBatcher.Reset(service.Connector.BatchMetrics, service.Connector.BatchMaxBytes)
@@ -546,7 +555,6 @@ func (service *AgentService) startTransport() error {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-
 		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not start")
@@ -619,7 +627,6 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-
 		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not fixTracerContext")

@@ -66,7 +66,7 @@ func (h *SLogHandler) Handle(ctx context.Context, r slog.Record) error {
 		case slog.KindBool:
 			_ = e.Bool(attr.Key, attr.Value.Bool())
 		case slog.KindDuration:
-			_ = e.Dur(attr.Key, attr.Value.Duration())
+			_ = e.Str(attr.Key, attr.Value.Duration().String())
 		case slog.KindFloat64:
 			_ = e.Float64(attr.Key, attr.Value.Float64())
 		case slog.KindInt64:

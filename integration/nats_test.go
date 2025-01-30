@@ -15,7 +15,7 @@ import (
 // if Groundwork Foundation is unavailable
 // TODO: TCG connects to Foundation as local connection
 func TestNatsQueue1(t *testing.T) {
-	setupIntegration(t, natsAckWait5s, dynInventoryTrue)
+	setupIntegration(t, OV{natsAckWait, 5 * time.Second}, OV{dynInventory, true})
 	apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)
@@ -59,7 +59,7 @@ func TestNatsQueue1(t *testing.T) {
 // after NATS streaming server restarting
 // TODO: TCG connects to Foundation as remote connection
 func TestNatsQueue2(t *testing.T) {
-	setupIntegration(t, natsAckWait30s, dynInventoryTrue)
+	setupIntegration(t, OV{natsAckWait, 30 * time.Second}, OV{dynInventory, true})
 	apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)

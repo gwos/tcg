@@ -17,14 +17,14 @@ import (
 )
 
 func TestIntegration(t *testing.T) {
-	setupIntegration(t, natsAckWait5s, dynInventoryFalse)
+	setupIntegration(t)
 	apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
 	defer cleanNats(t)
 
 	group := transit.ResourceGroup{
-		Description: testName,
-		GroupName:   testName,
+		Description: TestEntityName,
+		GroupName:   TestEntityName,
 		Type:        transit.HostGroup,
 	}
 	rs := makeResource(0, 3)
@@ -77,24 +77,31 @@ func TestIntegration(t *testing.T) {
 	gwServices := new(clients.GWServices)
 	assert.NoError(t, gwClient.GetServicesByAgent(cfg.Connector.AgentID, gwServices))
 	assert.Equal(t, 3, len(gwServices.Services))
-	assert.Equal(t, "host0.test.tcg.gw8", gwServices.Services[0].HostName)
+	assert.Equal(t, "host.0.test.tcg.gw8", gwServices.Services[0].HostName)
 
 	t.Log("Test GWClient.GetHostGroupsByAppTypeAndHostNames")
 	gwHostGroups := new(clients.GWHostGroups)
-	assert.NoError(t, gwClient.GetHostGroupsByAppTypeAndHostNames(cfg.Connector.AppType, []string{"host0.test.tcg.gw8"}, gwHostGroups))
+	assert.NoError(t, gwClient.GetHostGroupsByAppTypeAndHostNames(cfg.Connector.AppType, []string{"host.0.test.tcg.gw8"}, gwHostGroups))
 	assert.Equal(t, 1, len(gwHostGroups.HostGroups))
 	assert.Equal(t, 1, len(gwHostGroups.HostGroups[0].Hosts))
-	assert.Equal(t, "host0.test.tcg.gw8", gwHostGroups.HostGroups[0].Hosts[0].HostName)
-	assert.Equal(t, testName, gwHostGroups.HostGroups[0].Name)
+	assert.Equal(t, "host.0.test.tcg.gw8", gwHostGroups.HostGroups[0].Hosts[0].HostName)
+	assert.Equal(t, TestEntityName, gwHostGroups.HostGroups[0].Name)
 }
 
 func BenchmarkE2E(b *testing.B) {
-	setupIntegration(b, natsAckWait30s, dynInventoryFalse)
-	apiClient.RemoveAgent(services.GetTransitService().AgentID)
+	setupIntegration(b, OV{natsAckWait, 30 * time.Second}, OV{dynInventory, false})
+	agentIDs := []string{
+		config.GetConfig().Connector.AgentID,
+		config.GetConfig().Connector.AgentID + ".a2",
+	}
 
 	defer printMemStats()
 	defer cleanNats(b)
-	defer apiClient.RemoveAgent(services.GetTransitService().AgentID)
+	defer func() {
+		for _, a := range agentIDs {
+			apiClient.RemoveAgent(a)
+		}
+	}()
 
 	cfg := config.GetConfig()
 	gwClient := clients.GWClient{
@@ -104,10 +111,24 @@ func BenchmarkE2E(b *testing.B) {
 	}
 	transitService := services.GetTransitService()
 
+	// Load some inventory before actual test as prepare Syncronizer for more complex work:
+	// different host names / different hostgroup names
+	for i, a := range agentIDs {
+		apiClient.RemoveAgent(a)
+		time.Sleep(5 * time.Second)
+		transitService.AgentID = a
+		config.GetConfig().Connector.AgentID = a
+		payload, _ := inventoryRequest(TestResourcesCount, TestServicesCount, OV{hostPrefix, fmt.Sprintf("agent%v", i)})
+		_, _ = gwClient.SynchronizeInventory(context.Background(), payload)
+		time.Sleep(15 * time.Second)
+	}
+	config.GetConfig().Connector.AgentID = agentIDs[0]
+	transitService.AgentID = agentIDs[0]
+
 	// Benchmark sending data to Backend with/without NATS: TestFlagClient
 	b.Run("send.data", func(b *testing.B) {
 		printMemStats()
-		payload, err := inventoryRequest(TestResourcesCount, TestServicesCount)
+		payload, err := inventoryRequest(TestResourcesCount, TestServicesCount, OV{hostPrefix, "agent0"}, OV{servicePrefix, "s0"}, OV{hgPrefix, "g0"})
 		assert.NoError(b, err)
 
 		if TestFlagClient {
@@ -116,10 +137,10 @@ func BenchmarkE2E(b *testing.B) {
 		} else {
 			assert.NoError(b, transitService.SynchronizeInventory(context.Background(), payload))
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 		m0 := transitService.Stats().MessagesSent.Value()
 
-		for _, res := range resources(TestResourcesCount, TestServicesCount) {
+		for _, res := range resources(TestResourcesCount, TestServicesCount, OV{hostPrefix, "agent0"}, OV{servicePrefix, "s0"}, OV{hgPrefix, "g0"}) {
 			request := transit.ResourcesWithServicesRequest{
 				Context:   transitService.MakeTracerContext(),
 				Resources: []transit.MonitoredResource{res},
@@ -146,33 +167,51 @@ func BenchmarkE2E(b *testing.B) {
 			}
 		}
 	})
-
 }
 
-func resources(countHst, countSvc int) []transit.MonitoredResource {
+func resources(countHst, countSvc int, opts ...OV) []transit.MonitoredResource {
 	rr := make([]transit.MonitoredResource, 0, countHst)
 	for i := 0; i < countHst; i++ {
-		rs := makeResource(i, countSvc)
+		rs := makeResource(i, countSvc, opts...)
 		rr = append(rr, rs)
 	}
 	return rr
 }
 
-func inventoryRequest(countHst, countSvc int) ([]byte, error) {
+func inventoryRequest(countHst, countSvc int, opts ...OV) ([]byte, error) {
+	group1, group2 := TestEntityName, TestEntityName+"2"
+	for _, o := range opts {
+		switch o.Key {
+		case hgPrefix:
+			group2 = fmt.Sprintf("%v", o.Value)
+		}
+	}
+
 	inventory := new(transit.InventoryRequest)
 	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
-	group := transit.ResourceGroup{
-		Description: testName,
-		GroupName:   testName,
-		Type:        transit.HostGroup,
-	}
-	for _, rs := range resources(countHst, countSvc) {
-		inventory.AddResource(rs.ToInventoryResource())
-		group.AddResource(rs.ToResourceRef())
-	}
-	inventory.AddResourceGroup(group)
+	hg1, hg2 := new(transit.ResourceGroup), new(transit.ResourceGroup)
 
-	return json.MarshalIndent(inventory, " ", " ") // enlarge payload
+	for i, rs := range resources(countHst, countSvc, opts...) {
+		inventory.AddResource(rs.ToInventoryResource())
+		hg1.AddResource(rs.ToResourceRef())
+		hg2.AddResource(rs.ToResourceRef())
+		if i%5 == 0 {
+			hg1.Type = transit.HostGroup
+			hg1.GroupName = fmt.Sprintf("%v.%v.%v", group1, TestEntityName, i)
+			hg1.Description = fmt.Sprintf("%v %v %v", group1, TestEntityName, i)
+			inventory.AddResourceGroup(*hg1)
+			hg1 = new(transit.ResourceGroup)
+		}
+		if i%10 == 0 {
+			hg2.Type = transit.HostGroup
+			hg2.GroupName = fmt.Sprintf("%v.%v.%v", group2, TestEntityName, i)
+			hg2.Description = fmt.Sprintf("%v %v %v", group2, TestEntityName, i)
+			inventory.AddResourceGroup(*hg2)
+			hg2 = new(transit.ResourceGroup)
+		}
+	}
+
+	return json.Marshal(inventory)
 }
 
 // inspired by expvar.Handler() implementation

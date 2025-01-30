@@ -4,6 +4,7 @@ import (
 	"os"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/yaml.v3"
@@ -35,6 +36,7 @@ dsConnection:  # empty set
 	t.Setenv("TCG_CONNECTOR_ENABLED", `false`)
 	t.Setenv("TCG_CONNECTOR_BATCHMAXBYTES", `111`)
 	t.Setenv("TCG_CONNECTOR_LOGLEVEL", `2`)
+	t.Setenv("TCG_CONNECTOR_RETRYDELAYS", "2s,2m")
 	t.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
 	t.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
 	t.Setenv("TCG_GWCONNECTIONS_1_PASSWORD", "SEC_RET")
@@ -44,6 +46,7 @@ dsConnection:  # empty set
 	assert.Equal(t, false, cfg.Connector.Enabled)
 	assert.Equal(t, 111, cfg.Connector.BatchMaxBytes)
 	assert.Equal(t, LogLevel(2), cfg.Connector.LogLevel)
+	assert.Equal(t, []time.Duration{2 * time.Second, 2 * time.Minute}, cfg.Connector.RetryDelays)
 	assert.Equal(t, "localhost:3001", cfg.DSConnection.HostName)
 	assert.Equal(t, "SEC RET", cfg.GWConnections[0].Password)
 	assert.Equal(t, "SEC_RET", cfg.GWConnections[1].Password)
@@ -80,6 +83,7 @@ gwConnections:
 	t.Setenv(ConfigEnv, tmpFile.Name())
 	t.Setenv("TCG_CONNECTOR_NATSSTOREMAXAGE", "1h")
 	t.Setenv("TCG_CONNECTOR_NATSSTORETYPE", "MEMORY")
+	t.Setenv("TCG_CONNECTOR_RETRYDELAYS", "2s,2m")
 	t.Setenv("TCG_DSCONNECTION_HOSTNAME", "localhost:3001")
 	t.Setenv("TCG_GWCONNECTIONS_0_PASSWORD", "SEC RET")
 	t.Setenv("TCG_GWCONNECTIONS_1_HOSTNAME", "localhost:3001")
@@ -92,6 +96,7 @@ gwConnections:
 	expected.Connector.LogCondense = 30000000000
 	expected.Connector.NatsStoreType = "MEMORY"
 	expected.Connector.NatsStoreMaxAge = 3600000000000
+	expected.Connector.RetryDelays = []time.Duration{2 * time.Second, 2 * time.Minute}
 	expected.DSConnection = DSConnection{"localhost:3001"}
 	expected.GWConnections = GWConnections{
 		{Enabled: true, LocalConnection: false, HostName: "localhost:80", UserName: "RESTAPIACCESS", Password: "SEC RET"},

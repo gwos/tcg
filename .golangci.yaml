@@ -1,17 +1,7 @@
 run:
   go: '1.23'
-  skip-dirs:
-    - vendor
-    - bin
-    - var
-    - tmp
-    - gotocjson
-    - libtransit
-    - deprecated
-    - connectors/nsca
-  skip-files:
-    - \.pb\.go$
-  modules-download-mode: readonly
+  build-tags:
+    - codeanalysis
 
 govet:
   enable:
@@ -34,11 +24,8 @@ linters:
     - staticcheck
     - stylecheck
     - unconvert
-    # TODO:    - unparam
     - unused
     - whitespace
-  # TODO:    - gocognit
-  # TODO:    - gocyclo
   disable:
     - depguard
     - gochecknoglobals
@@ -50,8 +37,21 @@ linters:
     - gosimple
     - gosec
     - funlen
-
+    - typecheck
 issues:
+  exclude-dirs:
+    - vendor
+    - bin
+    - var
+    - tmp
+    - gotocjson
+    - libtransit
+    - deprecated
+    - connectors/nsca
+    - connector/nsca/nsca
+  exclude-files:
+    - \.pb\.go$
+    - connector/nsca/nsca/nsca.go
   # Excluding configuration per-path, per-linter, per-text and per-source
   exclude-rules:
     - path: _test\.go

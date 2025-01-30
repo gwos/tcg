@@ -5,27 +5,28 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
 	"github.com/gwos/tcg/batcher"
 	"github.com/gwos/tcg/batcher/events"
 	"github.com/gwos/tcg/batcher/metrics"
+	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/tracing"
 	"github.com/rs/zerolog/log"
 )
 
-// EnvSuppressX provides ability to globally suppress the submission of all data.
-// Not for any production use-case, but strictly troubleshooting:
-// this would be useful in troubleshooting to isolate synch issues to malformed perf data
-// (which is a really common problem)
+type TransitOperation string
+
 const (
-	EnvSuppressDowntimes = "TCG_SUPPRESS_DOWNTIMES"
-	EnvSuppressEvents    = "TCG_SUPPRESS_EVENTS"
-	EnvSuppressInventory = "TCG_SUPPRESS_INVENTORY"
-	EnvSuppressMetrics   = "TCG_SUPPRESS_METRICS"
+	TOpClearInDowntime TransitOperation = "downtime-clear"
+	TOpSetInDowntime   TransitOperation = "downtime-set"
+	TOpSendEvents      TransitOperation = "events"
+	TOpSendEventsAck   TransitOperation = "events-ack"
+	TOpSendEventsUnack TransitOperation = "events-unack"
+	TOpSendMetrics     TransitOperation = "metrics"
+	TOpSyncInventory   TransitOperation = "inventory"
 )
 
 // TransitService implements AgentServices, TransitServices interfaces
@@ -42,11 +43,6 @@ type TransitService struct {
 		buf []byte
 		hdr []string
 	}
-
-	suppressDowntimes bool
-	suppressEvents    bool
-	suppressInventory bool
-	suppressMetrics   bool
 }
 
 var onceTransitService sync.Once
@@ -83,18 +79,6 @@ func GetTransitService() *TransitService {
 				p.buf, p.hdr = nil, nil
 			}
 		})
-
-		applySuppressEnv := func(b *bool, env, str string) {
-			v, err := strconv.ParseBool(os.Getenv(env))
-			*b = err == nil && v
-			if *b {
-				log.Error().Msgf("TCG will suppress %v due to %v env var is active", str, env)
-			}
-		}
-		applySuppressEnv(&transitService.suppressDowntimes, EnvSuppressDowntimes, "Downtimes")
-		applySuppressEnv(&transitService.suppressEvents, EnvSuppressEvents, "Events")
-		applySuppressEnv(&transitService.suppressInventory, EnvSuppressInventory, "Inventory")
-		applySuppressEnv(&transitService.suppressMetrics, EnvSuppressMetrics, "Metrics")
 	})
 	return transitService
 }
@@ -118,13 +102,28 @@ func (service *TransitService) RemoveListMetricsHandler() {
 	service.listMetricsHandler = defaultListMetricsHandler
 }
 
-// ClearInDowntime implements TransitServices.ClearInDowntime interface
-func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
-	if service.suppressDowntimes {
+func (service *TransitService) exportTransit(op TransitOperation, payload []byte) error {
+	if len(service.Connector.ExportTransitDir) == 0 {
 		return nil
 	}
+	if err := os.MkdirAll(service.Connector.ExportTransitDir, 0777); err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
+	}
+	if err := os.WriteFile(
+		filepath.Join(service.Connector.ExportTransitDir,
+			time.Now().UTC().Format(time.RFC3339Nano)+"-"+string(op)+".json"),
+		payload, 0664,
+	); err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
+	}
+	return nil
+}
 
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "ClearInDowntime")
+// ClearInDowntime implements TransitServices.ClearInDowntime interface
+func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -136,6 +135,13 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 			log.Err(err).Msg("ClearInDowntime failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpClearInDowntime, payload)
+
+	if config.Suppress.Downtimes {
+		tracing.TraceAttrStr("suppress", "downtimes")(span)
+		return nil
+	}
 
 	err = Put2Nats(ctx, subjDowntimes, payload,
 		clients.HdrPayloadType, typeClearInDowntime.String())
@@ -144,11 +150,7 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
 func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error {
-	if service.suppressDowntimes {
-		return nil
-	}
-
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SetInDowntime")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -161,6 +163,13 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 		}
 	}()
 
+	_ = service.exportTransit(TOpSetInDowntime, payload)
+
+	if config.Suppress.Downtimes {
+		tracing.TraceAttrStr("suppress", "downtimes")(span)
+		return nil
+	}
+
 	err = Put2Nats(ctx, subjDowntimes, payload,
 		clients.HdrPayloadType, typeSetInDowntime.String())
 	return err
@@ -168,7 +177,9 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
-	if service.suppressEvents {
+	_ = service.exportTransit(TOpSendEvents, payload)
+
+	if config.Suppress.Events {
 		return nil
 	}
 
@@ -183,7 +194,7 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 func (service *TransitService) sendEvents(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendEvents", 1)
 
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEvents")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEvents))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -203,11 +214,7 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 
 // SendEventsAck implements TransitServices.SendEventsAck interface
 func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error {
-	if service.suppressEvents {
-		return nil
-	}
-
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsAck")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsAck))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -220,6 +227,13 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 		}
 	}()
 
+	_ = service.exportTransit(TOpSendEventsAck, payload)
+
+	if config.Suppress.Events {
+		tracing.TraceAttrStr("suppress", "events")(span)
+		return nil
+	}
+
 	err = Put2Nats(ctx, subjEvents, payload,
 		clients.HdrPayloadType, typeEventsAck.String())
 	return err
@@ -227,11 +241,7 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 
 // SendEventsUnack implements TransitServices.SendEventsUnack interface
 func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error {
-	if service.suppressEvents {
-		return nil
-	}
-
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendEventsUnack")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsUnack))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -244,6 +254,13 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 		}
 	}()
 
+	_ = service.exportTransit(TOpSendEventsUnack, payload)
+
+	if config.Suppress.Events {
+		tracing.TraceAttrStr("suppress", "events")(span)
+		return nil
+	}
+
 	err = Put2Nats(ctx, subjEvents, payload,
 		clients.HdrPayloadType, typeEventsUnack.String())
 	return err
@@ -251,7 +268,9 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
-	if service.suppressMetrics {
+	_ = service.exportTransit(TOpSendMetrics, payload)
+
+	if config.Suppress.Metrics {
 		return nil
 	}
 
@@ -266,7 +285,7 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
 	service.stats.x.Add("sendMetrics", 1)
 
-	ctx, span := tracing.StartTraceSpan(ctx, "services", "SendResourceWithMetrics")
+	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendMetrics))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -298,12 +317,7 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
 func (service *TransitService) SynchronizeInventory(ctx context.Context, payload []byte) error {
-	if service.suppressInventory {
-		return nil
-	}
-	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
-
-	_, span := tracing.StartTraceSpan(ctx, "services", "SynchronizeInventory")
+	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
 	var err error
 	defer func() {
 		tracing.EndTraceSpan(span,
@@ -315,6 +329,15 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 			log.Err(err).Msg("SynchronizeInventory failed")
 		}
 	}()
+
+	_ = service.exportTransit(TOpSyncInventory, payload)
+
+	if config.Suppress.Inventory {
+		tracing.TraceAttrStr("suppress", "inventory")(span)
+		return nil
+	}
+
+	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
 	headers := []string{clients.HdrPayloadType, typeInventory.String()}
