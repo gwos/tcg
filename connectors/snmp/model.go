@@ -154,21 +154,28 @@ func (device *DeviceExt) retrieveMonitoredServices(metricDefinitions map[string]
 			log.Err(err).Msgf("could not create monitored service '%s:%s'", device.Name, iFace.Name)
 		}
 		if mService != nil {
-			fmt.Println(mService.LastPluginOutput)
+			thresholdMessage := mService.LastPluginOutput
 			switch iFace.Status {
 			case 0:
-				mService.Status = transit.ServiceWarning
-				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is DOWN" + mService.LastPluginOutput
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is DOWN"
+				if mService.Status == transit.ServiceOk {
+					mService.Status = transit.ServiceWarning
+				}
 			case 1:
+				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is UP"
 				mService.Status = transit.ServiceUnscheduledCritical
-				mService.LastPluginOutput = "Interface Operational State is DOWN, Administrative state is UP" + mService.LastPluginOutput
 			case 2:
-				mService.Status = transit.ServiceWarning
-				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is DOWN" + mService.LastPluginOutput
+				mService.LastPluginOutput = "Administrative state is DOWN"
+				if mService.Status == transit.ServiceOk {
+					mService.Status = transit.ServiceWarning
+				}
 			case 3:
-				mService.Status = transit.ServiceOk
-				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP" + mService.LastPluginOutput
+				mService.LastPluginOutput = "Interface Operational State is UP, Administrative state is UP"
 			case -1:
+				mService.LastPluginOutput = "Interface Operational and Administrative states are UNKNOWN"
+			}
+			if thresholdMessage != "" {
+				mService.LastPluginOutput += fmt.Sprintf(" | %s", thresholdMessage)
 			}
 			mServices = append(mServices, *mService)
 		}
