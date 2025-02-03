@@ -108,7 +108,12 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Msgf("starting with config: %+v", agentService.Connector)
+			Any("connector", agentService.Connector).
+			Any("suppress", config.Suppress).
+			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
+			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
+			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
+			Msg("starting with config")
 	})
 
 	return agentService
@@ -393,6 +398,10 @@ func (service *AgentService) config(data []byte) error {
 		Str("ControllerAddr", service.ControllerAddr).
 		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
+
+	if !service.Connector.Enabled {
+		log.Error().Msg("could not start nats dispatcher as connector is disabled")
+	}
 
 	// ensure nested services properly initialized
 	GetTransitService().eventsBatcher.Reset(service.Connector.BatchEvents, service.Connector.BatchMaxBytes)

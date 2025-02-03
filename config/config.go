@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	stdlog "log"
 	"log/slog"
 	"os"
 	"path"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/logzer"
+	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/gwos/tcg/sdk/transit"
@@ -23,6 +25,17 @@ import (
 var (
 	once sync.Once
 	cfg  *Config
+
+	// Suppress provides ability to globally suppress the submission of all data.
+	// Not for any production use-case, but strictly troubleshooting:
+	// this would be useful in troubleshooting to isolate synch issues to malformed perf data
+	// (which is a really common problem)
+	Suppress struct {
+		Downtimes bool `env:"SUPPRESS_DOWNTIMES"`
+		Events    bool `env:"SUPPRESS_EVENTS"`
+		Inventory bool `env:"SUPPRESS_INVENTORY"`
+		Metrics   bool `env:"SUPPRESS_METRICS"`
+	}
 )
 
 const (
@@ -134,9 +147,13 @@ type Connector struct {
 
 	Nats `yaml:",inline"`
 
+	RetryDelays []time.Duration `env:"RETRYDELAYS" yaml:"-"`
+
 	TransportStartRndDelay int `env:"TRANSPORTSTARTRNDDELAY" yaml:"-"`
 
-	ExportProm bool `env:"EXPORTPROM" yaml:"exportProm"`
+	ExportProm bool `env:"EXPORTPROM" yaml:"-"`
+
+	ExportTransitDir string `env:"EXPORTTRANSITDIR" yaml:"-"`
 }
 
 // ConnectorDTO defines TCG Connector configuration
@@ -198,7 +215,9 @@ func (c *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
 			return fmt.Errorf("unmarshaler error: %s SecKeyEnv is empty", SecVerPrefix)
 		}
 		var encrypted []byte
-		fmt.Sscanf(c.Password, SecVerPrefix+"%x", &encrypted) //nolint:errcheck
+		if _, err := fmt.Sscanf(c.Password, SecVerPrefix+"%x", &encrypted); err != nil {
+			return err
+		}
 		decrypted, err := Decrypt(encrypted, []byte(s))
 		if err != nil {
 			return err
@@ -265,6 +284,8 @@ func defaults() Config {
 				NatsStoreMaxMsgs:       1_000_000,               // 1 000 000
 				NatsServerConfigFile:   "",
 			},
+			RetryDelays: []time.Duration{time.Second * 30, time.Second * 30, time.Second * 30, time.Second * 30, time.Second * 30,
+				time.Second * 30, time.Second * 30, time.Second * 30, time.Minute * 1, time.Minute * 5, time.Minute * 20},
 			TransportStartRndDelay: 60,
 		},
 		// create disabled connections to support partial setting with struct-path
@@ -302,10 +323,22 @@ func GetConfig() *Config {
 					Msg("could not parse config")
 			}
 		}
-		if err := applyEnv(cfg); err != nil {
+		if err := applyEnv(cfg, &Suppress); err != nil {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
+
+		logSuppress := func(b bool, str string) {
+			if b {
+				log.Error().Msgf("TCG will suppress %v due to env var is active", str)
+			}
+		}
+		logSuppress(Suppress.Downtimes, "Downtimes")
+		logSuppress(Suppress.Events, "Events")
+		logSuppress(Suppress.Inventory, "Inventory")
+		logSuppress(Suppress.Metrics, "Metrics")
+
+		nats.RetryDelays = cfg.Connector.RetryDelays
 
 		/* init logger and flush buffer */
 		cfg.initLogger()
@@ -515,4 +548,7 @@ func (cfg Config) initLogger() {
 		Logger()
 	/* adapt SDK logger */
 	sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
+	/* set as standard logger output */
+	stdlog.SetFlags(0)
+	stdlog.SetOutput(log.Logger)
 }
