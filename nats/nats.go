@@ -389,3 +389,11 @@ func Publish(subj string, data []byte, headers ...string) error {
 	}
 	return s.ncPublisher.PublishMsg(msg)
 }
+
+func IsStartedDispatcher() bool {
+	return s != nil && s.ncDispatcher != nil
+}
+
+func IsStartedServer() bool {
+	return s != nil && s.server != nil
+}

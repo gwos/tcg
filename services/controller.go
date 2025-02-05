@@ -111,7 +111,6 @@ func (controller *Controller) startController() error {
 	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
-		controller.agentStatus.Controller.Set(StatusRunning)
 		controller.srv = &http.Server{
 			Addr:         addr,
 			Handler:      router,
@@ -163,7 +162,6 @@ func (controller *Controller) startController() error {
 			}
 			break
 		}
-		controller.agentStatus.Controller.Set(StatusStopped)
 		controller.srv = nil
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
@@ -594,9 +592,11 @@ func (controller *Controller) agentIdentity(c *gin.Context) {
 // @Param   GWOS-API-TOKEN   header    string     true        "Auth header"
 func (controller *Controller) status(c *gin.Context) {
 	status := controller.Status()
-	statusDTO := ConnectorStatusDTO{Status(status.Transport.Value()), 0}
+	statusDTO := ConnectorStatusDTO{StatusStopped, 0}
 	if status.task != nil {
 		statusDTO = ConnectorStatusDTO{StatusProcessing, status.task.Idx}
+	} else if status.Transport.Value() == StatusRunning {
+		statusDTO = ConnectorStatusDTO{StatusRunning, 0}
 	}
 	c.JSON(http.StatusOK, statusDTO)
 }
