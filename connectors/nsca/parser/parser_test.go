@@ -87,7 +87,7 @@ S;1628530909;awips-demo-2;example-service-7;0;OK - example-service-7 (2021-08-09
 
 func TestBronxParser2(t *testing.T) {
 	data := []byte(
-`H;1628546296;awips-demo-2;0;UP - awips-demo-2 (2021-08-09 21:58:16 :: 1628546296) | result=21ms;;;0;
+		`H;1628546296;awips-demo-2;0;UP - awips-demo-2 (2021-08-09 21:58:16 :: 1628546296) | result=21ms;;;0;
 S;1628546296;awips-demo-2;example-service;0;OK - example-service (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
 S;1628546296;awips-demo-2;example-service-1;0;OK - example-service-1 (2021-08-09 21:58:16 :: 1628546296) | result=168ms;;;0;
 S;1628546296;awips-demo-2;example-service-2;0;OK - example-service-2 (2021-08-09 21:58:16 :: 1628546296) | result=84ms;;;0;
