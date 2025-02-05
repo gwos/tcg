@@ -121,7 +121,7 @@ func configHandler(data []byte) {
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	services.GetTransitService().RegisterExitHandler(cancel)
-	connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
+	connectors.StartPeriodic(ctxCancel, extConfig.CheckInterval, periodicHandler)
 }
 
 func periodicHandler() {

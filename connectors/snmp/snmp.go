@@ -75,8 +75,12 @@ func (connector *SnmpConnector) LoadConfig(config ExtConfig) error {
 	return nil
 }
 
-func (connector *SnmpConnector) CollectMetrics() ([]transit.MonitoredResource, []transit.InventoryResource,
-	[]transit.ResourceGroup, error) {
+func (connector *SnmpConnector) CollectMetrics() (
+	[]transit.MonitoredResource,
+	[]transit.InventoryResource,
+	[]transit.ResourceGroup,
+	error,
+) {
 	if len(connector.config.Views) > 0 {
 		devices, err := connector.nediClient.GetDevices()
 		if err != nil {
