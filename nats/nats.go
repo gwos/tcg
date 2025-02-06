@@ -32,6 +32,7 @@ var (
 	subjects = []string{"tcg.>"}
 
 	xClientURL = expvar.NewString("tcgNatsClientURL")
+	xStats     = expvar.NewMap("tcgNatsStats")
 )
 
 type state struct {

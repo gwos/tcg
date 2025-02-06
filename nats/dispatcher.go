@@ -3,6 +3,8 @@ package nats
 import (
 	"context"
 	"errors"
+	"expvar"
+	"fmt"
 	"sync"
 	"time"
 
@@ -142,10 +144,16 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 			}
 		}
 		if delayRetry != nil {
+			xk := "inRetryDelay / " + opt.Durable + " / " + opt.Subject + " / " + time.Now().UTC().Format(time.RFC3339)
+			xStats.Set(xk, expvar.Func(func() any {
+				return fmt.Sprintf("%v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry])
+			}))
+
 			select {
 			case <-ctx.Done(): // context cancelled
 			case <-time.After(RetryDelays[delayRetry.Retry]): // delay ended
 			}
+			xStats.Delete(xk)
 		}
 	}
 }
