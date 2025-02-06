@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 	"strings"
 	"sync"
 	"syscall"
@@ -763,6 +764,14 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 	router.GET("/api/v1/version", controller.version)
 
 	apiV1Debug := router.Group("/api/v1/debug")
+	apiV1Debug.GET("/config", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]any{
+			"BuildInfo": config.GetBuildInfo(),
+			"Config":    config.GetConfig(),
+			"Environ":   os.Environ(),
+			"Suppress":  config.Suppress,
+		})
+	})
 	apiV1Debug.GET("/vars", gin.WrapH(expvar.Handler()))
 	apiV1Debug.GET("/metrics", func() gin.HandlerFunc {
 		if !controller.Connector.ExportProm {
