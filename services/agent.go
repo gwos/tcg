@@ -88,7 +88,11 @@ func GetAgentService() *AgentService {
 		agentService = &AgentService{
 			Connector: &config.GetConfig().Connector,
 
-			agentStatus: NewAgentStatus(),
+			agentStatus: &AgentStatus{
+				Controller: xAgentStatusController,
+				Transport:  xAgentStatusTransport,
+				Nats:       xAgentStatusNats,
+			},
 			dsClient:    clients.DSClient{DSConnection: config.GetConfig().DSConnection.AsClient()},
 			quitChan:    make(chan struct{}, 1),
 			tracerCache: cache.New(-1, -1),
@@ -96,7 +100,18 @@ func GetAgentService() *AgentService {
 			configHandler: defaultConfigHandler,
 			exitHandler:   defaultExitHandler,
 
-			stats: NewStats(),
+			stats: &Stats{
+				BytesSent:              xStatsBytesSent,
+				MetricsSent:            xStatsMetricsSent,
+				MessagesSent:           xStatsMessagesSent,
+				ExecutionTimeInventory: xStatsExecutionTimeInventory,
+				ExecutionTimeMetrics:   xStatsExecutionTimeMetrics,
+				LastEventsRun:          xStatsLastEventsRun,
+				LastInventoryRun:       xStatsLastInventoryRun,
+				LastMetricsRun:         xStatsLastMetricsRun,
+				UpSince:                xStatsUpSince,
+				x:                      xStats,
+			},
 		}
 
 		agentService.initTracerToken()
@@ -516,7 +531,7 @@ func (service *AgentService) stopController() error {
 }
 
 func (service *AgentService) startNats() error {
-	err := nats.StartServer(nats.Config{
+	return nats.StartServer(nats.Config{
 		AckWait:            service.Connector.NatsAckWait,
 		LogColors:          service.Connector.LogColors,
 		MaxInflight:        service.Connector.NatsMaxInflight,
@@ -531,10 +546,6 @@ func (service *AgentService) startNats() error {
 
 		ConfigFile: service.Connector.NatsServerConfigFile,
 	})
-	if err == nil {
-		service.agentStatus.Nats.Set(StatusRunning)
-	}
-	return err
 }
 
 func (service *AgentService) stopNats() error {
@@ -546,7 +557,6 @@ func (service *AgentService) stopNats() error {
 	err := service.stopTransport()
 	// skip Stop Transport error checking
 	nats.StopServer()
-	service.agentStatus.Nats.Set(StatusStopped)
 	return err
 }
 
@@ -578,23 +588,14 @@ func (service *AgentService) startTransport() error {
 	}
 	service.gwClients = gwClients
 	/* Process dispatcher */
-	if sdErr := nats.StartDispatcher(makeSubscriptions(service.gwClients)); sdErr == nil {
-		service.agentStatus.Transport.Set(StatusRunning)
-	} else {
-		return sdErr
-	}
-	return nil
+	return nats.StartDispatcher(makeSubscriptions(service.gwClients))
 }
 
 func (service *AgentService) stopTransport() error {
 	if service.agentStatus.Transport.Value() == StatusStopped {
 		return nil
 	}
-	if err := nats.StopDispatcher(); err != nil {
-		return err
-	}
-	service.agentStatus.Transport.Set(StatusStopped)
-	return nil
+	return nats.StopDispatcher()
 }
 
 // mixTracerContext adds `context` field if absent

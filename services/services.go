@@ -11,16 +11,46 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/logzer"
+	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/taskqueue"
 	"go.opentelemetry.io/otel/trace"
 )
 
+func init() {
+	expvar.Publish("tcgAgentStatusController", xAgentStatusController)
+	expvar.Publish("tcgAgentStatusTransport", xAgentStatusTransport)
+	expvar.Publish("tcgAgentStatusNats", xAgentStatusNats)
+
+	xStatsLastEventsRun.Set(-1)
+	xStatsLastInventoryRun.Set(-1)
+	xStatsLastMetricsRun.Set(-1)
+	xStatsUpSince.Set(time.Now().UnixMilli())
+	xStats.Set("uptime", expvar.Func(func() any {
+		return time.Since(time.UnixMilli(xStatsUpSince.Value())).Round(time.Second).String()
+	}))
+}
+
 var (
 	// export debug info AgentStatus
-	xAgentStatusController = expvar.NewString("tcgAgentStatusController")
-	xAgentStatusTransport  = expvar.NewString("tcgAgentStatusTransport")
-	xAgentStatusNats       = expvar.NewString("tcgAgentStatusNats")
+	xAgentStatusController = expvar.Func(func() any {
+		if controller != nil && controller.srv != nil {
+			return StatusRunning
+		}
+		return StatusStopped
+	})
+	xAgentStatusTransport = expvar.Func(func() any {
+		if nats.IsStartedDispatcher() {
+			return StatusRunning
+		}
+		return StatusStopped
+	})
+	xAgentStatusNats = expvar.Func(func() any {
+		if nats.IsStartedServer() {
+			return StatusRunning
+		}
+		return StatusStopped
+	})
 
 	// export debug info Stats
 	xStatsBytesSent              = expvar.NewInt("tcgStatsBytesSent")
@@ -71,29 +101,6 @@ type Stats struct {
 	UpSince                *expvar.Int
 	// x handles different counters for debug
 	x *expvar.Map
-}
-
-func NewStats() *Stats {
-	p := &Stats{
-		BytesSent:              xStatsBytesSent,
-		MetricsSent:            xStatsMetricsSent,
-		MessagesSent:           xStatsMessagesSent,
-		ExecutionTimeInventory: xStatsExecutionTimeInventory,
-		ExecutionTimeMetrics:   xStatsExecutionTimeMetrics,
-		LastEventsRun:          xStatsLastEventsRun,
-		LastInventoryRun:       xStatsLastInventoryRun,
-		LastMetricsRun:         xStatsLastMetricsRun,
-		UpSince:                xStatsUpSince,
-		x:                      xStats,
-	}
-	p.LastEventsRun.Set(-1)
-	p.LastInventoryRun.Set(-1)
-	p.LastMetricsRun.Set(-1)
-	p.UpSince.Set(time.Now().UnixMilli())
-	p.x.Set("uptime", expvar.Func(func() interface{} {
-		return time.Since(time.UnixMilli(p.UpSince.Value())).Round(time.Second).String()
-	}))
-	return p
 }
 
 func (p Stats) MarshalJSON() ([]byte, error) {
@@ -167,23 +174,11 @@ func (p AgentStatsExt) MarshalJSON() ([]byte, error) {
 // AgentStatus defines TCG Agent status
 // exports debug info
 type AgentStatus struct {
+	Controller expvar.Func
+	Transport  expvar.Func
+	Nats       expvar.Func
+
 	task *taskqueue.Task
-
-	Controller *expvar.String
-	Transport  *expvar.String
-	Nats       *expvar.String
-}
-
-func NewAgentStatus() *AgentStatus {
-	p := &AgentStatus{
-		Controller: xAgentStatusController,
-		Transport:  xAgentStatusTransport,
-		Nats:       xAgentStatusNats,
-	}
-	p.Controller.Set(StatusStopped)
-	p.Transport.Set(StatusStopped)
-	p.Nats.Set(StatusStopped)
-	return p
 }
 
 func (p AgentStatus) String() string {

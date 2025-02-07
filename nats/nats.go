@@ -32,6 +32,7 @@ var (
 	subjects = []string{"tcg.>"}
 
 	xClientURL = expvar.NewString("tcgNatsClientURL")
+	xStats     = expvar.NewMap("tcgNatsStats")
 )
 
 type state struct {
@@ -388,4 +389,12 @@ func Publish(subj string, data []byte, headers ...string) error {
 		msg.Header.Add(headers[i], headers[i+1])
 	}
 	return s.ncPublisher.PublishMsg(msg)
+}
+
+func IsStartedDispatcher() bool {
+	return s != nil && s.ncDispatcher != nil
+}
+
+func IsStartedServer() bool {
+	return s != nil && s.server != nil
 }
