@@ -17,15 +17,17 @@ const (
 	WSAETIMEDOUT    syscall.Errno = 10060
 )
 
-// define error types for retry logic
 var (
 	ErrPermanent = errors.New("permanent error")
 	ErrTransient = errors.New("transient error")
 
+	// error types for dispatcher retry logic
 	ErrGateway      = fmt.Errorf("%w: %v", ErrTransient, "gateway error")
 	ErrSynchronizer = fmt.Errorf("%w: %v", ErrTransient, "synchronizer error")
 	ErrUnauthorized = fmt.Errorf("%w: %v", ErrPermanent, "unauthorized")
 	ErrUndecided    = fmt.Errorf("%w: %v", ErrPermanent, "undecided error")
+
+	ErrNotConfigured = fmt.Errorf("%w: %v", ErrPermanent, "connector is not configured")
 )
 
 /* for docs only
