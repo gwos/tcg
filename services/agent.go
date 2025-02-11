@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
+	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/taskqueue"
 	"github.com/gwos/tcg/tracing"
@@ -565,9 +567,13 @@ func (service *AgentService) startTransport() error {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
+		err := fmt.Errorf("%w: AppType/AgentID: %v/%v", tcgerr.ErrNotConfigured,
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not start")
+		if strings.EqualFold(service.Connector.AppType, "NAGIOS") {
+			// prevent DataGeyser fail on restart with empty config
+			return nil
+		}
 		return err
 	}
 	/* Process clients */
@@ -628,7 +634,7 @@ func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-		err := fmt.Errorf("connector is not configured: AppType/AgentID: %v/%v",
+		err := fmt.Errorf("%w: AppType/AgentID: %v/%v", tcgerr.ErrNotConfigured,
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not fixTracerContext")
 		return payloadJSON
