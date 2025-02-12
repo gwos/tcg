@@ -212,6 +212,12 @@ func (controller *Controller) config(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, "could not unmarshal connector dto")
 		return
 	}
+	if config.GetConfig().IsPMC() &&
+		dto.DSConnection.HostName != os.Getenv(config.ParentInstanceNameEnv) {
+		log.Err(err).Str("payload", string(payload)).Msg("wrong PMC connector config")
+		c.JSON(http.StatusBadRequest, "wrong PMC connector config")
+		return
+	}
 	/* process payload */
 	task, err := controller.taskQueue.PushAsync(taskConfig, payload)
 	if err != nil {
@@ -616,11 +622,6 @@ func (controller *Controller) version(c *gin.Context) {
 }
 
 func (controller *Controller) checkAccess(c *gin.Context) {
-	if config.GetConfig().IsConfiguringPMC() {
-		log.Info().Str("url", c.Request.URL.Redacted()).
-			Msg("omit access check on configuring PARENT_MANAGED_CHILD")
-		return
-	}
 	if len(controller.dsClient.HostName) == 0 && len(controller.gwClients) == 0 {
 		log.Info().Str("url", c.Request.URL.Redacted()).
 			Msg("omit access check on empty config")

@@ -45,6 +45,8 @@ const (
 	InstallationModeP   = "PARENT"
 	InstallationModeS   = "STANDALONE"
 
+	ParentInstanceNameEnv = "PARENT_INSTANCE_NAME"
+
 	SecVerPrefix = "_v1_"
 )
 
@@ -327,6 +329,10 @@ func GetConfig() *Config {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
+		if cfg.IsPMC() {
+			cfg.Connector.InstallationMode = InstallationModePMC
+			cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+		}
 
 		logSuppress := func(b bool, str string) {
 			if b {
@@ -479,8 +485,9 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	}
 
 	/* process PMC */
-	if cfg.IsConfiguringPMC() {
+	if cfg.IsPMC() {
 		newCfg.Connector.InstallationMode = InstallationModePMC
+		newCfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
 	}
 	/* prepare gwConnections */
 	gwEncode := strings.ToLower(newCfg.Connector.GWEncode)
@@ -500,10 +507,9 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	return dto, nil
 }
 
-// IsConfiguringPMC checks configuration stage
-func (cfg *Config) IsConfiguringPMC() bool {
-	return os.Getenv(InstallationModeEnv) == InstallationModePMC &&
-		cfg.Connector.InstallationMode != InstallationModePMC
+// IsPMC checks configuration
+func (cfg *Config) IsPMC() bool {
+	return os.Getenv(InstallationModeEnv) == InstallationModePMC
 }
 
 // InitTracerProvider inits provider
