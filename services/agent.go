@@ -141,11 +141,11 @@ func (service *AgentService) DemandConfig() error {
 	if err := service.StartController(); err != nil {
 		return err
 	}
-	if config.GetConfig().IsConfiguringPMC() {
-		log.Info().Msg("configuring PARENT_MANAGED_CHILD")
-		/* expect the config api call */
-		return nil
-	}
+	// if config.GetConfig().IsPMC() {
+	// 	log.Info().Msg("configuring PARENT_MANAGED_CHILD")
+	// 	/* expect the config api call */
+	// 	return nil
+	// }
 	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
 		log.Info().Msg("config server is not configured")
 		/* expect the config api call */
