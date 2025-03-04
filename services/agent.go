@@ -155,7 +155,7 @@ func (service *AgentService) DemandConfig() error {
 	go func() {
 		for i := 0; ; i++ {
 			if err := service.dsClient.Reload(service.AgentID); err != nil {
-				log.Err(err).Msg("config server is not available")
+				log.Warn().Err(err).Msg("config server is not available, will retry")
 				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
 				continue
 			}
