@@ -3,10 +3,6 @@ run:
   build-tags:
     - codeanalysis
 
-govet:
-  enable:
-    - fieldalignment
-
 linters:
   disable-all: false
   enable:

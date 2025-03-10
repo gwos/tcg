@@ -171,7 +171,7 @@ func (client *GWClient) connectLocal() (string, error) {
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not connect local groundwork", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -224,7 +224,7 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not authenticate password", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -286,7 +286,7 @@ func (client *GWClient) Disconnect() error {
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not disconnect groundwork", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return err
@@ -352,7 +352,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	}
 
 	sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not validate groundwork token", req.LogAttrs()...)
-	if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+	if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
 	return err
@@ -549,7 +549,7 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return nil, err
