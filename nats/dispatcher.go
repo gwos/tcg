@@ -161,7 +161,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
-		log.Warn().Err(err).Any("msg", *msg).
+		log.Warn().Err(err).Str("msg", fmt.Sprintf("%+v", *msg)).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Metadata")
 		return nil
@@ -172,7 +172,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 			return func(e *zerolog.Event) {
 				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
 				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
-				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+				e.Int64("nats.meta.timestamp", meta.Timestamp.UnixMilli())
 			}
 		}
 		return func(e *zerolog.Event) {}
@@ -183,7 +183,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 			log.Warn().Func(logDetailsFn(true)).
 				Uint64("done.sequence", seq).
 				Str("durable", opt.Durable).
-				Any("nats.msg.headers", msg.Header).
+				Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 				Msg("dispatcher lost order")
 		}
 	}
@@ -193,14 +193,14 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher delivered")
 		return nil
 	}
 	if !errors.Is(err, tcgerr.ErrTransient) {
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher could not deliver: will not retry")
 		return nil
 	}
@@ -221,7 +221,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 		d.retries.Delete(opt.Durable)
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher could not deliver: stop retrying")
 		return nil
 	}
@@ -230,7 +230,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 	log.Info().Err(err).Func(logDetailsFn()).
 		Int("retry", retry.Retry).
 		Str("durable", opt.Durable).
-		Any("nats.msg.headers", msg.Header).
+		Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 		Msg("dispatcher could not deliver: will retry")
 
 	return retry
