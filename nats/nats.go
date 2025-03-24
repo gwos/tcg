@@ -113,7 +113,7 @@ func StartServer(config Config) error {
 		} else {
 			log.Warn().
 				Err(err).
-				Any("natsOpts", *opts).
+				Str("natsOpts", fmt.Sprintf("%+v", *opts)).
 				Msg("nats failed NewServer")
 			return err
 		}
@@ -126,7 +126,7 @@ func StartServer(config Config) error {
 	log.Info().
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.Any("natsOpts", *opts)
+				e.Str("natsOpts", fmt.Sprintf("%+v", *opts))
 			}
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
@@ -216,22 +216,22 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 		u, errUsage := disk.Usage(s.config.StoreDir)
 		if errUsage != nil {
 			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", errUsage).
+				Str("config", fmt.Sprintf("%+v", *newCfg)).
+				Str("diskUsage", errUsage.Error()).
 				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
 			return err
 		}
 		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
 			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", u).
+				Str("config", fmt.Sprintf("%+v", *newCfg)).
+				Str("diskUsage", fmt.Sprintf("%+v", *u)).
 				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
 			return err
 		}
 		if u.Free < 1024*1024 {
 			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", u).
+				Str("config", fmt.Sprintf("%+v", *newCfg)).
+				Str("diskUsage", fmt.Sprintf("%+v", *u)).
 				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
 			return err
 		}
@@ -241,16 +241,16 @@ func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error
 		newCfg.MaxBytes = mb
 		_, err2 := fn(newCfg)
 		log.Err(err2).
-			Any("originalError", err).
-			Any("originalConfig", origCfg).
-			Any("reducedMaxBytes", mb).
-			Any("disk.Free", u.Free).
+			Str("originalError", err.Error()).
+			Str("originalConfig", fmt.Sprintf("%+v", origCfg)).
+			Int64("reducedMaxBytes", mb).
+			Uint64("disk.Free", u.Free).
 			Msgf("nats retrying %v with smaller storage", fnDesc)
 		return err2
 	}
 
 	log.Err(err).
-		Any("config", *newCfg).
+		Str("config", fmt.Sprintf("%+v", *newCfg)).
 		Msgf("nats %v", fnDesc)
 	return err
 }
