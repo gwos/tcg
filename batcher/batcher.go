@@ -3,6 +3,7 @@ package batcher
 import (
 	"bytes"
 	"context"
+	"expvar"
 	"math"
 	"reflect"
 	"sync"
@@ -12,6 +13,8 @@ import (
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/trace"
 )
+
+var xStats = expvar.NewMap("tcgStatsBatcher")
 
 // BatchBuilder defines builder interface
 type BatchBuilder interface {
@@ -39,6 +42,7 @@ type Batcher struct {
 	traceCtx   context.Context
 	traceSpan  trace.Span
 	tracerName string
+	xBatchedAt *expvar.Int
 }
 
 // NewBatcher returns new instance
@@ -61,8 +65,11 @@ func NewBatcher(
 		handler: bh,
 
 		tracerName: "batcher:" + reflect.TypeOf(bb).String(),
+		xBatchedAt: new(expvar.Int),
 	}
 	bt.traceCtx, bt.traceSpan = tracing.StartTraceSpan(context.Background(), bt.tracerName, "batching")
+	bt.xBatchedAt.Set(-1)
+	xStats.Set(bt.tracerName+":batchedAt", bt.xBatchedAt)
 
 	/* handle ticker */
 	go func() {
@@ -89,6 +96,10 @@ func (bt *Batcher) Add(p []byte) {
 	// 	attribute.String("payload", string(p)), // cannot wrap if debug
 	// ))
 	_, span := tracing.StartTraceSpan(bt.traceCtx, bt.tracerName, "batcher:Add")
+	log.Trace().Str("bt.tracerName", bt.tracerName).
+		RawJSON("payload", p).
+		Int("payloadLen", len(p)).
+		Msg("Batcher.Add")
 
 	bt.buf = append(bt.buf, p)
 	bt.bufSize += len(p)
@@ -100,14 +111,16 @@ func (bt *Batcher) Add(p []byte) {
 
 	bt.mu.Unlock()
 	if bt.bufSize > bt.maxBytes {
-		log.Debug().Msgf("batch buffer size %dKB exceeded the soft limit %dKB",
-			bt.bufSize/1024, bt.maxBytes/1024)
+		log.Trace().Str("bt.tracerName", bt.tracerName).
+			Msgf("batch buffer size %dKB exceeded the soft limit %dKB",
+				bt.bufSize/1024, bt.maxBytes/1024)
 		bt.Batch()
 	}
 }
 
 // Batch processes buffered payloads
 func (bt *Batcher) Batch() {
+	bt.xBatchedAt.Set(time.Now().UnixMilli())
 	bt.mu.Lock()
 
 	buf, bufSize := bt.buf, bt.bufSize
@@ -133,10 +146,21 @@ func (bt *Batcher) Batch() {
 			}()
 
 			bt.builder.Build(&buf, bt.maxBytes)
+			log.Trace().Str("bt.tracerName", bt.tracerName).
+				RawJSON("buf", append(append([]byte("["), bytes.Join(buf, []byte(","))...), ']')).
+				Int("bufferLen", len(buf)).
+				Int("bufferSize", bufSize).
+				Int("maxBytes", bt.maxBytes).
+				Msg("Batcher.Batch")
 			if len(buf) > 0 {
 				for _, p := range buf {
 					if len(p) > 0 {
-						_ = bt.handler(ctx, p)
+						if err := bt.handler(ctx, p); err != nil {
+							log.Err(err).Str("bt.tracerName", bt.tracerName).
+								RawJSON("payload", p).
+								Int("payloadLen", len(p)).
+								Msg("Batcher.Batch handler")
+						}
 					}
 				}
 			}
@@ -151,6 +175,7 @@ func (bt *Batcher) Exit() {
 
 // Reset applies configuration
 func (bt *Batcher) Reset(d time.Duration, maxBytes int) {
+	log.Trace().Str("bt.tracerName", bt.tracerName).Msg("Batcher.Reset")
 	bt.Batch()
 	bt.maxBytes = maxBytes
 	if d == 0 {
