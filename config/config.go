@@ -59,10 +59,11 @@ const (
 	Warn
 	Info
 	Debug
+	Trace
 )
 
 func (l LogLevel) String() string {
-	return [...]string{"Error", "Warn", "Info", "Debug"}[l]
+	return [...]string{"Error", "Warn", "Info", "Debug", "Trace"}[l]
 }
 
 type Nats struct {
@@ -524,7 +525,10 @@ func (cfg Config) Hashsum() ([]byte, error) {
 }
 
 func (cfg Config) initLogger() {
-	lvl := [...]zerolog.Level{3, 2, 1, 0}[cfg.Connector.LogLevel]
+	if cfg.Connector.LogLevel > 4 {
+		cfg.Connector.LogLevel = 4
+	}
+	lvl := [...]zerolog.Level{3, 2, 1, 0, -1}[cfg.Connector.LogLevel]
 	opts := []logzer.Option{
 		logzer.WithLastErrors(10),
 		logzer.WithLevel(lvl),
