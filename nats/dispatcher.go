@@ -106,6 +106,11 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 }
 
 func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Subscription) {
+	xFetchedAt, xProcessedAt := new(expvar.Int), new(expvar.Int)
+	xFetchedAt.Set(-1)
+	xProcessedAt.Set(-1)
+	xStats.Set(opt.Durable+":fetchedAt", xFetchedAt)
+	xStats.Set(opt.Durable+":processedAt", xProcessedAt)
 	for {
 		select {
 		case <-ctx.Done():
@@ -123,19 +128,35 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 			continue
 		}
 
+		if len(msgs) == 0 {
+			continue
+		}
+		xFetchedAt.Set(time.Now().UnixMilli())
+
 		// Process fetched messages and delay next fetching in case of transient error
 		var delayRetry *dispatcherRetry
 		for _, msg := range msgs {
 			if msg.Subject != opt.Subject {
 				// TODO: resolve this redundant case
 				_ = msg.Ack()
+
+				log.Trace().
+					Str("durable", opt.Durable).
+					Str("msg.Subject", msg.Subject).
+					Str("opt.Subject", opt.Subject).
+					Msg("dispatcher skipping: msg.Subject != opt.Subject")
 				continue
 			}
 			if delayRetry != nil {
 				_ = msg.Nak()
+
+				log.Trace().
+					Str("durable", opt.Durable).
+					Msg("dispatcher skipping: delayRetry != nil")
 				continue
 			}
 
+			xProcessedAt.Set(time.Now().UnixMilli())
 			delayRetry = d.processMsg(ctx, opt, msg)
 			if delayRetry != nil {
 				_ = msg.Nak()
@@ -148,6 +169,12 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 			xStats.Set(xk, expvar.Func(func() any {
 				return fmt.Sprintf("%v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry])
 			}))
+
+			log.Debug().
+				Str("xk", xk).
+				Int("retry", delayRetry.Retry).
+				Str("delay", RetryDelays[delayRetry.Retry].String()).
+				Msg("dispatcher delaying retry")
 
 			select {
 			case <-ctx.Done(): // context cancelled
