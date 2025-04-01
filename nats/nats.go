@@ -138,16 +138,10 @@ func StartServer(config Config) error {
 	}
 	s.ncPublisher = nc
 
-	return defineStream(nc, streamName, subjects)
+	return defineStream(nc)
 }
 
-func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
-	js, err := nc.JetStream(nats.DirectGet())
-	if err != nil {
-		log.Warn().Err(err).Msg("nats failed JetStream")
-		return err
-	}
-
+func defineStream(nc *nats.Conn) error {
 	storage := func(arg string) nats.StorageType {
 		switch strings.ToUpper(arg) {
 		case "MEMORY":
@@ -167,90 +161,70 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		Retention:   nats.LimitsPolicy,
 	}
 
+	js, err := nc.JetStream(nats.DirectGet())
+	if err != nil {
+		log.Err(err).Msg("nats failed JetStream")
+		return err
+	}
+
+	fn, fnDesc := js.UpdateStream, "UpdateStream"
 	if info, err := js.StreamInfo(streamName); err == nil {
-		if err := doStream(js, &info.Config, &sc); err != nil {
-			return err
+		if equalStreamConfig(sc, info.Config) {
+			return nil
 		}
 	} else if err == nats.ErrStreamNotFound {
-		if err := doStream(js, nil, &sc); err != nil {
-			return err
-		}
+		fn, fnDesc = js.AddStream, "AddStream"
 	} else {
 		log.Err(err).Msg("nats failed StreamInfo")
 		return err
 	}
 
-	return nil
-}
-
-func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error {
-	fn, fnDesc := js.AddStream, "AddStream"
-	if curCfg != nil {
-		if equalStreamConfig(*curCfg, *newCfg) {
-			return nil
-		}
-		fn, fnDesc = js.UpdateStream, "UpdateStream"
+	_, err = fn(&sc)
+	if err == nil {
+		return nil
+	} else if !isJSStorageErr(err) || sc.Storage != nats.FileStorage {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Msgf("nats failed %v", fnDesc)
+		return err
 	}
 
-	_, err := fn(newCfg)
-
-	chkAPIErr := func(err error) bool {
-		// Note: there is some inconsistency in public nats constants
-		codes := map[nats.ErrorCode]string{
-			10023: "nats.JSErrCodeInsufficientResourcesErr",
-			10047: "nats.JSStorageResourcesExceededErr", // missed as public const
-		}
-		var apiErr *nats.APIError
-		if errors.As(err, &apiErr) {
-			_, ok := codes[apiErr.ErrorCode]
-			return ok
-		}
-		return false
+	/* retry with smaller storage, 5/8 that smaller then 3/4
+	NATS Server allows up to 75% of available storage.
+	https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
+	u, errUsage := disk.Usage(s.config.StoreDir)
+	if errUsage != nil {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", errUsage.Error()).
+			Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+		return err
+	}
+	if u.Free/8*5 > uint64(sc.MaxBytes) {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", fmt.Sprintf("%+v", *u)).
+			Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
+		return err
+	}
+	if u.Free < 1024*1024 {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", fmt.Sprintf("%+v", *u)).
+			Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
+		return err
 	}
 
-	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
-		/* retry with smaller storage, 5/8 that smaller then 3/4
-		NATS Server allows up to 75% of available storage.
-		https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
-		u, errUsage := disk.Usage(s.config.StoreDir)
-		if errUsage != nil {
-			log.Err(err).
-				Str("config", fmt.Sprintf("%+v", *newCfg)).
-				Str("diskUsage", errUsage.Error()).
-				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
-			return err
-		}
-		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
-			log.Err(err).
-				Str("config", fmt.Sprintf("%+v", *newCfg)).
-				Str("diskUsage", fmt.Sprintf("%+v", *u)).
-				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
-			return err
-		}
-		if u.Free < 1024*1024 {
-			log.Err(err).
-				Str("config", fmt.Sprintf("%+v", *newCfg)).
-				Str("diskUsage", fmt.Sprintf("%+v", *u)).
-				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
-			return err
-		}
-
-		mb := int64(u.Free) / 8 * 5
-		origCfg := *newCfg
-		newCfg.MaxBytes = mb
-		_, err2 := fn(newCfg)
-		log.Err(err2).
-			Str("originalError", err.Error()).
-			Str("originalConfig", fmt.Sprintf("%+v", origCfg)).
-			Int64("reducedMaxBytes", mb).
-			Uint64("disk.Free", u.Free).
-			Msgf("nats retrying %v with smaller storage", fnDesc)
-		return err2
-	}
-
+	origCfg, origErr := sc, err
+	mb := int64(u.Free) / 8 * 5
+	sc.MaxBytes = mb
+	_, err = fn(&sc)
 	log.Err(err).
-		Str("config", fmt.Sprintf("%+v", *newCfg)).
-		Msgf("nats %v", fnDesc)
+		Str("originalError", origErr.Error()).
+		Str("originalConfig", fmt.Sprintf("%+v", origCfg)).
+		Int64("reducedMaxBytes", mb).
+		Uint64("disk.Free", u.Free).
+		Msgf("nats retrying %v with smaller storage", fnDesc)
 	return err
 }
 
@@ -258,24 +232,21 @@ func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
 	return c1.MaxAge == c2.MaxAge &&
 		c1.MaxBytes == c2.MaxBytes &&
 		c1.MaxMsgs == c2.MaxMsgs &&
-		c1.Storage == c2.Storage &&
-		equalStrs(c1.Subjects, c2.Subjects)
+		c1.Storage == c2.Storage
 }
 
-func equalStrs(ss1, ss2 []string) bool {
-	if len(ss1) != len(ss2) {
-		return false
+func isJSStorageErr(err error) bool {
+	// Note: there is some inconsistency in public nats constants
+	codes := map[nats.ErrorCode]string{
+		10023: "nats.JSErrCodeInsufficientResourcesErr",
+		10047: "nats.JSStorageResourcesExceededErr", // missed as public const
 	}
-	ms := make(map[string]bool, len(ss1))
-	for _, s := range ss1 {
-		ms[s] = false
+	var apiErr *nats.APIError
+	if errors.As(err, &apiErr) {
+		_, ok := codes[apiErr.ErrorCode]
+		return ok
 	}
-	for _, s := range ss2 {
-		if _, ok := ms[s]; !ok {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 // StopServer shutdowns NATS
