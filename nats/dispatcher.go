@@ -87,7 +87,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 	}
 
 	sub, err := js.PullSubscribe(
-		opt.Subject, opt.Durable,
+		"", opt.Durable,
 
 		nats.Bind(streamName, opt.Durable),
 		// nats.BindStream(streamName),
@@ -136,17 +136,6 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 		// Process fetched messages and delay next fetching in case of transient error
 		var delayRetry *dispatcherRetry
 		for _, msg := range msgs {
-			if msg.Subject != opt.Subject {
-				// TODO: resolve this redundant case
-				_ = msg.Ack()
-
-				log.Trace().
-					Str("durable", opt.Durable).
-					Str("msg.Subject", msg.Subject).
-					Str("opt.Subject", opt.Subject).
-					Msg("dispatcher skipping: msg.Subject != opt.Subject")
-				continue
-			}
 			if delayRetry != nil {
 				_ = msg.Nak()
 
@@ -165,7 +154,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 			}
 		}
 		if delayRetry != nil {
-			xk := "inRetryDelay / " + opt.Durable + " / " + opt.Subject + " / " + time.Now().UTC().Format(time.RFC3339)
+			xk := "inRetryDelay / " + opt.Durable + " / " + time.Now().UTC().Format(time.RFC3339)
 			xStats.Set(xk, expvar.Func(func() any {
 				return fmt.Sprintf("%v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry])
 			}))
