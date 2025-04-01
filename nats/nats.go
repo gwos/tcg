@@ -285,11 +285,17 @@ func StopServer() {
 	defer s.Unlock()
 
 	if s.ncPublisher != nil {
-		s.ncPublisher.Close()
+		if err := s.ncPublisher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats publisher connection")
+			s.ncPublisher.Close()
+		}
 		s.ncPublisher = nil
 	}
 	if s.ncDispatcher != nil {
-		s.ncDispatcher.Close()
+		if err := s.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+			s.ncDispatcher.Close()
+		}
 		s.ncDispatcher = nil
 	}
 	if s.server != nil {
@@ -344,12 +350,22 @@ func StopDispatcher() error {
 		d.cancel()
 		d.cancel = nil
 	}
+
+	ze := log.Info()
 	if d.ncDispatcher != nil {
-		d.ncDispatcher.Close()
+		if js, err := d.ncDispatcher.JetStream(); err == nil {
+			if info, err := js.StreamInfo(streamName); err == nil {
+				ze = ze.Str("streamState", fmt.Sprintf("%+v", info.State))
+			}
+		}
+		if err := d.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+			d.ncDispatcher.Close()
+		}
 		d.ncDispatcher = nil
 	}
 
-	log.Info().Msg("dispatcher stopped")
+	ze.Msg("dispatcher stopped")
 	return nil
 }
 
