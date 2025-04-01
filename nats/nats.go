@@ -65,7 +65,6 @@ type Config struct {
 // DurableCfg defines subscription
 type DurableCfg struct {
 	Durable string
-	Subject string
 	Handler func(context.Context, NatsMsg) error
 }
 

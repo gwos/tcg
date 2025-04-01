@@ -63,18 +63,18 @@ func getCtx(ctx context.Context, sc trace.SpanContext) context.Context {
 	return ctx
 }
 
-func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byte) error) nats.DurableCfg {
+func makeDurable(durable string, handleWithCtx func(context.Context, []byte) error) nats.DurableCfg {
 	for _, s := range []string{"/", ".", "*", ">"} {
 		durable = strings.ReplaceAll(durable, s, "")
 	}
 	return nats.DurableCfg{
 		Durable: durable,
-		Subject: subj,
 		Handler: func(ctx context.Context, msg nats.NatsMsg) error {
 			var (
 				err     error
 				data    = msg.Data
 				headers = msg.Header
+				subject = msg.Subject
 				sCtxCfg = trace.SpanContextConfig{}
 				spanID  []byte
 				traceID []byte
@@ -113,7 +113,7 @@ func makeDurable(durable, subj string, handleWithCtx func(context.Context, []byt
 					tracing.TraceAttrPayloadLen(data),
 					tracing.TraceAttrStr("type", headers.Get(clients.HdrPayloadType)),
 					tracing.TraceAttrStr("durable", durable),
-					tracing.TraceAttrStr("subject", subj),
+					tracing.TraceAttrStr("subject", subject),
 				)
 			}()
 
@@ -149,23 +149,10 @@ func makeSubscriptions(gwClients []clients.GWClient) []nats.DurableCfg {
 	for i := range gwClients {
 		// gwClient := gwClient /* hold loop var copy */
 		gwClient := &gwClients[i]
-		subs = append(subs,
-			makeDurable(
-				fmt.Sprintf("#%s#%s#", subjDowntimes, gwClient.HostName),
-				subjDowntimes,
-				adaptClient(gwClient),
-			),
-			makeDurable(
-				fmt.Sprintf("#%s#%s#", subjEvents, gwClient.HostName),
-				subjEvents,
-				adaptClient(gwClient),
-			),
-			makeDurable(
-				fmt.Sprintf("#%s#%s#", subjInventoryMetrics, gwClient.HostName),
-				subjInventoryMetrics,
-				adaptClient(gwClient),
-			),
-		)
+		subs = append(subs, makeDurable(
+			fmt.Sprintf("#%s#", gwClient.HostName),
+			adaptClient(gwClient),
+		))
 	}
 	return subs
 }
