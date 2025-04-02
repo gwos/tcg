@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"expvar"
 	"fmt"
 	"runtime"
 	"testing"
@@ -158,7 +159,7 @@ func BenchmarkE2E(b *testing.B) {
 		time.Sleep(5 * time.Second) // time for batcher + dispatcher
 		runtime.GC()
 		printMemStats()
-		printTcgStats()
+		printExpvar()
 
 		if transitService.BatchMaxBytes == 0 {
 			if cnt, dc := b.N*TestResourcesCount*TestResourcesCount, transitService.Stats().MessagesSent.Value()-m0; dc != int64(cnt) {
@@ -223,6 +224,9 @@ func memstats() any {
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
 }
-func printTcgStats() {
-	println("\n~", time.Now().Format(time.DateTime), "TCG_STATS", fmt.Sprintf("%+v", services.GetTransitService().Stats()))
+func printExpvar() {
+	// println("\n~", time.Now().Format(time.DateTime), "TCG_STATS", fmt.Sprintf("%+v", services.GetTransitService().Stats()))
+	buf := new(bytes.Buffer)
+	expvar.Do(func(kv expvar.KeyValue) { fmt.Fprintln(buf, kv.Key+": "+kv.Value.String()) })
+	println("\n~", time.Now().Format(time.DateTime), "TCG_EXPVAR", "\n", buf.String())
 }

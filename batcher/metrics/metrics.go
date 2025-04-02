@@ -70,7 +70,7 @@ func (bld *MetricsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 			continue
 		}
 		log.Err(err).
-			Any("resources", q).
+			Str("resources", fmt.Sprintf("%+v", q)).
 			Msg("could not marshal resources")
 	}
 }

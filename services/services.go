@@ -182,7 +182,7 @@ type AgentStatus struct {
 }
 
 func (p AgentStatus) String() string {
-	return fmt.Sprintf("[Nats:%v Transport:%v Controller:%v]",
+	return fmt.Sprintf("{Nats:%v Transport:%v Controller:%v}",
 		p.Nats.Value(), p.Transport.Value(), p.Controller.Value())
 }
 

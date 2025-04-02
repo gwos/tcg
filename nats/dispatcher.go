@@ -60,43 +60,44 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 		nats.DirectGet(),
 	)
 	if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed JetStream")
 		return
 	}
 
-	if _, err := js.ConsumerInfo(streamName, opt.Durable); errors.Is(err, nats.ErrConsumerNotFound) {
-		if _, err = js.AddConsumer(streamName, &nats.ConsumerConfig{
-			// AckWait:       d.config.AckWait,
+	consumerName, durableName := opt.Durable, opt.Durable
+	if _, err := js.ConsumerInfo(streamName, consumerName); errors.Is(err, nats.ErrConsumerNotFound) {
+		if _, err := js.AddConsumer(streamName, &nats.ConsumerConfig{
+			AckWait:       d.config.AckWait,
 			AckPolicy:     nats.AckExplicitPolicy,
 			DeliverPolicy: nats.DeliverLastPolicy,
-			Durable:       opt.Durable,
-			Name:          opt.Durable,
+			Durable:       durableName,
+			Name:          consumerName,
 		}); err != nil {
-			log.Warn().Err(err).
+			log.Err(err).
 				Str("durable", opt.Durable).
 				Msg("nats dispatcher failed AddConsumer")
 			return
 		}
 	} else if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed ConsumerInfo")
 		return
 	}
 
 	sub, err := js.PullSubscribe(
-		opt.Subject, opt.Durable,
+		"", durableName,
 
-		nats.Bind(streamName, opt.Durable),
+		nats.Bind(streamName, consumerName),
 		// nats.BindStream(streamName),
 		// nats.Durable(opt.Durable),
-		// nats.AckWait(d.config.AckWait),
+		nats.AckWait(d.config.AckWait),
 		nats.ManualAck(),
 	)
 	if err != nil {
-		log.Warn().Err(err).
+		log.Err(err).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Subscribe")
 		return
@@ -106,6 +107,11 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 }
 
 func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Subscription) {
+	xFetchedAt, xProcessedAt := new(expvar.Int), new(expvar.Int)
+	xFetchedAt.Set(-1)
+	xProcessedAt.Set(-1)
+	xStats.Set(opt.Durable+":fetchedAt", xFetchedAt)
+	xStats.Set(opt.Durable+":processedAt", xProcessedAt)
 	for {
 		select {
 		case <-ctx.Done():
@@ -117,25 +123,30 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 		// using a batch size of more than 1 allows for higher throughput when needed.
 		msgs, err := sub.Fetch(4, nats.Context(ctx))
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			log.Warn().Err(err).
+			log.Err(err).
 				Str("durable", opt.Durable).
 				Msg("nats dispatcher failed Fetch")
 			continue
 		}
 
+		if len(msgs) == 0 {
+			continue
+		}
+		xFetchedAt.Set(time.Now().UnixMilli())
+
 		// Process fetched messages and delay next fetching in case of transient error
 		var delayRetry *dispatcherRetry
 		for _, msg := range msgs {
-			if msg.Subject != opt.Subject {
-				// TODO: resolve this redundant case
-				_ = msg.Ack()
-				continue
-			}
 			if delayRetry != nil {
 				_ = msg.Nak()
+
+				log.Trace().
+					Str("durable", opt.Durable).
+					Msg("dispatcher skipping: delayRetry != nil")
 				continue
 			}
 
+			xProcessedAt.Set(time.Now().UnixMilli())
 			delayRetry = d.processMsg(ctx, opt, msg)
 			if delayRetry != nil {
 				_ = msg.Nak()
@@ -144,10 +155,16 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 			}
 		}
 		if delayRetry != nil {
-			xk := "inRetryDelay / " + opt.Durable + " / " + opt.Subject + " / " + time.Now().UTC().Format(time.RFC3339)
+			xk := "inRetryDelay / " + opt.Durable + " / " + time.Now().UTC().Format(time.RFC3339)
 			xStats.Set(xk, expvar.Func(func() any {
 				return fmt.Sprintf("%v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry])
 			}))
+
+			log.Debug().
+				Str("xk", xk).
+				Int("retry", delayRetry.Retry).
+				Str("delay", RetryDelays[delayRetry.Retry].String()).
+				Msg("dispatcher delaying retry")
 
 			select {
 			case <-ctx.Done(): // context cancelled
@@ -158,10 +175,10 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, sub *nats.Su
 	}
 }
 
-func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *nats.Msg) *dispatcherRetry {
 	meta, err := msg.Metadata()
 	if err != nil {
-		log.Warn().Err(err).Any("msg", *msg).
+		log.Warn().Err(err).Str("msg", fmt.Sprintf("%+v", *msg)).
 			Str("durable", opt.Durable).
 			Msg("nats dispatcher failed Metadata")
 		return nil
@@ -172,7 +189,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 			return func(e *zerolog.Event) {
 				e.Uint64("nats.meta.sequence.stream", meta.Sequence.Stream)
 				e.Uint64("nats.meta.sequence.consumer", meta.Sequence.Consumer)
-				e.Int64("nats.meta.timestamp", meta.Timestamp.Unix())
+				e.Int64("nats.meta.timestamp", meta.Timestamp.UnixMilli())
 			}
 		}
 		return func(e *zerolog.Event) {}
@@ -183,24 +200,24 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 			log.Warn().Func(logDetailsFn(true)).
 				Uint64("done.sequence", seq).
 				Str("durable", opt.Durable).
-				Any("nats.msg.headers", msg.Header).
+				Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 				Msg("dispatcher lost order")
 		}
 	}
 
-	err = opt.Handler(NatsMsg{msg})
+	err = opt.Handler(ctx, NatsMsg{msg})
 	if err == nil {
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher delivered")
 		return nil
 	}
 	if !errors.Is(err, tcgerr.ErrTransient) {
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher could not deliver: will not retry")
 		return nil
 	}
@@ -221,7 +238,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 		d.retries.Delete(opt.Durable)
 		log.Warn().Err(err).Func(logDetailsFn(true)).
 			Str("durable", opt.Durable).
-			Any("nats.msg.headers", msg.Header).
+			Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 			Msg("dispatcher could not deliver: stop retrying")
 		return nil
 	}
@@ -230,7 +247,7 @@ func (d *natsDispatcher) processMsg(_ context.Context, opt DurableCfg, msg *nats
 	log.Info().Err(err).Func(logDetailsFn()).
 		Int("retry", retry.Retry).
 		Str("durable", opt.Durable).
-		Any("nats.msg.headers", msg.Header).
+		Str("nats.msg.headers", fmt.Sprintf("%+v", msg.Header)).
 		Msg("dispatcher could not deliver: will retry")
 
 	return retry
