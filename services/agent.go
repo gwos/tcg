@@ -125,8 +125,8 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Any("connector", agentService.Connector).
-			Any("suppress", config.Suppress).
+			Str("connector", fmt.Sprintf("%+v", *agentService.Connector)).
+			Str("suppress", fmt.Sprintf("%+v", config.Suppress)).
 			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
 			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
 			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
@@ -327,7 +327,7 @@ func (service *AgentService) Status() AgentStatus {
 func (service *AgentService) handleTasks() {
 	hDebug := func(tt []taskqueue.Task) {
 		log.Error().
-			Any("lastTasks", tt).
+			Str("lastTasks", fmt.Sprintf("%+v", tt)).
 			Msg("task queue")
 	}
 	hAlarm := func(task *taskqueue.Task) error {

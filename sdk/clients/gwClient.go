@@ -549,7 +549,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request", req.LogAttrs()...)
-		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+			tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return nil, err

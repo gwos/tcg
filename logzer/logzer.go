@@ -100,7 +100,7 @@ func (w *CondenseWriter) onEvicted() func(string, interface{}) {
 			case zerolog.TimeFormatUnix:
 				return strconv.AppendInt(dst, ts.Unix(), 10)
 			case zerolog.TimeFormatUnixMs:
-				return strconv.AppendInt(dst, ts.UnixNano()/1000000, 10)
+				return strconv.AppendInt(dst, ts.UnixMilli(), 10)
 			case zerolog.TimeFormatUnixMicro:
 				return strconv.AppendInt(dst, ts.UnixNano()/1000, 10)
 			}

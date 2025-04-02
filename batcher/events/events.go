@@ -2,6 +2,7 @@ package events
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/rs/zerolog/log"
@@ -55,7 +56,7 @@ func (bld *EventsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 			continue
 		}
 		log.Err(err).
-			Any("events", q).
+			Str("events", fmt.Sprintf("%+v", q)).
 			Msg("could not marshal events")
 	}
 }
