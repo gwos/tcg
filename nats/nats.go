@@ -254,20 +254,25 @@ func StopServer() {
 	s.Lock()
 	defer s.Unlock()
 
+	var wg sync.WaitGroup
 	if s.ncPublisher != nil {
+		wg.Add(1)
+		s.ncPublisher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := s.ncPublisher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats publisher connection")
-			s.ncPublisher.Close()
 		}
 		s.ncPublisher = nil
 	}
 	if s.ncDispatcher != nil {
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := s.ncDispatcher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
-			s.ncDispatcher.Close()
 		}
 		s.ncDispatcher = nil
 	}
+	wg.Wait()
+
 	if s.server != nil {
 		s.server.Shutdown()
 		s.server = nil
@@ -322,19 +327,21 @@ func StopDispatcher() error {
 	}
 
 	ze := log.Info()
+	var wg sync.WaitGroup
 	if d.ncDispatcher != nil {
 		if js, err := d.ncDispatcher.JetStream(); err == nil {
 			if info, err := js.StreamInfo(streamName); err == nil {
 				ze = ze.Str("streamState", fmt.Sprintf("%+v", info.State))
 			}
 		}
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := d.ncDispatcher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
-			d.ncDispatcher.Close()
 		}
 		d.ncDispatcher = nil
 	}
-
+	wg.Wait()
 	ze.Msg("dispatcher stopped")
 	return nil
 }
