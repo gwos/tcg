@@ -462,7 +462,6 @@ func (service *AgentService) config(data []byte) error {
 func (service *AgentService) exit() error {
 	GetTransitService().eventsBatcher.Exit()
 	GetTransitService().metricsBatcher.Exit()
-	GetTransitService().inventoryKeeper.Stop()
 
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
