@@ -205,7 +205,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg *na
 		}
 	}
 
-	err = opt.Handler(ctx, NatsMsg{msg})
+	err = opt.Handler(ctx, msg)
 	if err == nil {
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		log.Info().Func(logDetailsFn()).

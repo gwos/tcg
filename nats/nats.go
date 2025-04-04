@@ -5,6 +5,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -65,11 +66,7 @@ type Config struct {
 // DurableCfg defines subscription
 type DurableCfg struct {
 	Durable string
-	Handler func(context.Context, NatsMsg) error
-}
-
-type NatsMsg struct {
-	*nats.Msg
+	Handler func(context.Context, *nats.Msg) error
 }
 
 // StartServer runs NATS
@@ -346,8 +343,8 @@ func StopDispatcher() error {
 	return nil
 }
 
-// Publish adds payload in queue with optional key-value headers
-func Publish(subj string, data []byte, headers ...string) error {
+// Publish adds payload in queue
+func Publish(subj string, data []byte, headers http.Header) error {
 	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
 			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
@@ -372,14 +369,11 @@ func Publish(subj string, data []byte, headers ...string) error {
 		s.ncPublisher = nc
 	}
 
-	if len(headers) < 2 {
-		return s.ncPublisher.Publish(subj, data)
-	}
-
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	for i := 0; i < len(headers)-1; i += 2 {
-		msg.Header.Add(headers[i], headers[i+1])
+	if headers != nil {
+		// nats.Header compatible with http.Header as type of map[string][]string
+		msg.Header = nats.Header(headers)
 	}
 	return s.ncPublisher.PublishMsg(msg)
 }
