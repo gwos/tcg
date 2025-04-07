@@ -52,7 +52,7 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers http.Hea
 	}
 	headers.Add(clients.HdrPayloadLen, fmt.Sprint(len(payload)))
 
-	err = tcgnats.Publish(subj, payload, headers)
+	err = tcgnats.Pub(subj, payload, headers)
 	return err
 }
 
