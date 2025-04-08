@@ -93,7 +93,7 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 		nats.Bind(streamName, consumerName),
 		// nats.BindStream(streamName),
 		// nats.Durable(opt.Durable),
-		nats.AckWait(d.config.AckWait),
+		// nats.AckWait(d.config.AckWait), // error: configuration requests ack wait to be 10m0s, but consumer's value is 30s
 		nats.ManualAck(),
 	)
 	if err != nil {
