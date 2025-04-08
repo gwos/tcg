@@ -104,7 +104,7 @@ func makeDurable(durable string, handleWithCtx func(context.Context, *nats.Msg) 
 					ctx = getCtx(ctx, trace.NewSpanContext(sCtxCfg))
 				}
 			}
-			// ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
+			ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
 
 			ctx, span := tracing.StartTraceSpan(ctx, "services", "nats:dispatch")
 			defer func() {
