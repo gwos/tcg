@@ -104,7 +104,7 @@ func (service *TransitService) exportTransit(op TransitOperation, payload []byte
 }
 
 // ClearInDowntime implements TransitServices.ClearInDowntime interface
-func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
+func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
 	defer func() {
@@ -134,7 +134,7 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 }
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
-func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error {
+func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error
 	defer func() {
@@ -204,7 +204,7 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 }
 
 // SendEventsAck implements TransitServices.SendEventsAck interface
-func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error {
+func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsAck))
 	var err error
 	defer func() {
@@ -234,7 +234,7 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 }
 
 // SendEventsUnack implements TransitServices.SendEventsUnack interface
-func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error {
+func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsUnack))
 	var err error
 	defer func() {
