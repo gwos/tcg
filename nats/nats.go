@@ -5,6 +5,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -28,11 +29,13 @@ var (
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 	ErrPayloadLim = fmt.Errorf("%w: payload oversized limit", ErrNATS)
 
-	s        = new(state)
 	subjects = []string{"tcg.>"}
 
 	xClientURL = expvar.NewString("tcgNatsClientURL")
 	xStats     = expvar.NewMap("tcgNatsStats")
+
+	s = new(state)
+	_ = func() int { s.pub = make(chan *nats.Msg, 2000); return 0 }()
 )
 
 type state struct {
@@ -43,6 +46,9 @@ type state struct {
 	// if a client is too slow the server will eventually cut them off by closing the connection
 	ncDispatcher *nats.Conn
 	ncPublisher  *nats.Conn
+
+	cancel context.CancelFunc
+	pub    chan *nats.Msg
 }
 
 // Config defines NATS configurable options
@@ -65,11 +71,7 @@ type Config struct {
 // DurableCfg defines subscription
 type DurableCfg struct {
 	Durable string
-	Handler func(context.Context, NatsMsg) error
-}
-
-type NatsMsg struct {
-	*nats.Msg
+	Handler func(context.Context, *nats.Msg) error
 }
 
 // StartServer runs NATS
@@ -137,6 +139,30 @@ func StartServer(config Config) error {
 		return err
 	}
 	s.ncPublisher = nc
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-s.pub:
+				if err := s.ncPublisher.PublishMsg(msg); err != nil {
+					log.Warn().Err(err).
+						Str("headers", fmt.Sprintf("%+v", msg.Header)).
+						Msg("nats failed PublishMsg: reconnecting")
+					if nc, err := nats.Connect(s.server.ClientURL()); err == nil {
+						s.ncPublisher = nc
+					} else {
+						log.Warn().Err(err).Msg("nats failed Connect")
+					}
+					s.ncPublisher = nc
+				}
+			}
+		}
+	}(ctx)
 
 	return defineStream(nc)
 }
@@ -254,20 +280,26 @@ func StopServer() {
 	s.Lock()
 	defer s.Unlock()
 
+	s.cancel()
+	var wg sync.WaitGroup
 	if s.ncPublisher != nil {
+		wg.Add(1)
+		s.ncPublisher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := s.ncPublisher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats publisher connection")
-			s.ncPublisher.Close()
 		}
 		s.ncPublisher = nil
 	}
 	if s.ncDispatcher != nil {
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := s.ncDispatcher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
-			s.ncDispatcher.Close()
 		}
 		s.ncDispatcher = nil
 	}
+	wg.Wait()
+
 	if s.server != nil {
 		s.server.Shutdown()
 		s.server = nil
@@ -322,25 +354,48 @@ func StopDispatcher() error {
 	}
 
 	ze := log.Info()
+	var wg sync.WaitGroup
 	if d.ncDispatcher != nil {
 		if js, err := d.ncDispatcher.JetStream(); err == nil {
 			if info, err := js.StreamInfo(streamName); err == nil {
 				ze = ze.Str("streamState", fmt.Sprintf("%+v", info.State))
 			}
 		}
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
 		if err := d.ncDispatcher.Drain(); err != nil {
 			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
-			d.ncDispatcher.Close()
 		}
 		d.ncDispatcher = nil
 	}
-
+	wg.Wait()
 	ze.Msg("dispatcher stopped")
 	return nil
 }
 
-// Publish adds payload in queue with optional key-value headers
-func Publish(subj string, data []byte, headers ...string) error {
+// Pub sends NATS message in buffered channel
+func Pub(subj string, data []byte, headers http.Header) error {
+	if len(data) > int(s.config.MaxPayload) {
+		err := fmt.Errorf("%w: %v / %v / %v",
+			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
+		log.Err(err).Msg("nats publisher failed")
+		return err
+	}
+	msg := nats.NewMsg(subj)
+	msg.Data = data
+	if headers != nil {
+		// nats.Header compatible with http.Header as type of map[string][]string
+		msg.Header = nats.Header(headers)
+	}
+	// use goroutine as L2 buffer
+	go func(msg *nats.Msg) { s.pub <- msg }(msg)
+	return nil
+}
+
+// Publish sends NATS message
+//
+// Deprecated: Use Pub
+func Publish(subj string, data []byte, headers http.Header) error {
 	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
 			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
@@ -365,14 +420,11 @@ func Publish(subj string, data []byte, headers ...string) error {
 		s.ncPublisher = nc
 	}
 
-	if len(headers) < 2 {
-		return s.ncPublisher.Publish(subj, data)
-	}
-
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	for i := 0; i < len(headers)-1; i += 2 {
-		msg.Header.Add(headers[i], headers[i+1])
+	if headers != nil {
+		// nats.Header compatible with http.Header as type of map[string][]string
+		msg.Header = nats.Header(headers)
 	}
 	return s.ncPublisher.PublishMsg(msg)
 }

@@ -6,17 +6,19 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
-	"github.com/gwos/tcg/nats"
+	tcgnats "github.com/gwos/tcg/nats"
 	"github.com/gwos/tcg/sdk/clients"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/tracing"
+	"github.com/nats-io/nats.go"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...string) error {
+func Put2Nats(ctx context.Context, subj string, payload []byte, headers http.Header) error {
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "Put2Nats")
 	var err error
 	defer func() {
@@ -28,11 +30,9 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...strin
 		}
 	}()
 
-	headers = append(headers,
-		clients.HdrSpanSpanID, span.SpanContext().SpanID().String(),
-		clients.HdrSpanTraceID, span.SpanContext().TraceID().String(),
-		clients.HdrSpanTraceFlags, span.SpanContext().TraceFlags().String(),
-	)
+	headers.Set(clients.HdrSpanSpanID, span.SpanContext().SpanID().String())
+	headers.Set(clients.HdrSpanTraceID, span.SpanContext().TraceID().String())
+	headers.Set(clients.HdrSpanTraceFlags, span.SpanContext().TraceFlags().String())
 
 	if len(payload) > int(agentService.NatsMaxPayload) {
 		n0 := len(payload)
@@ -43,16 +43,16 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers ...strin
 		}
 		if buf.Len() > int(agentService.NatsMaxPayload) {
 			err = fmt.Errorf("%w: %v / %v / %v / %v / gzip compressed",
-				nats.ErrPayloadLim, subj, agentService.NatsMaxPayload, n0, buf.Len())
+				tcgnats.ErrPayloadLim, subj, agentService.NatsMaxPayload, n0, buf.Len())
 			return err
 		}
 		payload = buf.Bytes()
-		headers = append(headers, clients.HdrCompressed, "gzip",
-			clients.HdrPayloadLen, fmt.Sprint(n0))
+		headers.Set(clients.HdrCompressed, "gzip")
+		headers.Set(clients.HdrPayloadLen, fmt.Sprint(n0))
 	}
-	headers = append(headers, clients.HdrPayloadLen, fmt.Sprint(len(payload)))
+	headers.Add(clients.HdrPayloadLen, fmt.Sprint(len(payload)))
 
-	err = nats.Publish(subj, payload, headers...)
+	err = tcgnats.Pub(subj, payload, headers)
 	return err
 }
 
@@ -63,13 +63,13 @@ func getCtx(ctx context.Context, sc trace.SpanContext) context.Context {
 	return ctx
 }
 
-func makeDurable(durable string, handleWithCtx func(context.Context, []byte) error) nats.DurableCfg {
+func makeDurable(durable string, handleWithCtx func(context.Context, *nats.Msg) error) tcgnats.DurableCfg {
 	for _, s := range []string{"/", ".", "*", ">"} {
 		durable = strings.ReplaceAll(durable, s, "")
 	}
-	return nats.DurableCfg{
+	return tcgnats.DurableCfg{
 		Durable: durable,
-		Handler: func(ctx context.Context, msg nats.NatsMsg) error {
+		Handler: func(ctx context.Context, msg *nats.Msg) error {
 			var (
 				err     error
 				data    = msg.Data
@@ -104,7 +104,7 @@ func makeDurable(durable string, handleWithCtx func(context.Context, []byte) err
 					ctx = getCtx(ctx, trace.NewSpanContext(sCtxCfg))
 				}
 			}
-			ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
+			// ctx = context.WithValue(ctx, clients.CtxHeaders, headers)
 
 			ctx, span := tracing.StartTraceSpan(ctx, "services", "nats:dispatch")
 			defer func() {
@@ -117,14 +117,10 @@ func makeDurable(durable string, handleWithCtx func(context.Context, []byte) err
 				)
 			}()
 
-			if err = handleWithCtx(ctx, data); err == nil {
+			if err = handleWithCtx(ctx, msg); err == nil {
 				agentService.stats.x.Add("sentTo:"+durable, 1)
 				agentService.stats.BytesSent.Add(int64(len(data)))
 				agentService.stats.MessagesSent.Add(1)
-				if pType, err := new(payloadType).FromStr(headers.Get(clients.HdrPayloadType)); err == nil &&
-					*pType == typeMetrics {
-					agentService.stats.MetricsSent.Add(1)
-				}
 			}
 
 			if errors.Is(err, tcgerr.ErrUnauthorized) {
@@ -144,8 +140,8 @@ func makeDurable(durable string, handleWithCtx func(context.Context, []byte) err
 	}
 }
 
-func makeSubscriptions(gwClients []clients.GWClient) []nats.DurableCfg {
-	var subs = make([]nats.DurableCfg, 0, len(gwClients))
+func makeSubscriptions(gwClients []clients.GWClient) []tcgnats.DurableCfg {
+	var subs = make([]tcgnats.DurableCfg, 0, len(gwClients))
 	for i := range gwClients {
 		// gwClient := gwClient /* hold loop var copy */
 		gwClient := &gwClients[i]
@@ -157,23 +153,19 @@ func makeSubscriptions(gwClients []clients.GWClient) []nats.DurableCfg {
 	return subs
 }
 
-func adaptClient(gwClient *clients.GWClient) func(context.Context, []byte) error {
-	return func(ctx context.Context, p []byte) error {
-		var pType payloadType
-		if h := ctx.Value(clients.CtxHeaders); h != nil {
-			if h, ok := h.(interface{ Get(string) string }); ok {
-				if _, err := pType.FromStr(h.Get(clients.HdrPayloadType)); err != nil {
-					return err
-				}
-				if h.Get(clients.HdrTodoTracerCtx) != "" &&
-					h.Get(clients.HdrCompressed) == "" {
-					p = agentService.fixTracerContext(p)
-				}
-			}
+func adaptClient(gwClient *clients.GWClient) func(context.Context, *nats.Msg) error {
+	return func(ctx context.Context, msg *nats.Msg) error {
+		data, headers, pType := msg.Data, msg.Header, new(payloadType)
+		if _, err := pType.FromStr(headers.Get(clients.HdrPayloadType)); err != nil {
+			return err
+		}
+		if headers.Get(clients.HdrTodoTracerCtx) != "" &&
+			headers.Get(clients.HdrCompressed) == "" {
+			data = agentService.fixTracerContext(data)
 		}
 
 		var fn func(context.Context, []byte) ([]byte, error)
-		switch pType {
+		switch *pType {
 		case typeEvents:
 			fn = gwClient.SendEvents
 		case typeEventsAck:
@@ -189,9 +181,13 @@ func adaptClient(gwClient *clients.GWClient) func(context.Context, []byte) error
 		case typeMetrics:
 			fn = gwClient.SendResourcesWithMetrics
 		default:
-			return fmt.Errorf("%w: unknown payload type: %v", nats.ErrDispatcher, pType)
+			return fmt.Errorf("%w: unknown payload type: %v", tcgnats.ErrDispatcher, *pType)
 		}
-		_, err := fn(ctx, p)
+		_, err := fn(ctx, data)
+		if err == nil && *pType == typeMetrics {
+			agentService.stats.MetricsSent.Add(1)
+		}
+
 		return err
 	}
 }
