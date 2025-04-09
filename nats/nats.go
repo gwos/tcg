@@ -5,6 +5,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -151,7 +152,7 @@ func StartServer(config Config) error {
 			case msg := <-s.pub:
 				if err := s.ncPublisher.PublishMsg(msg); err != nil {
 					log.Warn().Err(err).
-						Str("headers", fmt.Sprintf("%+v", msg.Header)).
+						Str("header", fmt.Sprintf("%+v", msg.Header)).
 						Msg("nats failed PublishMsg: reconnecting")
 					if nc, err := nats.Connect(s.server.ClientURL()); err == nil {
 						s.ncPublisher = nc
@@ -374,7 +375,7 @@ func StopDispatcher() error {
 }
 
 // Pub sends NATS message in buffered channel
-func Pub(subj string, data []byte, headers http.Header) error {
+func Pub(subj string, data []byte, header http.Header) error {
 	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
 			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
@@ -383,10 +384,7 @@ func Pub(subj string, data []byte, headers http.Header) error {
 	}
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	if headers != nil {
-		// nats.Header compatible with http.Header as type of map[string][]string
-		msg.Header = nats.Header(headers)
-	}
+	maps.Copy(msg.Header, header)
 	// use goroutine as L2 buffer
 	go func(msg *nats.Msg) { s.pub <- msg }(msg)
 	return nil
@@ -395,7 +393,7 @@ func Pub(subj string, data []byte, headers http.Header) error {
 // Publish sends NATS message
 //
 // Deprecated: Use Pub
-func Publish(subj string, data []byte, headers http.Header) error {
+func Publish(subj string, data []byte, header http.Header) error {
 	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
 			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
@@ -422,10 +420,7 @@ func Publish(subj string, data []byte, headers http.Header) error {
 
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	if headers != nil {
-		// nats.Header compatible with http.Header as type of map[string][]string
-		msg.Header = nats.Header(headers)
-	}
+	maps.Copy(msg.Header, header)
 	return s.ncPublisher.PublishMsg(msg)
 }
 
