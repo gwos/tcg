@@ -122,7 +122,9 @@ func makeDurable(durable string, handleWithCtx func(context.Context, *nats.Msg) 
 				agentService.stats.MessagesSent.Add(1)
 			}
 
-			if errors.Is(err, tcgerr.ErrUnauthorized) {
+			if errors.Is(err, tcgerr.ErrTransient) {
+				log.Warn().Err(err).Msg("dispatcher got an issue")
+			} else if errors.Is(err, tcgerr.ErrUnauthorized) {
 				/* it looks like an issue with credentialed user
 				so, wait for configuration update */
 				log.Err(err).Msg("dispatcher got an issue with credentialed user, wait for configuration update")
