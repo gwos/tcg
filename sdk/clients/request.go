@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -151,6 +152,9 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	if err != nil {
 		q.Status, q.Err = -1, err
 		return err
+	}
+	if h, ok := ctx.Value(ctxHeader).(http.Header); ok {
+		maps.Copy(request.Header, h)
 	}
 	request.Header.Set("Connection", "close")
 	for k, v := range q.Headers {
