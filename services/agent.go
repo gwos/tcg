@@ -692,7 +692,7 @@ func (service *AgentService) initOTEL() {
 		ctx, req = nestedHook(ctx, req)
 		return tracing.HookRequestContext(ctx, req)
 	}
-	clients.GZIP = tracing.GZIP
+	clients.GZip = tracing.GZip
 }
 
 // initProM inits Prometheus metrics

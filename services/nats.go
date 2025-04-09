@@ -37,7 +37,7 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, headers http.Hea
 	if len(payload) > int(agentService.NatsMaxPayload) {
 		n0 := len(payload)
 		buf := new(bytes.Buffer)
-		_, err = clients.GZIP(ctx, buf, payload)
+		_, err = clients.GZip(ctx, buf, payload)
 		if err != nil {
 			return err
 		}

@@ -50,11 +50,17 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 	return ctx, req
 }
 
-var GZIP = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
+var GZip = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
 	gw := gzip.NewWriter(w)
 	_, err := gw.Write(p)
 	_ = gw.Close()
 	return ctx, err
+}
+
+// IsGZipped detects if payload was compressed with gzip
+// by magic number: 1st byte is 0x1f and 2nd is 0x8b
+func IsGZipped(p []byte) bool {
+	return len(p) > 2 && p[0] == 31 && p[1] == 139
 }
 
 // SendRequest wraps HTTP methods

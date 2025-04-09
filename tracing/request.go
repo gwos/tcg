@@ -15,7 +15,7 @@ func HookRequestContext(ctx context.Context, req *http.Request) (context.Context
 	return ctx, req
 }
 
-func GZIP(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
+func GZip(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
 	var (
 		err error
 		n   int
