@@ -116,6 +116,7 @@ type Req struct {
 
 	client   *http.Client
 	duration time.Duration
+	header   http.Header
 }
 
 // SetClient sets http.Client to use
@@ -153,7 +154,7 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 		q.Status, q.Err = -1, err
 		return err
 	}
-	if h, ok := ctx.Value(ctxHeader).(http.Header); ok {
+	if h, ok := HeaderFromCtx(ctx); ok {
 		maps.Copy(request.Header, h)
 	}
 	request.Header.Set("Connection", "close")
@@ -168,6 +169,8 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	} else {
 		response, err = HttpClient.Do(request)
 	}
+	// taking data for logging
+	q.header = request.Header
 	q.duration = time.Since(t0).Truncate(1 * time.Millisecond)
 	if err != nil {
 		q.Status, q.Err = -1, err
@@ -204,15 +207,15 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 	}
 	if q.Status >= 400 || forceDetails ||
 		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
-		if len(q.Headers) > 0 {
-			attrs = append(attrs, slog.Any("headers", slog.AnyValue(q.Headers)))
+		if len(q.header) > 0 {
+			attrs = append(attrs, slog.Any("header", slog.AnyValue(q.header)))
 		}
 		if len(q.Form) > 0 {
 			attrs = append(attrs, slog.Any("form", q.Form))
 		}
 		if len(q.Payload) > 0 {
-			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-				attrs = append(attrs, slog.String("payload", "encoded:"+v))
+			if IsGZipped(q.Payload) {
+				attrs = append(attrs, slog.String("payload", "encoded:gzip"))
 			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 				attrs = append(attrs, slog.Any("payload", json.RawMessage(q.Payload)))
 			} else {
