@@ -18,9 +18,9 @@ const (
 	HdrTodoTracerCtx  = "Todo-Tracer-Ctx"
 )
 
-type CtxKey any
+type ctxKeyType int
 
-var ctxHeader = CtxKey("header")
+const ctxHeader ctxKeyType = iota
 
 func CtxWithHeader(ctx context.Context, header http.Header) context.Context {
 	if h, ok := ctx.Value(ctxHeader).(http.Header); ok {

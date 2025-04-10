@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"sync"
 
+	"maps"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
 	sdklog "github.com/gwos/tcg/sdk/log"
@@ -39,12 +41,8 @@ func (c *APIClient) SendRequest(httpMethod string, requestURL string, headers ma
 		c.gwURI = gwClient.GWConnection.HostName
 	})
 	hh := make(map[string]string, len(c.headers)+len(headers))
-	for k, v := range c.headers {
-		hh[k] = v
-	}
-	for k, v := range headers {
-		hh[k] = v
-	}
+	maps.Copy(hh, c.headers)
+	maps.Copy(hh, headers)
 	return clients.SendRequest(httpMethod, c.gwURI+requestURL, hh, formValues, byteBody)
 }
 
