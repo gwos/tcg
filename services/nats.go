@@ -13,7 +13,7 @@ import (
 	"github.com/gwos/tcg/sdk/clients"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/gwos/tcg/tracing"
-	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -63,18 +63,18 @@ func getCtx(ctx context.Context, sc trace.SpanContext) context.Context {
 	return ctx
 }
 
-func makeDurable(durable string, handleWithCtx func(context.Context, *nats.Msg) error) tcgnats.DurableCfg {
+func makeDurable(durable string, handleWithCtx func(context.Context, jetstream.Msg) error) tcgnats.DurableCfg {
 	for _, s := range []string{"/", ".", "*", ">"} {
 		durable = strings.ReplaceAll(durable, s, "")
 	}
 	return tcgnats.DurableCfg{
 		Durable: durable,
-		Handler: func(ctx context.Context, msg *nats.Msg) error {
+		Handler: func(ctx context.Context, msg jetstream.Msg) error {
 			var (
 				err     error
-				data    = msg.Data
-				header  = msg.Header
-				subject = msg.Subject
+				data    = msg.Data()
+				header  = msg.Headers()
+				subject = msg.Subject()
 				sCtxCfg = trace.SpanContextConfig{}
 				spanID  []byte
 				traceID []byte
@@ -154,9 +154,9 @@ func makeSubscriptions(gwClients []clients.GWClient) []tcgnats.DurableCfg {
 	return subs
 }
 
-func adaptClient(gwClient *clients.GWClient) func(context.Context, *nats.Msg) error {
-	return func(ctx context.Context, msg *nats.Msg) error {
-		data, header, pType := msg.Data, msg.Header, new(payloadType)
+func adaptClient(gwClient *clients.GWClient) func(context.Context, jetstream.Msg) error {
+	return func(ctx context.Context, msg jetstream.Msg) error {
+		data, header, pType := msg.Data(), msg.Headers(), new(payloadType)
 		if _, err := pType.FromStr(header.Get(clients.HdrPayloadType)); err != nil {
 			return err
 		}
