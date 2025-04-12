@@ -116,9 +116,12 @@ func configHandler(data []byte) {
 func periodicHandler() {
 	if len(metricsProfile.Metrics) > 0 {
 		log.Info().Msg("monitoring resources ...")
-		if err := connectors.SendMetrics(context.Background(), []transit.MonitoredResource{
-			*CollectMetrics(metricsProfile.Metrics),
-		}, nil); err != nil {
+		if err := connectors.SendMetrics(
+			context.Background(),
+			[]transit.MonitoredResource{*CollectMetrics(metricsProfile.Metrics)},
+			nil,
+			nil,
+		); err != nil {
 			log.Err(err).Msg("could not send metrics")
 		}
 	}
