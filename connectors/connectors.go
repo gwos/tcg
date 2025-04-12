@@ -91,7 +91,12 @@ func Start() error {
 }
 
 // SendMetrics processes metrics payload
-func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, groups *[]transit.ResourceGroup) error {
+func SendMetrics(
+	ctx context.Context,
+	resources []transit.MonitoredResource,
+	groups *[]transit.ResourceGroup,
+	ownershipType *string,
+) error {
 	var (
 		b   []byte
 		err error
@@ -110,6 +115,9 @@ func SendMetrics(ctx context.Context, resources []transit.MonitoredResource, gro
 	}
 	if groups != nil {
 		request.Groups = *groups
+	}
+	if ownershipType != nil {
+		request.OwnershipType = *ownershipType
 	}
 	for i := range request.Resources {
 		monitoredServices := EvaluateExpressions(request.Resources[i].Services)

@@ -33,11 +33,11 @@ func (p *MonitoredInfo) SetNextCheckTime(t *Timestamp) {
 
 // A MonitoredResource defines the current status and services of a resource during a metrics scan.
 // Examples include:
-//  * nagios host
-//  * virtual machine instance
-//  * RDS database
-//  * storage devices such as disks
-//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//   - nagios host
+//   - virtual machine instance
+//   - RDS database
+//   - storage devices such as disks
+//   - cloud resources such as cloud apps, cloud functions(lambdas)
 //
 // A MonitoredResource is the representation of a specific monitored resource during a metric scan.
 // Each MonitoredResource contains list of services (MonitoredService). A MonitoredResource does not have metrics,
@@ -107,9 +107,10 @@ func (p MonitoredService) ToInventoryService() InventoryService {
 
 // ResourcesWithServicesRequest defines SendResourcesWithMetrics payload
 type ResourcesWithServicesRequest struct {
-	Context   *TracerContext      `json:"context,omitempty"`
-	Resources []MonitoredResource `json:"resources"`
-	Groups    []ResourceGroup     `json:"groups,omitempty"`
+	Context       *TracerContext      `json:"context,omitempty"`
+	Resources     []MonitoredResource `json:"resources"`
+	Groups        []ResourceGroup     `json:"groups,omitempty"`
+	OwnershipType string              `json:"ownershipType,omitempty"`
 }
 
 func (p *ResourcesWithServicesRequest) AddResource(res MonitoredResource) {

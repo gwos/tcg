@@ -98,7 +98,9 @@ func collectMetrics() {
 		connectors.CreateResourceGroup(extConfig.HostGroup, defaultHostGroupDescription, transit.HostGroup, monitoredResourcesRef),
 	}
 
-	if err = connectors.SendMetrics(context.Background(), monitoredResources, &resourceGroups); err != nil {
+	ownershipType := string(extConfig.Ownership)
+
+	if err = connectors.SendMetrics(context.Background(), monitoredResources, &resourceGroups, &ownershipType); err != nil {
 		log.Error().Err(err).Msg("failed to send metrics")
 	}
 }
