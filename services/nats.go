@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -18,7 +19,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func Put2Nats(ctx context.Context, subj string, payload []byte, header http.Header) error {
+func Put2Nats(ctx context.Context, subj string, payload []byte) error {
 	ctx, span := tracing.StartTraceSpan(ctx, "services", "Put2Nats")
 	var err error
 	defer func() {
@@ -30,6 +31,10 @@ func Put2Nats(ctx context.Context, subj string, payload []byte, header http.Head
 		}
 	}()
 
+	header := make(http.Header)
+	if h, ok := clients.HeaderFromCtx(ctx); ok {
+		maps.Copy(header, h)
+	}
 	header.Set(clients.HdrSpanSpanID, span.SpanContext().SpanID().String())
 	header.Set(clients.HdrSpanTraceID, span.SpanContext().TraceID().String())
 	header.Set(clients.HdrSpanTraceFlags, span.SpanContext().TraceFlags().String())

@@ -129,7 +129,8 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 
 	header := make(http.Header)
 	header.Set(clients.HdrPayloadType, typeClearInDowntime.String())
-	err = Put2Nats(ctx, subjDowntimes, payload, header)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjDowntimes, payload)
 	return err
 }
 
@@ -159,7 +160,8 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 	header := make(http.Header)
 	header.Set(clients.HdrPayloadType, typeSetInDowntime.String())
-	err = Put2Nats(ctx, subjDowntimes, payload, header)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjDowntimes, payload)
 	return err
 }
 
@@ -199,7 +201,8 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 
 	header := make(http.Header)
 	header.Set(clients.HdrPayloadType, typeEvents.String())
-	err = Put2Nats(ctx, subjEvents, payload, header)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
@@ -229,7 +232,8 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 
 	header := make(http.Header)
 	header.Set(clients.HdrPayloadType, typeEventsAck.String())
-	err = Put2Nats(ctx, subjEvents, payload, header)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
@@ -259,7 +263,8 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 	header := make(http.Header)
 	header.Set(clients.HdrPayloadType, typeEventsUnack.String())
-	err = Put2Nats(ctx, subjEvents, payload, header)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
@@ -298,12 +303,13 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 	}()
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
-	headers := make(http.Header)
-	headers.Set(clients.HdrPayloadType, typeMetrics.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeMetrics.String())
 	if todoTracerCtx {
-		headers.Set(clients.HdrTodoTracerCtx, "-")
+		header.Set(clients.HdrTodoTracerCtx, "-")
 	}
-	err = Put2Nats(ctx, subjInventoryMetrics, payload, headers)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
 
 	// b, err = natsPayload{span.SpanContext(), payload, typeMetrics}.Marshal()
@@ -351,11 +357,12 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
-	headers := make(http.Header)
-	headers.Set(clients.HdrPayloadType, typeInventory.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeInventory.String())
 	if todoTracerCtx {
-		headers.Set(clients.HdrTodoTracerCtx, "-")
+		header.Set(clients.HdrTodoTracerCtx, "-")
 	}
-	err = Put2Nats(ctx, subjInventoryMetrics, payload, headers)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
 }
