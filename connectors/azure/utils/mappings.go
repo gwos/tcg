@@ -2,6 +2,7 @@ package utils
 
 import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
+
 	"github.com/gwos/tcg/sdk/mapping"
 )
 

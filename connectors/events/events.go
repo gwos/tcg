@@ -84,7 +84,7 @@ func receiver(c *gin.Context) {
 		groups = append(groups, resourceGroup)
 	}
 
-	if err = connectors.SendMetrics(c.Request.Context(), monitoredResources, &groups, nil); err != nil {
+	if err = connectors.SendMetrics(c.Request.Context(), monitoredResources, &groups); err != nil {
 		log.Err(err).
 			Msg("could not send metrics")
 		c.JSON(http.StatusInternalServerError, err.Error())

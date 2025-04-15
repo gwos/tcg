@@ -85,7 +85,7 @@ func main() {
 	fmt.Printf("resource 2 created with services: %+v\n", resource2)
 
 	//if enableTransit {
-	//	connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil, nil)
+	//	connectors.SendMetrics(context.Background(), []transit.MonitoredResource{*resource1, *resource2}, nil)
 	//}
 }
 

@@ -153,7 +153,7 @@ func (mi *promMetricsData) process() error {
 		}
 	}
 
-	if err = connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups, nil); err != nil {
+	if err = connectors.SendMetrics(context.Background(), *monitoredResources, resourceGroups); err != nil {
 		return err
 	}
 
