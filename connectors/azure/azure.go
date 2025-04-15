@@ -5,10 +5,12 @@ import (
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/rs/zerolog/log"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/azure/utils"
+	"github.com/gwos/tcg/sdk/clients"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -98,7 +100,14 @@ func collectMetrics() {
 		connectors.CreateResourceGroup(extConfig.HostGroup, defaultHostGroupDescription, transit.HostGroup, monitoredResourcesRef),
 	}
 
-	if err = connectors.SendMetrics(context.Background(), monitoredResources, &resourceGroups); err != nil {
+	ctx := context.Background()
+	if extConfig.HostPrefix != "" {
+		ctx = clients.CtxWithHeader(ctx, map[string][]string{
+			"HostNamePrefix": {extConfig.HostPrefix},
+		})
+	}
+
+	if err = connectors.SendMetrics(ctx, monitoredResources, &resourceGroups); err != nil {
 		log.Error().Err(err).Msg("failed to send metrics")
 	}
 }

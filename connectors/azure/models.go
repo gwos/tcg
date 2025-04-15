@@ -4,15 +4,17 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/gwos/tcg/sdk/mapping"
 	"github.com/gwos/tcg/sdk/transit"
-	"github.com/rs/zerolog/log"
 )
 
 type ExtConfig struct {
 	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
 	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
 	HostGroup     string                    `json:"customHostGroup"`
+	HostPrefix    string                    `json:"customHostPrefix"`
 
 	AzureTenantID       string `json:"azureTenantId"`
 	AzureClientID       string `json:"azureClientId"`
