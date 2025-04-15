@@ -122,6 +122,6 @@ func periodicHandler() {
 		count = count + 1
 	}
 	time.Sleep(3 * time.Second) // TODO: better way to assure sync completion?
-	err := connectors.SendMetrics(context.Background(), monitored, &groups, nil)
+	err := connectors.SendMetrics(context.Background(), monitored, &groups)
 	log.Err(err).Msg("sending metrics")
 }

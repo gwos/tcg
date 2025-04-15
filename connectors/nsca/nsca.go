@@ -94,5 +94,5 @@ func processData(ctx context.Context, payload []byte, dataFormat parser.DataForm
 	if err != nil {
 		return err
 	}
-	return connectors.SendMetrics(ctxN, *monitoredResources, nil, nil)
+	return connectors.SendMetrics(ctxN, *monitoredResources, nil)
 }

@@ -144,7 +144,7 @@ func periodicHandler() {
 		time.Sleep(8 * time.Second)
 	}
 
-	log.Err(connectors.SendMetrics(ctxCancel, monitored, &groups, nil)).
+	log.Err(connectors.SendMetrics(ctxCancel, monitored, &groups)).
 		Msg("Sending metrics")
 }
 

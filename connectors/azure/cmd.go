@@ -4,11 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
-	"github.com/rs/zerolog/log"
 )
 
 const defaultCheckInterval = time.Minute
@@ -69,5 +70,5 @@ func configHandler(data []byte) {
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	services.GetTransitService().RegisterExitHandler(cancel)
-	connectors.StartPeriodic(ctxCancel, defaultCheckInterval, collectMetrics)
+	connectors.StartPeriodic(ctxCancel, extConfig.CheckInterval, collectMetrics)
 }

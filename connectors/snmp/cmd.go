@@ -148,7 +148,7 @@ func periodicHandler() {
 				invChksum = chk
 			}
 
-			err = connectors.SendMetrics(context.Background(), metrics, nil, nil)
+			err = connectors.SendMetrics(context.Background(), metrics, nil)
 			log.Err(err).Msg("sending metrics")
 		}
 	}

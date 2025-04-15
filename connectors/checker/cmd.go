@@ -158,7 +158,7 @@ func taskHandler(task ScheduleTask) func() {
 				Msg("could not parse metrics")
 			return
 		}
-		if err = connectors.SendMetrics(ctx, *monitoredResources, nil, nil); err != nil {
+		if err = connectors.SendMetrics(ctx, *monitoredResources, nil); err != nil {
 			log.Warn().Err(err).
 				Interface("task", task).
 				Bytes("res", res).
