@@ -130,6 +130,7 @@ func GetAgentService() *AgentService {
 			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
 			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
 			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
+			Strs("env", os.Environ()).
 			Msg("starting with config")
 	})
 
