@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -23,6 +24,8 @@ const (
 )
 
 func collectMetrics() {
+	fmt.Println("============= HERE 1")
+
 	if extConfig.AzureTenantID == "" || extConfig.AzureClientID == "" ||
 		extConfig.AzureClientSecret == "" || extConfig.AzureSubscriptionID == "" {
 		return
@@ -38,12 +41,16 @@ func collectMetrics() {
 		return
 	}
 
+	fmt.Println("============= HERE 2")
+
 	allResources, err := utils.ResourcesList(cred, extConfig.AzureSubscriptionID)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get azure resources")
 		return
 	}
 	targetResources := utils.FilterResources(allResources, extConfig.GWMapping.Host)
+
+	fmt.Println("============= HERE 3")
 
 	monitoredResources := make([]transit.MonitoredResource, 0)
 	monitoredResourcesRef := make([]transit.ResourceRef, 0)
@@ -58,10 +65,14 @@ func collectMetrics() {
 		}
 		targetDefinitions := utils.FilterDefinitions(allDefinitions, extConfig.GWMapping.Service)
 
+		fmt.Println("============= HERE 4")
+
 		metrics, err := utils.MetricsList(cred, extConfig.AzureSubscriptionID, resource, targetDefinitions)
 		if err != nil {
 			continue
 		}
+
+		fmt.Println("============= HERE 5")
 
 		var services []transit.MonitoredService
 		for _, metric := range metrics {
