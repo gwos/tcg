@@ -366,3 +366,50 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
 }
+
+// SynchronizeInventoryExt processes extended inventory included additional host properties
+func (service *TransitService) SynchronizeInventoryExt(ctx context.Context, payload []byte) error {
+	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
+	var err error
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+			tracing.TraceAttrPayloadDbg(payload),
+			tracing.TraceAttrPayloadLen(payload),
+		)
+		if err != nil {
+			log.Err(err).Msg("SynchronizeInventoryExt failed")
+		}
+	}()
+
+	// Store as file 2 latest inventoryes for debug
+	func(payload []byte) {
+		f0 := filepath.Join(service.NatsStoreDir, "inventory.json")
+		f1 := filepath.Join(service.NatsStoreDir, "inventory1.json")
+		_, _ = os.MkdirAll(service.NatsStoreDir, 0777), os.Rename(f0, f1)
+		if err := os.WriteFile(f0, payload, 0666); err != nil {
+			log.Err(err).Msg("could not store inventory file")
+		}
+	}(payload)
+
+	if err := service.exportTransit(TOpSyncInventory, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSyncInventory)
+	}
+
+	if config.Suppress.Inventory {
+		tracing.TraceAttrStr("suppress", "inventory")(span)
+		return nil
+	}
+
+	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
+
+	payload, todoTracerCtx := service.mixTracerContext(payload)
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeInventory.String())
+	if todoTracerCtx {
+		header.Set(clients.HdrTodoTracerCtx, "-")
+	}
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
+	return err
+}
