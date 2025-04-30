@@ -83,7 +83,7 @@ type MonitoredService struct {
 	BaseInfo
 	MonitoredInfo
 	// metrics
-	Metrics []TimeSeries `json:"metrics"`
+	Metrics []TimeSeries `json:"metrics,omitempty"`
 }
 
 func (p *MonitoredService) AddMetric(t TimeSeries) {

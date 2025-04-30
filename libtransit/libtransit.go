@@ -623,12 +623,34 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	}
 
 	bb, err := json.Marshal(h.Value())
-	log.Debug().Err(err).RawJSON("payload", bb).Msg("Send")
+	log.Trace().Err(err).RawJSON("payload", bb).Msg("Send")
 	if err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
 	if err := sender(context.Background(), bb); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// Sync processes inventory
+//
+//export Sync
+func Sync(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
+	var inv *transit.InventoryRequest
+	h := cgo.Handle(p)
+	if v, ok := h.Value().(*transit.InventoryRequest); ok {
+		inv = v
+	} else {
+		msg := fmt.Sprintf("unexpected type: %+v", h.Value())
+		bufStr(errBuf, errBufLen, msg)
+		log.Warn().Msg(msg)
+		return false
+	}
+
+	if err := services.GetTransitService().Sync(context.Background(), inv); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}

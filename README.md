@@ -89,15 +89,15 @@ The TCG project is built with Go Modules. See `go.mod` for a list of dependencie
         github.com/shirou/gopsutil
 
 9. [Gin-Swagger](github.com/swaggo/gin-swagger)
-    
+
     > Gin Gonic middleware to automatically generate RESTful API documentation with Swagger 2.0.
-                                                        
+
         github.com/swaggo/gin-swagger
-        
+
     > Generate 'docs.go' for Swagger UI
-        
+
         $ swag init
-    
+
     > Swagger url:
 
         {host}:{port}/swagger/index.html
@@ -144,28 +144,28 @@ go tool dist list -json
 go tool dist list -json | jq '.[] | select(.CgoSupported == true)'
 ```
 
-## Installing as a service 
-To enable:      
+## Installing as a service
+To enable:
 ```
 sudo systemctl enable tcg-elastic
 ```
-To start:       
+To start:
 ```
 sudo systemctl start tcg-elastic
 ```
-Show status:    
+Show status:
 ```
 sudo systemctl status tcg-elastic
 ```
-To stop:        
+To stop:
 ```
 sudo systemctl stop tcg-elastic
 ```
-To disable:     
+To disable:
 ```
 sudo systemctl disable tcg-elastic
 ```
-To reconfigure: 
+To reconfigure:
 ```
 sudo systemctl daemon-reload
 ```
@@ -201,7 +201,7 @@ The [gotests](https://github.com/cweill/gotests) tool can generate Go tests.
 >With logs:
 
     $ go test -v ./<package_one>/ ./<package_two>/
-    
+
 ### Run integration tests:
 
 >For integration tests you must provide environment variables for Groundwork Connection. Also have to deal with TLS certs: get it in local trust storage or suppress check.
@@ -270,6 +270,7 @@ There are additional variables supported:
     * OTEL_EXPORTER_OTLP_ENDPOINT=http://jaegertracing:4317
     * TCG_HTTP_CLIENT_TIMEOUT=10s
     * TCG_HTTP_CLIENT_TIMEOUT_GW=120s
+    * TCG_INVENTORY_NOEXT=true
     * TCG_SUPPRESS_DOWNTIMES=true
     * TCG_SUPPRESS_EVENTS=true
     * TCG_SUPPRESS_INVENTORY=true
