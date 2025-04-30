@@ -88,11 +88,13 @@ func (d *natsDispatcher) OpenDurable(ctx context.Context, opt DurableCfg) {
 }
 
 func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstream.Consumer) {
-	xFetchedAt, xProcessedAt := new(expvar.Int), new(expvar.Int)
+	xFetchedAt, xProcessedAt, xRetryDelay := new(expvar.Int), new(expvar.Int), new(expvar.String)
 	xFetchedAt.Set(-1)
 	xProcessedAt.Set(-1)
+	xRetryDelay.Set("")
 	xStats.Set(opt.Durable+":fetchedAt", xFetchedAt)
 	xStats.Set(opt.Durable+":processedAt", xProcessedAt)
+	xStats.Set(opt.Durable+":retryDelay", xRetryDelay)
 	for {
 		select {
 		case <-ctx.Done():
@@ -136,13 +138,8 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 			}
 		}
 		if delayRetry != nil {
-			xk := "inRetryDelay / " + opt.Durable + " / " + time.Now().UTC().Format(time.RFC3339)
-			xStats.Set(xk, expvar.Func(func() any {
-				return fmt.Sprintf("%v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry])
-			}))
-
+			xRetryDelay.Set(fmt.Sprintf("%v / %v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry], time.Now().UTC().Format(time.RFC3339)))
 			log.Debug().
-				Str("xk", xk).
 				Int("retry", delayRetry.Retry).
 				Str("delay", RetryDelays[delayRetry.Retry].String()).
 				Msg("dispatcher delaying retry")
@@ -151,7 +148,7 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 			case <-ctx.Done(): // context cancelled
 			case <-time.After(RetryDelays[delayRetry.Retry]): // delay ended
 			}
-			xStats.Delete(xk)
+			xRetryDelay.Set("")
 		}
 	}
 }
@@ -203,6 +200,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 		return nil
 	}
 
+	/* processing transient error */
 	retry := &dispatcherRetry{
 		Timestamp: time.Now().UTC(),
 		LastError: err,
@@ -210,9 +208,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 	}
 	if lastRetry, ok := d.retries.Get(opt.Durable); ok {
 		lastRetry := lastRetry.(dispatcherRetry)
-		if retry.Timestamp.Before(lastRetry.Timestamp.Add(time.Second * 10)) {
-			retry.Retry = lastRetry.Retry + 1
-		}
+		retry.Retry = lastRetry.Retry + 1
 	}
 
 	if retry.Retry >= len(RetryDelays) {
