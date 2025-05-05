@@ -3,6 +3,7 @@ package errors
 import (
 	"errors"
 	"fmt"
+	"net"
 	"runtime"
 	"strings"
 	"syscall"
@@ -99,4 +100,22 @@ func IsErrorTimedOut(err error) bool {
 	s := strings.ToLower(err.Error())
 	return strings.Contains(s, "deadline") ||
 		strings.Contains(s, "timeout")
+}
+
+// IsErrorDNS verifies error
+func IsErrorDNS(err error) bool {
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return true
+	}
+	return false
+}
+
+// IsErrorDNSLookup verifies error
+func IsErrorNoSuchHost(err error) bool {
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return dnsError.IsNotFound
+	}
+	return false
 }

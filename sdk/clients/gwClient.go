@@ -171,7 +171,7 @@ func (client *GWClient) connectLocal() (string, error) {
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not connect local groundwork", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -224,7 +224,7 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not authenticate password", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return "", err
@@ -286,7 +286,7 @@ func (client *GWClient) Disconnect() error {
 	switch {
 	case err != nil:
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not disconnect groundwork", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
 		return err
@@ -352,7 +352,7 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	}
 
 	sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not validate groundwork token", req.LogAttrs()...)
-	if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+	if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
 	return err
@@ -361,30 +361,27 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 // SynchronizeInventory calls API
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
 	headers := []string{}
-	hdrCompressed := ""
-	if h := ctx.Value(CtxHeaders); h != nil {
-		if h, ok := h.(interface{ Get(string) string }); ok {
-			if hdrCompressed = h.Get(HdrCompressed); hdrCompressed != "" {
-				headers = append(headers, "Content-Encoding", hdrCompressed)
-			}
-		}
+	encoding := ""
+	if IsGZipped(payload) {
+		encoding = "gzip"
 	}
-	mergeParam := make(map[string]string)
-	mergeHosts := client.GWConnection.MergeHosts
-	if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+	if client.GWConnection.HTTPEncode && encoding == "" {
 		var buf bytes.Buffer
 		var err error
-		ctx, err = GZIP(ctx, &buf, payload)
-		if err != nil {
+		if ctx, err = GZip(ctx, &buf, payload); err != nil {
 			return nil, err
 		}
 		payload = buf.Bytes()
-		headers = append(headers, "Content-Encoding", "gzip")
+		encoding = "gzip"
 	}
-	mergeParam["merge"] = strconv.FormatBool(mergeHosts)
+	if encoding != "" {
+		headers = append(headers, "Content-Encoding", encoding)
+	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
+	mergeParam := make(map[string]string)
+	mergeParam["merge"] = strconv.FormatBool(client.GWConnection.MergeHosts)
 	return client.sendRequest(ctx, http.MethodPost, GWEntrypointSynchronizeInventory, BuildQueryParams(mergeParam),
 		payload, headers...)
 }
@@ -392,29 +389,28 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 // SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
 	headers := []string{}
-	hdrCompressed := ""
-	if h := ctx.Value(CtxHeaders); h != nil {
-		if h, ok := h.(interface{ Get(string) string }); ok {
-			if hdrCompressed = h.Get(HdrCompressed); hdrCompressed != "" {
-				headers = append(headers, "Content-Encoding", hdrCompressed)
-			}
-		}
+	encoding := ""
+	if IsGZipped(payload) {
+		encoding = "gzip"
 	}
-	if client.GWConnection.HTTPEncode && hdrCompressed == "" {
+	if client.GWConnection.HTTPEncode && encoding == "" {
 		var buf bytes.Buffer
 		var err error
-		if ctx, err = GZIP(ctx, &buf, payload); err != nil {
+		if ctx, err = GZip(ctx, &buf, payload); err != nil {
 			return nil, err
 		}
 		payload = buf.Bytes()
-		headers = append(headers, "Content-Encoding", "gzip")
+		encoding = "gzip"
+	}
+	if encoding != "" {
+		headers = append(headers, "Content-Encoding", encoding)
+	}
+	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
+		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
 	entrypoint := GWEntrypointSendResourceWithMetrics
 	if client.IsDynamicInventory {
 		entrypoint = GWEntrypointSendResourceWithMetricsDyn
-	}
-	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
-		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
 	return client.sendRequest(ctx, http.MethodPost, entrypoint, "", payload, headers...)
 }
@@ -548,10 +544,12 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 
 	switch {
 	case err != nil:
-		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request", req.LogAttrs()...)
-		if tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) ||
+			tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
+			sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not send request", req.LogAttrs()...)
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request", req.LogAttrs()...)
 		return nil, err
 
 	case req.Status == 401:

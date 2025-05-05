@@ -5,6 +5,8 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"maps"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +15,7 @@ import (
 	"github.com/nats-io/nats-server/v2/logger"
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
+	"github.com/nats-io/nats.go/jetstream"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -28,11 +31,13 @@ var (
 	ErrDispatcher = fmt.Errorf("%w: dispatcher", ErrNATS)
 	ErrPayloadLim = fmt.Errorf("%w: payload oversized limit", ErrNATS)
 
-	s        = new(state)
 	subjects = []string{"tcg.>"}
 
 	xClientURL = expvar.NewString("tcgNatsClientURL")
 	xStats     = expvar.NewMap("tcgNatsStats")
+
+	s = new(state)
+	_ = func() int { s.pub = make(chan *nats.Msg, 2000); return 0 }()
 )
 
 type state struct {
@@ -43,6 +48,9 @@ type state struct {
 	// if a client is too slow the server will eventually cut them off by closing the connection
 	ncDispatcher *nats.Conn
 	ncPublisher  *nats.Conn
+
+	cancel context.CancelFunc
+	pub    chan *nats.Msg
 }
 
 // Config defines NATS configurable options
@@ -65,12 +73,7 @@ type Config struct {
 // DurableCfg defines subscription
 type DurableCfg struct {
 	Durable string
-	Subject string
-	Handler func(msg NatsMsg) error
-}
-
-type NatsMsg struct {
-	*nats.Msg
+	Handler func(context.Context, jetstream.Msg) error
 }
 
 // StartServer runs NATS
@@ -113,7 +116,7 @@ func StartServer(config Config) error {
 		} else {
 			log.Warn().
 				Err(err).
-				Any("natsOpts", *opts).
+				Str("natsOpts", fmt.Sprintf("%+v", *opts)).
 				Msg("nats failed NewServer")
 			return err
 		}
@@ -126,7 +129,7 @@ func StartServer(config Config) error {
 	log.Info().
 		Func(func(e *zerolog.Event) {
 			if zerolog.GlobalLevel() <= zerolog.DebugLevel {
-				e.Any("natsOpts", *opts)
+				e.Str("natsOpts", fmt.Sprintf("%+v", *opts))
 			}
 		}).
 		Msgf("nats started at: %s", s.server.ClientURL())
@@ -134,30 +137,32 @@ func StartServer(config Config) error {
 
 	nc, err := nats.Connect(s.server.ClientURL())
 	if err != nil {
-		log.Warn().Err(err).Msg("nats failed Connect")
+		log.Err(err).Msg("nats failed Connect")
 		return err
 	}
 	s.ncPublisher = nc
 
-	return defineStream(nc, streamName, subjects)
-}
-
-func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
-	js, err := nc.JetStream(nats.DirectGet())
-	if err != nil {
-		log.Warn().Err(err).Msg("nats failed JetStream")
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	if err := defineStream(ctx, nc); err != nil {
+		log.Err(err).Msg("nats failed defineStream")
 		return err
 	}
 
-	storage := func(arg string) nats.StorageType {
+	go handlePubchan(ctx)
+	return nil
+}
+
+func defineStream(ctx context.Context, nc *nats.Conn) error {
+	storage := func(arg string) jetstream.StorageType {
 		switch strings.ToUpper(arg) {
 		case "MEMORY":
-			return nats.MemoryStorage
+			return jetstream.MemoryStorage
 		default:
-			return nats.FileStorage
+			return jetstream.FileStorage
 		}
 	}(s.config.StoreType)
-	sc := nats.StreamConfig{
+	sc := jetstream.StreamConfig{
 		Name:        streamName,
 		Subjects:    subjects,
 		Storage:     storage,
@@ -165,118 +170,100 @@ func defineStream(nc *nats.Conn, streamName string, subjects []string) error {
 		MaxAge:      s.config.StoreMaxAge,
 		MaxBytes:    s.config.StoreMaxBytes,
 		MaxMsgs:     s.config.StoreMaxMsgs,
-		Retention:   nats.LimitsPolicy,
+		Retention:   jetstream.LimitsPolicy,
 	}
 
-	if info, err := js.StreamInfo(streamName); err == nil {
-		if err := doStream(js, &info.Config, &sc); err != nil {
-			return err
-		}
-	} else if err == nats.ErrStreamNotFound {
-		if err := doStream(js, nil, &sc); err != nil {
-			return err
-		}
-	} else {
-		log.Err(err).Msg("nats failed StreamInfo")
+	js, err := jetstream.New(nc)
+	if err != nil {
+		log.Err(err).Msg("nats failed JetStream")
 		return err
 	}
 
-	return nil
-}
-
-func doStream(js nats.JetStreamContext, curCfg, newCfg *nats.StreamConfig) error {
-	fn, fnDesc := js.AddStream, "AddStream"
-	if curCfg != nil {
-		if equalStreamConfig(*curCfg, *newCfg) {
-			return nil
-		}
-		fn, fnDesc = js.UpdateStream, "UpdateStream"
-	}
-
-	_, err := fn(newCfg)
-
-	chkAPIErr := func(err error) bool {
-		// Note: there is some inconsistency in public nats constants
-		codes := map[nats.ErrorCode]string{
-			10023: "nats.JSErrCodeInsufficientResourcesErr",
-			10047: "nats.JSStorageResourcesExceededErr", // missed as public const
-		}
-		var apiErr *nats.APIError
-		if errors.As(err, &apiErr) {
-			_, ok := codes[apiErr.ErrorCode]
-			return ok
-		}
-		return false
-	}
-
-	if newCfg.Storage == nats.FileStorage && chkAPIErr(err) {
-		/* retry with smaller storage, 5/8 that smaller then 3/4
-		NATS Server allows up to 75% of available storage.
-		https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
-		u, errUsage := disk.Usage(s.config.StoreDir)
-		if errUsage != nil {
-			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", errUsage).
-				Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+	fn, fnDesc := js.UpdateStream, "UpdateStream"
+	if stream, err := js.Stream(ctx, streamName); err == nil {
+		if info, err := stream.Info(ctx); err == nil {
+			if equalStreamConfig(sc, info.Config) {
+				return nil
+			}
+		} else {
+			log.Err(err).Msg("nats failed JetStream Info")
 			return err
 		}
-		if u.Free/8*5 > uint64(newCfg.MaxBytes) {
-			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", u).
-				Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
-			return err
-		}
-		if u.Free < 1024*1024 {
-			log.Err(err).
-				Any("config", *newCfg).
-				Any("diskUsage", u).
-				Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
-			return err
-		}
-
-		mb := int64(u.Free) / 8 * 5
-		origCfg := *newCfg
-		newCfg.MaxBytes = mb
-		_, err2 := fn(newCfg)
-		log.Err(err2).
-			Any("originalError", err).
-			Any("originalConfig", origCfg).
-			Any("reducedMaxBytes", mb).
-			Any("disk.Free", u.Free).
-			Msgf("nats retrying %v with smaller storage", fnDesc)
-		return err2
+	} else if err == jetstream.ErrStreamNotFound {
+		fn, fnDesc = js.CreateStream, "CreateStream"
+	} else {
+		log.Err(err).Msg("nats failed Stream")
+		return err
 	}
 
+	_, err = fn(ctx, sc)
+	if err == nil {
+		return nil
+	} else if !isJSStorageErr(err) || sc.Storage != jetstream.FileStorage {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Msgf("nats failed %v", fnDesc)
+		return err
+	}
+
+	/* retry with smaller storage, 5/8 that smaller then 3/4
+	NATS Server allows up to 75% of available storage.
+	https://github.com/nats-io/nats-server/blob/v2.9.19/server/disk_avail.go */
+	u, errUsage := disk.Usage(s.config.StoreDir)
+	if errUsage != nil {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", errUsage.Error()).
+			Msgf("nats failed %v, could not repair due to disk.Usage error", fnDesc)
+		return err
+	}
+	if u.Free/8*5 > uint64(sc.MaxBytes) {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", fmt.Sprintf("%+v", *u)).
+			Msgf("nats failed %v, could not repair due to unexpected disk.Free", fnDesc)
+		return err
+	}
+	if u.Free < 1024*1024 {
+		log.Err(err).
+			Str("config", fmt.Sprintf("%+v", sc)).
+			Str("diskUsage", fmt.Sprintf("%+v", *u)).
+			Msgf("nats failed %v, could not repair due to low disk.Free", fnDesc)
+		return err
+	}
+
+	origCfg, origErr := sc, err
+	mb := int64(u.Free) / 8 * 5
+	sc.MaxBytes = mb
+	_, err = fn(ctx, sc)
 	log.Err(err).
-		Any("config", *newCfg).
-		Msgf("nats %v", fnDesc)
+		Str("originalError", origErr.Error()).
+		Str("originalConfig", fmt.Sprintf("%+v", origCfg)).
+		Int64("reducedMaxBytes", mb).
+		Uint64("disk.Free", u.Free).
+		Msgf("nats retrying %v with smaller storage", fnDesc)
 	return err
 }
 
-func equalStreamConfig(c1, c2 nats.StreamConfig) bool {
+func equalStreamConfig(c1, c2 jetstream.StreamConfig) bool {
 	return c1.MaxAge == c2.MaxAge &&
 		c1.MaxBytes == c2.MaxBytes &&
 		c1.MaxMsgs == c2.MaxMsgs &&
-		c1.Storage == c2.Storage &&
-		equalStrs(c1.Subjects, c2.Subjects)
+		c1.Storage == c2.Storage
 }
 
-func equalStrs(ss1, ss2 []string) bool {
-	if len(ss1) != len(ss2) {
-		return false
+func isJSStorageErr(err error) bool {
+	// Note: there is some inconsistency in public nats constants
+	codes := map[jetstream.ErrorCode]string{
+		10023: "nats.JSErrCodeInsufficientResourcesErr",
+		10047: "nats.JSStorageResourcesExceededErr", // missed as public const
 	}
-	ms := make(map[string]bool, len(ss1))
-	for _, s := range ss1 {
-		ms[s] = false
+	var apiErr *jetstream.APIError
+	if errors.As(err, &apiErr) {
+		_, ok := codes[apiErr.ErrorCode]
+		return ok
 	}
-	for _, s := range ss2 {
-		if _, ok := ms[s]; !ok {
-			return false
-		}
-	}
-	return true
+	return false
 }
 
 // StopServer shutdowns NATS
@@ -284,14 +271,26 @@ func StopServer() {
 	s.Lock()
 	defer s.Unlock()
 
+	s.cancel()
+	var wg sync.WaitGroup
 	if s.ncPublisher != nil {
-		s.ncPublisher.Close()
+		wg.Add(1)
+		s.ncPublisher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
+		if err := s.ncPublisher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats publisher connection")
+		}
 		s.ncPublisher = nil
 	}
 	if s.ncDispatcher != nil {
-		s.ncDispatcher.Close()
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
+		if err := s.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+		}
 		s.ncDispatcher = nil
 	}
+	wg.Wait()
+
 	if s.server != nil {
 		s.server.Shutdown()
 		s.server = nil
@@ -344,17 +343,47 @@ func StopDispatcher() error {
 		d.cancel()
 		d.cancel = nil
 	}
+
+	ze := log.Info()
+	var wg sync.WaitGroup
 	if d.ncDispatcher != nil {
-		d.ncDispatcher.Close()
+		if js, err := d.ncDispatcher.JetStream(); err == nil {
+			if info, err := js.StreamInfo(streamName); err == nil {
+				ze = ze.Str("streamState", fmt.Sprintf("%+v", info.State))
+			}
+		}
+		wg.Add(1)
+		s.ncDispatcher.SetClosedHandler(func(*nats.Conn) { wg.Done() })
+		if err := d.ncDispatcher.Drain(); err != nil {
+			log.Warn().Err(err).Msg("could not drain nats dispatcher connection")
+		}
 		d.ncDispatcher = nil
 	}
-
-	log.Info().Msg("dispatcher stopped")
+	wg.Wait()
+	ze.Msg("dispatcher stopped")
 	return nil
 }
 
-// Publish adds payload in queue with optional key-value headers
-func Publish(subj string, data []byte, headers ...string) error {
+// Pub sends NATS message in buffered channel
+func Pub(subj string, data []byte, header http.Header) error {
+	if len(data) > int(s.config.MaxPayload) {
+		err := fmt.Errorf("%w: %v / %v / %v",
+			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
+		log.Err(err).Msg("nats publisher failed")
+		return err
+	}
+	msg := nats.NewMsg(subj)
+	msg.Data = data
+	maps.Copy(msg.Header, header)
+	// use goroutine as L2 buffer
+	go func(msg *nats.Msg) { s.pub <- msg }(msg)
+	return nil
+}
+
+// Publish sends NATS message
+//
+// Deprecated: Use Pub
+func Publish(subj string, data []byte, header http.Header) error {
 	if len(data) > int(s.config.MaxPayload) {
 		err := fmt.Errorf("%w: %v / %v / %v",
 			ErrPayloadLim, subj, s.config.MaxPayload, len(data))
@@ -379,15 +408,9 @@ func Publish(subj string, data []byte, headers ...string) error {
 		s.ncPublisher = nc
 	}
 
-	if len(headers) < 2 {
-		return s.ncPublisher.Publish(subj, data)
-	}
-
 	msg := nats.NewMsg(subj)
 	msg.Data = data
-	for i := 0; i < len(headers)-1; i += 2 {
-		msg.Header.Add(headers[i], headers[i+1])
-	}
+	maps.Copy(msg.Header, header)
 	return s.ncPublisher.PublishMsg(msg)
 }
 
@@ -397,4 +420,30 @@ func IsStartedDispatcher() bool {
 
 func IsStartedServer() bool {
 	return s != nil && s.server != nil
+}
+
+func handlePubchan(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-s.pub:
+			if err := s.ncPublisher.PublishMsg(msg); err != nil {
+				log.Warn().Err(err).
+					Str("header", fmt.Sprintf("%+v", msg.Header)).
+					Msg("nats failed PublishMsg: reconnecting")
+				if nc, err := nats.Connect(s.server.ClientURL()); err == nil {
+					s.ncPublisher = nc
+					if err := s.ncPublisher.PublishMsg(msg); err != nil {
+						log.Warn().Err(err).
+							Str("header", fmt.Sprintf("%+v", msg.Header)).
+							Msg("nats failed PublishMsg")
+					}
+				} else {
+					log.Warn().Err(err).Msg("nats failed reConnect")
+					time.Sleep(time.Second)
+				}
+			}
+		}
+	}
 }

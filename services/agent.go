@@ -125,11 +125,12 @@ func GetAgentService() *AgentService {
 		}
 
 		log.Debug().
-			Any("connector", agentService.Connector).
-			Any("suppress", config.Suppress).
+			Str("connector", fmt.Sprintf("%+v", *agentService.Connector)).
+			Str("suppress", fmt.Sprintf("%+v", config.Suppress)).
 			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
 			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
 			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
+			Strs("env", os.Environ()).
 			Msg("starting with config")
 	})
 
@@ -155,7 +156,7 @@ func (service *AgentService) DemandConfig() error {
 	go func() {
 		for i := 0; ; i++ {
 			if err := service.dsClient.Reload(service.AgentID); err != nil {
-				log.Err(err).Msg("config server is not available")
+				log.Warn().Err(err).Msg("config server is not available, will retry")
 				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
 				continue
 			}
@@ -327,7 +328,7 @@ func (service *AgentService) Status() AgentStatus {
 func (service *AgentService) handleTasks() {
 	hDebug := func(tt []taskqueue.Task) {
 		log.Error().
-			Any("lastTasks", tt).
+			Str("lastTasks", fmt.Sprintf("%+v", tt)).
 			Msg("task queue")
 	}
 	hAlarm := func(task *taskqueue.Task) error {
@@ -462,7 +463,6 @@ func (service *AgentService) config(data []byte) error {
 func (service *AgentService) exit() error {
 	GetTransitService().eventsBatcher.Exit()
 	GetTransitService().metricsBatcher.Exit()
-	GetTransitService().inventoryKeeper.Stop()
 
 	if service.tracerProvider != nil {
 		service.tracerProvider.ForceFlush(context.Background())
@@ -693,7 +693,7 @@ func (service *AgentService) initOTEL() {
 		ctx, req = nestedHook(ctx, req)
 		return tracing.HookRequestContext(ctx, req)
 	}
-	clients.GZIP = tracing.GZIP
+	clients.GZip = tracing.GZip
 }
 
 // initProM inits Prometheus metrics

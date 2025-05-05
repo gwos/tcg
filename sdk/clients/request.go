@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -50,11 +51,17 @@ var HookRequestContext = func(ctx context.Context, req *http.Request) (context.C
 	return ctx, req
 }
 
-var GZIP = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
+var GZip = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
 	gw := gzip.NewWriter(w)
 	_, err := gw.Write(p)
 	_ = gw.Close()
 	return ctx, err
+}
+
+// IsGZipped detects if payload was compressed with gzip
+// by magic number: 1st byte is 0x1f and 2nd is 0x8b
+func IsGZipped(p []byte) bool {
+	return len(p) > 2 && p[0] == 31 && p[1] == 139
 }
 
 // SendRequest wraps HTTP methods
@@ -109,6 +116,7 @@ type Req struct {
 
 	client   *http.Client
 	duration time.Duration
+	header   http.Header
 }
 
 // SetClient sets http.Client to use
@@ -146,6 +154,9 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 		q.Status, q.Err = -1, err
 		return err
 	}
+	if h, ok := HeaderFromCtx(ctx); ok {
+		maps.Copy(request.Header, h)
+	}
 	request.Header.Set("Connection", "close")
 	for k, v := range q.Headers {
 		request.Header.Add(k, v)
@@ -158,6 +169,8 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	} else {
 		response, err = HttpClient.Do(request)
 	}
+	// taking data for logging
+	q.header = request.Header
 	q.duration = time.Since(t0).Truncate(1 * time.Millisecond)
 	if err != nil {
 		q.Status, q.Err = -1, err
@@ -194,15 +207,15 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 	}
 	if q.Status >= 400 || forceDetails ||
 		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
-		if len(q.Headers) > 0 {
-			attrs = append(attrs, slog.Any("headers", slog.AnyValue(q.Headers)))
+		if len(q.header) > 0 {
+			attrs = append(attrs, slog.Any("header", slog.AnyValue(q.header)))
 		}
 		if len(q.Form) > 0 {
 			attrs = append(attrs, slog.Any("form", q.Form))
 		}
 		if len(q.Payload) > 0 {
-			if v, ok := q.Headers["Content-Encoding"]; ok && v != "" {
-				attrs = append(attrs, slog.String("payload", "encoded:"+v))
+			if IsGZipped(q.Payload) {
+				attrs = append(attrs, slog.String("payload", "encoded:gzip"))
 			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
 				attrs = append(attrs, slog.Any("payload", json.RawMessage(q.Payload)))
 			} else {

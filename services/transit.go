@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -36,13 +37,6 @@ type TransitService struct {
 
 	eventsBatcher  *batcher.Batcher
 	metricsBatcher *batcher.Batcher
-
-	inventoryKeeper struct {
-		sync.Mutex
-		TickerFn
-		buf []byte
-		hdr []string
-	}
 }
 
 var onceTransitService sync.Once
@@ -67,18 +61,6 @@ func GetTransitService() *TransitService {
 			transitService.Connector.BatchMetrics,
 			transitService.Connector.BatchMaxBytes,
 		)
-
-		transitService.inventoryKeeper.TickerFn = *NewTickerFn(time.Second, func() {
-			p := &transitService.inventoryKeeper
-			p.Lock()
-			defer p.Unlock()
-			if len(p.buf) == 0 {
-				return
-			}
-			if err := Put2Nats(context.TODO(), subjInventoryMetrics, p.buf, p.hdr...); err == nil {
-				p.buf, p.hdr = nil, nil
-			}
-		})
 	})
 	return transitService
 }
@@ -122,7 +104,7 @@ func (service *TransitService) exportTransit(op TransitOperation, payload []byte
 }
 
 // ClearInDowntime implements TransitServices.ClearInDowntime interface
-func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error {
+func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
 	defer func() {
@@ -136,20 +118,24 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 		}
 	}()
 
-	_ = service.exportTransit(TOpClearInDowntime, payload)
+	if err := service.exportTransit(TOpClearInDowntime, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpClearInDowntime)
+	}
 
 	if config.Suppress.Downtimes {
 		tracing.TraceAttrStr("suppress", "downtimes")(span)
 		return nil
 	}
 
-	err = Put2Nats(ctx, subjDowntimes, payload,
-		clients.HdrPayloadType, typeClearInDowntime.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeClearInDowntime.String())
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjDowntimes, payload)
 	return err
 }
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
-func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error {
+func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error
 	defer func() {
@@ -159,25 +145,31 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 			tracing.TraceAttrPayloadLen(payload),
 		)
 		if err != nil {
-			log.Err(err).Msg("ClearInDowntime failed")
+			log.Err(err).Msg("SetInDowntime failed")
 		}
 	}()
 
-	_ = service.exportTransit(TOpSetInDowntime, payload)
+	if err := service.exportTransit(TOpSetInDowntime, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSetInDowntime)
+	}
 
 	if config.Suppress.Downtimes {
 		tracing.TraceAttrStr("suppress", "downtimes")(span)
 		return nil
 	}
 
-	err = Put2Nats(ctx, subjDowntimes, payload,
-		clients.HdrPayloadType, typeSetInDowntime.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeSetInDowntime.String())
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjDowntimes, payload)
 	return err
 }
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
-	_ = service.exportTransit(TOpSendEvents, payload)
+	if err := service.exportTransit(TOpSendEvents, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSendEvents)
+	}
 
 	if config.Suppress.Events {
 		return nil
@@ -207,13 +199,15 @@ func (service *TransitService) sendEvents(ctx context.Context, payload []byte) e
 		}
 	}()
 
-	err = Put2Nats(ctx, subjEvents, payload,
-		clients.HdrPayloadType, typeEvents.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeEvents.String())
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
 // SendEventsAck implements TransitServices.SendEventsAck interface
-func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error {
+func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsAck))
 	var err error
 	defer func() {
@@ -227,20 +221,24 @@ func (service *TransitService) SendEventsAck(ctx context.Context, payload []byte
 		}
 	}()
 
-	_ = service.exportTransit(TOpSendEventsAck, payload)
+	if err := service.exportTransit(TOpSendEventsAck, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSendEventsAck)
+	}
 
 	if config.Suppress.Events {
 		tracing.TraceAttrStr("suppress", "events")(span)
 		return nil
 	}
 
-	err = Put2Nats(ctx, subjEvents, payload,
-		clients.HdrPayloadType, typeEventsAck.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeEventsAck.String())
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
 // SendEventsUnack implements TransitServices.SendEventsUnack interface
-func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error {
+func (service *TransitService) SendEventsUnack(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendEventsUnack))
 	var err error
 	defer func() {
@@ -254,21 +252,27 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 		}
 	}()
 
-	_ = service.exportTransit(TOpSendEventsUnack, payload)
+	if err := service.exportTransit(TOpSendEventsUnack, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSendEventsUnack)
+	}
 
 	if config.Suppress.Events {
 		tracing.TraceAttrStr("suppress", "events")(span)
 		return nil
 	}
 
-	err = Put2Nats(ctx, subjEvents, payload,
-		clients.HdrPayloadType, typeEventsUnack.String())
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeEventsUnack.String())
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjEvents, payload)
 	return err
 }
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
-	_ = service.exportTransit(TOpSendMetrics, payload)
+	if err := service.exportTransit(TOpSendMetrics, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSendMetrics)
+	}
 
 	if config.Suppress.Metrics {
 		return nil
@@ -299,12 +303,13 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 	}()
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
-	headers := []string{clients.HdrPayloadType, typeMetrics.String()}
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeMetrics.String())
 	if todoTracerCtx {
-		headers = append(headers, clients.HdrTodoTracerCtx)
+		header.Set(clients.HdrTodoTracerCtx, "-")
 	}
-	err = Put2Nats(ctx, subjInventoryMetrics, payload,
-		headers...)
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
 
 	// b, err = natsPayload{span.SpanContext(), payload, typeMetrics}.Marshal()
@@ -330,7 +335,19 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 		}
 	}()
 
-	_ = service.exportTransit(TOpSyncInventory, payload)
+	// Store as file 2 latest inventoryes for debug
+	func(payload []byte) {
+		f0 := filepath.Join(service.NatsStoreDir, "inventory.json")
+		f1 := filepath.Join(service.NatsStoreDir, "inventory1.json")
+		_, _ = os.MkdirAll(service.NatsStoreDir, 0777), os.Rename(f0, f1)
+		if err := os.WriteFile(f0, payload, 0666); err != nil {
+			log.Err(err).Msg("could not store inventory file")
+		}
+	}(payload)
+
+	if err := service.exportTransit(TOpSyncInventory, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSyncInventory)
+	}
 
 	if config.Suppress.Inventory {
 		tracing.TraceAttrStr("suppress", "inventory")(span)
@@ -340,53 +357,12 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
-	headers := []string{clients.HdrPayloadType, typeInventory.String()}
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeInventory.String())
 	if todoTracerCtx {
-		headers = append(headers, clients.HdrTodoTracerCtx)
+		header.Set(clients.HdrTodoTracerCtx, "-")
 	}
-	// Note. There is a corner case when Nats is not ready
-	// We can buffer inventory and send when ready
-	// err = nats.Publish(subjInventoryMetrics, b)
-	// return err
-	func(payload []byte, headers []string) {
-		service.inventoryKeeper.Lock()
-		defer service.inventoryKeeper.Unlock()
-		service.inventoryKeeper.buf, service.inventoryKeeper.hdr = payload, headers
-
-		f0 := filepath.Join(service.NatsStoreDir, "inventory.json")
-		f1 := filepath.Join(service.NatsStoreDir, "inventory1.json")
-		_, _ = os.MkdirAll(service.NatsStoreDir, 0777), os.Rename(f0, f1)
-		if err := os.WriteFile(f0, payload, 0666); err != nil {
-			log.Err(err).Msg("could not store inventory file")
-		}
-	}(payload, headers)
-	return nil
-}
-
-// TickerFn is wrapper for time.Ticker
-type TickerFn struct {
-	time.Ticker
-	Stop func()
-	done chan bool
-}
-
-func NewTickerFn(d time.Duration, fn func()) *TickerFn {
-	ticker := new(TickerFn)
-	ticker.Ticker = *time.NewTicker(d)
-	ticker.done = make(chan bool)
-	ticker.Stop = func() {
-		ticker.Ticker.Stop()
-		ticker.done <- true
-	}
-	go func() {
-		for {
-			select {
-			case <-ticker.done:
-				return
-			case <-ticker.C:
-				fn()
-			}
-		}
-	}()
-	return ticker
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
+	return err
 }
