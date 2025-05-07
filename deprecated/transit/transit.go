@@ -128,7 +128,7 @@ type ServiceType string
 // Possible Types
 const (
 	Process ServiceType = "Process"
-	Service             = "Service"
+	Service ServiceType = "Service"
 )
 
 // GroupType defines the foundation group type
@@ -147,10 +147,10 @@ type MetricSampleType string
 // TimeSeries Metric Sample Possible Types
 const (
 	Value    MetricSampleType = "Value"
-	Warning                   = "Warning"
-	Critical                  = "Critical"
-	Min                       = "Min"
-	Max                       = "Max"
+	Warning  MetricSampleType = "Warning"
+	Critical MetricSampleType = "Critical"
+	Min      MetricSampleType = "Min"
+	Max      MetricSampleType = "Max"
 )
 
 // TimeInterval defines a closed time interval. It extends from the start time

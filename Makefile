@@ -41,16 +41,18 @@ LIBTRANSITJSON_OBJECTS = \
 
 LIBTRANSIT_DIRECTORY = libtransit
 
-LIBTRANSIT_SOURCE = ${LIBTRANSIT_DIRECTORY}/libtransit.go
+# LIBTRANSIT_SOURCE = ${LIBTRANSIT_DIRECTORY}/*.go
 
-LIBTRANSIT_HEADER = ${LIBTRANSIT_DIRECTORY}/libtransit.h
+LIBTRANSIT_HEADERS = \
+	${LIBTRANSIT_DIRECTORY}/libtransit.h \
+	${LIBTRANSIT_DIRECTORY}/transit.h
 
 LIBTRANSIT_LIBRARY = ${LIBTRANSIT_DIRECTORY}/libtransit.so
 
 LIBTRANSITJSON_LIBRARY = ${BUILD_TARGET_DIRECTORY}/libtransitjson.so
 
 BUILD_HEADER_FILES = \
-	${LIBTRANSIT_HEADER}				\
+	${LIBTRANSIT_HEADERS}				\
 	gotocjson/_c_code/convert_go_to_c.h		\
 	${BUILD_TARGET_DIRECTORY}/time.h		\
 	${BUILD_TARGET_DIRECTORY}/generic_datatypes.h	\
@@ -107,7 +109,7 @@ get	:
 	go get github.com/nats-io/go-nats-streaming
 	go get github.com/nats-io/nats-streaming-server/server
 
-# For the ${LIBTRANSIT_HEADER} and ${LIBTRANSIT_LIBRARY} targets, there are many more
+# For the ${LIBTRANSIT_HEADERS} and ${LIBTRANSIT_LIBRARY} targets, there are many more
 # dependencies than we ought to be keeping track of here, and they are all tracked
 # instead in the subsidiary Makefile where those targets are actually built.  So instead
 # of just depending on ${LIBTRANSIT_SOURCE}, which is of course the principal source file
@@ -117,8 +119,14 @@ get	:
 
 .PHONY	: ${LIBTRANSIT_DIRECTORY}
 
-${LIBTRANSIT_HEADER} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_DIRECTORY}
+# For today DataGeyser requires `transit.h` from ${TRANSIT_BUILD_OBJECTS} prepared by `gotocjson` tool.
+# And `libtransit` distribution provides its own `transit.h`.
+# Fortunatly the content of these headers is different and we can just catenate `libtransit` headers.
+# It's a `temporary` workaround as `gotocjson` stuff is deprecated and planned to be replaced with native `libtransit` calls.
+
+${LIBTRANSIT_HEADERS} ${LIBTRANSIT_LIBRARY}	: ${LIBTRANSIT_DIRECTORY}
 	make -C ${LIBTRANSIT_DIRECTORY}
+	cat ${LIBTRANSIT_DIRECTORY}/transit.h >> ${LIBTRANSIT_DIRECTORY}/libtransit.h
 
 ${BUILD_TARGET_DIRECTORY}	:
 	mkdir -p $@
