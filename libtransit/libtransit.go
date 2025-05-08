@@ -3,6 +3,8 @@ package main
 /*
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef const char cchar_t;
 */
 import "C"
 import (
@@ -32,7 +34,7 @@ func CreateInventoryRequest() C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateInventoryResource
-func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
+func CreateInventoryResource(name, resType *C.cchar_t) C.uintptr_t {
 	p := new(transit.InventoryResource)
 	p.Name = C.GoString(name)
 	p.Type = transit.ResourceType(C.GoString(resType))
@@ -44,7 +46,7 @@ func CreateInventoryResource(name *C.char, resType *C.char) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateInventoryService
-func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
+func CreateInventoryService(name, resType *C.cchar_t) C.uintptr_t {
 	p := new(transit.InventoryService)
 	p.Name = C.GoString(name)
 	p.Type = transit.ResourceType(C.GoString(resType))
@@ -55,7 +57,7 @@ func CreateInventoryService(name *C.char, resType *C.char) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateMonitoredResource
-func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
+func CreateMonitoredResource(name, resType *C.cchar_t) C.uintptr_t {
 	p := new(transit.MonitoredResource)
 	p.Name = C.GoString(name)
 	p.Type = transit.ResourceType(C.GoString(resType))
@@ -67,7 +69,7 @@ func CreateMonitoredResource(name *C.char, resType *C.char) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateMonitoredService
-func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
+func CreateMonitoredService(name, resType *C.cchar_t) C.uintptr_t {
 	p := new(transit.MonitoredService)
 	p.Name = C.GoString(name)
 	p.Type = transit.ResourceType(C.GoString(resType))
@@ -79,7 +81,7 @@ func CreateMonitoredService(name *C.char, resType *C.char) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateResourceGroup
-func CreateResourceGroup(name *C.char, grType *C.char) C.uintptr_t {
+func CreateResourceGroup(name, grType *C.cchar_t) C.uintptr_t {
 	p := new(transit.ResourceGroup)
 	p.GroupName = C.GoString(name)
 	p.Type = transit.GroupType(C.GoString(grType))
@@ -102,10 +104,7 @@ func CreateResourcesWithServicesRequest() C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateThresholdValue
-func CreateThresholdValue(
-	lbl *C.char,
-	sType *C.char,
-) C.uintptr_t {
+func CreateThresholdValue(lbl, sType *C.cchar_t) C.uintptr_t {
 	p := new(transit.ThresholdValue)
 	p.Label = C.GoString(lbl)
 	p.SampleType = transit.MetricSampleType(C.GoString(sType))
@@ -116,9 +115,7 @@ func CreateThresholdValue(
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateTimeSeries
-func CreateTimeSeries(
-	name *C.char,
-) C.uintptr_t {
+func CreateTimeSeries(name *C.cchar_t) C.uintptr_t {
 	p := new(transit.TimeSeries)
 	p.MetricName = C.GoString(name)
 	return C.uintptr_t(cgo.NewHandle(p))
@@ -135,7 +132,7 @@ func DeleteHandle(target C.uintptr_t) {
 // AddMetric appends metric value to target
 //
 //export AddMetric
-func AddMetric(target C.uintptr_t, value C.uintptr_t) {
+func AddMetric(target, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
 	if hv, ok := h.Value().(interface{ AddMetric(transit.TimeSeries) }); ok {
 		if hv2, ok := h2.Value().(*transit.TimeSeries); ok {
@@ -147,7 +144,7 @@ func AddMetric(target C.uintptr_t, value C.uintptr_t) {
 // AddResource appends resource value to target
 //
 //export AddResource
-func AddResource(target C.uintptr_t, value C.uintptr_t) {
+func AddResource(target, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
 	if hv, ok := h.Value().(interface {
 		AddResource(transit.InventoryResource)
@@ -180,7 +177,7 @@ func AddResource(target C.uintptr_t, value C.uintptr_t) {
 // AddResourceGroup appends resource group value to target
 //
 //export AddResourceGroup
-func AddResourceGroup(target C.uintptr_t, value C.uintptr_t) {
+func AddResourceGroup(target, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
 	if hv, ok := h.Value().(interface{ AddResourceGroup(transit.ResourceGroup) }); ok {
 		if hv2, ok := h2.Value().(*transit.ResourceGroup); ok {
@@ -193,7 +190,7 @@ func AddResourceGroup(target C.uintptr_t, value C.uintptr_t) {
 // AddService appends service value to target
 //
 //export AddService
-func AddService(target C.uintptr_t, value C.uintptr_t) {
+func AddService(target, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
 	if hv, ok := h.Value().(interface {
 		AddService(transit.InventoryService)
@@ -216,7 +213,7 @@ func AddService(target C.uintptr_t, value C.uintptr_t) {
 // AddThreshold appends threshold value to target
 //
 //export AddThreshold
-func AddThreshold(target C.uintptr_t, value C.uintptr_t) {
+func AddThreshold(target, value C.uintptr_t) {
 	h, h2 := cgo.Handle(target), cgo.Handle(value)
 	if hv, ok := h.Value().(interface{ AddThreshold(transit.ThresholdValue) }); ok {
 		if hv2, ok := h2.Value().(*transit.ThresholdValue); ok {
@@ -228,7 +225,7 @@ func AddThreshold(target C.uintptr_t, value C.uintptr_t) {
 // AddThresholdDouble appends threshold to target
 //
 //export AddThresholdDouble
-func AddThresholdDouble(target C.uintptr_t, lbl, sType *C.char, value C.double) {
+func AddThresholdDouble(target C.uintptr_t, lbl, sType *C.cchar_t, value C.double) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ AddThreshold(transit.ThresholdValue) }); ok {
 		hv.AddThreshold(transit.ThresholdValue{
@@ -242,7 +239,7 @@ func AddThresholdDouble(target C.uintptr_t, lbl, sType *C.char, value C.double) 
 // AddThresholdInt appends threshold to target
 //
 //export AddThresholdInt
-func AddThresholdInt(target C.uintptr_t, lbl, sType *C.char, value C.longlong) {
+func AddThresholdInt(target C.uintptr_t, lbl, sType *C.cchar_t, value C.longlong) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ AddThreshold(transit.ThresholdValue) }); ok {
 		hv.AddThreshold(transit.ThresholdValue{
@@ -280,7 +277,7 @@ func CalcStatus(target C.uintptr_t) {
 // SetCategory sets category value on target
 //
 //export SetCategory
-func SetCategory(target C.uintptr_t, value *C.char) {
+func SetCategory(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetCategory(string) }); ok {
 		hv.SetCategory(C.GoString(value))
@@ -302,7 +299,7 @@ func SetContextTimestamp(target C.uintptr_t, sec, nsec C.longlong) {
 // SetContextToken sets context token value on target
 //
 //export SetContextToken
-func SetContextToken(target C.uintptr_t, value *C.char) {
+func SetContextToken(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetContext(transit.TracerContext) }); ok {
 		hv.SetContext(transit.TracerContext{TraceToken: C.GoString(value)})
@@ -312,7 +309,7 @@ func SetContextToken(target C.uintptr_t, value *C.char) {
 // SetDescription sets description value on target
 //
 //export SetDescription
-func SetDescription(target C.uintptr_t, value *C.char) {
+func SetDescription(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetDescription(string) }); ok {
 		hv.SetDescription(C.GoString(value))
@@ -356,7 +353,7 @@ func SetIntervalStart(target C.uintptr_t, sec, nsec C.longlong) {
 // SetLastPluginOutput sets LastPluginOutput value on target
 //
 //export SetLastPluginOutput
-func SetLastPluginOutput(target C.uintptr_t, value *C.char) {
+func SetLastPluginOutput(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetLastPluginOutput(string) }); ok {
 		hv.SetLastPluginOutput(C.GoString(value))
@@ -390,7 +387,7 @@ func SetNextCheckTime(target C.uintptr_t, sec, nsec C.longlong) {
 // SetName sets name value on target
 //
 //export SetName
-func SetName(target C.uintptr_t, value *C.char) {
+func SetName(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetName(string) }); ok {
 		hv.SetName(C.GoString(value))
@@ -400,7 +397,7 @@ func SetName(target C.uintptr_t, value *C.char) {
 // SetOwner sets owner value on target
 //
 //export SetOwner
-func SetOwner(target C.uintptr_t, value *C.char) {
+func SetOwner(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetOwner(string) }); ok {
 		hv.SetOwner(C.GoString(value))
@@ -410,7 +407,7 @@ func SetOwner(target C.uintptr_t, value *C.char) {
 // SetPropertyBool sets key:value property on target
 //
 //export SetPropertyBool
-func SetPropertyBool(target C.uintptr_t, key *C.char, value C.bool) {
+func SetPropertyBool(target C.uintptr_t, key *C.cchar_t, value C.bool) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
 		hv.SetProperty(C.GoString(key), bool(value))
@@ -420,7 +417,7 @@ func SetPropertyBool(target C.uintptr_t, key *C.char, value C.bool) {
 // SetPropertyDouble sets key:value property on target
 //
 //export SetPropertyDouble
-func SetPropertyDouble(target C.uintptr_t, key *C.char, value C.double) {
+func SetPropertyDouble(target C.uintptr_t, key *C.cchar_t, value C.double) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
 		hv.SetProperty(C.GoString(key), float64(value))
@@ -430,7 +427,7 @@ func SetPropertyDouble(target C.uintptr_t, key *C.char, value C.double) {
 // SetPropertyInt sets key:value property on target
 //
 //export SetPropertyInt
-func SetPropertyInt(target C.uintptr_t, key *C.char, value C.longlong) {
+func SetPropertyInt(target C.uintptr_t, key *C.cchar_t, value C.longlong) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
 		hv.SetProperty(C.GoString(key), int64(value))
@@ -440,7 +437,7 @@ func SetPropertyInt(target C.uintptr_t, key *C.char, value C.longlong) {
 // SetPropertyStr sets key:value property on target
 //
 //export SetPropertyStr
-func SetPropertyStr(target C.uintptr_t, key *C.char, value *C.char) {
+func SetPropertyStr(target C.uintptr_t, key, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
 		hv.SetProperty(C.GoString(key), C.GoString(value))
@@ -450,7 +447,7 @@ func SetPropertyStr(target C.uintptr_t, key *C.char, value *C.char) {
 // SetPropertyTime sets key:timestamp property on target
 //
 //export SetPropertyTime
-func SetPropertyTime(target C.uintptr_t, key *C.char, sec, nsec C.longlong) {
+func SetPropertyTime(target C.uintptr_t, key *C.cchar_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
 		hv.SetProperty(C.GoString(key),
@@ -461,7 +458,7 @@ func SetPropertyTime(target C.uintptr_t, key *C.char, sec, nsec C.longlong) {
 // SetSampleType sets status value on target
 //
 //export SetSampleType
-func SetSampleType(target C.uintptr_t, value *C.char) {
+func SetSampleType(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface {
 		SetSampleType(transit.MetricSampleType)
@@ -473,7 +470,7 @@ func SetSampleType(target C.uintptr_t, value *C.char) {
 // SetStatus sets status value on target
 //
 //export SetStatus
-func SetStatus(target C.uintptr_t, value *C.char) {
+func SetStatus(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetStatus(transit.MonitorStatus) }); ok {
 		hv.SetStatus(transit.MonitorStatus(C.GoString(value)))
@@ -483,7 +480,7 @@ func SetStatus(target C.uintptr_t, value *C.char) {
 // SetTag sets key:value tag on target
 //
 //export SetTag
-func SetTag(target C.uintptr_t, key, value *C.char) {
+func SetTag(target C.uintptr_t, key, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetTag(string, string) }); ok {
 		hv.SetTag(C.GoString(key), C.GoString(value))
@@ -493,7 +490,7 @@ func SetTag(target C.uintptr_t, key, value *C.char) {
 // SetType sets type value on target
 //
 //export SetType
-func SetType(target C.uintptr_t, value *C.char) {
+func SetType(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetType(transit.GroupType) }); ok {
 		hv.SetType(transit.GroupType(C.GoString(value)))
@@ -508,7 +505,7 @@ func SetType(target C.uintptr_t, value *C.char) {
 // SetUnit sets type value on target
 //
 //export SetUnit
-func SetUnit(target C.uintptr_t, value *C.char) {
+func SetUnit(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetUnit(transit.UnitType) }); ok {
 		hv.SetUnit(transit.UnitType(C.GoString(value)))
@@ -548,7 +545,7 @@ func SetValueInt(target C.uintptr_t, value C.longlong) {
 // SetValueStr sets value to target
 //
 //export SetValueStr
-func SetValueStr(target C.uintptr_t, value *C.char) {
+func SetValueStr(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
 		hv.SetValue(C.GoString(value))
@@ -573,7 +570,7 @@ func SetValueTime(target C.uintptr_t, sec, nsec C.longlong) {
 //export MarshallIndentJSON
 func MarshallIndentJSON(
 	target C.uintptr_t,
-	prefix *C.char, indent *C.char,
+	prefix, indent *C.cchar_t,
 	buf *C.char, bufLen C.size_t,
 	errBuf *C.char, errBufLen C.size_t,
 ) C.bool {
