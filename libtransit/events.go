@@ -3,6 +3,8 @@ package main
 /*
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef const char cchar_t;
 */
 import "C"
 import (
@@ -17,7 +19,7 @@ import (
 //
 //export CreateEvent
 func CreateEvent(
-	appType, host, monStatus *C.char,
+	appType, host, monStatus *C.cchar_t,
 	sec, nsec C.longlong,
 ) C.uintptr_t {
 	p := new(transit.GroundworkEvent)
@@ -54,9 +56,9 @@ func SetEventAttrs(target C.uintptr_t,
 	errorType,
 	loggerName,
 	logType,
-	monServer *C.char,
+	monServer *C.cchar_t,
 ) {
-	attr := func(k *string, v *C.char) {
+	attr := func(k *string, v *C.cchar_t) {
 		if v != nil {
 			*k = C.GoString(v)
 		}
@@ -154,7 +156,7 @@ func CreateEventsAckRequest() C.uintptr_t {
 //export AddEventAck
 func AddEventAck(
 	target C.uintptr_t,
-	appType, host, service, ackBy, ackComment *C.char,
+	appType, host, service, ackBy, ackComment *C.cchar_t,
 ) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(*transit.GroundworkEventsAckRequest); ok {
@@ -183,7 +185,7 @@ func CreateEventsUnackRequest() C.uintptr_t {
 //export AddEventUnack
 func AddEventUnack(
 	target C.uintptr_t,
-	appType, host, service *C.char,
+	appType, host, service *C.cchar_t,
 ) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(*transit.GroundworkEventsUnackRequest); ok {
