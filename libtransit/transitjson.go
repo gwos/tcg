@@ -2,6 +2,8 @@ package main
 
 /*
 #include <stdbool.h>
+
+typedef const char cchar_t;
 */
 import "C"
 import (
@@ -34,7 +36,7 @@ func GetAgentIdentity(buf *C.char, bufLen C.size_t, errBuf *C.char, errBufLen C.
 // ClearInDowntime is a C API for services.GetTransitService().ClearInDowntime
 //
 //export ClearInDowntime
-func ClearInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func ClearInDowntime(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		ClearInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -46,7 +48,7 @@ func ClearInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
 // SetInDowntime is a C API for services.GetTransitService().SetInDowntime
 //
 //export SetInDowntime
-func SetInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SetInDowntime(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SetInDowntime(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -58,7 +60,7 @@ func SetInDowntime(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
 // SendEvents is a C API for services.GetTransitService().SendEvents
 //
 //export SendEvents
-func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SendEvents(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SendEvents(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -70,7 +72,7 @@ func SendEvents(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
 // SendEventsAck is a C API for services.GetTransitService().SendEventsAck
 //
 //export SendEventsAck
-func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SendEventsAck(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SendEventsAck(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -82,7 +84,7 @@ func SendEventsAck(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
 // SendEventsUnack is a C API for services.GetTransitService().SendEventsUnack
 //
 //export SendEventsUnack
-func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SendEventsUnack(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SendEventsUnack(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -94,7 +96,7 @@ func SendEventsUnack(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
 // SendResourcesWithMetrics is a C API for services.GetTransitService().SendResourceWithMetrics
 //
 //export SendResourcesWithMetrics
-func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SendResourcesWithMetrics(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SendResourceWithMetrics(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -106,7 +108,7 @@ func SendResourcesWithMetrics(payloadJSON, errBuf *C.char, errBufLen C.size_t) C
 // SynchronizeInventory is a C API for services.GetTransitService().SynchronizeInventory
 //
 //export SynchronizeInventory
-func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SynchronizeInventory(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SynchronizeInventory(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
@@ -118,7 +120,7 @@ func SynchronizeInventory(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.boo
 // SynchronizeInventoryExt is a C API for services.GetTransitService().SynchronizeInventoryExt
 //
 //export SynchronizeInventoryExt
-func SynchronizeInventoryExt(payloadJSON, errBuf *C.char, errBufLen C.size_t) C.bool {
+func SynchronizeInventoryExt(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	if err := services.GetTransitService().
 		SynchronizeInventoryExt(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
