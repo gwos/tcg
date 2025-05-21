@@ -16,8 +16,7 @@ type MetricsBatchBuilder struct{}
 // splits incoming payloads bigger than maxBytes
 func (bld *MetricsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 	// counter, batched request, and accum
-	c, bq := 0, transit.ResourcesWithServicesRequest{}
-	qq := make([]transit.ResourcesWithServicesRequest, 0)
+	c, bq, qq := 0, transit.ResourcesWithServicesRequest{}, make([]transit.ResourcesWithServicesRequest, 0)
 	var q transit.ResourcesWithServicesRequest
 
 	for _, p := range *buf {
@@ -93,12 +92,10 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, p []byte, maxBytes int) 
 		return
 	}
 
-	/* split big payload for parts contained ~lim metrics */
+	/* split big payload for parts contained ~lim services */
 	cnt := 0
 	for _, res := range q.Resources {
-		for _, svc := range res.Services {
-			cnt += len(svc.Metrics)
-		}
+		cnt += len(res.Services)
 	}
 	lim := cnt/(len(p)/maxBytes+1) + 1
 	log.Debug().Msgf("#MetricsBatchBuilder maxBytes/len(p)/cnt/lim %v/%v/%v/%v",
@@ -109,21 +106,20 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, p []byte, maxBytes int) 
 		pr := res
 		pr.Services = nil
 
-		for i, svc := range res.Services {
+		for _, svc := range res.Services {
 			pr.Services = append(pr.Services, svc)
-			c += len(svc.Metrics)
-
-			if c >= lim && i < len(res.Services)-1 {
-				x.Resources = append(x.Resources, pr)
-				x.SetContext(*q.Context)
-				*qq = append(*qq, x)
-
-				c, x = 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
-				pr = res
-				pr.Services = nil
+			if c += 1; c < lim {
+				continue
 			}
+
+			x.Resources = append(x.Resources, pr)
+			x.SetContext(*q.Context)
+			*qq = append(*qq, x)
+
+			c, x = 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
+			pr = res
+			pr.Services = nil
 		}
-		x.Resources = append(x.Resources, pr)
 	}
 
 	if len(x.Resources) > 0 {
