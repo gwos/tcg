@@ -26,6 +26,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -631,7 +632,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 	/* check local pin */
 	pin := controller.Connector.ControllerPin
 	if len(pin) > 0 && pin == c.Request.Header.Get("X-PIN") {
-		log.Debug().Str("url", c.Request.URL.Redacted()).
+		log.Debug().Func(func(e *zerolog.Event) { e.Str("url", c.Request.URL.Redacted()) }).
 			Msg("access allowed with X-PIN")
 		return
 	}
@@ -655,7 +656,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 		var err error
 		defer func() {
 			if err == nil {
-				log.Debug().Str("url", c.Request.URL.Redacted()).
+				log.Debug().Func(func(e *zerolog.Event) { e.Str("url", c.Request.URL.Redacted()) }).
 					Str("username", username).
 					Msg("access allowed with BASIC")
 				return
@@ -693,7 +694,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 	var err error
 	defer func() {
 		if err == nil {
-			log.Debug().Str("url", c.Request.URL.Redacted()).
+			log.Debug().Func(func(e *zerolog.Event) { e.Str("url", c.Request.URL.Redacted()) }).
 				Str("gwosAppName", gwosAppName).
 				Msg("access allowed with GWOS")
 			return

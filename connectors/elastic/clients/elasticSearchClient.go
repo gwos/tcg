@@ -204,7 +204,7 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 	}
 
 	log.Debug().
-		Str("response", response.String()).
+		Stringer("response", response).
 		Msg("ES Search response")
 
 	if response.IsError() {
@@ -273,7 +273,7 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 	}
 
 	log.Debug().
-		Str("response", response.String()).
+		Stringer("response", response).
 		Msg("ES FieldCaps response")
 
 	if response.IsError() {
