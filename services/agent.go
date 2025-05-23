@@ -168,7 +168,7 @@ func (service *AgentService) DemandConfig() error {
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
-func (service *AgentService) MakeTracerContext() *transit.TracerContext {
+func (service *AgentService) MakeTracerContext() transit.TracerContext {
 	/* combine TraceToken from fixed and incremental parts */
 	tokenBuf := make([]byte, 16)
 	copy(tokenBuf, service.tracerToken)
@@ -190,7 +190,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		appType = traceOnDemandAppType
 	}
 
-	return &transit.TracerContext{
+	return transit.TracerContext{
 		AgentID:    agentID,
 		AppType:    appType,
 		TimeStamp:  transit.NewTimestamp(),

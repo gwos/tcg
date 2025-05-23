@@ -43,7 +43,7 @@ func (bld *MetricsBatchBuilder) Build(buf *[][]byte, maxBytes int) {
 			continue
 		}
 
-		bq.SetContext(*q.Context)
+		bq.SetContext(q.Context)
 		bq.Groups = append(bq.Groups, q.Groups...)
 		bq.Resources = append(bq.Resources, q.Resources...)
 		c += len(p)
@@ -113,7 +113,7 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, p []byte, maxBytes int) 
 			}
 
 			x.Resources = append(x.Resources, pr)
-			x.SetContext(*q.Context)
+			x.SetContext(q.Context)
 			*qq = append(*qq, x)
 
 			c, x = 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
@@ -123,7 +123,7 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, p []byte, maxBytes int) 
 	}
 
 	if len(x.Resources) > 0 {
-		x.SetContext(*q.Context)
+		x.SetContext(q.Context)
 		*qq = append(*qq, x)
 	}
 

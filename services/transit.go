@@ -415,6 +415,7 @@ func (service *TransitService) Sync(ctx context.Context, p *transit.InventoryReq
 	}
 
 	if len(mon.Resources) > 0 {
+		mon.SetContext(service.MakeTracerContext())
 		payload, err = json.Marshal(mon)
 		if err != nil {
 			return err
