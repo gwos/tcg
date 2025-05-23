@@ -632,10 +632,10 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	return true
 }
 
-// Sync processes inventory
+// SyncExt processes extended inventory included additional properties
 //
-//export Sync
-func Sync(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
+//export SyncExt
+func SyncExt(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	var inv *transit.InventoryRequest
 	h := cgo.Handle(p)
 	if v, ok := h.Value().(*transit.InventoryRequest); ok {
@@ -647,7 +647,7 @@ func Sync(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 		return false
 	}
 
-	if err := services.GetTransitService().Sync(context.Background(), inv); err != nil {
+	if err := services.GetTransitService().SyncExt(context.Background(), inv); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}

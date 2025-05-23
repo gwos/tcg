@@ -372,15 +372,20 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 
 // SynchronizeInventoryExt processes extended inventory included additional properties
 func (service *TransitService) SynchronizeInventoryExt(ctx context.Context, payload []byte) error {
+	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
+		log.Info().Msg("SynchronizeInventoryExt: TCG_INVENTORY_NOEXT")
+		return service.SynchronizeInventory(ctx, payload)
+	}
+
 	var p transit.InventoryRequest
 	if err := json.Unmarshal(payload, &p); err != nil {
 		return err
 	}
-	return service.Sync(ctx, &p)
+	return service.SyncExt(ctx, &p)
 }
 
-// Sync processes inventory
-func (service *TransitService) Sync(ctx context.Context, p *transit.InventoryRequest) error {
+// SyncExt processes extended inventory included additional properties
+func (service *TransitService) SyncExt(ctx context.Context, p *transit.InventoryRequest) error {
 	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
 	var err error
 	defer func() {
@@ -392,14 +397,14 @@ func (service *TransitService) Sync(ctx context.Context, p *transit.InventoryReq
 		}
 	}()
 
-	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_EXT")); err != nil || !v {
+	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
+		log.Info().Msg("Sync: TCG_INVENTORY_NOEXT")
 		payload, err := json.Marshal(p)
 		if err != nil {
 			return err
 		}
 		return service.SynchronizeInventory(ctx, payload)
 	}
-	log.Info().Msg("Sync: TCG_INVENTORY_EXT")
 
 	var dt transit.Downtimes
 	var mon transit.ResourcesWithServicesRequest
