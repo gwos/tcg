@@ -118,10 +118,10 @@ func (client *KibanaClient) GetDefaultIndexID() string {
 			Msgf("Kibana Get Default Index request: %s", path)
 	}
 
-	p := new(struct {
+	var p struct {
 		IndexPatternID string `json:"index_pattern_id"`
-	})
-	if err := json.Unmarshal(response, p); err != nil {
+	}
+	if err := json.Unmarshal(response, &p); err != nil {
 		log.Err(err).Msg("could not parse Kibana Get Default Index response")
 		return ""
 	}
@@ -215,8 +215,8 @@ func (client *KibanaClient) BulkGetSO(savedObjectType KibanaSavedObjectType, ids
 			Msgf("Kibana Bulk Get Saved Objects request: %s", path)
 	}
 
-	bulkResponse := new(KBulkGetSOResponse)
-	if err := json.Unmarshal(response, bulkResponse); err != nil {
+	var bulkResponse KBulkGetSOResponse
+	if err := json.Unmarshal(response, &bulkResponse); err != nil {
 		log.Err(err).Msg("could not parse Kibana Bulk Get Saved Objects response")
 		return nil
 	}
@@ -279,8 +279,8 @@ func (client *KibanaClient) BulkResolveSO(savedObjectType KibanaSavedObjectType,
 			Msgf("Kibana Bulk Resolve Saved Objects request: %s", path)
 	}
 
-	bulkResponse := new(KBulkResolveSOResponse)
-	if err := json.Unmarshal(response, bulkResponse); err != nil {
+	var bulkResponse KBulkResolveSOResponse
+	if err := json.Unmarshal(response, &bulkResponse); err != nil {
 		log.Err(err).Msg("could not parse Kibana Bulk Resolve Saved Objects response")
 		return nil
 	}

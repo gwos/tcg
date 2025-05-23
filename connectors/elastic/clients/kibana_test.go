@@ -29,8 +29,8 @@ func TestBulkGetSavedObjects(t *testing.T) {
     }
   }
 ]}`)
-	bulkResponse := new(KBulkGetSOResponse)
-	assert.NoError(t, json.Unmarshal(res, bulkResponse))
+	var bulkResponse KBulkGetSOResponse
+	assert.NoError(t, json.Unmarshal(res, &bulkResponse))
 
 	actualErrors, expectedErrors := 0, 1
 	savedObjects := make([]KSavedObject, 0)

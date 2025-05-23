@@ -164,13 +164,13 @@ func (client *GWClient) connectLocal() (string, error) {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	req := new(Req)
-	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointConnect, "",
+	ctx, req := context.TODO(), Req{}
+	err := client.doReq(ctx, &req, http.MethodPost, GWEntrypointConnect, "",
 		headers, formValues, nil)
 
 	switch {
 	case err != nil:
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not connect local groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not connect local groundwork", req.LogAttrs()...)
 		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -180,28 +180,28 @@ func (client *GWClient) connectLocal() (string, error) {
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not connect local groundwork", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not connect local groundwork", req.Details()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not connect local groundwork", req.Details()...)
 		return "", eee
 	}
-	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
+	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
 	return string(req.Response), nil
 }
 
@@ -217,13 +217,13 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		"GWOS-APP-NAME": client.AppName,
 	}
 
-	req := new(Req)
-	err := client.doReq(context.Background(), req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
+	ctx, req := context.TODO(), Req{}
+	err := client.doReq(ctx, &req, http.MethodPut, GWEntrypointAuthenticatePassword, "",
 		headers, nil, payload)
 
 	switch {
 	case err != nil:
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not authenticate password", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not authenticate password", req.LogAttrs()...)
 		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return "", fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -233,25 +233,25 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		(req.Status == 404 && bytes.Contains(req.Response, []byte("password"))):
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not authenticate password", req.LogAttrs()...)
 		return "", eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not authenticate password", req.Details()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not authenticate password", req.Details()...)
 		return "", eee
 	}
 
@@ -261,10 +261,10 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 	}
 	user := UserResponse{AccessToken: ""}
 	if err := json.Unmarshal(req.Response, &user); err != nil {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "authenticate password", req.LogAttrs()...)
+	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "authenticate password", req.LogAttrs()...)
 	return user.AccessToken, nil
 }
 
@@ -279,13 +279,13 @@ func (client *GWClient) Disconnect() error {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	req := new(Req)
-	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointDisconnect, "",
+	ctx, req := context.TODO(), Req{}
+	err := client.doReq(ctx, &req, http.MethodPost, GWEntrypointDisconnect, "",
 		headers, formValues, nil)
 
 	switch {
 	case err != nil:
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not disconnect groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not disconnect groundwork", req.LogAttrs()...)
 		if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 			return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
@@ -294,28 +294,28 @@ func (client *GWClient) Disconnect() error {
 	case req.Status == 401:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status == 502 || req.Status == 504:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrGateway, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status == 503:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrSynchronizer, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not disconnect groundwork", req.LogAttrs()...)
 		return eee
 
 	case req.Status != 200:
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not disconnect groundwork", req.Details()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not disconnect groundwork", req.Details()...)
 		return eee
 	}
-	sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "disconnect groundwork", req.LogAttrs()...)
+	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "disconnect groundwork", req.LogAttrs()...)
 	return nil
 }
 
@@ -330,28 +330,28 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 		"gwos-api-token": apiToken,
 	}
 
-	req := new(Req)
-	err := client.doReq(context.Background(), req, http.MethodPost, GWEntrypointValidateToken, "",
+	ctx, req := context.TODO(), Req{}
+	err := client.doReq(ctx, &req, http.MethodPost, GWEntrypointValidateToken, "",
 		headers, formValues, nil)
 
 	if err == nil {
 		if req.Status == 200 {
 			if b, e := strconv.ParseBool(string(req.Response)); e == nil && b {
-				sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "validate groundwork token", req.LogAttrs()...)
+				sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "validate groundwork token", req.LogAttrs()...)
 				return nil
 			}
 			eee := fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
 			req.Err = eee
-			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate groundwork token", req.LogAttrs()...)
+			sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not validate groundwork token", req.LogAttrs()...)
 			return eee
 		}
 		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not validate groundwork token", req.Details()...)
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not validate groundwork token", req.Details()...)
 		return eee
 	}
 
-	sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not validate groundwork token", req.LogAttrs()...)
+	sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not validate groundwork token", req.LogAttrs()...)
 	if tcgerr.IsErrorDNS(err) || tcgerr.IsErrorConnection(err) || tcgerr.IsErrorTimedOut(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
@@ -471,14 +471,15 @@ func (client *GWClient) GetServicesByAgent(agentID string, gwServices *GWService
 	params["query"] = "agentid = '" + agentID + "'"
 	params["depth"] = "Shallow"
 
-	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointServices, BuildQueryParams(params), nil)
+	ctx := context.TODO()
+	response, err := client.sendRequest(ctx, http.MethodGet, GWEntrypointServices, BuildQueryParams(params), nil)
 	if err != nil {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not get GW services", slog.String("error", err.Error()))
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not get GW services", slog.String("error", err.Error()))
 		return err
 	}
 	err = json.Unmarshal(response, gwServices)
 	if err != nil {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not parse received GW services", slog.String("error", err.Error()))
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not parse received GW services", slog.String("error", err.Error()))
 		return err
 	}
 	return nil
@@ -503,14 +504,15 @@ func (client *GWClient) GetHostGroupsByAppTypeAndHostNames(appType string, hostN
 	params["query"] = query
 	params["depth"] = "Shallow"
 
-	response, err := client.sendRequest(context.Background(), http.MethodGet, GWEntrypointHostgroups, BuildQueryParams(params), nil)
+	ctx := context.TODO()
+	response, err := client.sendRequest(ctx, http.MethodGet, GWEntrypointHostgroups, BuildQueryParams(params), nil)
 	if err != nil {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not get GW host groups", slog.String("error", err.Error()))
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not get GW host groups", slog.String("error", err.Error()))
 		return err
 	}
 	err = json.Unmarshal(response, gwHostGroups)
 	if err != nil {
-		sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not parse received GW host groups", slog.String("error", err.Error()))
+		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not parse received GW host groups", slog.String("error", err.Error()))
 		return err
 	}
 	return nil
@@ -530,8 +532,8 @@ func (client *GWClient) sendRequest(ctx context.Context, httpMethod string, entr
 		headers[k] = v
 	}
 
-	req := new(Req)
-	err := client.doReq(ctx, req, httpMethod, entrypoint, queryStr, headers, nil, payload)
+	req := Req{}
+	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == 401 {
 		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
 		if err := client.Connect(); err != nil {

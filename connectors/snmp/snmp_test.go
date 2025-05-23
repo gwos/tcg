@@ -2263,7 +2263,7 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 		return nil, nil, nil, err
 	}
 
-	state := new(MonitoringState)
+	var state MonitoringState
 	if err := json.Unmarshal(devicesJSON, &state.devices); err != nil {
 		return nil, nil, nil, err
 	}
@@ -2277,5 +2277,5 @@ func seedTest() (*MonitoringState, map[string]transit.MetricDefinition, []transi
 		return nil, nil, nil, err
 	}
 
-	return state, metricDefinitions, mResources, nil
+	return &state, metricDefinitions, mResources, nil
 }
