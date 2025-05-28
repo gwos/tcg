@@ -2,10 +2,12 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/gwos/tcg/batcher/metrics"
 	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/sdk/clients"
+	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/tracing"
 	"github.com/rs/zerolog/log"
 )
@@ -365,4 +368,178 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	ctx = clients.CtxWithHeader(ctx, header)
 	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
+}
+
+// SynchronizeInventoryExt processes extended inventory included additional properties
+func (service *TransitService) SynchronizeInventoryExt(ctx context.Context, payload []byte) error {
+	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
+		log.Info().Msg("SynchronizeInventoryExt: TCG_INVENTORY_NOEXT")
+		return service.SynchronizeInventory(ctx, payload)
+	}
+
+	var p transit.InventoryRequest
+	if err := json.Unmarshal(payload, &p); err != nil {
+		return err
+	}
+	return service.SyncExt(ctx, &p)
+}
+
+// SyncExt processes extended inventory included additional properties
+func (service *TransitService) SyncExt(ctx context.Context, p *transit.InventoryRequest) error {
+	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
+	var err error
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+		)
+		if err != nil {
+			log.Err(err).Msg("Sync failed")
+		}
+	}()
+
+	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
+		log.Info().Msg("Sync: TCG_INVENTORY_NOEXT")
+		payload, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		return service.SynchronizeInventory(ctx, payload)
+	}
+
+	var dt transit.Downtimes
+	var mon transit.ResourcesWithServicesRequest
+	filterExtInfo(p, &mon, &dt)
+
+	payload, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	err = service.SynchronizeInventory(ctx, payload)
+	if err != nil {
+		return err
+	}
+
+	if len(mon.Resources) > 0 {
+		mon.SetContext(service.MakeTracerContext())
+		payload, err = json.Marshal(mon)
+		if err != nil {
+			return err
+		}
+		err = service.SendResourceWithMetrics(ctx, payload)
+		if err != nil {
+			return err
+		}
+	}
+
+	if len(dt.BizHostServiceInDowntimes) > 0 {
+		payload, err = json.Marshal(dt)
+		if err != nil {
+			return err
+		}
+		// TODO: Sync Downtimes
+		log.Trace().RawJSON("downtimes", payload).Msg("TODO: Sync Downtimes")
+	}
+
+	return nil
+}
+
+func filterExtInfo(
+	p *transit.InventoryRequest,
+	mon *transit.ResourcesWithServicesRequest,
+	dt *transit.Downtimes,
+) {
+	var iPropsRes map[string]int = map[string]int{"Alias": 0, "Notes": 0}
+	var iPropsSvc map[string]int = map[string]int{"Notes": 0}
+
+	var mRes transit.MonitoredResource
+	var mSvc transit.MonitoredService
+
+	for i, iRes := range p.Resources {
+		mRes = transit.MonitoredResource{}
+		mRes.BaseResource = iRes.BaseResource
+		mRes.Properties = iRes.Properties
+
+		iProps := make(map[string]transit.TypedValue, len(iPropsRes))
+		for k := range iPropsRes {
+			if v, ok := iRes.Properties[k]; ok {
+				iProps[k] = v
+			}
+		}
+		p.Resources[i].Properties = iProps
+
+		if v, ok := mRes.Properties["MonitorStatus"]; ok {
+			delete(mRes.Properties, "MonitorStatus")
+			mRes.SetStatus(transit.MonitorStatus(*v.StringValue))
+		}
+		if v, ok := mRes.Properties["LastPluginOutput"]; ok {
+			delete(mRes.Properties, "LastPluginOutput")
+			mRes.SetLastPluginOutput(*v.StringValue)
+		}
+		if v, ok := mRes.Properties["LastCheckTime"]; ok {
+			delete(mRes.Properties, "LastCheckTime")
+			mRes.SetLastCheckTime(v.TimeValue)
+		} else {
+			mRes.SetLastCheckTime(transit.NewTimestamp())
+		}
+		if v, ok := mRes.Properties["NextCheckTime"]; ok {
+			delete(mRes.Properties, "NextCheckTime")
+			mRes.SetNextCheckTime(v.TimeValue)
+		}
+		if v, ok := mRes.Properties["ScheduledDowntimeDepth"]; ok {
+			delete(mRes.Properties, "ScheduledDowntimeDepth")
+			dt.BizHostServiceInDowntimes = append(dt.BizHostServiceInDowntimes, transit.Downtime{
+				EntityType:             "HOST",
+				EntityName:             mRes.Name,
+				HostName:               mRes.Name,
+				ScheduledDowntimeDepth: int(*v.IntegerValue),
+			})
+		}
+
+		for j, iSvc := range iRes.Services {
+			mSvc = transit.MonitoredService{}
+			mSvc.BaseInfo = iSvc.BaseInfo
+			mSvc.Properties = iSvc.Properties
+
+			iProps := make(map[string]transit.TypedValue, len(iPropsSvc))
+			for k := range iPropsSvc {
+				if v, ok := iSvc.Properties[k]; ok {
+					iProps[k] = v
+				}
+			}
+			p.Resources[i].Services[j].Properties = iProps
+
+			if v, ok := mSvc.Properties["MonitorStatus"]; ok {
+				delete(mSvc.Properties, "MonitorStatus")
+				mSvc.SetStatus(transit.MonitorStatus(*v.StringValue))
+			}
+			if v, ok := mSvc.Properties["LastPluginOutput"]; ok {
+				delete(mSvc.Properties, "LastPluginOutput")
+				mSvc.SetLastPluginOutput(*v.StringValue)
+			}
+			if v, ok := mSvc.Properties["LastCheckTime"]; ok {
+				delete(mSvc.Properties, "LastCheckTime")
+				mSvc.SetLastCheckTime(v.TimeValue)
+			} else {
+				mSvc.SetLastCheckTime(transit.NewTimestamp())
+			}
+			if v, ok := mSvc.Properties["NextCheckTime"]; ok {
+				delete(mSvc.Properties, "NextCheckTime")
+				mSvc.SetNextCheckTime(v.TimeValue)
+			}
+			if v, ok := mSvc.Properties["ScheduledDowntimeDepth"]; ok {
+				delete(mSvc.Properties, "ScheduledDowntimeDepth")
+				dt.BizHostServiceInDowntimes = append(dt.BizHostServiceInDowntimes, transit.Downtime{
+					EntityType:             "HOST",
+					EntityName:             mRes.Name,
+					HostName:               mRes.Name,
+					ServiceDescription:     mSvc.Description,
+					ScheduledDowntimeDepth: int(*v.IntegerValue),
+				})
+			}
+
+			mRes.AddService(mSvc)
+		}
+
+		mon.AddResource(mRes)
+	}
 }

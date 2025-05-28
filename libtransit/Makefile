@@ -22,19 +22,27 @@ INCLUDES = -I./
 # We use "-g" because it helps with running under gdb when we experience segfaults.
 CFLAGS = ${INCLUDES} -m64 -std=gnu11 -g
 
-all: echo libtransit.h libtransit.so transit.h examples
+all		: echo \
+    transit.h \
+    libtransit.h libtransit.so\
+    libtransit_compat.h \
+	examples
 
-echo:
+echo	:
 	@echo Build info: ${BUILD_TAG} / ${BUILD_TIME}
 
 run_examples: examples
 	@echo Running examples
 	LIBTRANSIT=./libtransit.so ./example_dl.run
 
-examples: libtransit.h libtransit.so transit.h ./examples/c/*.c
+examples	: libtransit.so libtransit.h transit.h ./examples/c/*.c
 	${CC} ${CFLAGS} -o example_dl.run ./examples/c/example_dl.c -ldl
 
-# Build shared lib and set build info values with Go linker
+# Build header with constants definitions
+transit.h	: ../sdk/transit/*.go
+	go run ./tools/hgen/ --folders ../sdk/transit
+
+# Build shared lib with build info
 libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
 	go build \
 		-ldflags "-X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}' \
@@ -42,11 +50,13 @@ libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
 		-buildmode=c-shared -o libtransit.so ./
 	chmod +x libtransit.so
 
-# Build additional header
-transit.h: ../sdk/transit/*.go
-	go run ./tools/hgen/ --folders ../sdk/transit
+# Build combined header for compatibility
+libtransit_compat.h	: libtransit.h transit.h
+	cat transit.h > libtransit_compat.h
+	echo >> libtransit_compat.h
+	cat libtransit.h >> libtransit_compat.h
 
-clean:
+clean	:
 	rm -rf *.h *.so *.run
 
 distclean: clean

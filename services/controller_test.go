@@ -29,6 +29,8 @@ func init() {
 func TestController(t *testing.T) {
 	t.Cleanup(func() {
 		assert.NoError(t, os.RemoveAll(filepath.Join(GetController().Connector.NatsStoreDir, "jetstream")))
+		assert.NoError(t, os.RemoveAll(filepath.Join(GetController().Connector.NatsStoreDir, "inventory.json")))
+		assert.NoError(t, os.RemoveAll(filepath.Join(GetController().Connector.NatsStoreDir, "inventory1.json")))
 		assert.NoError(t, os.Remove(GetController().Connector.NatsStoreDir))
 	})
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gwos/tcg/tracing"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -146,8 +147,10 @@ func (bt *Batcher) Batch() {
 			}()
 
 			bt.builder.Build(&buf, bt.maxBytes)
-			log.Trace().Str("bt.tracerName", bt.tracerName).
-				RawJSON("buf", append(append([]byte("["), bytes.Join(buf, []byte(","))...), ']')).
+			log.Trace().Func(func(e *zerolog.Event) { // process only if loglevel enabled
+				e.RawJSON("buf", append(append([]byte("["), bytes.Join(buf, []byte(","))...), ']'))
+			}).
+				Str("bt.tracerName", bt.tracerName).
 				Int("bufferLen", len(buf)).
 				Int("bufferSize", bufSize).
 				Int("maxBytes", bt.maxBytes).

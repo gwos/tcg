@@ -29,10 +29,11 @@ func TestBuild(t *testing.T) {
 	printMemStats()
 
 	qq := make([]transit.GroundworkEventsRequest, 0)
+	var q transit.GroundworkEventsRequest
 	for _, p := range buf {
-		q := new(transit.GroundworkEventsRequest)
-		assert.NoError(t, json.Unmarshal(p, q))
-		qq = append(qq, *q)
+		q = transit.GroundworkEventsRequest{}
+		assert.NoError(t, json.Unmarshal(p, &q))
+		qq = append(qq, q)
 	}
 	assert.Equal(t, 3, len(qq))
 	assert.Equal(t, 3, len(qq[0].Events))
@@ -44,9 +45,9 @@ func TestBuild(t *testing.T) {
 
 // inspired by expvar.Handler() implementation
 func memstats() any {
-	stats := new(runtime.MemStats)
-	runtime.ReadMemStats(stats)
-	return *stats
+	var stats runtime.MemStats
+	runtime.ReadMemStats(&stats)
+	return stats
 }
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))

@@ -120,7 +120,7 @@ func ExecuteRequest(graphURI, token string) ([]byte, error) {
 		}
 		if response.StatusCode != 200 {
 			b, _ := io.ReadAll(response.Body)
-			log.Debug().Msg(fmt.Sprintf("[url=%s][response=%s]", graphURI, string(b)))
+			log.Debug().Msgf("[url=%s][response=%s]", graphURI, string(b))
 			_ = response.Body.Close()
 			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphURI, response.StatusCode))
 		}

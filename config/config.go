@@ -330,11 +330,6 @@ func GetConfig() *Config {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
 		}
-		if cfg.IsPMC() {
-			cfg.Connector.InstallationMode = InstallationModePMC
-			cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
-		}
-
 		logSuppress := func(b bool, str string) {
 			if b {
 				log.Error().Msgf("TCG will suppress %v due to env var is active", str)
@@ -345,11 +340,23 @@ func GetConfig() *Config {
 		logSuppress(Suppress.Inventory, "Inventory")
 		logSuppress(Suppress.Metrics, "Metrics")
 
-		nats.RetryDelays = cfg.Connector.RetryDelays
-
+		/* process PMC */
+		if cfg.IsPMC() {
+			cfg.Connector.InstallationMode = InstallationModePMC
+			cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+		}
+		/* prepare gwConnections */
+		gwEncode := strings.ToLower(cfg.Connector.GWEncode)
+		for i := range cfg.GWConnections {
+			cfg.GWConnections[i].IsDynamicInventory = cfg.Connector.IsDynamicInventory
+			cfg.GWConnections[i].HTTPEncode = gwEncode == "force" ||
+				(gwEncode != "off" && cfg.GWConnections[i].IsChild)
+		}
 		/* init logger and flush buffer */
 		cfg.initLogger()
 		logzer.WriteLogBuffer(logBuf)
+		/* update other deps */
+		nats.RetryDelays = cfg.Connector.RetryDelays
 	})
 	return cfg
 }
@@ -505,6 +512,9 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* update logger */
 	cfg.initLogger()
 
+	/* update other deps */
+	nats.RetryDelays = cfg.Connector.RetryDelays
+
 	return dto, nil
 }
 
@@ -535,7 +545,7 @@ func (cfg Config) initLogger() {
 		logzer.WithColors(cfg.Connector.LogColors),
 		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
 	}
-	if cfg.Connector.LogCondense != 0 && lvl != zerolog.DebugLevel {
+	if cfg.Connector.LogCondense != 0 && lvl > zerolog.DebugLevel {
 		opts = append(opts, logzer.WithCondense(cfg.Connector.LogCondense))
 	}
 	if cfg.Connector.LogFile != "" {

@@ -68,7 +68,7 @@ func testSetContextTimestamp(t *testing.T) {
 			h.Delete()
 			r := reflect.ValueOf(it.target)
 			f := reflect.Indirect(r).FieldByName(it.field)
-			assert.Equal(t, v, f.Interface().(*transit.TracerContext).TimeStamp.String())
+			assert.Equal(t, v, f.Interface().(transit.TracerContext).TimeStamp.String())
 		})
 	}
 }
@@ -95,7 +95,7 @@ func testSetContextToken(t *testing.T) {
 			h.Delete()
 			r := reflect.ValueOf(it.target)
 			f := reflect.Indirect(r).FieldByName(it.field)
-			assert.Equal(t, value, f.Interface().(*transit.TracerContext).TraceToken)
+			assert.Equal(t, value, f.Interface().(transit.TracerContext).TraceToken)
 		})
 	}
 }

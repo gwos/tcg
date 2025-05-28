@@ -28,6 +28,7 @@ import (
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
@@ -124,13 +125,14 @@ func GetAgentService() *AgentService {
 			agentService.hookInterrupt()
 		}
 
-		log.Debug().
-			Str("connector", fmt.Sprintf("%+v", *agentService.Connector)).
-			Str("suppress", fmt.Sprintf("%+v", config.Suppress)).
+		log.Debug().Func(func(e *zerolog.Event) {
+			e.Strs("env", os.Environ()).
+				Str("connector", fmt.Sprintf("%+v", *agentService.Connector)).
+				Str("suppress", fmt.Sprintf("%+v", config.Suppress))
+		}).
+			Stringer("httpClientTimeout", clients.HttpClient.Timeout).
+			Stringer("httpClientTimeoutGW", clients.HttpClientGW.Timeout).
 			Bool("tlsClientInsecure", clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify).
-			Str("httpClientTimeout", clients.HttpClient.Timeout.String()).
-			Str("httpClientTimeoutGW", clients.HttpClientGW.Timeout.String()).
-			Strs("env", os.Environ()).
 			Msg("starting with config")
 	})
 
@@ -168,7 +170,7 @@ func (service *AgentService) DemandConfig() error {
 }
 
 // MakeTracerContext implements AgentServices.MakeTracerContext interface
-func (service *AgentService) MakeTracerContext() *transit.TracerContext {
+func (service *AgentService) MakeTracerContext() transit.TracerContext {
 	/* combine TraceToken from fixed and incremental parts */
 	tokenBuf := make([]byte, 16)
 	copy(tokenBuf, service.tracerToken)
@@ -190,7 +192,7 @@ func (service *AgentService) MakeTracerContext() *transit.TracerContext {
 		appType = traceOnDemandAppType
 	}
 
-	return &transit.TracerContext{
+	return transit.TracerContext{
 		AgentID:    agentID,
 		AppType:    appType,
 		TimeStamp:  transit.NewTimestamp(),
@@ -410,8 +412,8 @@ func (service *AgentService) config(data []byte) error {
 		Str("AgentID", service.AgentID).
 		Str("AppType", service.AppType).
 		Str("AppName", service.AppName).
-		Str("BatchEvents", service.BatchEvents.String()).
-		Str("BatchMetrics", service.BatchMetrics.String()).
+		Stringer("BatchEvents", service.BatchEvents).
+		Stringer("BatchMetrics", service.BatchMetrics).
 		Int("BatchMaxBytes", service.BatchMaxBytes).
 		Str("ControllerAddr", service.ControllerAddr).
 		Str("DSClient", service.dsClient.HostName).

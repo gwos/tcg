@@ -3,6 +3,8 @@ package main
 /*
 #include <stdbool.h>
 #include <stdint.h>
+
+typedef const char cchar_t;
 */
 import "C"
 import (
@@ -24,11 +26,10 @@ func CreateDowntimes() C.uintptr_t {
 // AddDowntime appends HostServiceInDowntime value to target.
 //
 //export AddDowntime
-func AddDowntime(target C.uintptr_t,
-	entityType *C.char,
-	entityName *C.char,
-	hostName *C.char,
-	serviceDesc *C.char,
+func AddDowntime(
+	target C.uintptr_t,
+	entityType, entityName,
+	hostName, serviceDesc *C.cchar_t,
 	scheduledDepth C.int,
 ) {
 	h := cgo.Handle(target)
@@ -61,11 +62,11 @@ func CreateDowntimesRequest() C.uintptr_t {
 // It skips NULL params.
 //
 //export ExtendDowntimesRequest
-func ExtendDowntimesRequest(target C.uintptr_t,
-	hostName,
-	hostGroup,
-	serviceDesc,
-	serviceGroup *C.char) {
+func ExtendDowntimesRequest(
+	target C.uintptr_t,
+	hostName, hostGroup,
+	serviceDesc, serviceGroup *C.cchar_t,
+) {
 	h := cgo.Handle(target)
 	if hv, ok := h.Value().(*transit.DowntimesRequest); ok {
 		if hostName != nil {

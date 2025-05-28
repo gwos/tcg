@@ -140,8 +140,8 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 		if delayRetry != nil {
 			xRetryDelay.Set(fmt.Sprintf("%v / %v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry], time.Now().UTC().Format(time.RFC3339)))
 			log.Debug().
+				Stringer("delay", RetryDelays[delayRetry.Retry]).
 				Int("retry", delayRetry.Retry).
-				Str("delay", RetryDelays[delayRetry.Retry].String()).
 				Msg("dispatcher delaying retry")
 
 			select {
