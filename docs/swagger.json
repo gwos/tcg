@@ -1,8 +1,7 @@
 {
     "swagger": "2.0",
     "info": {
-        "contact": {},
-        "license": {}
+        "contact": {}
     },
     "paths": {
         "/agent": {
@@ -22,7 +21,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentIdentity"
+                            "$ref": "#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity"
                         }
                     }
                 }
@@ -58,7 +57,91 @@
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/downtime-clear": {
+            "post": {
+                "description": "The following API endpoint can be used to send Downtimes to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "downtimes"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/downtime-set": {
+            "post": {
+                "description": "The following API endpoint can be used to send Downtimes to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "downtimes"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -98,7 +181,9 @@
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": "OK"
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -138,7 +223,9 @@
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": "OK"
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -178,7 +265,50 @@
                     }
                 ],
                 "responses": {
-                    "200": {},
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/inventory": {
+            "post": {
+                "description": "The following API endpoint can be used to send Inventory to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
@@ -219,8 +349,96 @@
                 "responses": {
                     "200": {
                         "description": "OK",
+                        "schema": {}
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentStatus"
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The following API endpoint can be used to send Metrics to Foundation.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/reset-nats": {
+            "post": {
+                "description": "The following API endpoint can be used to reset NATS queues.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "agent",
+                    "connector"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/services.ConnectorStatusDTO"
                         }
                     },
                     "401": {
@@ -322,7 +540,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/services.AgentIdentityStats"
+                            "$ref": "#/definitions/services.AgentStatsExt"
                         }
                     },
                     "401": {
@@ -429,16 +647,72 @@
                     }
                 }
             }
+        },
+        "/version": {
+            "get": {
+                "description": "The following API endpoint can be used to return actual TCG connector version.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "agent",
+                    "connector"
+                ],
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-APP-NAME",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth header",
+                        "name": "GWOS-API-TOKEN",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/config.BuildInfo"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "transit.Timestamp": {
-            "type": "object"
-        },
-        "services.AgentIdentity": {
+        "config.BuildInfo": {
             "type": "object",
             "properties": {
-                "agentID": {
+                "tag": {
+                    "type": "string"
+                },
+                "time": {
+                    "type": "string"
+                }
+            }
+        },
+        "expvar.Int": {
+            "type": "object"
+        },
+        "github_com_gwos_tcg_sdk_transit.AgentIdentity": {
+            "type": "object",
+            "properties": {
+                "agentId": {
                     "type": "string"
                 },
                 "appName": {
@@ -449,10 +723,13 @@
                 }
             }
         },
-        "services.AgentIdentityStats": {
+        "logzer.LogRecord": {
+            "type": "object"
+        },
+        "services.AgentStatsExt": {
             "type": "object",
             "properties": {
-                "agentID": {
+                "agentId": {
                     "type": "string"
                 },
                 "appName": {
@@ -462,59 +739,37 @@
                     "type": "string"
                 },
                 "bytesSent": {
-                    "type": "integer"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "executionTimeInventory": {
-                    "type": "string"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "executionTimeMetrics": {
-                    "type": "string"
-                },
-                "lastAlertRun": {
-                    "type": "object",
-                    "$ref": "#/definitions/transit.Timestamp"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "lastErrors": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/services.LastError"
+                        "$ref": "#/definitions/logzer.LogRecord"
                     }
                 },
+                "lastEventsRun": {
+                    "$ref": "#/definitions/expvar.Int"
+                },
                 "lastInventoryRun": {
-                    "type": "object",
-                    "$ref": "#/definitions/transit.Timestamp"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "lastMetricsRun": {
-                    "type": "object",
-                    "$ref": "#/definitions/transit.Timestamp"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "messagesSent": {
-                    "type": "integer"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "metricsSent": {
-                    "type": "integer"
+                    "$ref": "#/definitions/expvar.Int"
                 },
                 "upSince": {
-                    "type": "object",
-                    "$ref": "#/definitions/transit.Timestamp"
-                }
-            }
-        },
-        "services.AgentStatus": {
-            "type": "object",
-            "properties": {
-                "controller": {
-                    "type": "string"
-                },
-                "ctrl": {
-                    "type": "object",
-                    "$ref": "#/definitions/services.CtrlAction"
-                },
-                "nats": {
-                    "type": "string"
-                },
-                "transport": {
-                    "type": "string"
+                    "$ref": "#/definitions/expvar.Int"
                 }
             }
         },
@@ -526,18 +781,6 @@
                 },
                 "jobId": {
                     "type": "integer"
-                }
-            }
-        },
-        "services.LastError": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
-                },
-                "time": {
-                    "type": "object",
-                    "$ref": "#/definitions/transit.Timestamp"
                 }
             }
         }
