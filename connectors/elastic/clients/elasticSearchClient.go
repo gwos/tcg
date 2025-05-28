@@ -208,15 +208,15 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 		Msg("ES Search response")
 
 	if response.IsError() {
-		var e map[string]interface{}
+		var e map[string]any
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
 			log.Err(err).Msg("could not parse Search response")
 		} else {
 			// Print the response status and error information.
 			log.Error().Msgf("response is error: %s: %s: %s",
 				response.Status(),
-				e["error"].(map[string]interface{})["type"],
-				e["error"].(map[string]interface{})["reason"],
+				e["error"].(map[string]any)["type"],
+				e["error"].(map[string]any)["reason"],
 			)
 		}
 		return nil
@@ -277,15 +277,15 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		Msg("ES FieldCaps response")
 
 	if response.IsError() {
-		var e map[string]interface{}
+		var e map[string]any
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
 			log.Err(err).Msg("could not parse ES FieldCaps response")
 		} else {
 			// Print the response status and error information.
 			log.Error().Msgf("response is error: %s: %s: %s",
 				response.Status(),
-				e["error"].(map[string]interface{})["type"],
-				e["error"].(map[string]interface{})["reason"],
+				e["error"].(map[string]any)["type"],
+				e["error"].(map[string]any)["reason"],
 			)
 		}
 		return result, nil
@@ -310,12 +310,12 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		for _, fieldName := range fieldNames {
 			if field, exists := fieldCapsResponse.Fields[fieldName]; exists {
 				switch field.(type) {
-				case map[string]interface{}:
-					fieldCaps := field.(map[string]interface{})
+				case map[string]any:
+					fieldCaps := field.(map[string]any)
 					for _, v := range fieldCaps {
 						switch v.(type) {
-						case map[string]interface{}:
-							fieldCap := v.(map[string]interface{})
+						case map[string]any:
+							fieldCap := v.(map[string]any)
 							if aggregatable, exists := fieldCap["aggregatable"]; exists {
 								switch aggregatable := aggregatable.(type) {
 								case bool:

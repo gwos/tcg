@@ -29,7 +29,7 @@ func BuildEsQuery(storedQuery KSavedObject) EsQuery {
 			q, err := nodes.ParseKueryString(storedQuery.Attributes.Query.Query,
 				nil, config.New(), context.New())
 			if err == nil {
-				/* got parsed query organized in nested map[string]interface{} similar to EsQuery type
+				/* got parsed query organized in nested map[string]any similar to EsQuery type
 				with `.bool.minimum_should_match:1` and filled `.bool.should` members */
 				esQuery.Bool.Filter = append(esQuery.Bool.Filter, q)
 			} else {
@@ -83,7 +83,7 @@ func buildQueryFromFilters(filters []KFilter) EsQueryBool {
 }
 
 // = buildQueryFromFilters.filtersToESQueries in /kibana/src/plugins/data/common/es_query/es_query/from_filters.ts
-func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
+func filtersToESQueries(filters []KFilter, negate bool) []any {
 	// filter negate
 	var negateFilters []KFilter
 	for _, filter := range filters {
@@ -102,12 +102,12 @@ func filtersToESQueries(filters []KFilter, negate bool) []interface{} {
 
 	// TODO nested filters are not supported
 
-	var translatedFilters = make([]interface{}, 0, len(migratedFilters))
+	var translatedFilters = make([]any, 0, len(migratedFilters))
 	for _, filter := range migratedFilters {
 		translatedFilters = append(translatedFilters, translateToQuery(filter))
 	}
 
-	var cleanedFilters = make([]interface{}, 0, len(translatedFilters))
+	var cleanedFilters = make([]any, 0, len(translatedFilters))
 	for _, filter := range translatedFilters {
 		cleanedFilters = append(cleanedFilters, cleanFilter(filter))
 	}
@@ -134,25 +134,25 @@ func filterNegate(filter KFilter, reverse bool) bool {
 func migrateDeprecatedPhraseFilter(filter KFilter) KFilter {
 	if filter.Query != nil {
 		switch filter.Query.(type) {
-		case map[string]interface{}:
-			filterQuery := filter.Query.(map[string]interface{})
+		case map[string]any:
+			filterQuery := filter.Query.(map[string]any)
 			if matchValue, has := filterQuery["match"]; has {
 				switch matchValue.(type) {
-				case map[string]interface{}:
-					queryBody := matchValue.(map[string]interface{})
+				case map[string]any:
+					queryBody := matchValue.(map[string]any)
 					var fieldName string
 					for k := range queryBody {
 						fieldName = k
 						break
 					}
 					switch queryBody[fieldName].(type) {
-					case map[string]interface{}:
-						field := queryBody[fieldName].(map[string]interface{})
+					case map[string]any:
+						field := queryBody[fieldName].(map[string]any)
 						if fieldType, has := field["type"]; has {
 							switch fieldType.(type) {
 							case string:
 								if fieldType.(string) == "phrase" {
-									query := queryBody[fieldName].(map[string]interface{})["query"]
+									query := queryBody[fieldName].(map[string]any)["query"]
 									filter.Query = buildMatchPhraseFilter(fieldName, query)
 								}
 							}
@@ -166,7 +166,7 @@ func migrateDeprecatedPhraseFilter(filter KFilter) KFilter {
 }
 
 // = translateToQuery in /kibana/src/plugins/data/common/es_query/es_query/from_filters.ts
-func translateToQuery(filter KFilter) interface{} {
+func translateToQuery(filter KFilter) any {
 	if filter.Query != nil {
 		return filter.Query
 	}
@@ -174,7 +174,7 @@ func translateToQuery(filter KFilter) interface{} {
 }
 
 // = cleanFilter in /kibana/src/plugins/data/common/es_query/filters/index.ts
-func cleanFilter(filter interface{}) interface{} {
+func cleanFilter(filter any) any {
 	switch filter := filter.(type) {
 	case KFilter:
 		cleanedFilter := filter
@@ -190,7 +190,7 @@ func buildRangeFilterFromTimeFilter(timeFilter KTimeFilter) KFilter {
 		From: timeFilter.From,
 		To:   timeFilter.To,
 	}
-	rangeFilter := map[string]interface{}{
+	rangeFilter := map[string]any{
 		"@timestamp": timestamp.toAbsoluteUtcTime(),
 	}
 	return KFilter{
@@ -199,10 +199,10 @@ func buildRangeFilterFromTimeFilter(timeFilter KTimeFilter) KFilter {
 }
 
 // to replace deprecated match phrase filter and assign our hostName filter
-func buildMatchPhraseFilter(fieldName string, value interface{}) interface{} {
-	query := map[string]interface{}{
-		"match_phrase": map[string]interface{}{
-			fieldName: map[string]interface{}{
+func buildMatchPhraseFilter(fieldName string, value any) any {
+	query := map[string]any{
+		"match_phrase": map[string]any{
+			fieldName: map[string]any{
 				"query": value,
 			},
 		},

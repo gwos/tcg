@@ -17,7 +17,7 @@ func AddonLicenseMetrics(service *transit.MonitoredService, token string) (err e
 	var (
 		c    int
 		body []byte
-		v    interface{}
+		v    any
 	)
 
 	if body, err = ExecuteRequest(licenseURI, token); err == nil {

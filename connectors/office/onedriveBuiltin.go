@@ -13,7 +13,7 @@ const oneDriveURI = "https://graph.microsoft.com/v1.0/drive"
 func OneDrive(service *transit.MonitoredService, token string) (err error) {
 	var (
 		body []byte
-		v    interface{}
+		v    any
 	)
 	if body, err = ExecuteRequest(oneDriveURI, token); err == nil {
 		_ = json.Unmarshal(body, &v)

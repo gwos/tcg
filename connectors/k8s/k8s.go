@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -402,7 +403,7 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 		}
 		// process services
 		for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
-			var value interface{}
+			var value any
 			switch key {
 			case cpuCores:
 				value = node.Status.Capacity.Cpu().Value()
@@ -578,7 +579,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) 
 		stateKey := fmt.Sprintf("node:%v:%v", GetLabels(node)["namespace"], node.Name)
 		if resource, ok := state.State[stateKey]; ok {
 			for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
-				var value interface{}
+				var value any
 				switch key {
 				case cpu:
 					value = node.Usage.Cpu().MilliValue()
@@ -634,7 +635,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *Monitor
 				}
 				metricBuilders := make([]connectors.MetricBuilder, 0)
 				for key, metricDefinition := range connector.ExtConfig.Views[ViewPods] {
-					var value interface{}
+					var value any
 					switch key {
 					case cpuCores:
 						value = container.Usage.Cpu().Value()
@@ -702,7 +703,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *Monit
 
 				stateKey := fmt.Sprintf("pod:%v:%v:%v", GetLabels(pod, container)["namespace"], pod.Name, container.Name)
 				if resource, ok := state.State[stateKey]; ok {
-					var value interface{}
+					var value any
 					switch key {
 					case cpuCores:
 						value = container.Usage.Cpu().Value()
@@ -843,7 +844,7 @@ func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
 	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
 }
 
-func GetLabels(a ...interface{}) map[string]string {
+func GetLabels(a ...any) map[string]string {
 	labels := map[string]string{
 		"cluster":   "default",
 		"namespace": "default",
@@ -856,33 +857,25 @@ func GetLabels(a ...interface{}) map[string]string {
 			labels["container_name"] = v.Name
 		case v1.Node:
 			labels["node_name"] = v.Name
-			for key, element := range v.GetLabels() {
-				labels[key] = element
-			}
+			maps.Copy(labels, v.GetLabels())
 			if ns := v.GetNamespace(); ns != "" {
 				labels["namespace"] = ns
 			}
 		case v1beta1.NodeMetrics:
 			labels["node_name"] = v.Name
-			for key, element := range v.GetLabels() {
-				labels[key] = element
-			}
+			maps.Copy(labels, v.GetLabels())
 			if ns := v.GetNamespace(); ns != "" {
 				labels["namespace"] = ns
 			}
 		case v1.Pod:
 			labels["pod_name"] = v.Name
-			for key, element := range v.GetLabels() {
-				labels[key] = element
-			}
+			maps.Copy(labels, v.GetLabels())
 			if ns := v.GetNamespace(); ns != "" {
 				labels["namespace"] = ns
 			}
 		case v1beta1.PodMetrics:
 			labels["pod_name"] = v.Name
-			for key, element := range v.GetLabels() {
-				labels[key] = element
-			}
+			maps.Copy(labels, v.GetLabels())
 			if ns := v.GetNamespace(); ns != "" {
 				labels["namespace"] = ns
 			}

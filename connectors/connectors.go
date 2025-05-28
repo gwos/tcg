@@ -217,10 +217,10 @@ type MetricBuilder struct {
 	CustomName     string
 	ComputeType    transit.ComputeType
 	Expression     string
-	Value          interface{}
-	UnitType       interface{}
-	Warning        interface{}
-	Critical       interface{}
+	Value          any
+	UnitType       any
+	Warning        any
+	Critical       any
 	StartTimestamp *transit.Timestamp
 	EndTimestamp   *transit.Timestamp
 	Graphed        bool
@@ -229,7 +229,7 @@ type MetricBuilder struct {
 
 // BuildMetric creates metric based on data provided with metricBuilder
 func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
-	var args []interface{}
+	var args []any
 	if metricBuilder.UnitType != nil {
 		args = append(args, metricBuilder.UnitType)
 	}
@@ -294,7 +294,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 // with optional Unit and optional Interval and optional UnitType
 // CreateMetric("cpu", 30.59, interval, transit.PercentCPU)
 // Thresholds must be set separately
-func CreateMetric(name string, value interface{}, args ...interface{}) (*transit.TimeSeries, error) {
+func CreateMetric(name string, value any, args ...any) (*transit.TimeSeries, error) {
 	// set the value based on variable type
 	typedValue := transit.NewTypedValue(value)
 	if typedValue == nil {
@@ -306,7 +306,7 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 		Value:      typedValue,
 	}
 	// optional argument processing
-	// var arguments []interface{} = make([]interface{}, len(args))
+	// var arguments []any = make([]any, len(args))
 	for _, arg := range args {
 		switch arg := arg.(type) {
 		case string:
@@ -337,15 +337,15 @@ func CreateMetric(name string, value interface{}, args ...interface{}) (*transit
 	return &metric, nil
 }
 
-func CreateWarningThreshold(label string, value interface{}) (*transit.ThresholdValue, error) {
+func CreateWarningThreshold(label string, value any) (*transit.ThresholdValue, error) {
 	return CreateThreshold(transit.Warning, label, value)
 }
 
-func CreateCriticalThreshold(label string, value interface{}) (*transit.ThresholdValue, error) {
+func CreateCriticalThreshold(label string, value any) (*transit.ThresholdValue, error) {
 	return CreateThreshold(transit.Critical, label, value)
 }
 
-func CreateThreshold(thresholdType transit.MetricSampleType, label string, value interface{}) (*transit.ThresholdValue, error) {
+func CreateThreshold(thresholdType transit.MetricSampleType, label string, value any) (*transit.ThresholdValue, error) {
 	// create the threshold type
 	// set the value based on variable type
 	typedValue := transit.NewTypedValue(value)
@@ -372,7 +372,7 @@ func BuildServiceForMetric(hostName string, metricBuilder MetricBuilder) (*trans
 	}
 	serviceName := Name(metricBuilder.Name, metricBuilder.CustomName)
 
-	serviceProperties := make(map[string]interface{})
+	serviceProperties := make(map[string]any)
 	// serviceProperties["isGraphed"] = metricBuilder.Graphed
 
 	return CreateService(serviceName, hostName, []transit.TimeSeries{*metric}, serviceProperties)
@@ -427,7 +427,7 @@ func BuildServiceForMetrics(serviceName string, hostName string, metricBuilders 
 // CreateService makes node
 // required params: name, owner(resource)
 // optional params: metrics
-func CreateService(name string, owner string, args ...interface{}) (*transit.MonitoredService, error) {
+func CreateService(name string, owner string, args ...any) (*transit.MonitoredService, error) {
 	lastCheckTime := *transit.NewTimestamp()
 	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	service := transit.MonitoredService{
@@ -452,7 +452,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 				service.LastCheckTime = &lastCheckTime
 				service.NextCheckTime = &nextCheckTime
 			}
-		case map[string]interface{}:
+		case map[string]any:
 			service.CreateProperties(arg)
 		default:
 			return nil, fmt.Errorf("%w: %T", ErrUnsupportedType, arg)
@@ -469,7 +469,7 @@ func CreateService(name string, owner string, args ...interface{}) (*transit.Mon
 // CreateResource makes node
 // required params: name
 // optional params: services
-func CreateResource(name string, args ...interface{}) (*transit.MonitoredResource, error) {
+func CreateResource(name string, args ...any) (*transit.MonitoredResource, error) {
 	lastCheckTime := *transit.NewTimestamp()
 	nextCheckTime := lastCheckTime.Add(CheckInterval)
 	resource := transit.MonitoredResource{
@@ -512,7 +512,7 @@ func CreateResource(name string, args ...interface{}) (*transit.MonitoredResourc
 // EvaluateExpressions calculates synthetic metrics
 func EvaluateExpressions(services []transit.MonitoredService) []transit.MonitoredService {
 	var (
-		vars   = make(map[string]interface{})
+		vars   = make(map[string]any)
 		result = make([]transit.MonitoredService, 0, len(services))
 	)
 

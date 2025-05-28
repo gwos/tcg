@@ -83,8 +83,8 @@ func (w *CondenseWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
 	return w.LevelWriter.WriteLevel(lvl, p)
 }
 
-func (w *CondenseWriter) onEvicted() func(string, interface{}) {
-	return func(ck string, i interface{}) {
+func (w *CondenseWriter) onEvicted() func(string, any) {
+	return func(ck string, i any) {
 		appendLvl := func(dst []byte, lvl zerolog.Level) []byte {
 			dst = append(dst, '"')
 			dst = append(dst, zerolog.LevelFieldName...)
@@ -169,7 +169,7 @@ func (lb *LogBuffer) Records() []LogRecord {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
 	rec := []LogRecord{}
-	lb.ring.Do(func(p interface{}) {
+	lb.ring.Do(func(p any) {
 		if p != nil {
 			rec = append(rec, p.(LogRecord))
 		}

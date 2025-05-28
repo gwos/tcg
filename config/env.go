@@ -48,7 +48,7 @@ func applyFlags() {
 	}
 }
 
-func applyEnv(v ...interface{}) error {
+func applyEnv(v ...any) error {
 	var ee []error
 	for i := range v {
 		if err := env.ParseWithOptions(v[i], env.Options{Prefix: EnvPrefix}); err != nil {

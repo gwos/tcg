@@ -12,7 +12,7 @@ const (
 
 func SecurityAssessments(service *transit.MonitoredService, token string) (err error) {
 	var (
-		v    interface{}
+		v    any
 		c    int
 		body []byte
 	)

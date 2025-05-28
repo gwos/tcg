@@ -3,6 +3,7 @@ package snmp
 import (
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"sort"
 	"strconv"
@@ -117,9 +118,7 @@ func (connector *SnmpConnector) CollectMetrics() (
 			log.Warn().Msgf("not supported view: %s", view)
 			continue
 		}
-		for k, v := range metrics {
-			metricDefinitions[k] = v
-		}
+		maps.Copy(metricDefinitions, metrics)
 	}
 
 	mrs := connector.mState.retrieveMonitoredResources(metricDefinitions)

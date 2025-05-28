@@ -15,7 +15,7 @@ func testSetCategory(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -50,7 +50,7 @@ func testSetContextTimestamp(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryRequest",
@@ -77,7 +77,7 @@ func testSetContextToken(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryRequest",
@@ -104,7 +104,7 @@ func testSetDescription(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -143,7 +143,7 @@ func testSetDevice(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -170,7 +170,7 @@ func testSetIntervalEnd(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "TimeSeries",
@@ -193,7 +193,7 @@ func testSetIntervalStart(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "TimeSeries",
@@ -216,7 +216,7 @@ func testSetLastPluginOutput(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "MonitoredResource",
@@ -243,7 +243,7 @@ func testSetLastCheckTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "MonitoredResource",
@@ -270,7 +270,7 @@ func testSetNextCheckTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "MonitoredResource",
@@ -297,7 +297,7 @@ func testSetName(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -340,7 +340,7 @@ func testSetOwner(t *testing.T) {
 	value := "test-test"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -375,7 +375,7 @@ func testSetPropertyBool(t *testing.T) {
 	key, value := "test-test", false
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -414,7 +414,7 @@ func testSetPropertyDouble(t *testing.T) {
 	key, value := "test-test", -1.1
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -450,7 +450,7 @@ func testSetPropertyInt(t *testing.T) {
 	key, value := "test-test", int64(42)
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -486,7 +486,7 @@ func testSetPropertyStr(t *testing.T) {
 	key, value := "test-test", "foo-bar"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -522,7 +522,7 @@ func testSetPropertyTime(t *testing.T) {
 	key, v, v1, v2 := "test-test", "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "InventoryResource",
@@ -558,7 +558,7 @@ func testSetSampleType(t *testing.T) {
 	value := transit.Value
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "TimeSeries",
@@ -580,9 +580,9 @@ func testSetSampleType(t *testing.T) {
 func testSetStatus(t *testing.T) {
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
-		value  interface{}
+		value  any
 	}{{
 		name:   "MonitoredResource",
 		target: new(transit.MonitoredResource),
@@ -610,7 +610,7 @@ func testSetTag(t *testing.T) {
 	key, value := "test-test", "foo-bar"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "TimeSeries",
@@ -632,9 +632,9 @@ func testSetTag(t *testing.T) {
 func testSetType(t *testing.T) {
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
-		value  interface{}
+		value  any
 	}{{
 		name:   "InventoryResource",
 		target: new(transit.InventoryResource),
@@ -677,7 +677,7 @@ func testSetUnit(t *testing.T) {
 	value := transit.UnitCounter
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "TimeSeries",
@@ -700,7 +700,7 @@ func testSetValueBool(t *testing.T) {
 	value := false
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "ThresholdValue",
@@ -731,7 +731,7 @@ func testSetValueDouble(t *testing.T) {
 	value := -1.1
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "ThresholdValue",
@@ -759,7 +759,7 @@ func testSetValueInt(t *testing.T) {
 	value := int64(42)
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "ThresholdValue",
@@ -787,7 +787,7 @@ func testSetValueStr(t *testing.T) {
 	value := "foo-bar"
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "ThresholdValue",
@@ -815,7 +815,7 @@ func testSetValueTime(t *testing.T) {
 	v, v1, v2 := "1609372800000", 1609372800, 0
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		field  string
 	}{{
 		name:   "ThresholdValue",

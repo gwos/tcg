@@ -227,7 +227,7 @@ func (value TypedValue) String() string {
 }
 
 // NewTypedValue returns a reference to TypedValue or nil
-func NewTypedValue(v interface{}) *TypedValue {
+func NewTypedValue(v any) *TypedValue {
 	p := new(TypedValue)
 	switch v := v.(type) {
 	case bool:
@@ -367,7 +367,7 @@ type ThresholdValue struct {
 	Value      *TypedValue      `json:"value"`
 }
 
-func (p *ThresholdValue) SetValue(v interface{}) {
+func (p *ThresholdValue) SetValue(v any) {
 	p.Value = NewTypedValue(v)
 }
 
@@ -425,7 +425,7 @@ func (p *TimeSeries) SetIntervalStart(t *Timestamp) {
 	p.Interval.StartTime = t
 }
 
-func (p *TimeSeries) SetValue(v interface{}) {
+func (p *TimeSeries) SetValue(v any) {
 	p.Value = NewTypedValue(v)
 }
 
@@ -635,23 +635,23 @@ func (operationResults OperationResults) String() string {
 }
 
 type View struct {
-	Name        string                 `json:"name"`
-	DisplayName string                 `json:"displayName"`
-	Enabled     bool                   `json:"enabled"`
-	Extensions  map[string]interface{} `json:"extensions,omitempty"`
+	Name        string         `json:"name"`
+	DisplayName string         `json:"displayName"`
+	Enabled     bool           `json:"enabled"`
+	Extensions  map[string]any `json:"extensions,omitempty"`
 }
 
 // MonitorConnection describes the connection to the monitored system
 type MonitorConnection struct {
-	ID          int         `json:"id"`
-	Server      string      `json:"server"`
-	UserName    string      `json:"userName"`
-	Password    string      `json:"password"`
-	SslEnabled  bool        `json:"sslEnabled"`
-	URL         string      `json:"url"`
-	Views       []View      `json:"views,omitempty"`
-	Extensions  interface{} `json:"extensions"`
-	ConnectorID int         `json:"connectorId"`
+	ID          int    `json:"id"`
+	Server      string `json:"server"`
+	UserName    string `json:"userName"`
+	Password    string `json:"password"`
+	SslEnabled  bool   `json:"sslEnabled"`
+	URL         string `json:"url"`
+	Views       []View `json:"views,omitempty"`
+	Extensions  any    `json:"extensions"`
+	ConnectorID int    `json:"connectorId"`
 }
 
 // String implements Stringer interface

@@ -192,7 +192,7 @@ func (c *GWConnection) AsClient() clients.GWConnection {
 
 // MarshalYAML implements yaml.Marshaler interface
 // overrides the password field
-func (c GWConnection) MarshalYAML() (interface{}, error) {
+func (c GWConnection) MarshalYAML() (any, error) {
 	type plain GWConnection
 	p := plain(c)
 	if s := os.Getenv(SecKeyEnv); s != "" {
@@ -207,7 +207,7 @@ func (c GWConnection) MarshalYAML() (interface{}, error) {
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 // overrides the password field
-func (c *GWConnection) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (c *GWConnection) UnmarshalYAML(unmarshal func(any) error) error {
 	type plain GWConnection
 	if err := unmarshal((*plain)(c)); err != nil {
 		return err
@@ -397,8 +397,8 @@ func (cfg *Config) loadAdvancedPrefixes(data []byte) error {
 			Prefixes []struct {
 				GWConnectionID int    `json:"groundworkConnectionId"`
 				Prefix         string `json:"prefix"`
-			} `json:"prefixes,omitempty"`
-		} `json:"advanced,omitempty"`
+			} `json:"prefixes,omitzero"`
+		} `json:"advanced,omitzero"`
 	}
 	if err := json.Unmarshal(data, &s); err != nil {
 		log.Err(err).Msg("could not parse advanced")

@@ -42,7 +42,7 @@ func (p *BaseInfo) SetDescription(s string) {
 	p.Description = s
 }
 
-func (p *BaseInfo) SetProperty(k string, v interface{}) {
+func (p *BaseInfo) SetProperty(k string, v any) {
 	t := NewTypedValue(v)
 	if t == nil {
 		sdklog.Logger.Error(fmt.Sprintf("could not set property %s on %s: unsupported value type: %T",
@@ -55,7 +55,7 @@ func (p *BaseInfo) SetProperty(k string, v interface{}) {
 	p.Properties[k] = *t
 }
 
-func (p *BaseInfo) CreateProperties(properties map[string]interface{}) {
+func (p *BaseInfo) CreateProperties(properties map[string]any) {
 	for k, v := range properties {
 		p.SetProperty(k, v)
 	}
@@ -77,11 +77,11 @@ func (p BaseResource) ToResourceRef() ResourceRef {
 
 // InventoryResource represents a resource that is included in a inventory scan.
 // Examples include:
-//  * nagios host
-//  * virtual machine instance
-//  * RDS database
-//  * storage devices such as disks
-//  * cloud resources such as cloud apps, cloud functions(lambdas)
+//   - nagios host
+//   - virtual machine instance
+//   - RDS database
+//   - storage devices such as disks
+//   - cloud resources such as cloud apps, cloud functions(lambdas)
 //
 // An InventoryResource is the representation of a specific monitored resource during an inventory scan.
 // Each InventoryResource contains list of services (InventoryService) (no metrics are sent).

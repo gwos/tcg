@@ -20,7 +20,7 @@ func testSetEventAttrs(t *testing.T) {
 	}
 	tests := []struct {
 		name   string
-		target interface{}
+		target any
 		fields []string
 		values []string
 	}{{
@@ -77,7 +77,7 @@ func testSetEventDates(t *testing.T) {
 	ptr := func(i int64) *C.longlong { return (*C.longlong)(&i) }
 	tests := []struct {
 		name     string
-		target   interface{}
+		target   any
 		fields   []string
 		values   [][2]*C.longlong
 		expected []*transit.Timestamp
