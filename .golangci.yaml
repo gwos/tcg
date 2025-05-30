@@ -1,69 +1,90 @@
+version: "2"
 run:
-  go: '1.24'
-  build-tags:
-    - codeanalysis
-
+    go: "1.24"
+    build-tags:
+        - codeanalysis
 linters:
-  disable-all: false
-  enable:
-    - bodyclose
-    - dogsled
-    - dupl
-    - errcheck
-    - goconst
-    - gofmt
-    - goimports
-    - govet
-    - ineffassign
-    - misspell
-    - prealloc
-    - staticcheck
-    - stylecheck
-    - unconvert
-    - unused
-    - whitespace
-  disable:
-    - depguard
-    - gochecknoglobals
-    - gochecknoinits
-    - godox
-    - lll
-    - nakedret
-    - wsl
-    - gosimple
-    - gosec
-    - funlen
-    - typecheck
-issues:
-  exclude-dirs:
-    - vendor
-    - bin
-    - var
-    - tmp
-    - gotocjson
-    - libtransit
-    - deprecated
-    - connectors/nsca
-    - connector/nsca/nsca
-  exclude-files:
-    - \.pb\.go$
-    - connector/nsca/nsca/nsca.go
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - gomnd
-        - funlen
-        - scopelint
-        - dupl
-        - gocognit
-    - path: _tst\.go
-      linters:
+    enable:
+        - bodyclose
+        - dogsled
         - dupl
         - goconst
-        - govet
-  exclude:
-    - "not declared by package utf8"
-    - "unicode/utf8/utf8.go"
-    - "DecodeRuneInString not declared by package utf8"
-    - ".*and that stutters.*"
+        - misspell
+        - prealloc
+        - staticcheck
+        - unconvert
+        - whitespace
+    disable:
+        - depguard
+        - funlen
+        - gochecknoglobals
+        - gochecknoinits
+        - godox
+        - gosec
+        - lll
+        - nakedret
+        - wsl
+    exclusions:
+        generated: lax
+        presets:
+            - comments
+            - common-false-positives
+            - legacy
+            - std-error-handling
+        rules:
+            - linters:
+                  - dupl
+                  - funlen
+                  - gocognit
+                  - mnd
+                  - scopelint
+              path: _test\.go
+            - linters:
+                  - dupl
+                  - goconst
+                  - govet
+              path: _tst\.go
+            - path: (.+)\.go$
+              text: not declared by package utf8
+            - path: (.+)\.go$
+              text: unicode/utf8/utf8.go
+            - path: (.+)\.go$
+              text: DecodeRuneInString not declared by package utf8
+            - path: (.+)\.go$
+              text: .*and that stutters.*
+        paths:
+            - \.pb\.go$
+            - connector/nsca/nsca/nsca.go
+            - vendor
+            - bin
+            - var
+            - tmp
+            - gotocjson
+            - libtransit
+            - deprecated
+            - connectors/nsca
+            - connector/nsca/nsca
+            - third_party$
+            - builtin$
+            - examples$
+formatters:
+    enable:
+        - gofmt
+        - goimports
+    exclusions:
+        generated: lax
+        paths:
+            - \.pb\.go$
+            - connector/nsca/nsca/nsca.go
+            - vendor
+            - bin
+            - var
+            - tmp
+            - gotocjson
+            - libtransit
+            - deprecated
+            - connectors/nsca
+            - connector/nsca/nsca
+            - third_party$
+            - builtin$
+            - examples$
