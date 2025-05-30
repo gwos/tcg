@@ -43,7 +43,7 @@ const (
 )
 
 // expressionToFuncMap allows to call function using it's special Groundwork name
-var expressionToFuncMap = map[string]interface{}{
+var expressionToFuncMap = map[string]any{
 	Kb:                 KB,
 	Mb:                 MB,
 	Gb:                 GB,
@@ -374,7 +374,7 @@ func ScalePercentageUsed(values ...float64) float64 {
 	return ToPercentage(usage)
 }
 
-func EvaluateGroundworkExpression(expression string, vars map[string]interface{}, argumentCounter int) (float64, []float64, error) {
+func EvaluateGroundworkExpression(expression string, vars map[string]any, argumentCounter int) (float64, []float64, error) {
 	expression = strings.TrimSpace(expression)
 
 	pattern := `^GW:\w+\([^\(\)]+\)$`
@@ -458,7 +458,7 @@ func ListExpressions(name string) []ExpressionToSuggest {
 }
 
 func EvaluateExpression(expression ExpressionToEvaluate, override bool) (float64, error) {
-	vars := make(map[string]interface{})
+	vars := make(map[string]any)
 
 	if !override {
 		if processesInterface, exist := ProcessesCache.Get("processes"); exist {

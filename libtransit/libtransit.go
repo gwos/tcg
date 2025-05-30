@@ -409,7 +409,7 @@ func SetOwner(target C.uintptr_t, value *C.cchar_t) {
 //export SetPropertyBool
 func SetPropertyBool(target C.uintptr_t, key *C.cchar_t, value C.bool) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetProperty(string, any) }); ok {
 		hv.SetProperty(C.GoString(key), bool(value))
 	}
 }
@@ -419,7 +419,7 @@ func SetPropertyBool(target C.uintptr_t, key *C.cchar_t, value C.bool) {
 //export SetPropertyDouble
 func SetPropertyDouble(target C.uintptr_t, key *C.cchar_t, value C.double) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetProperty(string, any) }); ok {
 		hv.SetProperty(C.GoString(key), float64(value))
 	}
 }
@@ -429,7 +429,7 @@ func SetPropertyDouble(target C.uintptr_t, key *C.cchar_t, value C.double) {
 //export SetPropertyInt
 func SetPropertyInt(target C.uintptr_t, key *C.cchar_t, value C.longlong) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetProperty(string, any) }); ok {
 		hv.SetProperty(C.GoString(key), int64(value))
 	}
 }
@@ -439,7 +439,7 @@ func SetPropertyInt(target C.uintptr_t, key *C.cchar_t, value C.longlong) {
 //export SetPropertyStr
 func SetPropertyStr(target C.uintptr_t, key, value *C.cchar_t) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetProperty(string, any) }); ok {
 		hv.SetProperty(C.GoString(key), C.GoString(value))
 	}
 }
@@ -449,7 +449,7 @@ func SetPropertyStr(target C.uintptr_t, key, value *C.cchar_t) {
 //export SetPropertyTime
 func SetPropertyTime(target C.uintptr_t, key *C.cchar_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetProperty(string, interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetProperty(string, any) }); ok {
 		hv.SetProperty(C.GoString(key),
 			transit.Timestamp{Time: time.Unix(int64(sec), int64(nsec)).UTC()})
 	}
@@ -517,7 +517,7 @@ func SetUnit(target C.uintptr_t, value *C.cchar_t) {
 //export SetValueBool
 func SetValueBool(target C.uintptr_t, value C.bool) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetValue(any) }); ok {
 		hv.SetValue(bool(value))
 	}
 }
@@ -527,7 +527,7 @@ func SetValueBool(target C.uintptr_t, value C.bool) {
 //export SetValueDouble
 func SetValueDouble(target C.uintptr_t, value C.double) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetValue(any) }); ok {
 		hv.SetValue(float64(value))
 	}
 }
@@ -537,7 +537,7 @@ func SetValueDouble(target C.uintptr_t, value C.double) {
 //export SetValueInt
 func SetValueInt(target C.uintptr_t, value C.longlong) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetValue(any) }); ok {
 		hv.SetValue(int64(value))
 	}
 }
@@ -547,7 +547,7 @@ func SetValueInt(target C.uintptr_t, value C.longlong) {
 //export SetValueStr
 func SetValueStr(target C.uintptr_t, value *C.cchar_t) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetValue(any) }); ok {
 		hv.SetValue(C.GoString(value))
 	}
 }
@@ -557,7 +557,7 @@ func SetValueStr(target C.uintptr_t, value *C.cchar_t) {
 //export SetValueTime
 func SetValueTime(target C.uintptr_t, sec, nsec C.longlong) {
 	h := cgo.Handle(target)
-	if hv, ok := h.Value().(interface{ SetValue(interface{}) }); ok {
+	if hv, ok := h.Value().(interface{ SetValue(any) }); ok {
 		hv.SetValue(
 			transit.Timestamp{Time: time.Unix(int64(sec), int64(nsec)).UTC()})
 	}

@@ -19,7 +19,7 @@ var (
 // Task defines queued task
 type Task struct {
 	done    chan error
-	Args    []interface{}
+	Args    []any
 	Idx     uint8
 	Subject Subject
 }
@@ -34,7 +34,7 @@ type Handler func(*Task) error
 
 // Subject defines task subject
 // used as key in map and requires comparable type
-type Subject interface{}
+type Subject any
 
 // TaskQueue defines task queue
 type TaskQueue struct {
@@ -50,7 +50,7 @@ type TaskQueue struct {
 }
 
 // PushAsync adds task into queue and returns immediately
-func (q *TaskQueue) PushAsync(subj Subject, args ...interface{}) (*Task, error) {
+func (q *TaskQueue) PushAsync(subj Subject, args ...any) (*Task, error) {
 	if _, ok := q.handlers[subj]; !ok {
 		return nil, fmt.Errorf("%w: %v", ErrTaskQueueUndefined, subj)
 	}
@@ -72,7 +72,7 @@ func (q *TaskQueue) PushAsync(subj Subject, args ...interface{}) (*Task, error) 
 	default:
 		if q.debugger != nil {
 			lastTasks := []Task{}
-			q.ring.Do(func(p interface{}) {
+			q.ring.Do(func(p any) {
 				if p != nil {
 					lastTasks = append(lastTasks, p.(Task))
 				}
@@ -84,7 +84,7 @@ func (q *TaskQueue) PushAsync(subj Subject, args ...interface{}) (*Task, error) 
 }
 
 // PushSync adds task into queue and returns after task processing
-func (q *TaskQueue) PushSync(subj Subject, args ...interface{}) error {
+func (q *TaskQueue) PushSync(subj Subject, args ...any) error {
 	if task, err := q.PushAsync(subj, args...); err != nil {
 		return err
 	} else {

@@ -22,9 +22,7 @@ func ResourcesList(cred *azidentity.DefaultAzureCredential, subscriptionID strin
 			return nil, fmt.Errorf("failed to retrieve next page: %w", err)
 		}
 
-		for _, resource := range page.Value {
-			result = append(result, resource)
-		}
+		result = append(result, page.Value...)
 	}
 
 	return result, nil

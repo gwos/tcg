@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -184,9 +185,7 @@ func (connector *ElasticConnector) CollectMetrics() ([]transit.MonitoredResource
 	spanMonitoringState.End()
 
 	for view, metrics := range connector.config.Views {
-		for metricName, metric := range metrics {
-			connector.monitoringState.Metrics[metricName] = metric
-		}
+		maps.Copy(connector.monitoringState.Metrics, metrics)
 		switch view {
 		case string(StoredQueries):
 			queries := retrieveMonitoredServiceNames(StoredQueries, metrics)

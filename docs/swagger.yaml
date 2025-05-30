@@ -1,61 +1,54 @@
 definitions:
-  transit.Timestamp:
-    type: object
-  services.AgentIdentity:
+  config.BuildInfo:
     properties:
-      agentID:
+      tag:
+        type: string
+      time:
+        type: string
+    type: object
+  expvar.Int:
+    type: object
+  github_com_gwos_tcg_sdk_transit.AgentIdentity:
+    properties:
+      agentId:
         type: string
       appName:
         type: string
       appType:
         type: string
     type: object
-  services.AgentIdentityStats:
+  logzer.LogRecord:
+    type: object
+  services.AgentStatsExt:
     properties:
-      agentID:
+      agentId:
         type: string
       appName:
         type: string
       appType:
         type: string
       bytesSent:
-        type: integer
+        $ref: '#/definitions/expvar.Int'
       executionTimeInventory:
-        type: string
+        $ref: '#/definitions/expvar.Int'
       executionTimeMetrics:
-        type: string
-      lastAlertRun:
-        $ref: '#/definitions/transit.Timestamp'
-        type: object
+        $ref: '#/definitions/expvar.Int'
       lastErrors:
         items:
-          $ref: '#/definitions/services.LastError'
+          $ref: '#/definitions/logzer.LogRecord'
         type: array
+      lastEventsRun:
+        $ref: '#/definitions/expvar.Int'
       lastInventoryRun:
-        $ref: '#/definitions/transit.Timestamp'
-        type: object
+        $ref: '#/definitions/expvar.Int'
       lastMetricsRun:
-        $ref: '#/definitions/transit.Timestamp'
-        type: object
+        $ref: '#/definitions/expvar.Int'
       messagesSent:
-        type: integer
+        $ref: '#/definitions/expvar.Int'
       metricsSent:
-        type: integer
+        $ref: '#/definitions/expvar.Int'
       upSince:
-        $ref: '#/definitions/transit.Timestamp'
-        type: object
-    type: object
-  services.AgentStatus:
-    properties:
-      controller:
-        type: string
-      ctrl:
-        $ref: '#/definitions/services.CtrlAction'
-        type: object
-      nats:
-        type: string
-      transport:
-        type: string
+        $ref: '#/definitions/expvar.Int'
     type: object
   services.ConnectorStatusDTO:
     properties:
@@ -64,17 +57,8 @@ definitions:
       jobId:
         type: integer
     type: object
-  services.LastError:
-    properties:
-      message:
-        type: string
-      time:
-        $ref: '#/definitions/transit.Timestamp'
-        type: object
-    type: object
 info:
   contact: {}
-  license: {}
 paths:
   /agent:
     get:
@@ -87,7 +71,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentIdentity'
+            $ref: '#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity'
       tags:
       - agent
       - connector
@@ -110,7 +94,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: OK
         "401":
           description: Unauthorized
           schema:
@@ -118,6 +103,60 @@ paths:
       tags:
       - agent
       - connector
+  /downtime-clear:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Downtimes to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - downtimes
+  /downtime-set:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Downtimes to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - downtimes
   /events:
     post:
       consumes:
@@ -137,7 +176,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: OK
         "401":
           description: Unauthorized
           schema:
@@ -164,7 +204,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: OK
         "401":
           description: Unauthorized
           schema:
@@ -191,7 +232,8 @@ paths:
       produces:
       - application/json
       responses:
-        "200": {}
+        "200":
+          description: OK
         "401":
           description: Unauthorized
           schema:
@@ -199,6 +241,33 @@ paths:
       tags:
       - alert
       - event
+  /inventory:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Inventory to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - inventory
   /metrics:
     get:
       consumes:
@@ -221,8 +290,7 @@ paths:
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/services.AgentStatus'
+          schema: {}
         "401":
           description: Unauthorized
           schema:
@@ -233,6 +301,66 @@ paths:
             type: string
       tags:
       - metric
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to send Metrics to Foundation.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+      tags:
+      - metrics
+  /reset-nats:
+    post:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to reset NATS queues.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/services.ConnectorStatusDTO'
+        "401":
+          description: Unauthorized
+          schema:
+            type: string
+        "500":
+          description: Internal server error
+          schema:
+            type: string
+      tags:
+      - agent
+      - connector
   /start:
     post:
       consumes:
@@ -289,7 +417,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/services.AgentIdentityStats'
+            $ref: '#/definitions/services.AgentStatsExt'
         "401":
           description: Unauthorized
           schema:
@@ -356,6 +484,37 @@ paths:
             type: string
         "500":
           description: Internal server error
+          schema:
+            type: string
+      tags:
+      - agent
+      - connector
+  /version:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to return actual TCG connector
+        version.
+      parameters:
+      - description: Auth header
+        in: header
+        name: GWOS-APP-NAME
+        required: true
+        type: string
+      - description: Auth header
+        in: header
+        name: GWOS-API-TOKEN
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/config.BuildInfo'
+        "401":
+          description: Unauthorized
           schema:
             type: string
       tags:

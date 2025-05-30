@@ -24,7 +24,7 @@ func SharePoint(service *transit.MonitoredService, token, sharePointSite, shareP
 		c       int
 		body    []byte
 		baseURI string
-		v       interface{}
+		v       any
 	)
 	if len(sharePointSubSite) > 0 {
 		baseURI = subSiteGraphURI

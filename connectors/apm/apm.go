@@ -167,8 +167,8 @@ func validatePrometheusService(service *dto.MetricFamily) error {
 	return nil
 }
 
-func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metric) map[string]interface{} {
-	result := make(map[string]interface{})
+func makeValue(serviceName string, metricType *dto.MetricType, metric *dto.Metric) map[string]any {
+	result := make(map[string]any)
 	switch *metricType {
 	case dto.MetricType_COUNTER:
 		result[serviceName] = metric.GetCounter().GetValue()
@@ -512,7 +512,7 @@ func pull(resources []Resource) {
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not pull data from resource", req.LogAttrs()...)
 			continue
 		}
-		if !(req.Status == 200 || req.Status == 201 || req.Status == 220) {
+		if req.Status != 200 && req.Status != 201 && req.Status != 220 {
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelError, "could not pull data from resource", req.Details()...)
 			continue
 		}

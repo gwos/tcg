@@ -1,6 +1,8 @@
 package helpers
 
 import (
+	"maps"
+
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/prometheus/alertmanager/template"
@@ -24,18 +26,10 @@ func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, err
 	for _, alert := range data.Alerts {
 		tags := make(map[string]string,
 			len(data.CommonAnnotations)+len(alert.Annotations)+len(data.CommonLabels)+len(alert.Labels))
-		for k, v := range data.CommonAnnotations {
-			tags[k] = v
-		}
-		for k, v := range alert.Annotations {
-			tags[k] = v
-		}
-		for k, v := range data.CommonLabels {
-			tags[k] = v
-		}
-		for k, v := range alert.Labels {
-			tags[k] = v
-		}
+		maps.Copy(tags, data.CommonAnnotations)
+		maps.Copy(tags, alert.Annotations)
+		maps.Copy(tags, data.CommonLabels)
+		maps.Copy(tags, alert.Labels)
 
 		hostGroupName, err := cfg.MapHostgroup.ApplyOR(tags)
 		if err != nil {

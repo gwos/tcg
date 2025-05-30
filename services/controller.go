@@ -22,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gwos/tcg/config"
 	tcgerr "github.com/gwos/tcg/sdk/errors"
+	_ "github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/tracing"
 	"github.com/patrickmn/go-cache"
 	"github.com/prometheus/client_golang/prometheus"
@@ -484,7 +485,7 @@ func (controller *Controller) sendMetrics(c *gin.Context) {
 // @Tags    metric
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentStatus
+// @Success 200 {object} any
 // @Failure 401 {string} string "Unauthorized"
 // @Failure 500 {string} string "Internal server error"
 // @Router  /metrics [get]
@@ -583,7 +584,7 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} services.AgentIdentity
+// @Success 200 {object} transit.AgentIdentity
 // @Router  /agent [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
 	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
@@ -613,7 +614,7 @@ func (controller *Controller) status(c *gin.Context) {
 // @Tags    agent, connector
 // @Accept  json
 // @Produce json
-// @Success 200 {object} config.BuildVersion
+// @Success 200 {object} config.BuildInfo
 // @Failure 401 {string} string "Unauthorized"
 // @Router  /version [get]
 // @Param   GWOS-APP-NAME    header    string     true        "Auth header"
@@ -668,7 +669,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 				gin.H{"error": err.Error()})
 		}()
 
-		if !(len(username) > 0 && len(password) > 0 && len(controller.gwClients) > 0) {
+		if len(username) == 0 || len(password) == 0 || len(controller.gwClients) == 0 {
 			err = fmt.Errorf("misconfigured BASIC auth")
 			return
 		}
@@ -706,7 +707,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 			gin.H{"error": err.Error()})
 	}()
 
-	if !(len(gwosAppName) > 0 && len(gwosAPIToken) > 0 && len(controller.dsClient.HostName) > 0) {
+	if len(gwosAppName) == 0 || len(gwosAPIToken) == 0 || len(controller.dsClient.HostName) == 0 {
 		err = fmt.Errorf("misconfigured GWOS auth")
 		return
 	}

@@ -448,8 +448,8 @@ func filterExtInfo(
 	mon *transit.ResourcesWithServicesRequest,
 	dt *transit.Downtimes,
 ) {
-	var iPropsRes map[string]int = map[string]int{"Alias": 0, "Notes": 0}
-	var iPropsSvc map[string]int = map[string]int{"Notes": 0}
+	var iPropsRes = map[string]int{"Alias": 0, "Notes": 0}
+	var iPropsSvc = map[string]int{"Notes": 0}
 
 	var mRes transit.MonitoredResource
 	var mSvc transit.MonitoredService

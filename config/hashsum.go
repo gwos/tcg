@@ -7,7 +7,7 @@ import (
 )
 
 // Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
-func Hashsum(args ...interface{}) ([]byte, error) {
+func Hashsum(args ...any) ([]byte, error) {
 	var b bytes.Buffer
 	for _, arg := range args {
 		s, err := json.Marshal(arg)

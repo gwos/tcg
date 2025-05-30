@@ -130,7 +130,7 @@ func processRequest() (float64, float64, float64) {
 
 // simulate the generation of requests
 func requestsGenerator() {
-	for ; ; {
+	for {
 		resp, _ := http.Get("http://localhost:2222/analytics")
 		_, _ = io.ReadAll(resp.Body)
 		_ = resp.Body.Close()

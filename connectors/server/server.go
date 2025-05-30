@@ -58,7 +58,7 @@ const (
 // MB defines the divisor for conversion
 const MB uint64 = 1048576
 
-var processToFuncMap = map[string]interface{}{
+var processToFuncMap = map[string]any{
 	TotalDiskAllocatedServiceName: getTotalDiskUsageService,
 	TotalMemoryUsageAllocatedName: getTotalMemoryUsageService,
 	TotalCPUUsageServiceName:      getTotalCPUUsage,

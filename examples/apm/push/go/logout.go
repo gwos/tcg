@@ -7,17 +7,17 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var logoutUrl = "/api/auth/logout"
+var logoutURL = "/api/auth/logout"
 
-func logout(host, gwosAppName, gwosApiToken string) {
+func logout(host, gwosAppName, gwosAPIToken string) {
 	formValues := map[string]string{
 		"gwos-app-name":  gwosAppName,
-		"gwos-api-token": gwosApiToken,
+		"gwos-api-token": gwosAPIToken,
 	}
 
 	headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-	statusCode, body, err := clients.SendRequest(http.MethodPost, host+logoutUrl, headers, formValues, nil)
+	statusCode, body, err := clients.SendRequest(http.MethodPost, host+logoutURL, headers, formValues, nil)
 	if err != nil {
 		log.Err(err).Msg("could not send request")
 	}

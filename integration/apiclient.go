@@ -38,7 +38,7 @@ func (c *APIClient) SendRequest(httpMethod string, requestURL string, headers ma
 			"GWOS-APP-NAME":  gwClient.AppName,
 			"GWOS-API-TOKEN": token,
 		}
-		c.gwURI = gwClient.GWConnection.HostName
+		c.gwURI = gwClient.HostName
 	})
 	hh := make(map[string]string, len(c.headers)+len(headers))
 	maps.Copy(hh, c.headers)
@@ -60,7 +60,7 @@ func (c *APIClient) CheckHostExist(host string, mustExist bool, mustHasStatus st
 	if !mustExist && statusCode == 404 {
 		return nil
 	}
-	if !(mustExist && statusCode == 200) {
+	if !mustExist || statusCode != 200 {
 		return fmt.Errorf("status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 200)
 	}
 

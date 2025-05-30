@@ -2,6 +2,7 @@ package apm
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"time"
 
@@ -30,10 +31,8 @@ func (p *PromParser) Parse(buf []byte, withFilters bool, resource string) (map[s
 
 	availableMetrics[resource] = []string{}
 	for _, ts := range req.Timeseries {
-		tags := map[string]string{}
-		for key, value := range p.DefaultTags {
-			tags[key] = value
-		}
+		tags := make(map[string]string)
+		maps.Copy(tags, p.DefaultTags)
 
 		labels := make([]*dto.LabelPair, 0)
 		for _, l := range ts.Labels {

@@ -173,14 +173,14 @@ func BenchmarkCatStrings(b *testing.B) {
 	rr := transit.ResourceRef{Type: transit.ResourceTypeHost, Name: "test_10"}
 
 	b.Run("fmt.Sprintf", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			rk := fmt.Sprintf("%s:%s", rr.Type, rr.Name)
 			assert.Contains(b, rk, ":test_")
 		}
 	})
 
 	b.Run("strings.Join", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			rk := strings.Join([]string{string(rr.Type), rr.Name}, ":")
 			assert.Contains(b, rk, ":test_")
 		}

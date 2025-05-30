@@ -105,12 +105,12 @@ func TestWithHandlers(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, uint8(1), task.Idx)
 	assert.Equal(t, Subject(task1), task.Subject)
-	assert.Equal(t, []interface{}(nil), task.Args)
+	assert.Equal(t, []any(nil), task.Args)
 	task, err = q.PushAsync(task2, "data_arg", 1, true, []byte("data arg"))
 	assert.NoError(t, err)
 	assert.Equal(t, uint8(2), task.Idx)
 	assert.Equal(t, Subject(task2), task.Subject)
-	assert.Equal(t, []interface{}{"data_arg", 1, true, []byte("data arg")}, task.Args)
+	assert.Equal(t, []any{"data_arg", 1, true, []byte("data arg")}, task.Args)
 
 	/* use sync to complete queue and check totals */
 	err = q.PushSync(task2)

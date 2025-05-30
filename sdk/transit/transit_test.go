@@ -56,7 +56,7 @@ func TestMonitoredService_UnmarshalJSON(t *testing.T) {
 
 func TestMonitoredService_CreateProperties(t *testing.T) {
 	svc := new(MonitoredService)
-	svc.CreateProperties(map[string]interface{}{
+	svc.CreateProperties(map[string]any{
 		"prop-0": true,
 		"prop-1": false,
 		"prop-2": 0.0,
@@ -119,7 +119,7 @@ func TestMonitoredService_CreateProperties(t *testing.T) {
 	}`)
 
 	/* check json equality */
-	var expected, value interface{}
+	var expected, value any
 	valueJSON, err := json.Marshal(svc)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

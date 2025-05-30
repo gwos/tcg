@@ -204,7 +204,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	b.ResetTimer()
 
 	b.Run("marshalGob", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalGob(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -214,7 +214,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalJSON", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := json.Marshal(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -225,7 +225,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV1", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := p.marshalV1()
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -235,7 +235,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := p.marshalV2()
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -245,7 +245,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2fprintf", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalV2fprintf(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -255,7 +255,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2write", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalV2write(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -265,7 +265,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2append", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalV2append(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -275,7 +275,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2join", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalV2join(p)
 			assert.NoError(b, err)
 			q := natsPayload{}
@@ -285,7 +285,7 @@ func Benchmark_natsPayloadMarshal(b *testing.B) {
 	})
 
 	b.Run("marshalV2json", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			encoded, err := marshalV2json(p)
 			assert.NoError(b, err)
 			q := natsPayload{}

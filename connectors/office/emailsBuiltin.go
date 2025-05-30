@@ -15,7 +15,7 @@ func Emails(service *transit.MonitoredService, token, outlookEmailAddress string
 	var (
 		c    int
 		body []byte
-		v    interface{}
+		v    any
 	)
 
 	params := url.Values{
