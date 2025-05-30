@@ -165,7 +165,8 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	// and global HttpClientTransport cannot be used with the TLS client certificate.
 	// So, using a new default httpClient and configuring both according to connector settings.
 	clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify =
-		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify || connector.ExtConfig.Insecure
+		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify ||
+			connector.ExtConfig.Insecure
 
 	kConfig := &rest.Config{
 		Host:                connector.ExtConfig.EndPoint,

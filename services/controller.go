@@ -669,7 +669,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 				gin.H{"error": err.Error()})
 		}()
 
-		if !(len(username) > 0 && len(password) > 0 && len(controller.gwClients) > 0) {
+		if len(username) == 0 || len(password) == 0 || len(controller.gwClients) == 0 {
 			err = fmt.Errorf("misconfigured BASIC auth")
 			return
 		}
@@ -707,7 +707,7 @@ func (controller *Controller) checkAccess(c *gin.Context) {
 			gin.H{"error": err.Error()})
 	}()
 
-	if !(len(gwosAppName) > 0 && len(gwosAPIToken) > 0 && len(controller.dsClient.HostName) > 0) {
+	if len(gwosAppName) == 0 || len(gwosAPIToken) == 0 || len(controller.dsClient.HostName) == 0 {
 		err = fmt.Errorf("misconfigured GWOS auth")
 		return
 	}

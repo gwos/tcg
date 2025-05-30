@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	prometheusConnectorUrl = "http://localhost:8099/api/v1"
+	prometheusConnectorURL = "http://localhost:8099/api/v1"
 )
 
 var (
@@ -73,40 +73,40 @@ func performBackup() (int, error) {
 }
 
 type options struct {
-	foundationUrl string
+	foundationURL string
 	user          string
 	password      string
 	gwosAppName   string
 }
 
 func getOptions() *options {
-	foundationUrl := flag.String("foundationUrl", "http://localhost", "Foundation server url to connect")
+	foundationURL := flag.String("foundationUrl", "http://localhost", "Foundation server url to connect")
 	user := flag.String("user", "defaultUser", "User for Authentication")
 	password := flag.String("password", "defaultPassword", "Password for Authentication")
 	gwosAppName := flag.String("gwosAppName", "gw8", "GWOS Application Name for token registration")
 
 	flag.Parse()
 
-	return &options{*foundationUrl, *user, *password, *gwosAppName}
+	return &options{*foundationURL, *user, *password, *gwosAppName}
 }
 
 func main() {
 	options := getOptions()
-	credentials, err := login(options.foundationUrl, options.user, options.password, options.gwosAppName)
+	credentials, err := login(options.foundationURL, options.user, options.password, options.gwosAppName)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	headers["GWOS-APP-NAME"] = credentials.gwosAppName
-	headers["GWOS-API-TOKEN"] = credentials.gwosApiToken
-	defer logout(options.foundationUrl, credentials.gwosAppName, credentials.gwosApiToken)
+	headers["GWOS-API-TOKEN"] = credentials.gwosAPIToken
+	defer logout(options.foundationURL, credentials.gwosAppName, credentials.gwosAPIToken)
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(completionTime, duration, records)
 	// Note that successTime is not registered.
 
-	pusher := push.New(prometheusConnectorUrl, "db_backup").Gatherer(registry)
-	pusher.Client(CustomHttpDoer{})
+	pusher := push.New(prometheusConnectorURL, "db_backup").Gatherer(registry)
+	pusher.Client(CustomHTTPDoer{})
 
 	start := time.Now()
 	n, err := performBackup()

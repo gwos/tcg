@@ -201,8 +201,8 @@ func FillGroupWithResources(group transit.ResourceGroup, resources []transit.Inv
 	for _, resource := range resources {
 		monitoredResourceRefs = append(monitoredResourceRefs,
 			transit.ResourceRef{
-				Name: resource.BaseResource.Name,
-				Type: resource.BaseResource.Type,
+				Name: resource.Name,
+				Type: resource.Type,
 			},
 		)
 	}
@@ -244,7 +244,7 @@ func BuildMetric(metricBuilder MetricBuilder) (*transit.TimeSeries, error) {
 			Msgf("could not create time interval for metric %s: either start time or end time is not provided",
 				metricBuilder.Name)
 	}
-	if metricBuilder.Tags != nil && len(metricBuilder.Tags) != 0 {
+	if len(metricBuilder.Tags) != 0 {
 		args = append(args, metricBuilder.Tags)
 	}
 
@@ -500,7 +500,7 @@ func CreateResource(name string, args ...any) (*transit.MonitoredResource, error
 		}
 	}
 
-	if resource.Services != nil && len(resource.Services) != 0 {
+	if len(resource.Services) != 0 {
 		resource.Status = transit.CalculateResourceStatus(resource.Services)
 	} else {
 		resource.Status = transit.HostUp
@@ -817,11 +817,7 @@ func addThresholdsToStatusText(statusText string, service *transit.MonitoredServ
 		}
 	}
 
-	if strings.HasPrefix(statusText, " | ") {
-		statusText = statusText[3:]
-	}
-
-	return statusText
+	return strings.TrimPrefix(statusText, " | ")
 }
 
 func extractValueForStatusText(service *transit.MonitoredService) (string, error) {

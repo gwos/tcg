@@ -113,7 +113,6 @@ func (connector *SnmpConnector) CollectMetrics() (
 				mibs = append(mibs, v.Mib)
 			}
 			connector.collectInterfacesMetrics(mibs)
-			break
 		default:
 			log.Warn().Msgf("not supported view: %s", view)
 			continue

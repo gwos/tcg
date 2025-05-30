@@ -154,7 +154,7 @@ func getAfterKey(searchResponse *EsSearchResponse) *EsAggregationKey {
 		if searchResponse.Aggregations.Aggregation.AfterKey != nil {
 			afterKey = searchResponse.Aggregations.Aggregation.AfterKey
 		} else {
-			if searchResponse.Aggregations.Aggregation.Buckets != nil && len(searchResponse.Aggregations.Aggregation.Buckets) > 0 {
+			if len(searchResponse.Aggregations.Aggregation.Buckets) > 0 {
 				afterKey = &searchResponse.Aggregations.Aggregation.Buckets[len(searchResponse.Aggregations.Aggregation.Buckets)-1].Key
 			}
 		}
