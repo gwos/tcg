@@ -67,6 +67,11 @@ linters:
             - third_party$
             - builtin$
             - examples$
+    settings:
+        staticcheck: # more info https://staticcheck.dev/docs/configuration/#example-configuration
+            checks:
+                - all
+                - "-QF1008" # Disable QF1008 to retain embedded fields for better readability
 formatters:
     enable:
         - gofmt
