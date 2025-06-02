@@ -29,29 +29,29 @@ var (
 	cfgOnce sync.Once
 
 	logError, logWarn, logInfo, logDebug = func(flags int, calldepth int, level *int8) (
-		func(format string, a ...interface{}),
-		func(format string, a ...interface{}),
-		func(format string, a ...interface{}),
-		func(format string, a ...interface{}),
+		func(format string, a ...any),
+		func(format string, a ...any),
+		func(format string, a ...any),
+		func(format string, a ...any),
 	) {
 		loggerErr := log.New(log.Writer(), "ERR ", flags)
 		loggerWrn := log.New(log.Writer(), "WRN ", flags)
 		loggerInf := log.New(log.Writer(), "INF ", flags)
 		loggerDbg := log.New(log.Writer(), "DBG ", flags)
-		return func(format string, a ...interface{}) {
+		return func(format string, a ...any) {
 				_ = loggerErr.Output(calldepth, fmt.Sprintf(format, a...))
 			},
-			func(format string, a ...interface{}) {
+			func(format string, a ...any) {
 				if *level > 0 {
 					_ = loggerWrn.Output(calldepth, fmt.Sprintf(format, a...))
 				}
 			},
-			func(format string, a ...interface{}) {
+			func(format string, a ...any) {
 				if *level > 1 {
 					_ = loggerInf.Output(calldepth, fmt.Sprintf(format, a...))
 				}
 			},
-			func(format string, a ...interface{}) {
+			func(format string, a ...any) {
 				if *level > 2 {
 					_ = loggerDbg.Output(calldepth, fmt.Sprintf(format, a...))
 				}

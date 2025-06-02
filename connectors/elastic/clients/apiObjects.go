@@ -70,10 +70,10 @@ type KAttributes struct {
 }
 
 type KFilter struct {
-	Meta   *KMeta      `json:"meta,omitempty"`
-	Query  interface{} `json:"query,omitempty"`
-	Exists interface{} `json:"exists,omitempty"`
-	Range  interface{} `json:"range,omitempty"`
+	Meta   *KMeta `json:"meta,omitempty"`
+	Query  any    `json:"query,omitempty"`
+	Exists any    `json:"exists,omitempty"`
+	Range  any    `json:"range,omitempty"`
 }
 
 type KMeta struct {
@@ -105,10 +105,10 @@ type EsQuery struct {
 }
 
 type EsQueryBool struct {
-	Must    []interface{} `json:"must"`
-	Filter  []interface{} `json:"filter"`
-	Should  []interface{} `json:"should"`
-	MustNot []interface{} `json:"must_not"`
+	Must    []any `json:"must"`
+	Filter  []any `json:"filter"`
+	Should  []any `json:"should"`
+	MustNot []any `json:"must_not"`
 }
 
 type EsQueryStr struct {
@@ -125,9 +125,9 @@ type EsAggByHost struct {
 }
 
 type EsAggComposite struct {
-	Size    int           `json:"size"`
-	Sources []interface{} `json:"sources"`
-	After   interface{}   `json:"after,omitempty"`
+	Size    int   `json:"size"`
+	Sources []any `json:"sources"`
+	After   any   `json:"after,omitempty"`
 }
 
 type EsHostAggSource struct {
@@ -148,7 +148,7 @@ type EsAggTermField struct {
 
 type EsSearchResponse struct {
 	Hits         EsSearchHits        `json:"hits"`
-	Aggregations EsAggregationByHost `json:"aggregations,omitempty"`
+	Aggregations EsAggregationByHost `json:"aggregations,omitzero"`
 }
 
 type EsSearchHits struct {
@@ -179,7 +179,7 @@ type EsAggregationKey struct {
 }
 
 type EsFieldCapsResponse struct {
-	Fields map[string]interface{} `json:"fields"`
+	Fields map[string]any `json:"fields"`
 }
 
 // Extracts indexes's ids linked to stored query's filters
@@ -198,7 +198,7 @@ func (storedQuery *KSavedObject) ExtractIndexIds() []string {
 }
 
 func BuildAggregationsByHostNameAndHostGroup(hostNameField string, hostGroupField *string) *EsAggs {
-	sources := []interface{}{EsHostAggSource{
+	sources := []any{EsHostAggSource{
 		HostTerm: EsAggTerm{
 			Term: EsAggTermField{
 				Field: hostNameField,
@@ -229,19 +229,19 @@ func copyQuery(query *EsQuery) *EsQuery {
 	if query != nil {
 		queryCopy := new(EsQuery)
 		if query.Bool.Must != nil {
-			queryCopy.Bool.Must = make([]interface{}, 0, len(query.Bool.Must))
+			queryCopy.Bool.Must = make([]any, 0, len(query.Bool.Must))
 			copy(queryCopy.Bool.Must, query.Bool.Must)
 		}
 		if query.Bool.MustNot != nil {
-			queryCopy.Bool.MustNot = make([]interface{}, 0, len(query.Bool.MustNot))
+			queryCopy.Bool.MustNot = make([]any, 0, len(query.Bool.MustNot))
 			copy(queryCopy.Bool.MustNot, query.Bool.MustNot)
 		}
 		if query.Bool.Should != nil {
-			queryCopy.Bool.Should = make([]interface{}, 0, len(query.Bool.Should))
+			queryCopy.Bool.Should = make([]any, 0, len(query.Bool.Should))
 			copy(queryCopy.Bool.Should, query.Bool.Should)
 		}
 		if query.Bool.Filter != nil {
-			queryCopy.Bool.Filter = make([]interface{}, 0, len(query.Bool.Filter))
+			queryCopy.Bool.Filter = make([]any, 0, len(query.Bool.Filter))
 			copy(queryCopy.Bool.Filter, query.Bool.Filter)
 		}
 		return queryCopy

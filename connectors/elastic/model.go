@@ -63,7 +63,7 @@ func (cfg *ExtConfig) initMonitoringState(previousState MonitoringState, esClien
 	doOnce.Do(func() {
 		log.Info().Msgf("initializing state with GW hosts for agent %s", cfg.AgentID)
 		// add hosts form GW to current state
-		if cfg.GWConnections == nil || len(cfg.GWConnections) == 0 {
+		if len(cfg.GWConnections) == 0 {
 			log.Error().Msg("could not get GW hosts to initialize state: GW connections are not set")
 		} else {
 			gwHosts := initGwHosts(cfg.AgentID, cfg.AppName, cfg.AppType, cfg.GWConnections)

@@ -13,7 +13,7 @@ func testAddDowntime(t *testing.T) {
 	ptr := func(s string) *C.char { return C.CString(s) }
 	tests := []struct {
 		name     string
-		target   interface{}
+		target   any
 		values   [][4]string
 		expected *transit.Downtimes
 	}{{
@@ -76,7 +76,7 @@ func testExtendDowntimesRequest(t *testing.T) {
 	}
 	tests := []struct {
 		name     string
-		target   interface{}
+		target   any
 		values   [][4]string
 		expected *transit.DowntimesRequest
 	}{{

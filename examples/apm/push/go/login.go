@@ -7,11 +7,11 @@ import (
 	"github.com/gwos/tcg/sdk/clients"
 )
 
-var loginUrl = "/api/auth/login"
+var loginURL = "/api/auth/login"
 
 type credentials struct {
 	gwosAppName  string
-	gwosApiToken string
+	gwosAPIToken string
 }
 
 func login(host, user, password, gwosAppName string) (*credentials, error) {
@@ -24,7 +24,7 @@ func login(host, user, password, gwosAppName string) (*credentials, error) {
 		"Content-Type": "application/x-www-form-urlencoded",
 	}
 
-	statusCode, body, err := clients.SendRequest(http.MethodPost, host+loginUrl, headers, formValues, nil)
+	statusCode, body, err := clients.SendRequest(http.MethodPost, host+loginURL, headers, formValues, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,6 @@ func login(host, user, password, gwosAppName string) (*credentials, error) {
 
 	return &credentials{
 		gwosAppName:  gwosAppName,
-		gwosApiToken: string(body),
+		gwosAPIToken: string(body),
 	}, nil
 }

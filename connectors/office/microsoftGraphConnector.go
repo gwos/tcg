@@ -223,7 +223,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	// create one Drive metrics
 	if viewStateMap[string(ViewOneDrive)] {
 		serviceName := "OneDrive for Business"
-		serviceProperties := make(map[string]interface{})
+		serviceProperties := make(map[string]any)
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := OneDrive(monitoredService, graphToken)
@@ -245,7 +245,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	// create License metrics
 	if viewStateMap[string(ViewLicensing)] {
 		serviceName := "License Activities"
-		serviceProperties := make(map[string]interface{})
+		serviceProperties := make(map[string]any)
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := AddonLicenseMetrics(monitoredService, graphToken)
@@ -267,7 +267,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	// create SharePoint metrics
 	if viewStateMap[string(ViewSharePoint)] {
 		serviceName := "SharePoint Online"
-		serviceProperties := make(map[string]interface{})
+		serviceProperties := make(map[string]any)
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := SharePoint(monitoredService, graphToken, sharePointSite, sharePointSubSite) // TODO: params
@@ -289,7 +289,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	// Create Email metrics
 	if viewStateMap[string(ViewEmail)] {
 		serviceName := "Emails"
-		serviceProperties := make(map[string]interface{})
+		serviceProperties := make(map[string]any)
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := Emails(monitoredService, graphToken, outlookEmailAddress)
@@ -311,7 +311,7 @@ func (connector *MicrosoftGraphConnector) collectBuiltins(
 	// Create Security metrics
 	if viewStateMap[string(ViewSecurity)] {
 		serviceName := "SecurityIndicators"
-		serviceProperties := make(map[string]interface{})
+		serviceProperties := make(map[string]any)
 		serviceProperties["isGraphed"] = true
 		monitoredService, _ := connectors.CreateService(serviceName, interacApp, []transit.TimeSeries{}, serviceProperties)
 		err := SecurityAssessments(monitoredService, graphToken)

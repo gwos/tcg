@@ -27,8 +27,8 @@ func login(tenantID, clientID, clientSecret, resource string) (str string, err e
 	var (
 		responseBody []byte
 		body         io.Reader
-		token        interface{}
-		v            interface{}
+		token        any
+		v            any
 		request      *http.Request
 		response     *http.Response
 	)
@@ -122,7 +122,7 @@ func ExecuteRequest(graphURI, token string) ([]byte, error) {
 			b, _ := io.ReadAll(response.Body)
 			log.Debug().Msgf("[url=%s][response=%s]", graphURI, string(b))
 			_ = response.Body.Close()
-			return nil, errors.New(fmt.Sprintf("error to get data. [url: %s, status code: %d", graphURI, response.StatusCode))
+			return nil, fmt.Errorf("error to get data. url: %s, status code: %d", graphURI, response.StatusCode)
 		}
 	}
 	defer func() {
@@ -145,7 +145,7 @@ func Do(request *http.Request) (*http.Response, error) {
 	return response, err
 }
 
-func parseError(v interface{}) error {
+func parseError(v any) error {
 	msg, err := jsonpath.Get("$.error.message", v)
 	if err != nil {
 		log.Err(err).Msg("could not parse")
@@ -159,7 +159,7 @@ func parseError(v interface{}) error {
 	return nil
 }
 
-func createMetricWithThresholds(name string, suffix string, value interface{}, warning float64, critical float64) *transit.TimeSeries {
+func createMetricWithThresholds(name string, suffix string, value any, warning float64, critical float64) *transit.TimeSeries {
 	metricBuilder := connectors.MetricBuilder{
 		Name:     fmt.Sprintf("%s%s", name, suffix),
 		Value:    value,
@@ -178,14 +178,14 @@ func createMetricWithThresholds(name string, suffix string, value interface{}, w
 	return metric
 }
 
-func getCount(v interface{}) (c int, err error) {
+func getCount(v any) (c int, err error) {
 	var (
-		value interface{}
+		value any
 	)
 	if v != nil {
 		if value, err = jsonpath.Get("$.value[*]", v); err == nil {
 			if value != nil {
-				c = len(value.([]interface{}))
+				c = len(value.([]any))
 				if c == 0 && parseError(v) != nil {
 					return
 				}

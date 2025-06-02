@@ -229,15 +229,15 @@ func parseInterfaces(response []byte) []Interface {
 	return interfaces
 }
 
-func parseResponse(bytes []byte) []map[string]interface{} {
-	var response []interface{}
+func parseResponse(bytes []byte) []map[string]any {
+	var response []any
 	if err := json.Unmarshal(bytes, &response); err != nil {
 		log.Err(err).Bytes("response", bytes).Msg("could not parse NeDi response")
 		return nil
 	}
 
 	dbg := log.Debug().Bytes("response", bytes)
-	res := make([]map[string]interface{}, 0, len(response)-1)
+	res := make([]map[string]any, 0, len(response)-1)
 	skip := 0
 	for i, r := range response {
 		if i == 0 {
@@ -245,7 +245,7 @@ func parseResponse(bytes []byte) []map[string]interface{} {
 			continue
 		}
 		switch r := r.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			res = append(res, r)
 		default:
 			skip++
@@ -273,7 +273,7 @@ func executeGet(url string) ([]byte, error) {
 	return r, nil
 }
 
-func getInt(v interface{}) (int, error) {
+func getInt(v any) (int, error) {
 	switch v := v.(type) {
 	case int:
 		return v, nil
