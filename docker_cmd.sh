@@ -55,9 +55,10 @@ handle_signal() {
         # Terminate tcg- process and wait while it stops, then others.
         # Note, we faced different issues trying to use $pid_tcg here.
         # `tail --pid` implemented in GNU coreutils, not in busybox.
+        # `pkill -e` implemented in GNU procops, not in busybox.
         pkill -SIGTERM -ef tcg-${cmd}
         tail --pid=$(pgrep -f tcg-${cmd}) -f /dev/null
-        pkill -SIGTERM -e -s 0
+        pkill -SIGTERM -es 0
     fi
 }
 
