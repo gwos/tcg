@@ -81,7 +81,7 @@ $TCG_RESTART_ON_CRASH ||
 
 healthcheck() {
     TCG_CONNECTOR_CONTROLLERADDR=${TCG_CONNECTOR_CONTROLLERADDR:-127.0.0.1:8099}
-    curl --fail --silent ${TCG_CONNECTOR_CONTROLLERADDR}/api/v1/identity
+    curl --fail --silent ${TCG_CONNECTOR_CONTROLLERADDR}/api/v1/identity > /dev/null 2>&1
 }
 
 pid_tcg=-1

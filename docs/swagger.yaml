@@ -60,21 +60,6 @@ definitions:
 info:
   contact: {}
 paths:
-  /agent:
-    get:
-      consumes:
-      - application/json
-      description: The following API endpoint can be used to get a TCG agent id
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity'
-      tags:
-      - agent
-      - connector
   /config:
     post:
       consumes:
@@ -241,6 +226,21 @@ paths:
       tags:
       - alert
       - event
+  /identity:
+    get:
+      consumes:
+      - application/json
+      description: The following API endpoint can be used to get a TCG agent id
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity'
+      tags:
+      - agent
+      - connector
   /inventory:
     post:
       consumes:

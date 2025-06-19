@@ -539,14 +539,15 @@ func (cfg Config) initLogger() {
 		cfg.Connector.LogLevel = 4
 	}
 	lvl := [...]zerolog.Level{3, 2, 1, 0, -1}[cfg.Connector.LogLevel]
+	if lvl <= zerolog.DebugLevel {
+		cfg.Connector.LogCondense = 0
+	}
 	opts := []logzer.Option{
+		logzer.WithColors(cfg.Connector.LogColors),
+		logzer.WithCondense(cfg.Connector.LogCondense),
 		logzer.WithLastErrors(10),
 		logzer.WithLevel(lvl),
-		logzer.WithColors(cfg.Connector.LogColors),
 		logzer.WithTimeFormat(cfg.Connector.LogTimeFormat),
-	}
-	if cfg.Connector.LogCondense != 0 && lvl > zerolog.DebugLevel {
-		opts = append(opts, logzer.WithCondense(cfg.Connector.LogCondense))
 	}
 	if cfg.Connector.LogFile != "" {
 		opts = append(opts, logzer.WithLogFile(&logzer.LogFile{
