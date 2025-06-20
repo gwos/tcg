@@ -15,29 +15,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/agent": {
-            "get": {
-                "description": "The following API endpoint can be used to get a TCG agent id",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "agent",
-                    "connector"
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity"
-                        }
-                    }
-                }
-            }
-        },
         "/config": {
             "post": {
                 "description": "The following API endpoint can be used to Agent configure.",
@@ -283,6 +260,29 @@ const docTemplate = `{
                         "description": "Unauthorized",
                         "schema": {
                             "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/identity": {
+            "get": {
+                "description": "The following API endpoint can be used to get a TCG agent id",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "agent",
+                    "connector"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_gwos_tcg_sdk_transit.AgentIdentity"
                         }
                     }
                 }

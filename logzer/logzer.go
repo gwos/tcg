@@ -163,12 +163,11 @@ type LogBuffer struct {
 
 // Records returns collected writes
 func (lb *LogBuffer) Records() []LogRecord {
-	lb.once.Do(func() {
-		lb.ring = ring.New(lb.Size)
-	})
+	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	rec := []LogRecord{}
+
+	rec := make([]LogRecord, 0, lb.Size)
 	lb.ring.Do(func(p any) {
 		if p != nil {
 			rec = append(rec, p.(LogRecord))
@@ -184,11 +183,10 @@ func (lb *LogBuffer) Write(p []byte) (int, error) {
 
 // WriteLevel implements zerolog.LevelWriter interface
 func (lb *LogBuffer) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
-	lb.once.Do(func() {
-		lb.ring = ring.New(lb.Size)
-	})
+	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
+
 	if lvl >= lb.Level {
 		/* store the copy as source could be updated */
 		cp := make([]byte, len(p))

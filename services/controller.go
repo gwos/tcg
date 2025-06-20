@@ -585,7 +585,7 @@ func (controller *Controller) stats(c *gin.Context) {
 // @Accept  json
 // @Produce json
 // @Success 200 {object} transit.AgentIdentity
-// @Router  /agent [get]
+// @Router  /identity [get]
 func (controller *Controller) agentIdentity(c *gin.Context) {
 	c.JSON(http.StatusOK, controller.Connector.AgentIdentity)
 }
