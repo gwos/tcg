@@ -271,6 +271,15 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 	return err
 }
 
+func hasStatus(q *transit.ResourcesWithServicesRequest) bool {
+	for _, res := range q.Resources {
+		if res.Status != transit.HostUnchanged {
+			return true
+		}
+	}
+	return false
+}
+
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
 	if err := service.exportTransit(TOpSendMetrics, payload); err != nil {
@@ -278,7 +287,17 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 	}
 
 	if config.Suppress.Metrics {
-		return nil
+		var q transit.ResourcesWithServicesRequest
+		if err := json.Unmarshal(payload, &q); err != nil {
+			log.Err(err).
+				RawJSON("payload", payload).
+				Msg("could not unmarshal metrics payload for Suppress.Metrics")
+			return nil
+		}
+
+		if !hasStatus(&q) {
+			return nil
+		}
 	}
 
 	service.stats.LastMetricsRun.Set(time.Now().UnixMilli())
