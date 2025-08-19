@@ -784,7 +784,7 @@ func (controller *Controller) registerAPI1(router *gin.Engine, addr string, entr
 		return gin.WrapH(promhttp.HandlerFor(prometheus.DefaultGatherer, promhttp.HandlerOpts{}))
 	}())
 
-	pprofGroup := apiV1Debug.Group("/pprof")
+	pprofGroup := router.Group("/api/v1/debug/pprof")
 	pprofGroup.GET("/", gin.WrapF(pprof.Index))
 	pprofGroup.GET("/cmdline", gin.WrapF(pprof.Cmdline))
 	pprofGroup.GET("/profile", gin.WrapF(pprof.Profile))
