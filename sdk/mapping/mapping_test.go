@@ -1133,14 +1133,12 @@ func testData() (tagMaps []map[string]string) {
 	}
 
 	tagMaps = make([]map[string]string, 0, len(payloads))
-	var p P
-	var m map[string]string
 	for _, payload := range payloads {
-		p = P{}
-		if err := json.Unmarshal([]byte(payload), &p); err != nil {
+		p := new(P)
+		if err := json.Unmarshal([]byte(payload), p); err != nil {
 			panic(err)
 		}
-		m = map[string]string{}
+		m := map[string]string{}
 		for _, tag := range p.Metrics[0].Tags {
 			m[tag.Key] = tag.Value
 		}

@@ -202,9 +202,9 @@ func BenchmarkUpdateToken(b *testing.B) {
 
 // inspired by expvar.Handler() implementation
 func memstats() any {
-	var stats runtime.MemStats
-	runtime.ReadMemStats(&stats)
-	return stats
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	return *stats
 }
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))

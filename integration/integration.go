@@ -149,7 +149,7 @@ func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
 		}
 	}
 
-	var rs transit.MonitoredResource
+	rs := new(transit.MonitoredResource)
 	rs.Status = transit.HostUp
 	rs.Type = transit.ResourceTypeHost
 	rs.LastCheckTime = transit.NewTimestamp()
@@ -160,10 +160,8 @@ func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
 	rs.Description = strings.Join(
 		append([]string{strings.ToUpper(rs.Name)}, randStrs(rsIdx)...), " ")
 
-	var svc transit.MonitoredService
-	var m transit.TimeSeries
 	for i := 0; i < svcCount; i++ {
-		svc = transit.MonitoredService{}
+		svc := new(transit.MonitoredService)
 		svc.Name = fmt.Sprintf("%v.%v.%v", sPrefix, i, rs.Name)
 		svc.Owner = rs.Name
 		svc.Status = transit.ServiceOk
@@ -176,7 +174,7 @@ func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
 		svc.Description = strings.Join(
 			append([]string{strings.ToUpper(svc.Name)}, randStrs(i+rsIdx)...), " ")
 
-		m = transit.TimeSeries{}
+		m := new(transit.TimeSeries)
 		m.Interval = new(transit.TimeInterval)
 		m.Interval.StartTime = transit.NewTimestamp()
 		m.Interval.EndTime = transit.NewTimestamp()
@@ -185,11 +183,11 @@ func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
 		m.Value = transit.NewTypedValue(i)
 		m.Unit = transit.MB
 
-		svc.Metrics = append(svc.Metrics, m)
-		rs.Services = append(rs.Services, svc)
+		svc.Metrics = append(svc.Metrics, *m)
+		rs.Services = append(rs.Services, *svc)
 	}
 
-	return rs
+	return *rs
 }
 
 func randStrs(x ...int) []string {

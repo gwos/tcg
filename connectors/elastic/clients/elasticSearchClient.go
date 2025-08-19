@@ -171,8 +171,8 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 		}
 	}
 	client := esClient.client
-	var body bytes.Buffer
-	if err := json.NewEncoder(&body).Encode(searchBody); err != nil {
+	body := new(bytes.Buffer)
+	if err := json.NewEncoder(body).Encode(searchBody); err != nil {
 		log.Err(err).Msg("could not encode ES Search Body")
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
 		client.Search.WithIndex(indexes...),
-		client.Search.WithBody(&body),
+		client.Search.WithBody(body),
 		client.Search.WithTrackTotalHits(true),
 		client.Search.WithSize(0),
 	)

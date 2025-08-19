@@ -29,10 +29,10 @@ func TestIntegration(t *testing.T) {
 		Type:        transit.HostGroup,
 	}
 	rs := makeResource(0, 3)
-	var resources transit.ResourcesWithServicesRequest
+	resources := new(transit.ResourcesWithServicesRequest)
 	resources.SetContext(services.GetTransitService().MakeTracerContext())
 	resources.AddResource(rs)
-	var inventory transit.InventoryRequest
+	inventory := new(transit.InventoryRequest)
 	inventory.SetContext(services.GetTransitService().MakeTracerContext())
 	inventory.AddResource(rs.ToInventoryResource())
 	group.AddResource(rs.ToResourceRef())
@@ -188,9 +188,9 @@ func inventoryRequest(countHst, countSvc int, opts ...OV) ([]byte, error) {
 		}
 	}
 
-	var inventory transit.InventoryRequest
+	inventory := new(transit.InventoryRequest)
 	inventory.SetContext(services.GetTransitService().MakeTracerContext())
-	var hg1, hg2 transit.ResourceGroup
+	hg1, hg2 := new(transit.ResourceGroup), new(transit.ResourceGroup)
 
 	for i, rs := range resources(countHst, countSvc, opts...) {
 		inventory.AddResource(rs.ToInventoryResource())
@@ -200,15 +200,15 @@ func inventoryRequest(countHst, countSvc int, opts ...OV) ([]byte, error) {
 			hg1.Type = transit.HostGroup
 			hg1.GroupName = fmt.Sprintf("%v.%v.%v", group1, TestEntityName, i)
 			hg1.Description = fmt.Sprintf("%v %v %v", group1, TestEntityName, i)
-			inventory.AddResourceGroup(hg1)
-			hg1 = transit.ResourceGroup{}
+			inventory.AddResourceGroup(*hg1)
+			hg1 = new(transit.ResourceGroup)
 		}
 		if i%10 == 0 {
 			hg2.Type = transit.HostGroup
 			hg2.GroupName = fmt.Sprintf("%v.%v.%v", group2, TestEntityName, i)
 			hg2.Description = fmt.Sprintf("%v %v %v", group2, TestEntityName, i)
-			inventory.AddResourceGroup(hg2)
-			hg2 = transit.ResourceGroup{}
+			inventory.AddResourceGroup(*hg2)
+			hg2 = new(transit.ResourceGroup)
 		}
 	}
 
@@ -217,16 +217,16 @@ func inventoryRequest(countHst, countSvc int, opts ...OV) ([]byte, error) {
 
 // inspired by expvar.Handler() implementation
 func memstats() any {
-	var stats runtime.MemStats
-	runtime.ReadMemStats(&stats)
-	return stats
+	stats := new(runtime.MemStats)
+	runtime.ReadMemStats(stats)
+	return *stats
 }
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
 }
 func printExpvar() {
 	// println("\n~", time.Now().Format(time.DateTime), "TCG_STATS", fmt.Sprintf("%+v", services.GetTransitService().Stats()))
-	var buf bytes.Buffer
-	expvar.Do(func(kv expvar.KeyValue) { fmt.Fprintln(&buf, kv.Key+": "+kv.Value.String()) })
+	buf := new(bytes.Buffer)
+	expvar.Do(func(kv expvar.KeyValue) { fmt.Fprintln(buf, kv.Key+": "+kv.Value.String()) })
 	println("\n~", time.Now().Format(time.DateTime), "TCG_EXPVAR", "\n", buf.String())
 }

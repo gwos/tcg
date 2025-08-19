@@ -64,11 +64,11 @@ func (c *APIClient) CheckHostExist(host string, mustExist bool, mustHasStatus st
 		return fmt.Errorf("status code = %d (Details: %s), want = %d ", statusCode, string(byteResponse), 200)
 	}
 
-	var response struct {
+	response := new(struct {
 		HostName      string `json:"hostName"`
 		MonitorStatus string `json:"monitorStatus"`
-	}
-	if err := json.Unmarshal(byteResponse, &response); err != nil {
+	})
+	if err := json.Unmarshal(byteResponse, response); err != nil {
 		return err
 	}
 
