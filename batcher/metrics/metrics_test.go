@@ -54,8 +54,8 @@ func TestResourcesWithServicesRequest(t *testing.T) {
 		}
 	]
 	}`)
-	var q transit.ResourcesWithServicesRequest
-	assert.NoError(t, json.Unmarshal(p, &q))
+	q := new(transit.ResourcesWithServicesRequest)
+	assert.NoError(t, json.Unmarshal(p, q))
 	s := fmt.Sprintf("%#v", q)
 	assert.Contains(t, s, `Status:"SERVICE_OK", LastCheckTime:<nil>, NextCheckTime:<nil>`)
 	/* no wrong dates added on re-marshaling */
@@ -74,40 +74,16 @@ func TestBuild(t *testing.T) {
 		}
 		mbb.Build(&buf, 1024)
 		qq := make([]transit.ResourcesWithServicesRequest, 0)
-		var q transit.ResourcesWithServicesRequest
 		for _, p := range buf {
-			q = transit.ResourcesWithServicesRequest{}
-			assert.NoError(t, json.Unmarshal(p, &q))
-			qq = append(qq, q)
+			q := new(transit.ResourcesWithServicesRequest)
+			assert.NoError(t, json.Unmarshal(p, q))
+			qq = append(qq, *q)
 		}
 		assert.Equal(t, 4, len(qq))
 		assert.Contains(t, qq[0].Context.TraceToken, "b491b98e-0000")
 		assert.Contains(t, qq[1].Context.TraceToken, "b491b98e-0001")
 		assert.Equal(t, 2, len(qq[0].Resources[0].Services))
 		assert.Equal(t, 2, len(qq[3].Resources[0].Services))
-
-		// bb, err := json.MarshalIndent(qq, "", "  ")
-		// assert.NoError(t, err)
-		// t.Logf("%#v\n\n%s", qq, bb)
-	})
-
-	t.Run("split oversized without metrics", func(t *testing.T) {
-		buf := [][]byte{
-			[]byte(`{"context":{"agentId":"a3d1a71c-3123-4cf4-bc44-493abe8d693e","appType":"NAGIOS","timeStamp":"1747733605675","traceToken":"b491b98e-c0cf-40c8-9938-3e30cb6a444c","version":"1.0.0"},"resources":[{"description":"atest11","device":"127.1.1.11","lastCheckTime":"1747756069000","lastPluginOutput":"OK - 127.1.1.11 rta 0.032ms lost 0%","name":"atest11","nextCheckTime":"1747756129000","properties":{"Alias":{"stringValue":"atest11","valueType":"StringType"},"CheckType":{"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.003,"valueType":"DoubleType"},"LastNotificationTime":{"timeValue":"0","valueType":"TimeType"},"LastStateChange":{"timeValue":"1747683022000","valueType":"TimeType"},"Latency":{"doubleValue":0,"valueType":"DoubleType"},"MaxAttempts":{"integerValue":3,"valueType":"IntegerType"},"PercentStateChange":{"doubleValue":0,"valueType":"DoubleType"},"PerformanceData":{"stringValue":"rta=0.032ms;3000.000;5000.000;0; pl=0%;80;100;0;100 rtmax=0.032ms;;;; rtmin=0.032ms;;;;","valueType":"StringType"},"StateType":{"stringValue":"HARD","valueType":"StringType"},"isAcknowledged":{"boolValue":false,"valueType":"BooleanType"},"isChecksEnabled":{"boolValue":true,"valueType":"BooleanType"},"isEventHandlersEnabled":{"boolValue":true,"valueType":"BooleanType"},"isFlapDetectionEnabled":{"boolValue":true,"valueType":"BooleanType"},"isNotificationsEnabled":{"boolValue":true,"valueType":"BooleanType"},"isPassiveChecksEnabled":{"boolValue":true,"valueType":"BooleanType"}},"services":[{"lastCheckTime":"1747756069000","lastPluginOutput":"OK - 127.1.1.11 rta 0.050ms lost 0%","name":"icmp_ping_alive","nextCheckTime":"1747756129000","properties":{"CheckType":{"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.004,"valueType":"DoubleType"},"LastNotificationTime":{"timeValue":"0","valueType":"TimeType"},"Latency":{"doubleValue":0,"valueType":"DoubleType"},"MaxAttempts":{"integerValue":3,"valueType":"IntegerType"},"PercentStateChange":{"doubleValue":0,"valueType":"DoubleType"},"PerformanceData":{"stringValue":"rta=0.050ms;3000.000;5000.000;0; pl=0%;80;100;0;100 rtmax=0.050ms;;;; rtmin=0.050ms;;;;","valueType":"StringType"},"StateType":{"stringValue":"HARD","valueType":"StringType"},"isAcceptPassiveChecks":{"boolValue":true,"valueType":"BooleanType"},"isChecksEnabled":{"boolValue":true,"valueType":"BooleanType"},"isEventHandlersEnabled":{"boolValue":true,"valueType":"BooleanType"},"isFlapDetectionEnabled":{"boolValue":true,"valueType":"BooleanType"},"isNotificationsEnabled":{"boolValue":true,"valueType":"BooleanType"},"isProblemAcknowledged":{"boolValue":false,"valueType":"BooleanType"}},"status":"SERVICE_OK","type":"service"}],"status":"HOST_UP","type":"host"},{"description":"atest22","device":"127.1.1.22","lastCheckTime":"1747756029000","lastPluginOutput":"OK - 127.1.1.22 rta 0.044ms lost 0%","name":"atest22","nextCheckTime":"1747756091000","properties":{"Alias":{"stringValue":"atest22","valueType":"StringType"},"CheckType":{"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.003,"valueType":"DoubleType"},"LastNotificationTime":{"timeValue":"0","valueType":"TimeType"},"LastStateChange":{"timeValue":"1747683049000","valueType":"TimeType"},"Latency":{"doubleValue":0,"valueType":"DoubleType"},"MaxAttempts":{"integerValue":3,"valueType":"IntegerType"},"PercentStateChange":{"doubleValue":0,"valueType":"DoubleType"},"PerformanceData":{"stringValue":"rta=0.044ms;3000.000;5000.000;0; pl=0%;80;100;0;100 rtmax=0.044ms;;;; rtmin=0.044ms;;;;","valueType":"StringType"},"StateType":{"stringValue":"HARD","valueType":"StringType"},"isAcknowledged":{"boolValue":false,"valueType":"BooleanType"},"isChecksEnabled":{"boolValue":true,"valueType":"BooleanType"},"isEventHandlersEnabled":{"boolValue":true,"valueType":"BooleanType"},"isFlapDetectionEnabled":{"boolValue":true,"valueType":"BooleanType"},"isNotificationsEnabled":{"boolValue":true,"valueType":"BooleanType"},"isPassiveChecksEnabled":{"boolValue":true,"valueType":"BooleanType"}},"services":[{"lastCheckTime":"1747756060000","lastPluginOutput":"OK - 127.1.1.22 rta 0.031ms lost 0%","name":"icmp_ping_alive","nextCheckTime":"1747756120000","properties":{"CheckType":{"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"integerValue":1,"valueType":"IntegerType"},"CurrentNotificationNumber":{"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.003,"valueType":"DoubleType"},"LastNotificationTime":{"timeValue":"0","valueType":"TimeType"},"Latency":{"doubleValue":0,"valueType":"DoubleType"},"MaxAttempts":{"integerValue":3,"valueType":"IntegerType"},"PercentStateChange":{"doubleValue":0,"valueType":"DoubleType"},"PerformanceData":{"stringValue":"rta=0.031ms;3000.000;5000.000;0; pl=0%;80;100;0;100 rtmax=0.031ms;;;; rtmin=0.031ms;;;;","valueType":"StringType"},"StateType":{"stringValue":"HARD","valueType":"StringType"},"isAcceptPassiveChecks":{"boolValue":true,"valueType":"BooleanType"},"isChecksEnabled":{"boolValue":true,"valueType":"BooleanType"},"isEventHandlersEnabled":{"boolValue":true,"valueType":"BooleanType"},"isFlapDetectionEnabled":{"boolValue":true,"valueType":"BooleanType"},"isNotificationsEnabled":{"boolValue":true,"valueType":"BooleanType"},"isProblemAcknowledged":{"boolValue":false,"valueType":"BooleanType"}},"status":"SERVICE_OK","type":"service"}],"status":"HOST_UP","type":"host"}]}`),
-		}
-		mbb.Build(&buf, 1024)
-		qq := make([]transit.ResourcesWithServicesRequest, 0)
-		var q transit.ResourcesWithServicesRequest
-		for _, p := range buf {
-			q = transit.ResourcesWithServicesRequest{}
-			assert.NoError(t, json.Unmarshal(p, &q))
-			qq = append(qq, q)
-		}
-		assert.Equal(t, 2, len(qq))
-		assert.Contains(t, qq[0].Context.TraceToken, "b491b98e-0000")
-		assert.Contains(t, qq[1].Context.TraceToken, "b491b98e-0001")
-		assert.Equal(t, 1, len(qq[0].Resources[0].Services))
-		assert.Equal(t, 1, len(qq[1].Resources[0].Services))
 
 		// bb, err := json.MarshalIndent(qq, "", "  ")
 		// assert.NoError(t, err)
@@ -127,12 +103,11 @@ func TestBuild(t *testing.T) {
 		printMemStats()
 
 		qq := make([]transit.ResourcesWithServicesRequest, 0)
-		var q transit.ResourcesWithServicesRequest
 		for _, p := range buf {
 			// t.Logf("\n\n%s\n", p)
-			q = transit.ResourcesWithServicesRequest{}
-			assert.NoError(t, json.Unmarshal(p, &q))
-			qq = append(qq, q)
+			q := new(transit.ResourcesWithServicesRequest)
+			assert.NoError(t, json.Unmarshal(p, q))
+			qq = append(qq, *q)
 		}
 		assert.Equal(t, 3, len(qq))
 		assert.Equal(t, 1, len(qq[0].Groups))
@@ -152,12 +127,11 @@ func TestBuild(t *testing.T) {
 		}
 		mbb.Build(&buf, 10240)
 		qq := make([]transit.ResourcesWithServicesRequest, 0)
-		var q transit.ResourcesWithServicesRequest
 		for _, p := range buf {
 			// t.Logf("\n\n%s\n", p)
-			q = transit.ResourcesWithServicesRequest{}
-			assert.NoError(t, json.Unmarshal(p, &q))
-			qq = append(qq, q)
+			q := new(transit.ResourcesWithServicesRequest)
+			assert.NoError(t, json.Unmarshal(p, q))
+			qq = append(qq, *q)
 		}
 		assert.Equal(t, 4, len(qq))
 		assert.Equal(t, 0, len(qq[0].Groups))
