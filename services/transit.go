@@ -420,7 +420,6 @@ func (service *TransitService) SyncExt(ctx context.Context, p *transit.Inventory
 	}
 
 	if len(mon.Resources) > 0 {
-		mon.SetContext(service.MakeTracerContext())
 		payload, err = json.Marshal(mon)
 		if err != nil {
 			return err

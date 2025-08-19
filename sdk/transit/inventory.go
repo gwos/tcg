@@ -167,7 +167,7 @@ func (p ResourceGroup) String() string {
 
 // InventoryRequest defines SynchronizeInventory payload
 type InventoryRequest struct {
-	Context       TracerContext       `json:"context"`
+	Context       *TracerContext      `json:"context,omitempty"`
 	OwnershipType HostOwnershipType   `json:"ownershipType,omitempty"`
 	Resources     []InventoryResource `json:"resources"`
 	Groups        []ResourceGroup     `json:"groups,omitempty"`
@@ -182,6 +182,9 @@ func (p *InventoryRequest) AddResourceGroup(gr ResourceGroup) {
 }
 
 func (p *InventoryRequest) SetContext(c TracerContext) {
+	if p.Context == nil {
+		p.Context = new(TracerContext)
+	}
 	p.Context.SetContext(c)
 }
 

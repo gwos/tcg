@@ -30,10 +30,10 @@ func TestIntegration(t *testing.T) {
 	}
 	rs := makeResource(0, 3)
 	resources := new(transit.ResourcesWithServicesRequest)
-	resources.SetContext(services.GetTransitService().MakeTracerContext())
+	resources.SetContext(*services.GetTransitService().MakeTracerContext())
 	resources.AddResource(rs)
 	inventory := new(transit.InventoryRequest)
-	inventory.SetContext(services.GetTransitService().MakeTracerContext())
+	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 	inventory.AddResource(rs.ToInventoryResource())
 	group.AddResource(rs.ToResourceRef())
 	inventory.AddResourceGroup(group)
@@ -189,7 +189,7 @@ func inventoryRequest(countHst, countSvc int, opts ...OV) ([]byte, error) {
 	}
 
 	inventory := new(transit.InventoryRequest)
-	inventory.SetContext(services.GetTransitService().MakeTracerContext())
+	inventory.SetContext(*services.GetTransitService().MakeTracerContext())
 	hg1, hg2 := new(transit.ResourceGroup), new(transit.ResourceGroup)
 
 	for i, rs := range resources(countHst, countSvc, opts...) {
