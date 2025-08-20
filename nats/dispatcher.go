@@ -102,9 +102,10 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 		default:
 		}
 
+		// msgBatch, err := cons.FetchNoWait(4) // may cause high CPU consumption
 		// Fetch will return as soon as any message is available rather than wait until the full batch size is available,
 		// using a batch size of more than 1 allows for higher throughput when needed.
-		msgBatch, err := cons.FetchNoWait(4)
+		msgBatch, err := cons.Fetch(4)
 		if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 			log.Err(err).
 				Str("durable", opt.Durable).
