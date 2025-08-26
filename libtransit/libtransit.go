@@ -632,6 +632,29 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	return true
 }
 
+// SendStates processes ResourcesWithServicesRequest with statuses,
+// flushes MetricsBatcher to avoid misordering
+//
+//export SendStates
+func SendStates(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
+	var q *transit.ResourcesWithServicesRequest
+	h := cgo.Handle(p)
+	if v, ok := h.Value().(*transit.ResourcesWithServicesRequest); ok {
+		q = v
+	} else {
+		msg := fmt.Sprintf("unexpected type: %+v", h.Value())
+		bufStr(errBuf, errBufLen, msg)
+		log.Warn().Msg(msg)
+		return false
+	}
+
+	if err := services.GetTransitService().SendStates(context.Background(), q); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
 // SyncExt processes extended inventory included additional properties
 //
 //export SyncExt
