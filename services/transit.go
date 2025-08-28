@@ -30,6 +30,7 @@ const (
 	TOpSendEventsAck   TransitOperation = "events-ack"
 	TOpSendEventsUnack TransitOperation = "events-unack"
 	TOpSendMetrics     TransitOperation = "metrics"
+	TOpSendStates      TransitOperation = "states"
 	TOpSyncInventory   TransitOperation = "inventory"
 )
 
@@ -290,8 +291,6 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 }
 
 func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) error {
-	service.stats.x.Add("sendMetrics", 1)
-
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendMetrics))
 	var err error
 	defer func() {
@@ -302,6 +301,8 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 		)
 		if err != nil {
 			log.Err(err).Msg("sendMetrics failed")
+		} else {
+			service.stats.x.Add("sendMetrics", 1)
 		}
 	}()
 
@@ -321,6 +322,49 @@ func (service *TransitService) sendMetrics(ctx context.Context, payload []byte) 
 	// }
 	// err = nats.Publish(subjInventoryMetrics, b)
 	// return err
+}
+
+// SendStates processes ResourcesWithServicesRequest with statuses,
+// flushes MetricsBatcher to avoid misordering
+func (service *TransitService) SendStates(ctx context.Context, p *transit.ResourcesWithServicesRequest) error {
+	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSendStates))
+	var err error
+	defer func() {
+		tracing.EndTraceSpan(span,
+			tracing.TraceAttrError(err),
+		)
+		if err != nil {
+			log.Err(err).Msg("SendStates failed")
+		} else {
+			service.stats.x.Add("sendStates", 1)
+		}
+	}()
+
+	payload, err := json.Marshal(p)
+	if err != nil {
+		return err
+	}
+	if err := service.exportTransit(TOpSendStates, payload); err != nil {
+		log.Err(err).Msgf("could not exportTransit: %v", TOpSendStates)
+	}
+
+	if config.Suppress.States {
+		return nil
+	}
+
+	if service.Connector.BatchMetrics != 0 {
+		service.metricsBatcher.Batch()
+	}
+
+	payload, todoTracerCtx := service.mixTracerContext(payload)
+	header := make(http.Header)
+	header.Set(clients.HdrPayloadType, typeMetrics.String())
+	if todoTracerCtx {
+		header.Set(clients.HdrTodoTracerCtx, "-")
+	}
+	ctx = clients.CtxWithHeader(ctx, header)
+	err = Put2Nats(ctx, subjInventoryMetrics, payload)
+	return err
 }
 
 // SynchronizeInventory implements TransitServices.SynchronizeInventory interface
@@ -357,6 +401,10 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 		return nil
 	}
 
+	if service.Connector.BatchMetrics != 0 {
+		service.metricsBatcher.Batch()
+	}
+
 	service.stats.LastInventoryRun.Set(time.Now().UnixMilli())
 
 	payload, todoTracerCtx := service.mixTracerContext(payload)
@@ -372,9 +420,11 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 
 // SynchronizeInventoryExt processes extended inventory included additional properties
 func (service *TransitService) SynchronizeInventoryExt(ctx context.Context, payload []byte) error {
-	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
-		log.Info().Msg("SynchronizeInventoryExt: TCG_INVENTORY_NOEXT")
-		return service.SynchronizeInventory(ctx, payload)
+	if v, ok := os.LookupEnv("TCG_INVENTORY_EXT"); ok {
+		if val, err := strconv.ParseBool(v); err == nil && !val {
+			log.Info().Msg("SynchronizeInventoryExt: False TCG_INVENTORY_EXT")
+			return service.SynchronizeInventory(ctx, payload)
+		}
 	}
 
 	var p transit.InventoryRequest
@@ -393,17 +443,19 @@ func (service *TransitService) SyncExt(ctx context.Context, p *transit.Inventory
 			tracing.TraceAttrError(err),
 		)
 		if err != nil {
-			log.Err(err).Msg("Sync failed")
+			log.Err(err).Msg("SyncExt failed")
 		}
 	}()
 
-	if v, err := strconv.ParseBool(os.Getenv("TCG_INVENTORY_NOEXT")); err == nil && v {
-		log.Info().Msg("Sync: TCG_INVENTORY_NOEXT")
-		payload, err := json.Marshal(p)
-		if err != nil {
-			return err
+	if v, ok := os.LookupEnv("TCG_INVENTORY_EXT"); ok {
+		if val, err := strconv.ParseBool(v); err == nil && !val {
+			log.Info().Msg("SyncExt: False TCG_INVENTORY_EXT")
+			payload, err := json.Marshal(p)
+			if err != nil {
+				return err
+			}
+			return service.SynchronizeInventory(ctx, payload)
 		}
-		return service.SynchronizeInventory(ctx, payload)
 	}
 
 	var dt transit.Downtimes
@@ -421,11 +473,7 @@ func (service *TransitService) SyncExt(ctx context.Context, p *transit.Inventory
 
 	if len(mon.Resources) > 0 {
 		mon.SetContext(service.MakeTracerContext())
-		payload, err = json.Marshal(mon)
-		if err != nil {
-			return err
-		}
-		err = service.SendResourceWithMetrics(ctx, payload)
+		err = service.SendStates(ctx, &mon)
 		if err != nil {
 			return err
 		}
