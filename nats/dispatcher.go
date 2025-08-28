@@ -123,25 +123,26 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 		// }
 		// xFetchedAt.Set(time.Now().UnixMilli())
 
-		// Process fetched messages and delay next fetching in case of transient error
-		var delayRetry *dispatcherRetry
+		/* Process fetched messages and delay next fetching in case of transient error */
+
+		delayRetry, done := &dispatcherRetry{}, true
 		for msg := range msgBatch.Messages() {
-			if delayRetry != nil {
+			if !done {
 				_ = msg.Nak()
 
-				logger.Trace().Msg("dispatcher skipping: delayRetry != nil")
+				logger.Trace().Msg("dispatcher skipping: preparing retry")
 				continue
 			}
 
 			xProcessedAt.Set(time.Now().UnixMilli())
-			delayRetry = d.processMsg(logger.WithContext(ctx), opt, msg)
-			if delayRetry != nil {
+			done = d.processMsg(logger.WithContext(ctx), opt, msg, delayRetry)
+			if !done {
 				_ = msg.Nak()
 			} else {
 				_ = msg.Ack()
 			}
 		}
-		if delayRetry != nil {
+		if !done {
 			xRetryDelay.Set(fmt.Sprintf("%v / %v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry], time.Now().UTC().Format(time.RFC3339)))
 			logger.Debug().
 				Stringer("delay", RetryDelays[delayRetry.Retry]).
@@ -159,12 +160,15 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 	}
 }
 
-func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jetstream.Msg) *dispatcherRetry {
+// processMsg wraps opt.Handler() call,
+// in case of transient error it calculates retry and returns False
+func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jetstream.Msg, retry *dispatcherRetry) bool {
+	done := true
 	meta, err := msg.Metadata()
 	if err != nil {
 		zerolog.Ctx(ctx).Err(err).Str("msg", fmt.Sprintf("%+v", msg)).
 			Msg("nats dispatcher failed Metadata")
-		return nil
+		return done
 	}
 	doneSeq, lostOrder := uint64(0), false
 	if seq, ok := d.duraSeqs.Get(opt.Durable); ok {
@@ -197,12 +201,12 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 		d.duraSeqs.Set(opt.Durable, meta.Sequence.Stream, -1)
 		logger.Info().
 			Msg("dispatcher delivered")
-		return nil
+		return done
 	}
 	if !errors.Is(err, tcgerr.ErrTransient) {
 		logger.Warn().Err(err).
 			Msg("dispatcher could not deliver: will not retry")
-		return nil
+		return done
 	}
 
 	/* processing transient error */
@@ -210,7 +214,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 	logger.Trace().Err(err).
 		Msg("dispatcher processing transient error")
 
-	retry := &dispatcherRetry{
+	*retry = dispatcherRetry{
 		Timestamp: time.Now().UTC(),
 		LastError: err,
 		Retry:     0,
@@ -224,7 +228,7 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 		d.retries.Delete(opt.Durable)
 		logger.Warn().Err(err).
 			Msg("dispatcher could not deliver: stop retrying")
-		return nil
+		return done
 	}
 
 	d.retries.Set(opt.Durable, *retry, 0)
@@ -232,5 +236,5 @@ func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jet
 		Int("retry", retry.Retry).
 		Msg("dispatcher could not deliver: will retry")
 
-	return retry
+	return !done
 }
