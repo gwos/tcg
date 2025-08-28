@@ -35,6 +35,7 @@ var (
 		Events    bool `env:"SUPPRESS_EVENTS"`
 		Inventory bool `env:"SUPPRESS_INVENTORY"`
 		Metrics   bool `env:"SUPPRESS_METRICS"`
+		States    bool `env:"SUPPRESS_STATES"`
 	}
 )
 
