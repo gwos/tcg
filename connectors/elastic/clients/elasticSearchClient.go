@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,6 +29,9 @@ func (esClient *EsClient) InitClient() error {
 		Addresses: esClient.Addresses,
 		Username:  esClient.Username,
 		Password:  esClient.Password,
+		Logger:    EsLogger{},
+
+		EnableDebugLogger: zerolog.GlobalLevel() <= zerolog.DebugLevel,
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
@@ -177,10 +183,6 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 		return nil, err
 	}
 
-	log.Debug().
-		Bytes("body", body.Bytes()).
-		Msg("performing ES search request")
-
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
 		client.Search.WithIndex(indexes...),
@@ -202,10 +204,6 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 		log.Error().Msg("ES Search response is nil")
 		return nil
 	}
-
-	log.Debug().
-		Stringer("response", response).
-		Msg("ES Search response")
 
 	if response.IsError() {
 		var e map[string]any
@@ -272,10 +270,6 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		return result, nil
 	}
 
-	log.Debug().
-		Stringer("response", response).
-		Msg("ES FieldCaps response")
-
 	if response.IsError() {
 		var e map[string]any
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
@@ -333,4 +327,68 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 	}
 
 	return result, nil
+}
+
+type EsLogger struct{}
+
+func (EsLogger) RequestBodyEnabled() bool  { return true }
+func (EsLogger) ResponseBodyEnabled() bool { return true }
+func (EsLogger) LogRoundTrip(rq *http.Request, rs *http.Response, e error, t time.Time, d time.Duration) error {
+	if e == nil && zerolog.GlobalLevel() > zerolog.DebugLevel {
+		return nil
+	}
+
+	logctx := log.With().Int("status", rs.StatusCode).
+		Str("duration", d.Round(time.Millisecond).String()).
+		Str("url", rq.URL.Redacted()).
+		Dict("request-headers", zerolog.Dict().Fields(rq.Header)).
+		Dict("response-headers", zerolog.Dict().Fields(rs.Header))
+
+	loggedRq, loggedRs := false, false
+	if rq.Body != nil {
+		if body, err := io.ReadAll(rq.Body); err == nil {
+			body = bytes.TrimSpace(body)
+			if isJSON(body) {
+				logctx, loggedRq = logctx.RawJSON("request", body), !loggedRq
+			} else {
+				logctx, loggedRq = logctx.Str("request", string(body)), !loggedRq
+			}
+		}
+		rq.Body.Close()
+	}
+	if !loggedRq {
+		logctx = logctx.Str("request", "")
+	}
+	if rs.Body != nil {
+		if body, err := io.ReadAll(rs.Body); err == nil {
+			body = bytes.TrimSpace(body)
+			if isJSON(body) {
+				logctx, loggedRs = logctx.RawJSON("response", body), !loggedRs
+			} else {
+				logctx, loggedRs = logctx.Str("response", string(body)), !loggedRs
+			}
+		}
+		rs.Body.Close()
+	}
+	if !loggedRs {
+		logctx = logctx.Str("response", "")
+	}
+
+	logger := logctx.Logger()
+	if e != nil {
+		logger.Err(e).Msg("ES request")
+	} else {
+		logger.Debug().Msg("ES request")
+	}
+
+	return nil
+}
+
+func isJSON(s []byte) bool {
+	if len(s) >= 2 &&
+		((s[0] == '{' && s[len(s)-1] == '}') ||
+			(s[0] == '[' && s[len(s)-1] == ']')) {
+		return true
+	}
+	return false
 }
