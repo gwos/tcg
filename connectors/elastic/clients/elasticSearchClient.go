@@ -5,9 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,6 +29,9 @@ func (esClient *EsClient) InitClient() error {
 		Addresses: esClient.Addresses,
 		Username:  esClient.Username,
 		Password:  esClient.Password,
+		Logger:    EsLogger{},
+
+		EnableDebugLogger: zerolog.GlobalLevel() <= zerolog.DebugLevel,
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
@@ -333,4 +339,31 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 	}
 
 	return result, nil
+}
+
+type EsLogger struct{}
+
+func (EsLogger) RequestBodyEnabled() bool  { return true }
+func (EsLogger) ResponseBodyEnabled() bool { return true }
+func (EsLogger) LogRoundTrip(rq *http.Request, rs *http.Response, e error, t time.Time, d time.Duration) error {
+	var rqBody, rsBody []byte
+	if body, err := io.ReadAll(rq.Body); err == nil {
+		copy(rqBody, body)
+	}
+	if body, err := io.ReadAll(rs.Body); err == nil {
+		copy(rsBody, body)
+	}
+	defer rq.Body.Close()
+	defer rs.Body.Close()
+
+	logger := log.With().Int("status", rs.StatusCode).Str("url", rq.RequestURI).
+		Dict("headers", zerolog.Dict().Fields(rq.Header)).
+		RawJSON("request", rqBody).RawJSON("response", rsBody).
+		Dur("duration", d).Logger()
+	if e != nil {
+		logger.Err(e).Msg("ES request")
+	} else {
+		logger.Debug().Msg("ES request")
+	}
+	return nil
 }
