@@ -10,6 +10,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/gwos/tcg/logzer"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -333,62 +334,40 @@ type EsLogger struct{}
 
 func (EsLogger) RequestBodyEnabled() bool  { return true }
 func (EsLogger) ResponseBodyEnabled() bool { return true }
-func (EsLogger) LogRoundTrip(rq *http.Request, rs *http.Response, e error, t time.Time, d time.Duration) error {
-	if e == nil && zerolog.GlobalLevel() > zerolog.DebugLevel {
+func (EsLogger) LogRoundTrip(rq *http.Request, rs *http.Response, err error, t time.Time, d time.Duration) error {
+	if err == nil && zerolog.GlobalLevel() > zerolog.DebugLevel {
 		return nil
 	}
 
-	logctx := log.With().Int("status", rs.StatusCode).
-		Str("duration", d.Round(time.Millisecond).String()).
-		Str("url", rq.URL.Redacted()).
-		Dict("request-headers", zerolog.Dict().Fields(rq.Header)).
-		Dict("response-headers", zerolog.Dict().Fields(rs.Header))
+	var e *zerolog.Event
+	if err != nil {
+		e = log.Err(err)
+	} else {
+		e = log.Debug()
+	}
 
-	loggedRq, loggedRs := false, false
+	e.Func(func(e *zerolog.Event) {
+		e.Int("status", rs.StatusCode).
+			Str("method", rq.Method).
+			Str("url", rq.URL.Redacted()).
+			Str("duration", d.Truncate(time.Millisecond).String()).
+			Any("request-header", rq.Header).
+			Any("response-header", rs.Header)
+	})
+
 	if rq.Body != nil {
 		if body, err := io.ReadAll(rq.Body); err == nil {
-			body = bytes.TrimSpace(body)
-			if isJSON(body) {
-				logctx, loggedRq = logctx.RawJSON("request", body), !loggedRq
-			} else {
-				logctx, loggedRq = logctx.Str("request", string(body)), !loggedRq
-			}
+			e.Func(func(e *zerolog.Event) { e.EmbedObject(logzer.StrOrJSON("request", body)) })
 		}
 		rq.Body.Close()
 	}
-	if !loggedRq {
-		logctx = logctx.Str("request", "")
-	}
 	if rs.Body != nil {
 		if body, err := io.ReadAll(rs.Body); err == nil {
-			body = bytes.TrimSpace(body)
-			if isJSON(body) {
-				logctx, loggedRs = logctx.RawJSON("response", body), !loggedRs
-			} else {
-				logctx, loggedRs = logctx.Str("response", string(body)), !loggedRs
-			}
+			e.Func(func(e *zerolog.Event) { e.EmbedObject(logzer.StrOrJSON("response", body)) })
 		}
 		rs.Body.Close()
 	}
-	if !loggedRs {
-		logctx = logctx.Str("response", "")
-	}
 
-	logger := logctx.Logger()
-	if e != nil {
-		logger.Err(e).Msg("ES request")
-	} else {
-		logger.Debug().Msg("ES request")
-	}
-
+	e.Msg("ES request")
 	return nil
-}
-
-func isJSON(s []byte) bool {
-	if len(s) >= 2 &&
-		((s[0] == '{' && s[len(s)-1] == '}') ||
-			(s[0] == '[' && s[len(s)-1] == ']')) {
-		return true
-	}
-	return false
 }
