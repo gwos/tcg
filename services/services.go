@@ -27,7 +27,7 @@ func init() {
 	xStatsLastMetricsRun.Set(-1)
 	xStatsUpSince.Set(time.Now().UnixMilli())
 	xStats.Set("uptime", expvar.Func(func() any {
-		return time.Since(time.UnixMilli(xStatsUpSince.Value())).Round(time.Second).String()
+		return time.Since(time.UnixMilli(xStatsUpSince.Value())).Truncate(time.Second).String()
 	}))
 }
 

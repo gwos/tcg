@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gwos/tcg/logzer"
 	"github.com/gwos/tcg/sdk/clients"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -97,25 +98,28 @@ func (client *KibanaClient) RetrieveIndexTitles(storedQuery KSavedObject) []stri
 }
 
 func (client *KibanaClient) GetDefaultIndexID() string {
-	path := client.APIRoot + apiPath + defaultIndexPath
-	status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
-	logger := log.With().Int("status", status).Str("path", path).
-		Dict("headers", zerolog.Dict().Fields(client.headers)).
-		RawJSON("response", response).Logger()
+	url := client.APIRoot + apiPath + defaultIndexPath
+	status, response, err := clients.SendRequest(http.MethodGet, url, client.headers, nil, nil)
+	dbg := func(e *zerolog.Event) {
+		e.Int("status", status).Str("url", url).
+			Str("method", http.MethodGet).
+			Any("header", client.headers).
+			EmbedObject(logzer.StrOrJSON("response", response))
+	}
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
-			logger.Err(err).Msg("failed to perform Kibana Get Default Index request")
+			log.Err(err).Func(dbg).Msg("failed to perform Kibana Get Default Index request")
 		}
 		if status != 200 {
-			logger.Error().Msg("failure Kibana Get Default Index response")
+			log.Error().Func(dbg).Msg("failure Kibana Get Default Index response")
 		}
 		if len(response) == 0 {
-			logger.Error().Msg("Kibana Get Default Index response is empty")
+			log.Error().Func(dbg).Msg("Kibana Get Default Index response is empty")
 		}
 		return ""
 	} else {
-		logger.Debug().Msg("Kibana Get Default Index")
+		log.Debug().Func(dbg).Msg("Kibana Get Default Index")
 	}
 
 	var p struct {
@@ -134,25 +138,28 @@ func (client *KibanaClient) FindSO(savedObjectType KibanaSavedObjectType, search
 	var savedObjects []KSavedObject
 
 	for page, perPage, total := 1, 1000, -1; total == -1 || total >= page*perPage; page++ {
-		path := client.buildFindSOPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
-		status, response, err := clients.SendRequest(http.MethodGet, path, client.headers, nil, nil)
-		logger := log.With().Int("status", status).Str("path", path).
-			Dict("headers", zerolog.Dict().Fields(client.headers)).
-			RawJSON("response", response).Logger()
+		url := client.buildFindSOPath(&page, &perPage, &savedObjectType, &searchField, searchValues)
+		status, response, err := clients.SendRequest(http.MethodGet, url, client.headers, nil, nil)
+		dbg := func(e *zerolog.Event) {
+			e.Int("status", status).Str("url", url).
+				Str("method", http.MethodGet).
+				Any("header", client.headers).
+				EmbedObject(logzer.StrOrJSON("response", response))
+		}
 
 		if err != nil || status != 200 || len(response) == 0 {
 			if err != nil {
-				logger.Err(err).Msg("failed to perform Kibana Find Saved Objects request")
+				log.Err(err).Func(dbg).Msg("failed to perform Kibana Find Saved Objects request")
 			}
 			if status != 200 {
-				logger.Error().Msg("failure Kibana Find Saved Objects response")
+				log.Error().Func(dbg).Msg("failure Kibana Find Saved Objects response")
 			}
 			if len(response) == 0 {
-				logger.Error().Msg("Kibana Find Saved Objects response is empty")
+				log.Error().Func(dbg).Msg("Kibana Find Saved Objects response is empty")
 			}
 			return nil
 		} else {
-			logger.Debug().Msgf("Kibana Find Saved Objects")
+			log.Debug().Func(dbg).Msgf("Kibana Find Saved Objects")
 		}
 
 		var savedObjectsResponse KSavedObjectsResponse
@@ -184,31 +191,35 @@ func (client *KibanaClient) BulkGetSO(savedObjectType KibanaSavedObjectType, ids
 		})
 	}
 
-	path := client.buildBulkGetSOPath()
+	url := client.buildBulkGetSOPath()
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
 		log.Err(err).Msg("could not marshal Kibana Bulk Get request")
 		return nil
 	}
-	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, body)
-	logger := log.With().Int("status", status).Str("path", path).
-		Dict("headers", zerolog.Dict().Fields(client.headers)).
-		RawJSON("request", body).RawJSON("response", response).Logger()
+	status, response, err := clients.SendRequest(http.MethodPost, url, client.headers, nil, body)
+	dbg := func(e *zerolog.Event) {
+		e.Int("status", status).Str("url", url).
+			Str("method", http.MethodPost).
+			Any("header", client.headers).
+			EmbedObject(logzer.StrOrJSON("request", body)).
+			EmbedObject(logzer.StrOrJSON("response", response))
+	}
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
-			logger.Err(err).Msg("could not perform Kibana Bulk Get Saved Objects request")
+			log.Err(err).Func(dbg).Msg("could not perform Kibana Bulk Get Saved Objects request")
 		}
 		if status != 200 {
-			logger.Error().Msg("failure Kibana Bulk Get Saved Objects response")
+			log.Error().Func(dbg).Msg("failure Kibana Bulk Get Saved Objects response")
 		}
 		if len(response) == 0 {
-			logger.Error().Msg("Kibana Bulk Get Saved Objects response is empty")
+			log.Error().Func(dbg).Msg("Kibana Bulk Get Saved Objects response is empty")
 		}
 		return nil
 	} else {
-		logger.Debug().Msg("Kibana Bulk Get Saved Objects")
+		log.Debug().Func(dbg).Msg("Kibana Bulk Get Saved Objects")
 	}
 
 	var bulkResponse KBulkGetSOResponse
@@ -245,31 +256,35 @@ func (client *KibanaClient) BulkResolveSO(savedObjectType KibanaSavedObjectType,
 		})
 	}
 
-	path := client.buildBulkResolveSOPath()
+	url := client.buildBulkResolveSOPath()
 
 	body, err := json.Marshal(requestBody)
 	if err != nil {
 		log.Err(err).Msg("could not marshal Kibana Bulk Resolve request")
 		return nil
 	}
-	status, response, err := clients.SendRequest(http.MethodPost, path, client.headers, nil, body)
-	logger := log.With().Int("status", status).Str("path", path).
-		Dict("headers", zerolog.Dict().Fields(client.headers)).
-		RawJSON("request", body).RawJSON("response", response).Logger()
+	status, response, err := clients.SendRequest(http.MethodPost, url, client.headers, nil, body)
+	dbg := func(e *zerolog.Event) {
+		e.Int("status", status).Str("url", url).
+			Str("method", http.MethodPost).
+			Any("header", client.headers).
+			EmbedObject(logzer.StrOrJSON("request", body)).
+			EmbedObject(logzer.StrOrJSON("response", response))
+	}
 
 	if err != nil || status != 200 || len(response) == 0 {
 		if err != nil {
-			logger.Err(err).Msg("could not perform Kibana Bulk Resolve Saved Objects request")
+			log.Err(err).Func(dbg).Msg("could not perform Kibana Bulk Resolve Saved Objects request")
 		}
 		if status != 200 {
-			logger.Error().Msg("failure Kibana Bulk Resolve Saved Objects response")
+			log.Error().Func(dbg).Msg("failure Kibana Bulk Resolve Saved Objects response")
 		}
 		if len(response) == 0 {
-			logger.Error().Msg("Kibana Bulk Resolve Saved Objects response is empty")
+			log.Error().Func(dbg).Msg("Kibana Bulk Resolve Saved Objects response is empty")
 		}
 		return nil
 	} else {
-		logger.Debug().Msg("Kibana Bulk Resolve Saved Objects")
+		log.Debug().Func(dbg).Msg("Kibana Bulk Resolve Saved Objects")
 	}
 
 	var bulkResponse KBulkResolveSOResponse
