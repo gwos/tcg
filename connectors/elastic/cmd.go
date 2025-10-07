@@ -70,6 +70,7 @@ func configHandler(data []byte) {
 		HostGroupField:     defaultHostGroupLabel,
 		GroupNameByUser:    defaultGroupNameByUser,
 		CheckInterval:      connectors.DefaultCheckInterval,
+		AppName:            config.GetConfig().Connector.AppName,
 		AppType:            config.GetConfig().Connector.AppType,
 		AgentID:            config.GetConfig().Connector.AgentID,
 		GWConnections:      config.GetConfig().GWConnections,
