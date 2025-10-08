@@ -64,6 +64,16 @@ func IsGZipped(p []byte) bool {
 	return len(p) > 2 && p[0] == 31 && p[1] == 139
 }
 
+// IsJSON does quick check for JSON-like content
+func IsJSON(s []byte) bool {
+	if len(s) >= 2 &&
+		((s[0] == '{' && s[len(s)-1] == '}') ||
+			(s[0] == '[' && s[len(s)-1] == ']')) {
+		return true
+	}
+	return false
+}
+
 // SendRequest wraps HTTP methods
 func SendRequest(httpMethod string, requestURL string,
 	headers map[string]string, formValues map[string]string, body []byte) (int, []byte, error) {
@@ -171,7 +181,7 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	}
 	// taking data for logging
 	q.header = request.Header
-	q.duration = time.Since(t0).Truncate(1 * time.Millisecond)
+	q.duration = time.Since(t0).Truncate(time.Millisecond)
 	if err != nil {
 		q.Status, q.Err = -1, err
 		return err
@@ -208,26 +218,25 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 	if q.Status >= 400 || forceDetails ||
 		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
 		if len(q.header) > 0 {
-			attrs = append(attrs, slog.Any("header", slog.AnyValue(q.header)))
+			attrs = append(attrs, slog.Any("header", q.header))
 		}
+
 		if len(q.Form) > 0 {
 			attrs = append(attrs, slog.Any("form", q.Form))
 		}
-		if len(q.Payload) > 0 {
-			if IsGZipped(q.Payload) {
-				attrs = append(attrs, slog.String("payload", "encoded:gzip"))
-			} else if bytes.HasPrefix(q.Payload, []byte(`{`)) {
-				attrs = append(attrs, slog.Any("payload", json.RawMessage(q.Payload)))
-			} else {
-				attrs = append(attrs, slog.String("payload", string(q.Payload)))
-			}
+
+		if p := bytes.TrimSpace(q.Payload); IsGZipped(p) {
+			attrs = append(attrs, slog.String("payload", "encoded:gzip"))
+		} else if IsJSON(p) {
+			attrs = append(attrs, slog.Any("payload", json.RawMessage(p)))
+		} else {
+			attrs = append(attrs, slog.String("payload", string(p)))
 		}
-		if len(q.Response) > 0 {
-			if bytes.HasPrefix(q.Response, []byte(`{`)) {
-				attrs = append(attrs, slog.Any("response", json.RawMessage(q.Response)))
-			} else {
-				attrs = append(attrs, slog.String("response", string(q.Response)))
-			}
+
+		if p := bytes.TrimSpace(q.Response); IsJSON(p) {
+			attrs = append(attrs, slog.Any("response", json.RawMessage(p)))
+		} else {
+			attrs = append(attrs, slog.String("response", string(p)))
 		}
 	}
 

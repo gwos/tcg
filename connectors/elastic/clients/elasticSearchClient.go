@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"net/http"
+	"time"
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esapi"
+	"github.com/gwos/tcg/logzer"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,6 +30,9 @@ func (esClient *EsClient) InitClient() error {
 		Addresses: esClient.Addresses,
 		Username:  esClient.Username,
 		Password:  esClient.Password,
+		Logger:    EsLogger{},
+
+		EnableDebugLogger: zerolog.GlobalLevel() <= zerolog.DebugLevel,
 	}
 	client, err := elasticsearch.NewClient(cfg)
 	if err != nil {
@@ -177,10 +184,6 @@ func (esClient EsClient) doSearchRequest(searchBody EsSearchBody, indexes []stri
 		return nil, err
 	}
 
-	log.Debug().
-		Bytes("body", body.Bytes()).
-		Msg("performing ES search request")
-
 	response, err := client.Search(
 		client.Search.WithContext(context.Background()),
 		client.Search.WithIndex(indexes...),
@@ -202,10 +205,6 @@ func parseSearchResponse(response *esapi.Response) *EsSearchResponse {
 		log.Error().Msg("ES Search response is nil")
 		return nil
 	}
-
-	log.Debug().
-		Stringer("response", response).
-		Msg("ES Search response")
 
 	if response.IsError() {
 		var e map[string]any
@@ -272,10 +271,6 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 		return result, nil
 	}
 
-	log.Debug().
-		Stringer("response", response).
-		Msg("ES FieldCaps response")
-
 	if response.IsError() {
 		var e map[string]any
 		if err := json.NewDecoder(response.Body).Decode(&e); err != nil {
@@ -333,4 +328,46 @@ func (esClient EsClient) IsAggregatable(fieldNames []string, indexes []string) (
 	}
 
 	return result, nil
+}
+
+type EsLogger struct{}
+
+func (EsLogger) RequestBodyEnabled() bool  { return true }
+func (EsLogger) ResponseBodyEnabled() bool { return true }
+func (EsLogger) LogRoundTrip(rq *http.Request, rs *http.Response, err error, t time.Time, d time.Duration) error {
+	if err == nil && zerolog.GlobalLevel() > zerolog.DebugLevel {
+		return nil
+	}
+
+	var e *zerolog.Event
+	if err != nil {
+		e = log.Err(err)
+	} else {
+		e = log.Debug()
+	}
+
+	e.Func(func(e *zerolog.Event) {
+		e.Int("status", rs.StatusCode).
+			Str("method", rq.Method).
+			Str("url", rq.URL.Redacted()).
+			Str("duration", d.Truncate(time.Millisecond).String()).
+			Any("request-header", rq.Header).
+			Any("response-header", rs.Header)
+	})
+
+	if rq.Body != nil {
+		if body, err := io.ReadAll(rq.Body); err == nil {
+			e.Func(func(e *zerolog.Event) { e.EmbedObject(logzer.StrOrJSON("request", body)) })
+		}
+		rq.Body.Close()
+	}
+	if rs.Body != nil {
+		if body, err := io.ReadAll(rs.Body); err == nil {
+			e.Func(func(e *zerolog.Event) { e.EmbedObject(logzer.StrOrJSON("response", body)) })
+		}
+		rs.Body.Close()
+	}
+
+	e.Msg("ES request")
+	return nil
 }
