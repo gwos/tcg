@@ -232,6 +232,7 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	}
 	version, err := kClientSet.Discovery().ServerVersion()
 	if err != nil {
+		err = fmt.Errorf("%w: %v", ErrAPI, err)
 		return err
 	}
 
@@ -258,6 +259,7 @@ func (connector *KubernetesConnector) Ping() error {
 	}
 	_, err := connector.kClientSet.Discovery().ServerVersion()
 	if err != nil {
+		err = fmt.Errorf("%w: %v", ErrAPI, err)
 		return err
 	}
 	return nil
@@ -351,6 +353,7 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 	// TODO: ListOptions can filter by label
 	nodes, err := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
+		err = fmt.Errorf("%w: %v", ErrKAPI, err)
 		log.Err(err).Msg("could not collect nodes inventory")
 		return err
 	}
@@ -455,6 +458,7 @@ func (connector *KubernetesConnector) collectPodInventory(
 	// TODO: filter pods by namespace(s)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
+		err = fmt.Errorf("%w: %v", ErrKAPI, err)
 		log.Err(err).Msg("could not collect pods inventory")
 		return err
 	}
@@ -572,7 +576,8 @@ func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) 
 	// TODO: filter by namespace
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect nodes metrics")
+		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		log.Err(err).Msg("could not collect node metricses")
 		return err
 	}
 
@@ -623,7 +628,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *Monitor
 	// TODO: filter by namespace
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect pods metrics")
+		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		log.Err(err).Msg("could not collect pod metricses")
 		return err
 	}
 
@@ -689,7 +695,8 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *Monit
 	// TODO: filter by namespace
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		log.Err(err).Msg("could not collect pod metrics")
+		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		log.Err(err).Msg("could not collect pod metricses")
 		return err
 	}
 	debugDetails := false
