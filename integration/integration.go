@@ -84,7 +84,7 @@ const (
 	servicePrefix Option = "servicePrefix"
 )
 
-var apiClient = new(APIClient)
+var apiClient *APIClient
 
 func setupIntegration(t testing.TB, opts ...OV) {
 	for k, v := range TestConfigDefaults {
@@ -126,6 +126,11 @@ func setupIntegration(t testing.TB, opts ...OV) {
 	t.Log("[setupIntegration]: ", service.Status())
 	t.Logf("cfg.Connector: %+v", cfg.Connector)
 	t.Logf("cfg.GWConnections[0]: %+v", cfg.GWConnections[0])
+
+	apiClient = new(APIClient)
+	apiClient.AppName = cfg.Connector.AppName
+	apiClient.AppType = cfg.Connector.AppType
+	apiClient.GWConnection = cfg.GWConnections[0].AsClient()
 }
 
 func cleanNats(t testing.TB) {
