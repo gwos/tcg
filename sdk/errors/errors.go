@@ -19,16 +19,18 @@ const (
 )
 
 var (
+	// error types for dispatcher retry logic
 	ErrPermanent = errors.New("permanent error")
 	ErrTransient = errors.New("transient error")
 
-	// error types for dispatcher retry logic
 	ErrGateway      = fmt.Errorf("%w: %v", ErrTransient, "gateway error")
 	ErrSynchronizer = fmt.Errorf("%w: %v", ErrTransient, "synchronizer error")
+
 	ErrUnauthorized = fmt.Errorf("%w: %v", ErrPermanent, "unauthorized")
 	ErrUndecided    = fmt.Errorf("%w: %v", ErrPermanent, "undecided error")
 
 	ErrNotConfigured = fmt.Errorf("%w: %v", ErrPermanent, "connector is not configured")
+	ErrNotFound      = fmt.Errorf("%w: %v", ErrPermanent, "not found")
 )
 
 /* for docs only

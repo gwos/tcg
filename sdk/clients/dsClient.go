@@ -106,11 +106,13 @@ func (client *DSClient) Reload(agentID string) error {
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelDebug, "request for reload", req.LogAttrs()...)
 			return nil
 		}
-		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		if req.Status == 404 {
+			eee := fmt.Errorf("%w: %v", tcgerr.ErrNotFound, string(req.Response))
 			req.Err = eee
 			sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)
+			return eee
 		}
+		eee := fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
 		req.Err = eee
 		sdklog.Logger.LogAttrs(context.Background(), slog.LevelWarn, "could not request for reload", req.Details()...)
 		return eee
