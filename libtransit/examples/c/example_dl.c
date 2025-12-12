@@ -58,12 +58,12 @@ void (*addThresholdInt)(uintptr_t target, char *lbl, char *sType,
                         double value) = NULL;
 void (*calcStatus)(uintptr_t target) = NULL;
 uintptr_t (*createInventoryRequest)() = NULL;
-uintptr_t (*createInventoryResource)(char *name, char *resType) = NULL;
-uintptr_t (*createInventoryService)(char *name, char *resType) = NULL;
-uintptr_t (*createMonitoredResource)(char *name, char *resType) = NULL;
-uintptr_t (*createMonitoredService)(char *name, char *resType) = NULL;
-uintptr_t (*createResourceGroup)(char *name, char *grType) = NULL;
 uintptr_t (*createResourcesWithServicesRequest)() = NULL;
+uintptr_t (*createInventoryResource)(char *name) = NULL;
+uintptr_t (*createInventoryService)(char *name) = NULL;
+uintptr_t (*createMonitoredResource)(char *name) = NULL;
+uintptr_t (*createMonitoredService)(char *name) = NULL;
+uintptr_t (*createResourceGroup)(char *name, char *grType) = NULL;
 uintptr_t (*createThresholdValue)(char *lbl, char *sType) = NULL;
 uintptr_t (*createTimeSeries)(char *name) = NULL;
 void (*deleteHandle)(uintptr_t target) = NULL;
@@ -449,12 +449,9 @@ void example_libtransit_control() {
 
 void example_send_inventory() {
   uintptr_t invReq = createInventoryRequest();
-  uintptr_t invRes =
-      createInventoryResource("invRes", TRANSIT_RESOURCE_TYPE_HOST);
-  uintptr_t invSvc =
-      createInventoryService("invSvc", TRANSIT_RESOURCE_TYPE_SERVICE);
-  uintptr_t monSvc =
-      createMonitoredService("monSvc", TRANSIT_RESOURCE_TYPE_SERVICE);
+  uintptr_t invRes = createInventoryResource("invRes");
+  uintptr_t invSvc = createInventoryService("invSvc");
+  uintptr_t monSvc = createMonitoredService("monSvc");
   uintptr_t resGroup = createResourceGroup("group-01", TRANSIT_HOST_GROUP);
 
   setName(invRes, "resource-01");
@@ -489,12 +486,9 @@ void example_send_inventory() {
 
 void example_send_metrics() {
   uintptr_t monReq = createResourcesWithServicesRequest();
-  uintptr_t monRes =
-      createMonitoredResource("monRes", TRANSIT_RESOURCE_TYPE_HOST);
-  uintptr_t monSvc =
-      createMonitoredService("monSvc", TRANSIT_RESOURCE_TYPE_SERVICE);
-  uintptr_t invSvc =
-      createInventoryService("invSvc", TRANSIT_RESOURCE_TYPE_SERVICE);
+  uintptr_t monRes = createMonitoredResource("monRes");
+  uintptr_t monSvc = createMonitoredService("monSvc");
+  uintptr_t invSvc = createInventoryService("invSvc");
   uintptr_t resGroup = createResourceGroup("group-01", TRANSIT_HOST_GROUP);
 
   setName(monRes, "resource-01");

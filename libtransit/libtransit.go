@@ -34,10 +34,10 @@ func CreateInventoryRequest() C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateInventoryResource
-func CreateInventoryResource(name, resType *C.cchar_t) C.uintptr_t {
+func CreateInventoryResource(name *C.cchar_t) C.uintptr_t {
 	p := new(transit.InventoryResource)
 	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Type = transit.ResourceTypeHost
 	p.Services = []transit.InventoryService{}
 	return C.uintptr_t(cgo.NewHandle(p))
 }
@@ -46,10 +46,10 @@ func CreateInventoryResource(name, resType *C.cchar_t) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateInventoryService
-func CreateInventoryService(name, resType *C.cchar_t) C.uintptr_t {
+func CreateInventoryService(name *C.cchar_t) C.uintptr_t {
 	p := new(transit.InventoryService)
 	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Type = transit.ResourceTypeService
 	return C.uintptr_t(cgo.NewHandle(p))
 }
 
@@ -57,10 +57,10 @@ func CreateInventoryService(name, resType *C.cchar_t) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateMonitoredResource
-func CreateMonitoredResource(name, resType *C.cchar_t) C.uintptr_t {
+func CreateMonitoredResource(name *C.cchar_t) C.uintptr_t {
 	p := new(transit.MonitoredResource)
 	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Type = transit.ResourceTypeHost
 	p.Services = []transit.MonitoredService{}
 	return C.uintptr_t(cgo.NewHandle(p))
 }
@@ -69,10 +69,10 @@ func CreateMonitoredResource(name, resType *C.cchar_t) C.uintptr_t {
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateMonitoredService
-func CreateMonitoredService(name, resType *C.cchar_t) C.uintptr_t {
+func CreateMonitoredService(name *C.cchar_t) C.uintptr_t {
 	p := new(transit.MonitoredService)
 	p.Name = C.GoString(name)
-	p.Type = transit.ResourceType(C.GoString(resType))
+	p.Type = transit.ResourceTypeService
 	p.Metrics = []transit.TimeSeries{}
 	return C.uintptr_t(cgo.NewHandle(p))
 }
@@ -626,6 +626,39 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 		return false
 	}
 	if err := sender(context.Background(), bb); err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	return true
+}
+
+// SendChecks processes ResourcesWithServicesRequest or MonitoredResource with perf data
+// TODO: re-factor MetricsBatcher for support nonserialized structures
+//
+//export SendChecks
+func SendChecks(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
+	var q *transit.ResourcesWithServicesRequest
+	h := cgo.Handle(req)
+	switch v := h.Value().(type) {
+	case *transit.MonitoredResource:
+		q = new(transit.ResourcesWithServicesRequest)
+		q.AddResource(*v)
+	case *transit.ResourcesWithServicesRequest:
+		q = v
+	default:
+		msg := fmt.Sprintf("unknown type: %+v", h.Value())
+		bufStr(errBuf, errBufLen, msg)
+		log.Warn().Msg(msg)
+		return false
+	}
+
+	bb, err := json.Marshal(q)
+	log.Trace().Err(err).RawJSON("payload", bb).Msg("SendChecks")
+	if err != nil {
+		bufStr(errBuf, errBufLen, err.Error())
+		return false
+	}
+	if err := services.GetTransitService().SendResourceWithMetrics(context.Background(), bb); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
