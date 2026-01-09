@@ -442,6 +442,12 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 				log.Err(err).Msgf("could not create service %s:%s", stateKey, customServiceName)
 			}
 			if monitoredService != nil {
+				monitoredService.LastPluginOutput = fmt.Sprintf(
+					"(%s), Status=%s, (value=%v) [W/C=%d/%d] %s",
+					monitoredService.Name, monitoredService.Status, value,
+					metricBuilder.Warning, metricBuilder.Critical,
+					monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+				)
 				resource.Services[metricBuilder.Name] = *monitoredService
 			}
 		}
@@ -613,6 +619,12 @@ func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) 
 					log.Err(err).Msgf("could not create service %v:%v", stateKey, customServiceName)
 				}
 				if monitoredService != nil {
+					monitoredService.LastPluginOutput = fmt.Sprintf(
+						"(%s), Status=%s, (value=%v), [W/C=%d/%d] %s",
+						monitoredService.Name, monitoredService.Status, value,
+						metricBuilder.Warning, metricBuilder.Critical,
+						monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+					)
 					resource.Services[metricBuilder.Name] = *monitoredService
 				}
 			}
@@ -678,6 +690,20 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *Monitor
 						log.Err(err).Msgf("could not create service %v:%v", stateKey, metricDefinition.Name)
 					}
 					if monitoredService != nil {
+						if len(metricBuilders) == 1 {
+							monitoredService.LastPluginOutput = fmt.Sprintf(
+								"(%s), Status=%s, (value=%v), [W/C=%d/%d] %s",
+								monitoredService.Name, monitoredService.Status, value,
+								metricBuilders[0].Warning, metricBuilders[0].Critical,
+								monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+							)
+						} else {
+							monitoredService.LastPluginOutput = fmt.Sprintf(
+								"(%s), Status=%s, %s",
+								monitoredService.Name, monitoredService.Status,
+								monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+							)
+						}
 						resource.Services[metricBuilder.Name] = *monitoredService
 					}
 				}
@@ -762,6 +788,22 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *Monit
 						monitoredService.Metrics = append(monitoredService.Metrics, *metric)
 					} else {
 						monitoredService, _ = connectors.BuildServiceForMultiMetric(resource.Name, metricDefinition.Name, metricDefinition.CustomName, builders)
+						if monitoredService != nil {
+							if len(builders) == 1 {
+								monitoredService.LastPluginOutput = fmt.Sprintf(
+									"(%s), Status=%s, (value=%v), [W/C=%d/%d] %s",
+									monitoredService.Name, monitoredService.Status, value,
+									builders[0].Warning, builders[0].Critical,
+									monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+								)
+							} else {
+								monitoredService.LastPluginOutput = fmt.Sprintf(
+									"(%s), Status=%s, %s",
+									monitoredService.Name, monitoredService.Status,
+									monitoredService.MonitoredInfo.LastCheckTime.Format("Mon Jan 02 15:04:05 MST 2006"),
+								)
+							}
+						}
 						serviceMap[smKey] = *monitoredService
 					}
 					if monitoredService != nil {
