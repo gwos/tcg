@@ -32,20 +32,20 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/shirou/gopsutil/v4 v4.25.7
 	github.com/spf13/pflag v1.0.7
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.6
 	github.com/tubemogul/nscatools v0.0.0-20170420204428-ca8ef6bde11e
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.62.0
-	go.opentelemetry.io/otel v1.37.0
+	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.37.0
-	go.opentelemetry.io/otel/sdk v1.37.0
-	go.opentelemetry.io/otel/trace v1.37.0
+	go.opentelemetry.io/otel/sdk v1.40.0
+	go.opentelemetry.io/otel/trace v1.40.0
 	golang.org/x/crypto v0.45.0
-	golang.org/x/sys v0.38.0
+	golang.org/x/sys v0.40.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.33.4
 	k8s.io/apimachinery v0.33.4
@@ -123,8 +123,8 @@ require (
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
-	go.opentelemetry.io/otel/metric v1.37.0 // indirect
+	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
+	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	golang.org/x/arch v0.20.0 // indirect
 	golang.org/x/mod v0.29.0 // indirect
