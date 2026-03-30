@@ -141,7 +141,7 @@ func Encrypt(s string) string {
 
 // XORpass implements N XORpass from NeDi
 func XORpass(s []byte) []byte {
-	k, r := []byte("change for more security"), []byte{}
+	k, r := []byte("change for more security"), []byte{} // nolint:prealloc
 	if v, ok := os.LookupEnv("NEDI_ENCRYPT_KEY"); ok {
 		k = []byte(v)
 	}

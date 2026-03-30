@@ -198,7 +198,7 @@ func makeResource(rsIdx, svcCount int, opts ...OV) transit.MonitoredResource {
 }
 
 func randStrs(x ...int) []string {
-	dict := []string{
+	dict := []string{ // nolint:prealloc
 		string(transit.ResourceTypeHost),
 		string(transit.ResourceTypeService),
 		string(transit.ResourceTypeHypervisor),

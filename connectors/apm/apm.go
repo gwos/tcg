@@ -457,7 +457,7 @@ func initializeEntrypoints() []services.Entrypoint {
 			URL:    "/metrics/available",
 			Method: http.MethodGet,
 			Handler: func(c *gin.Context) {
-				resultSet := make([]string, 0)
+				resultSet := make([]string, 0, len(availableMetrics))
 				for _, arr := range availableMetrics {
 					resultSet = append(resultSet, arr...)
 				}
