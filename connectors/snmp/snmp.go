@@ -220,14 +220,13 @@ func (connector *SnmpConnector) listSuggestions(view string, name string) []stri
 }
 
 func (connector *SnmpConnector) getInventoryHashSum() ([]byte, error) {
-	var (
-		hostsServices []string
-		devices       = make([]string, 0, len(connector.mState.devices))
-	)
+	devices := make([]string, 0, len(connector.mState.devices))
 	for deviceName := range connector.mState.devices {
 		devices = append(devices, deviceName)
 	}
 	sort.Strings(devices)
+
+	hostsServices := make([]string, 0) // nolint:prealloc
 	for _, host := range devices {
 		device := connector.mState.devices[host]
 		var interfaces []string

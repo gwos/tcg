@@ -28,7 +28,7 @@ func TestBuild(t *testing.T) {
 	mbb.Build(&buf, 1024)
 	printMemStats()
 
-	qq := make([]transit.GroundworkEventsRequest, 0)
+	qq := make([]transit.GroundworkEventsRequest, 0, len(buf))
 	var q transit.GroundworkEventsRequest
 	for _, p := range buf {
 		q = transit.GroundworkEventsRequest{}

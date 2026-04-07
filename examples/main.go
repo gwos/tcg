@@ -32,10 +32,9 @@ func main() {
 	//////////////////////////////////////////////////////////////////////////////////////////
 	//                                Inventory Examples                                    //
 	//////////////////////////////////////////////////////////////////////////////////////////
-	var iServices []transit.InventoryService
 	is1 := connectors.CreateInventoryService(Service1, Resource1)
 	is2 := connectors.CreateInventoryService(Service2, Resource1)
-	iServices = append(iServices, is1, is2)
+	iServices := []transit.InventoryService{is1, is2}
 	iResource1 := connectors.CreateInventoryResource(Resource1, iServices)
 	println(iResource1.Services[0].Description)
 	println(iResource1.Description)
