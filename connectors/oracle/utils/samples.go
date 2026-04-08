@@ -14,6 +14,7 @@ type sample struct {
 	HostName    string
 	ServiceName string
 	Value       float64
+	NoData      bool
 }
 
 func ListSamples(
@@ -45,6 +46,7 @@ func ListSamples(
 				HostName:    getHostName(definition.Dimensions, compartment.Name),
 				ServiceName: definition.Name,
 				Value:       0,
+				NoData:      true,
 			},
 		}, nil
 	}
@@ -69,6 +71,7 @@ func ListSamples(
 			HostName:    getHostName(tags, compartment.Name),
 			ServiceName: serviceName,
 			Value:       value,
+			NoData:      !ok,
 		})
 	}
 
