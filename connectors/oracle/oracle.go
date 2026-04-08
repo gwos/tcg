@@ -1,7 +1,10 @@
 package oracle
 
 import (
+	"fmt"
 	"sort"
+	"strconv"
+	"time"
 
 	ociCom "github.com/oracle/oci-go-sdk/v65/common"
 	ociIde "github.com/oracle/oci-go-sdk/v65/identity"
@@ -99,6 +102,7 @@ func collectMetrics() {
 						Msg("failed to build service for metric")
 					continue
 				}
+				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, extConfig.CheckInterval, sample.Value)
 				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
 			}
 		}
@@ -147,4 +151,9 @@ func collectMetrics() {
 	if err = connectors.SendMetrics(ctxCancel, mResources, &resourceGroups); err != nil {
 		log.Error().Err(err).Msg("failed to send oracle metrics")
 	}
+}
+
+func buildServiceLastPluginOutput(serviceName string, interval time.Duration, value float64) string {
+	valueText := strconv.FormatFloat(value, 'f', -1, 64)
+	return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
 }
