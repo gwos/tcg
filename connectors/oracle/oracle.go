@@ -102,7 +102,7 @@ func collectMetrics() {
 						Msg("failed to build service for metric")
 					continue
 				}
-				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, extConfig.CheckInterval, sample.Value)
+				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, extConfig.CheckInterval, sample.Value, sample.NoData)
 				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
 			}
 		}
@@ -153,7 +153,13 @@ func collectMetrics() {
 	}
 }
 
-func buildServiceLastPluginOutput(serviceName string, interval time.Duration, value float64) string {
+func buildServiceLastPluginOutput(serviceName string, interval time.Duration, value float64, noData bool) string {
+	if noData {
+		return fmt.Sprintf(
+			"%s sum(%dm)=0 (no metrics found for the selected period; defaulting to 0)",
+			serviceName, int(interval.Minutes()),
+		)
+	}
 	valueText := strconv.FormatFloat(value, 'f', -1, 64)
 	return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
 }
