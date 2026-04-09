@@ -41,9 +41,13 @@ func ListSamples(
 
 	result := make([]sample, 0, len(resp.Items))
 	if len(resp.Items) == 0 {
+		hostName, ok := getHostName(definition.Dimensions)
+		if !ok {
+			return nil, nil
+		}
 		return []sample{
 			{
-				HostName:    getHostName(definition.Dimensions, compartment.Name),
+				HostName:    hostName,
 				ServiceName: definition.Name,
 				Value:       0,
 				NoData:      true,
@@ -61,6 +65,10 @@ func ListSamples(
 		if len(tags) == 0 {
 			tags = definition.Dimensions
 		}
+		hostName, ok := getHostName(tags)
+		if !ok {
+			continue
+		}
 
 		value, ok := getValue(item.AggregatedDatapoints)
 		if !ok {
@@ -68,7 +76,7 @@ func ListSamples(
 		}
 
 		result = append(result, sample{
-			HostName:    getHostName(tags, compartment.Name),
+			HostName:    hostName,
 			ServiceName: serviceName,
 			Value:       value,
 			NoData:      !ok,
