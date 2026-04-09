@@ -457,6 +457,11 @@ func (service *AgentService) config(data []byte) error {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}
 	}
+
+	if len(service.Connector.AgentID) == 0 {
+		logzer.ClearLastErrors()
+	}
+
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	return nil
@@ -610,7 +615,9 @@ func (service *AgentService) stopTransport() error {
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool) {
 	if bytes.Contains(payloadJSON, []byte(`"context":`)) &&
 		bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
-		return payloadJSON, false
+		todoTracerCtx := bytes.Contains(payloadJSON, []byte(traceOnDemandAgentID)) ||
+			bytes.Contains(payloadJSON, []byte(traceOnDemandAppType))
+		return payloadJSON, todoTracerCtx
 	}
 
 	tc, todoTracerCtx := service.MakeTracerContext(), false

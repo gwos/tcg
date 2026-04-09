@@ -161,6 +161,14 @@ type LogBuffer struct {
 	Size  int
 }
 
+// Clear removes all collected records.
+func (lb *LogBuffer) Clear() {
+	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.ring = ring.New(lb.Size)
+}
+
 // Records returns collected writes
 func (lb *LogBuffer) Records() []LogRecord {
 	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
@@ -276,6 +284,11 @@ func IsDebugEnabled() bool { return zerolog.GlobalLevel() <= zerolog.DebugLevel 
 // LastErrors returns last error writes
 func LastErrors() []LogRecord {
 	return errBuffer.Records()
+}
+
+// ClearLastErrors removes buffered error records.
+func ClearLastErrors() {
+	errBuffer.Clear()
 }
 
 // WriteLogBuffer writes buffered data to current logger
