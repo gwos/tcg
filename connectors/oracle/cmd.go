@@ -37,8 +37,6 @@ func Run() {
 		return
 	}
 
-	connectors.StartPeriodic(ctxCancel, defaultCheckInterval, collectMetrics)
-
 	/* return on quit signal */
 	<-transitService.Quit()
 }
@@ -70,5 +68,10 @@ func configHandler(data []byte) {
 	cancel()
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	services.GetTransitService().RegisterExitHandler(cancel)
+
+	if !config.GetConfig().Connector.Enabled {
+		return
+	}
+
 	connectors.StartPeriodic(ctxCancel, extConfig.CheckInterval, collectMetrics)
 }
