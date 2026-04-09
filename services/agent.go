@@ -419,10 +419,6 @@ func (service *AgentService) config(data []byte) error {
 		Str("DSClient", service.dsClient.HostName).
 		Msg("loaded config")
 
-	if len(service.Connector.AgentID) == 0 {
-		logzer.ClearLastErrors()
-	}
-
 	if !service.Connector.Enabled {
 		log.Error().Msg("could not start nats dispatcher as connector is disabled")
 	}
@@ -461,6 +457,11 @@ func (service *AgentService) config(data []byte) error {
 			log.Err(err).Msg("error starting nats dispatcher on processing config")
 		}
 	}
+
+	if len(service.Connector.AgentID) == 0 {
+		logzer.ClearLastErrors()
+	}
+
 	// custom connector may provide additional handler for extended fields
 	service.configHandler(data)
 	return nil
