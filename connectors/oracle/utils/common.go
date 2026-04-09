@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-func getHostName(dimensions map[string]string, fallback string) string {
+func getHostName(dimensions map[string]string) (string, bool) {
 	for _, key := range []string{
 		"resourceDisplayName",
 		"resourceName",
@@ -17,11 +17,12 @@ func getHostName(dimensions map[string]string, fallback string) string {
 		"displayName",
 	} {
 		if value, ok := dimensions[key]; ok && strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
+			name := strings.TrimSpace(value)
+			if strings.HasPrefix(strings.ToLower(name), "ocid1.") {
+				continue
+			}
+			return name, true
 		}
 	}
-	if strings.TrimSpace(fallback) != "" {
-		return strings.TrimSpace(fallback)
-	}
-	return "unnamed-oracle-resource"
+	return "", false
 }
