@@ -614,7 +614,9 @@ func (service *AgentService) stopTransport() error {
 func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool) {
 	if bytes.Contains(payloadJSON, []byte(`"context":`)) &&
 		bytes.Contains(payloadJSON, []byte(`"traceToken":`)) {
-		return payloadJSON, false
+		todoTracerCtx := bytes.Contains(payloadJSON, []byte(traceOnDemandAgentID)) ||
+			bytes.Contains(payloadJSON, []byte(traceOnDemandAppType))
+		return payloadJSON, todoTracerCtx
 	}
 
 	tc, todoTracerCtx := service.MakeTracerContext(), false

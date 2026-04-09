@@ -11,7 +11,6 @@ import (
 	ociMon "github.com/oracle/oci-go-sdk/v65/monitoring"
 	"github.com/rs/zerolog/log"
 
-	"github.com/gwos/tcg/config"
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/oracle/utils"
 	"github.com/gwos/tcg/sdk/transit"
@@ -23,10 +22,6 @@ const (
 )
 
 func collectMetrics() {
-	for len(config.GetConfig().Connector.AgentID) == 0 {
-		time.Sleep(1 * time.Second)
-	}
-
 	if extConfig.OracleTenancyOCID == "" || extConfig.OracleUserOCID == "" ||
 		extConfig.OraclePrivateKey == "" || extConfig.OracleFingerprint == "" || extConfig.OracleRegion == "" {
 		log.Error().Msg("failed to create oracle identity client: missing required config parameters")
