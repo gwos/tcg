@@ -93,6 +93,12 @@ func collectMetrics() {
 					CustomName: sample.ServiceName,
 					Value:      sample.Value,
 					UnitType:   transit.UnitCounter,
+					StartTimestamp: &transit.Timestamp{
+						Time: sample.StartTime,
+					},
+					EndTimestamp: &transit.Timestamp{
+						Time: sample.EndTime,
+					},
 				}
 				service, err := connectors.BuildServiceForMetric(sample.HostName, metricBuilder)
 				if err != nil {
