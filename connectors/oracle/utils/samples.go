@@ -14,14 +14,18 @@ type sample struct {
 	HostName    string
 	ServiceName string
 	Value       float64
+	StartTime   time.Time
+	EndTime     time.Time
 	NoData      bool
 }
 
 func ListSamples(
 	ctx context.Context, client ociMon.MonitoringClient, compartment compartment, definition definition, interval time.Duration,
 ) ([]sample, error) {
-	end := ociCom.SDKTime{Time: time.Now().UTC()}
-	start := ociCom.SDKTime{Time: end.Time.Add(-interval)}
+	endTime := time.Now().UTC().Truncate(time.Minute)
+	startTime := endTime.Add(-interval).Add(-1 * time.Minute)
+	end := ociCom.SDKTime{Time: endTime}
+	start := ociCom.SDKTime{Time: startTime}
 	query := fmt.Sprintf("%s[%dm].sum()", definition.Name, int(interval.Minutes()))
 	resolution := fmt.Sprintf("%dm", int(interval.Minutes()))
 
@@ -50,6 +54,8 @@ func ListSamples(
 				HostName:    hostName,
 				ServiceName: definition.Name,
 				Value:       0,
+				StartTime:   endTime,
+				EndTime:     endTime,
 				NoData:      true,
 			},
 		}, nil
@@ -70,15 +76,18 @@ func ListSamples(
 			continue
 		}
 
-		value, ok := getValue(item.AggregatedDatapoints)
+		value, pointTime, ok := getValue(item.AggregatedDatapoints)
 		if !ok {
 			value = 0
+			pointTime = endTime
 		}
 
 		result = append(result, sample{
 			HostName:    hostName,
 			ServiceName: serviceName,
 			Value:       value,
+			StartTime:   pointTime,
+			EndTime:     pointTime,
 			NoData:      !ok,
 		})
 	}
@@ -86,7 +95,7 @@ func ListSamples(
 	return result, nil
 }
 
-func getValue(datapoints []ociMon.AggregatedDatapoint) (float64, bool) {
+func getValue(datapoints []ociMon.AggregatedDatapoint) (float64, time.Time, bool) {
 	var (
 		hasValue bool
 		maxTime  time.Time
@@ -102,5 +111,5 @@ func getValue(datapoints []ociMon.AggregatedDatapoint) (float64, bool) {
 			value = *datapoint.Value
 		}
 	}
-	return value, hasValue
+	return value, maxTime, hasValue
 }
