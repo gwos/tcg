@@ -13,6 +13,16 @@ const (
 	defaultPageLimit = 1000
 )
 
+var excludedServiceDefinitions = map[string]struct{}{
+	"maintenance_status":          {},
+	"instance_status":             {},
+	"instanceaccessibilitystatus": {},
+	"instancefilesystemstatus":    {},
+	"backupfailure":               {},
+	"backupsize":                  {},
+	"backuptime":                  {},
+}
+
 type definition struct {
 	Namespace  string
 	Name       string
@@ -40,6 +50,9 @@ func ListDefinitions(ctx context.Context, client ociMon.MonitoringClient, compar
 			namespace := strings.TrimSpace(*item.Namespace)
 			name := strings.TrimSpace(*item.Name)
 			if namespace == "" || name == "" {
+				continue
+			}
+			if isExcludedServiceDefinition(name) {
 				continue
 			}
 
@@ -71,4 +84,9 @@ func ListDefinitions(ctx context.Context, client ociMon.MonitoringClient, compar
 	})
 
 	return result, nil
+}
+
+func isExcludedServiceDefinition(name string) bool {
+	_, exists := excludedServiceDefinitions[strings.ToLower(strings.TrimSpace(name))]
+	return exists
 }
