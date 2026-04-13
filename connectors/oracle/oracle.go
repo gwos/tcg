@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	ociCom "github.com/oracle/oci-go-sdk/v65/common"
@@ -14,11 +15,6 @@ import (
 	"github.com/gwos/tcg/connectors"
 	"github.com/gwos/tcg/connectors/oracle/utils"
 	"github.com/gwos/tcg/sdk/transit"
-)
-
-const (
-	defaultHostGroupName        = "TCG-ORACLE"
-	defaultHostGroupDescription = "Default host group created by the oracle connector"
 )
 
 func collectMetrics() {
@@ -58,6 +54,7 @@ func collectMetrics() {
 	}
 
 	servicesByResource := make(map[string][]transit.MonitoredService)
+	resourceGroupByHost := make(map[string]string)
 	for _, compartment := range compartments {
 		definitions, err := utils.ListDefinitions(ctxCancel, monClient, compartment.ID)
 		if err != nil {
@@ -110,6 +107,13 @@ func collectMetrics() {
 				}
 				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, extConfig.CheckInterval, sample.Value, sample.NoData)
 				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
+				if _, exists := resourceGroupByHost[sample.HostName]; !exists {
+					groupName := strings.TrimSpace(compartment.Name)
+					if groupName == "" {
+						groupName = strings.TrimSpace(compartment.ID)
+					}
+					resourceGroupByHost[sample.HostName] = groupName
+				}
 			}
 		}
 	}
@@ -121,7 +125,7 @@ func collectMetrics() {
 	sort.Strings(resourceNames)
 
 	mResources := make([]transit.MonitoredResource, 0, len(resourceNames))
-	mResourcesRef := make([]transit.ResourceRef, 0, len(resourceNames))
+	resourceRefsByGroup := make(map[string][]transit.ResourceRef)
 	for _, resourceName := range resourceNames {
 		services := servicesByResource[resourceName]
 		if len(services) == 0 {
@@ -136,8 +140,12 @@ func collectMetrics() {
 			continue
 		}
 		mResources = append(mResources, *mResource)
-		mResourcesRef = append(
-			mResourcesRef,
+		groupName := resourceGroupByHost[resourceName]
+		if groupName == "" {
+			continue
+		}
+		resourceRefsByGroup[groupName] = append(
+			resourceRefsByGroup[groupName],
 			connectors.CreateResourceRef(resourceName, "", transit.ResourceTypeHost),
 		)
 	}
@@ -147,11 +155,25 @@ func collectMetrics() {
 		return
 	}
 
-	if extConfig.HostGroup == "" {
-		extConfig.HostGroup = defaultHostGroupName
+	groupNames := make([]string, 0, len(resourceRefsByGroup))
+	for groupName := range resourceRefsByGroup {
+		groupNames = append(groupNames, groupName)
 	}
-	resourceGroups := []transit.ResourceGroup{
-		connectors.CreateResourceGroup(extConfig.HostGroup, defaultHostGroupDescription, transit.HostGroup, mResourcesRef),
+	sort.Strings(groupNames)
+
+	resourceGroups := make([]transit.ResourceGroup, 0, len(groupNames))
+	for _, groupName := range groupNames {
+		refs := resourceRefsByGroup[groupName]
+		if len(refs) == 0 {
+			continue
+		}
+		sort.Slice(refs, func(i, j int) bool {
+			return refs[i].Name < refs[j].Name
+		})
+		resourceGroups = append(
+			resourceGroups,
+			connectors.CreateResourceGroup(groupName, "", transit.HostGroup, refs),
+		)
 	}
 
 	if err = connectors.SendMetrics(ctxCancel, mResources, &resourceGroups); err != nil {
