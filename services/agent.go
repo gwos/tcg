@@ -574,14 +574,13 @@ func (service *AgentService) startTransport() error {
 		service.Connector.AppType == traceOnDemandAppType ||
 		len(service.Connector.AgentID) == 0 ||
 		len(service.Connector.AppType) == 0 {
-		err := fmt.Errorf("%w: AppType/AgentID: %v/%v", tcgerr.ErrNotConfigured,
-			service.Connector.AppType, service.Connector.AgentID)
-		log.Err(err).Msg("could not start")
+		log.Warn().Msg("could not start: connector is not configured")
 		if strings.EqualFold(service.Connector.AppType, "NAGIOS") {
 			// prevent DataGeyser fail on restart with empty config
 			return nil
 		}
-		return err
+		return fmt.Errorf("%w: AppType/AgentID: %v/%v", tcgerr.ErrNotConfigured,
+			service.Connector.AppType, service.Connector.AgentID)
 	}
 	/* Process clients */
 	gwClients := make([]clients.GWClient, 0, len(config.GetConfig().GWConnections))
