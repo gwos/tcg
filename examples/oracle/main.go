@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/gwos/tcg/sdk/mapping"
 	ociCom "github.com/oracle/oci-go-sdk/v65/common"
 	ociIde "github.com/oracle/oci-go-sdk/v65/identity"
 	ociMon "github.com/oracle/oci-go-sdk/v65/monitoring"
@@ -17,15 +18,30 @@ import (
 )
 
 var extConfig = &oracle.ExtConfig{
-	OracleTenancyOCID: "***",
-	OracleUserOCID:    "***",
-	OraclePrivateKey:  "***",
-	OracleFingerprint: "***",
-	OracleRegion:      "***",
+	OracleTenancyOCID: "ocid1.tenancy.oc1..aaaaaaaagtixojupjfgpjbykxnqaq3pnkq23b4fiwqaaskapudqhdhlqvjlq",
+	OracleUserOCID:    "ocid1.user.oc1..aaaaaaaam7hlqsedfhw2rr5ndzuffmgrhusez5gatlji46oc7lpp23i34muq",
+	OraclePrivateKey:  "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDQhxdK2Cfb90Bs\nPQ5VhKc0H0UOHOQ77hU6FA0ZUH3fK2o5/DEliPDtzhKahqSxQaz2j9dq3o9fLPOj\no8FPAlORHBqX3iOb7Gq+HKL7mxAhzYses1mFoIcu7hnP4CnZmYBpXPKth9QsSJnV\ndzeendfUf2bRbISF8470m3Uhu1BZkSG3DFWrdEQ9I8JFvkJ8aASO1Pyky98ed11p\n+iHZaXip0A756UWVD6EIO9mQNZRdXHfASF3kRcVPAf1qvr5z71JzawMIVd2HwcdF\nhE7O9xjpIqMfQsAsku42KFDKu0As1QRxw6rnUO2jbpUwVUtOUk8ePLrgQtC2KOY5\nfiFDNZOlAgMBAAECggEASt6+J7K9ePZo7JPtchoLWKUDi8Im1jew6mXpoBWs4/R4\nEvKwCKyG6LMtLcs7FaOhgPN7YlUfgAopPi9dCEurCnZfO/jXqzOyzaiFgjYWEDT3\nBuJZOae98cUuglsXW5gIKYxkW5bhwLaeeSzxTOOaayMFHRtL57ZftQaeAyr4efeB\n0mpcWqO5/BC/V4+7GKbHI3tG4a2mUMOnhMzB0Sua2HnrxVVd5Pe8n+JgcMTg7j2d\nJ8S313fnpLPtsSZKJ+dDbLxcoak5sB1nEr/oU9yxWHr7izlpWBLH9+4ThdNvIhTQ\n1VmwFS60CVUE0RgKVfMl4gnVAp/gctFJUaEudzTNLwKBgQD9rT66AYFZaErbjdH2\nhEJFn4R5obk1XBayXKHrgzLmLeekUhg/KprAMJlLrG/zBPhQk+EWtt13yg3i2AfI\nXM8auRf4+Q1AY+MM8WOei6dD+OWCiWdlQuNo2pgSnZdlUCv4zbNfGfQzr2EvB/Zt\nNVyKHted2Q5QwdhAiFrBzZBz1wKBgQDSb/4GOoD/Kt/WgpR/XCMHO1BruDBhasEk\n/A3Wt7i1Bol2j3SwM/ynRauR4B+3O8h5V5XlPll9OYqg00NQeZ/PESwaX43bp8s4\nB1clH0MtOqalsv+Bx64uquQMU9mLADcP2XRdzyYWUH6svLmWRs/VpCg8lEOxNvBC\nQ+AZNjyE4wKBgBpn/E2Udoh+CLzOCHsmzVc+AaY/pW3ehiZO6jP/1j6LrL84JHn+\nz1kONgbgjk63x7lri1S3+FnN2KAyaKz8rDpV5h7uneiD/VCNmBca5nB26j0qXG74\nBYAWsRnO+cF8FPezQea2ZusyaGVi6M35bgaaq0stGwZhB0fAaeIeqdjFAoGAddbm\n3eAG+lys6bdHpqYWq2cImrmSxgp8y9Qlf7ZzxVM6yNx+UGlcMuMtt0tVF0tv8Jse\nQjgO7rO5MGP9TuQ8nDyWgNI/YuBsSRy7LPt7p6kvRpycvbTukg16FHkj2dWt/78a\njamBP3+l397y4fcXTSBWs82mtmb4VXMi25tmelcCgYB7EQqQUNAwXOTPSIgY7Al3\nUDY79l1w979Svml6FKQVdJgYMelPyAuYP+9gN5+tKQVG/wnXYD8ajuJX1zh1Tcg/\nZsK/W8RxdmoQt7aVa5fmSvaeYdMc40a6Y/dj0scRIYrFxG7o+1Wg6sekFqlMxfPI\nu/mHddUc7bx3esqk61leHw==\n-----END PRIVATE KEY-----\nOCI_API_KEY",
+	OracleFingerprint: "a7:68:ab:22:61:36:b4:86:23:6c:52:66:aa:91:b0:17",
+	OracleRegion:      "ap-mumbai-1",
 	CheckInterval:     1 * time.Minute,
 }
 
 func main() {
+	extConfig.GWMapping = oracle.GWMapping{
+		Host: []mapping.Mapping{
+			{
+				Matcher: "gwos-block.*",
+			},
+		},
+		Service: []mapping.Mapping{
+			{
+				Matcher: ".*",
+			},
+		},
+	}
+
+	extConfig.GWMapping.Prepare()
+
 	if extConfig.OracleTenancyOCID == "" || extConfig.OracleUserOCID == "" ||
 		extConfig.OraclePrivateKey == "" || extConfig.OracleFingerprint == "" || extConfig.OracleRegion == "" {
 		log.Error().Msg("failed to create oracle identity client: missing required config parameters")

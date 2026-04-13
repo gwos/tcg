@@ -18,9 +18,9 @@ func getHostName(dimensions map[string]string) (string, bool) {
 	} {
 		if value, ok := dimensions[key]; ok && strings.TrimSpace(value) != "" {
 			name := strings.TrimSpace(value)
-			if strings.HasPrefix(strings.ToLower(name), "ocid1.") {
-				continue
-			}
+			// if strings.HasPrefix(strings.ToLower(name), "ocid1.") {
+			// 	continue
+			// }
 			return name, true
 		}
 	}
