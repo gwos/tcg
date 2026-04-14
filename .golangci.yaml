@@ -10,7 +10,6 @@ linters:
         - dupl
         - goconst
         - misspell
-        - prealloc
         - staticcheck
         - unconvert
         - whitespace
@@ -23,6 +22,7 @@ linters:
         - gosec
         - lll
         - nakedret
+        - prealloc
         - wsl
     exclusions:
         generated: lax
