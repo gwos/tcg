@@ -6,7 +6,6 @@ import (
 
 func getHostName(dimensions map[string]string) (string, bool) {
 	for _, key := range []string{
-		"displayName",
 		"resourceDisplayName",
 		"resourceName",
 		"hostName",

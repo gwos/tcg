@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 
 	"github.com/gwos/tcg/config"
@@ -19,6 +20,7 @@ var (
 		Extensions: extConfig,
 	}
 	ctxCancel, cancel = context.WithCancel(context.Background())
+	configVersion     atomic.Uint64
 )
 
 func Run() {
@@ -61,6 +63,7 @@ func configHandler(data []byte) {
 	}
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
+	configVersion.Add(1)
 
 	tExt.GWMapping.Prepare()
 

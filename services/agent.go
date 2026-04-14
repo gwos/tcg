@@ -458,8 +458,12 @@ func (service *AgentService) config(data []byte) error {
 		}
 	}
 
-	if len(service.Connector.AgentID) == 0 {
-		logzer.ClearLastErrors()
+	if service.Connector.AgentID == traceOnDemandAgentID || service.Connector.AppType == traceOnDemandAppType ||
+		len(service.Connector.AgentID) == 0 || len(service.Connector.AppType) == 0 {
+		GetTransitService().eventsBatcher.Clear()
+		GetTransitService().metricsBatcher.Clear()
+		_ = service.resetNats()
+		service.resetErrorLogs()
 	}
 
 	// custom connector may provide additional handler for extended fields
@@ -718,4 +722,8 @@ func (service *AgentService) initProM() {
 	if err := prometheus.Register(expvarCollector); err != nil {
 		log.Warn().Err(err).Msg("could not register expvar collector")
 	}
+}
+
+func (service *AgentService) resetErrorLogs() {
+	logzer.ClearLastErrors()
 }
