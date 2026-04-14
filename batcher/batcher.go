@@ -176,6 +176,15 @@ func (bt *Batcher) Exit() {
 	bt.tickerExit <- true
 }
 
+// Clear drops all buffered payloads without sending them.
+func (bt *Batcher) Clear() {
+	bt.mu.Lock()
+	defer bt.mu.Unlock()
+
+	bt.buf = make([][]byte, 0)
+	bt.bufSize = 0
+}
+
 // Reset applies configuration
 func (bt *Batcher) Reset(d time.Duration, maxBytes int) {
 	log.Trace().Str("bt.tracerName", bt.tracerName).Msg("Batcher.Reset")
