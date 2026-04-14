@@ -1,6 +1,8 @@
 package oracle
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -18,18 +20,24 @@ import (
 )
 
 func collectMetrics() {
-	if extConfig.OracleTenancyOCID == "" || extConfig.OracleUserOCID == "" ||
-		extConfig.OraclePrivateKey == "" || extConfig.OracleFingerprint == "" || extConfig.OracleRegion == "" {
+	cfg, cfgVersion, ctx := extConfig, configVersion.Load(), ctxCancel
+
+	if cfg.OracleTenancyOCID == "" || cfg.OracleUserOCID == "" ||
+		cfg.OraclePrivateKey == "" || cfg.OracleFingerprint == "" || cfg.OracleRegion == "" {
 		log.Error().Msg("failed to create oracle identity client: missing required config parameters")
 		return
 	}
 
+	if len(cfg.GWMapping.Host) == 0 || len(cfg.GWMapping.Service) == 0 {
+		return
+	}
+
 	provider := ociCom.NewRawConfigurationProvider(
-		extConfig.OracleTenancyOCID,
-		extConfig.OracleUserOCID,
-		extConfig.OracleRegion,
-		extConfig.OracleFingerprint,
-		extConfig.OraclePrivateKey,
+		cfg.OracleTenancyOCID,
+		cfg.OracleUserOCID,
+		cfg.OracleRegion,
+		cfg.OracleFingerprint,
+		cfg.OraclePrivateKey,
 		nil,
 	)
 
@@ -38,26 +46,33 @@ func collectMetrics() {
 		log.Error().Err(err).Msg("failed to create oracle identity client")
 		return
 	}
-	ideClient.SetRegion(extConfig.OracleRegion)
+	ideClient.SetRegion(cfg.OracleRegion)
 
 	monClient, err := ociMon.NewMonitoringClientWithConfigurationProvider(provider)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to create oracle monitoring client")
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to create oracle monitoring client")
+		}
 		return
 	}
-	monClient.SetRegion(extConfig.OracleRegion)
+	monClient.SetRegion(cfg.OracleRegion)
 
-	compartments, err := utils.ListCompartments(ctxCancel, ideClient, extConfig.OracleTenancyOCID)
+	compartments, err := utils.ListCompartments(ctx, ideClient, cfg.OracleTenancyOCID)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to list oracle compartments")
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to list oracle compartments")
+		}
 		return
 	}
 
 	servicesByResource := make(map[string][]transit.MonitoredService)
 	resourceGroupByHost := make(map[string]string)
 	for _, compartment := range compartments {
-		definitions, err := utils.ListDefinitions(ctxCancel, monClient, compartment.ID)
+		definitions, err := utils.ListDefinitions(ctx, monClient, compartment.ID)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			log.Error().Err(err).
 				Str("compartment_id", compartment.ID).
 				Str("compartment_name", compartment.Name).
@@ -66,12 +81,15 @@ func collectMetrics() {
 		}
 
 		for _, definition := range definitions {
-			if !extConfig.GWMapping.Service.MatchString(definition.Name) {
+			if !cfg.GWMapping.Service.MatchString(definition.Name) {
 				continue
 			}
 
-			samples, err := utils.ListSamples(ctxCancel, monClient, compartment, definition, extConfig.CheckInterval)
+			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
 				log.Error().Err(err).
 					Str("compartment_id", compartment.ID).
 					Str("namespace", definition.Namespace).
@@ -81,7 +99,7 @@ func collectMetrics() {
 			}
 
 			for _, sample := range samples {
-				if !extConfig.GWMapping.Host.MatchString(sample.HostName) {
+				if !cfg.GWMapping.Host.MatchString(sample.HostName) {
 					continue
 				}
 
@@ -105,7 +123,7 @@ func collectMetrics() {
 						Msg("failed to build service for metric")
 					continue
 				}
-				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, extConfig.CheckInterval, sample.Value, sample.NoData)
+				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, cfg.CheckInterval, sample.Value, sample.NoData)
 				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
 				if _, exists := resourceGroupByHost[sample.HostName]; !exists {
 					groupName := strings.TrimSpace(compartment.Name)
@@ -155,6 +173,14 @@ func collectMetrics() {
 		return
 	}
 
+	if cfgVersion != configVersion.Load() {
+		log.Debug().
+			Uint64("thread_config_version", cfgVersion).
+			Uint64("current_config_version", configVersion.Load()).
+			Msg("skip sending stale oracle metrics")
+		return
+	}
+
 	groupNames := make([]string, 0, len(resourceRefsByGroup))
 	for groupName := range resourceRefsByGroup {
 		groupNames = append(groupNames, groupName)
@@ -176,8 +202,10 @@ func collectMetrics() {
 		)
 	}
 
-	if err = connectors.SendMetrics(ctxCancel, mResources, &resourceGroups); err != nil {
-		log.Error().Err(err).Msg("failed to send oracle metrics")
+	if err = connectors.SendMetrics(ctx, mResources, &resourceGroups); err != nil {
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to send oracle metrics")
+		}
 	}
 }
 

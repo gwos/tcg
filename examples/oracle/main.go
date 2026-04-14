@@ -2,7 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sort"
+	"strconv"
+	"strings"
+	"sync/atomic"
 	"time"
 
 	ociCom "github.com/oracle/oci-go-sdk/v65/common"
@@ -16,28 +21,33 @@ import (
 	"github.com/gwos/tcg/sdk/transit"
 )
 
-var extConfig = &oracle.ExtConfig{
-	OracleTenancyOCID: "***",
-	OracleUserOCID:    "***",
-	OraclePrivateKey:  "***",
-	OracleFingerprint: "***",
-	OracleRegion:      "***",
-	CheckInterval:     1 * time.Minute,
-}
+var (
+	configVersion atomic.Uint64
+	extConfig     = &oracle.ExtConfig{
+		OracleTenancyOCID: "***",
+		OracleUserOCID:    "***",
+		OraclePrivateKey:  "***",
+		OracleFingerprint: "***",
+		OracleRegion:      "***",
+		CheckInterval:     1 * time.Minute,
+	}
+)
 
 func main() {
-	if extConfig.OracleTenancyOCID == "" || extConfig.OracleUserOCID == "" ||
-		extConfig.OraclePrivateKey == "" || extConfig.OracleFingerprint == "" || extConfig.OracleRegion == "" {
+	cfg, cfgVersion, ctx := extConfig, configVersion.Load(), context.Background()
+
+	if cfg.OracleTenancyOCID == "" || cfg.OracleUserOCID == "" ||
+		cfg.OraclePrivateKey == "" || cfg.OracleFingerprint == "" || cfg.OracleRegion == "" {
 		log.Error().Msg("failed to create oracle identity client: missing required config parameters")
 		return
 	}
 
 	provider := ociCom.NewRawConfigurationProvider(
-		extConfig.OracleTenancyOCID,
-		extConfig.OracleUserOCID,
-		extConfig.OracleRegion,
-		extConfig.OracleFingerprint,
-		extConfig.OraclePrivateKey,
+		cfg.OracleTenancyOCID,
+		cfg.OracleUserOCID,
+		cfg.OracleRegion,
+		cfg.OracleFingerprint,
+		cfg.OraclePrivateKey,
 		nil,
 	)
 
@@ -46,25 +56,33 @@ func main() {
 		log.Error().Err(err).Msg("failed to create oracle identity client")
 		return
 	}
-	ideClient.SetRegion(extConfig.OracleRegion)
+	ideClient.SetRegion(cfg.OracleRegion)
 
 	monClient, err := ociMon.NewMonitoringClientWithConfigurationProvider(provider)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to create oracle monitoring client")
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to create oracle monitoring client")
+		}
 		return
 	}
-	monClient.SetRegion(extConfig.OracleRegion)
+	monClient.SetRegion(cfg.OracleRegion)
 
-	compartments, err := utils.ListCompartments(context.Background(), ideClient, extConfig.OracleTenancyOCID)
+	compartments, err := utils.ListCompartments(ctx, ideClient, cfg.OracleTenancyOCID)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to list oracle compartments")
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to list oracle compartments")
+		}
 		return
 	}
 
 	servicesByResource := make(map[string][]transit.MonitoredService)
+	resourceGroupByHost := make(map[string]string)
 	for _, compartment := range compartments {
-		definitions, err := utils.ListDefinitions(context.Background(), monClient, compartment.ID)
+		definitions, err := utils.ListDefinitions(ctx, monClient, compartment.ID)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
 			log.Error().Err(err).
 				Str("compartment_id", compartment.ID).
 				Str("compartment_name", compartment.Name).
@@ -73,12 +91,15 @@ func main() {
 		}
 
 		for _, definition := range definitions {
-			if !extConfig.GWMapping.Service.MatchString(definition.Name) {
+			if !cfg.GWMapping.Service.MatchString(definition.Name) {
 				continue
 			}
 
-			samples, err := utils.ListSamples(context.Background(), monClient, compartment, definition, extConfig.CheckInterval)
+			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval)
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return
+				}
 				log.Error().Err(err).
 					Str("compartment_id", compartment.ID).
 					Str("namespace", definition.Namespace).
@@ -88,7 +109,7 @@ func main() {
 			}
 
 			for _, sample := range samples {
-				if !extConfig.GWMapping.Host.MatchString(sample.HostName) {
+				if !cfg.GWMapping.Host.MatchString(sample.HostName) {
 					continue
 				}
 
@@ -97,6 +118,12 @@ func main() {
 					CustomName: sample.ServiceName,
 					Value:      sample.Value,
 					UnitType:   transit.UnitCounter,
+					StartTimestamp: &transit.Timestamp{
+						Time: sample.StartTime,
+					},
+					EndTimestamp: &transit.Timestamp{
+						Time: sample.EndTime,
+					},
 				}
 				service, err := connectors.BuildServiceForMetric(sample.HostName, metricBuilder)
 				if err != nil {
@@ -106,7 +133,15 @@ func main() {
 						Msg("failed to build service for metric")
 					continue
 				}
+				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, cfg.CheckInterval, sample.Value, sample.NoData)
 				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
+				if _, exists := resourceGroupByHost[sample.HostName]; !exists {
+					groupName := strings.TrimSpace(compartment.Name)
+					if groupName == "" {
+						groupName = strings.TrimSpace(compartment.ID)
+					}
+					resourceGroupByHost[sample.HostName] = groupName
+				}
 			}
 		}
 	}
@@ -118,7 +153,7 @@ func main() {
 	sort.Strings(resourceNames)
 
 	mResources := make([]transit.MonitoredResource, 0, len(resourceNames))
-	mResourcesRef := make([]transit.ResourceRef, 0, len(resourceNames))
+	resourceRefsByGroup := make(map[string][]transit.ResourceRef)
 	for _, resourceName := range resourceNames {
 		services := servicesByResource[resourceName]
 		if len(services) == 0 {
@@ -133,8 +168,12 @@ func main() {
 			continue
 		}
 		mResources = append(mResources, *mResource)
-		mResourcesRef = append(
-			mResourcesRef,
+		groupName := resourceGroupByHost[resourceName]
+		if groupName == "" {
+			continue
+		}
+		resourceRefsByGroup[groupName] = append(
+			resourceRefsByGroup[groupName],
 			connectors.CreateResourceRef(resourceName, "", transit.ResourceTypeHost),
 		)
 	}
@@ -144,15 +183,48 @@ func main() {
 		return
 	}
 
-	if extConfig.HostGroup == "" {
-		extConfig.HostGroup = "TEST"
+	if cfgVersion != configVersion.Load() {
+		log.Debug().
+			Uint64("thread_config_version", cfgVersion).
+			Uint64("current_config_version", configVersion.Load()).
+			Msg("skip sending stale oracle metrics")
+		return
 	}
-	resourceGroups := []transit.ResourceGroup{
-		connectors.CreateResourceGroup(extConfig.HostGroup, "TEST", transit.HostGroup, mResourcesRef),
+
+	groupNames := make([]string, 0, len(resourceRefsByGroup))
+	for groupName := range resourceRefsByGroup {
+		groupNames = append(groupNames, groupName)
+	}
+	sort.Strings(groupNames)
+
+	resourceGroups := make([]transit.ResourceGroup, 0, len(groupNames))
+	for _, groupName := range groupNames {
+		refs := resourceRefsByGroup[groupName]
+		if len(refs) == 0 {
+			continue
+		}
+		sort.Slice(refs, func(i, j int) bool {
+			return refs[i].Name < refs[j].Name
+		})
+		resourceGroups = append(
+			resourceGroups,
+			connectors.CreateResourceGroup(groupName, "", transit.HostGroup, refs),
+		)
 	}
 
 	log.Info().
 		Interface("resources", mResources).
 		Interface("resource_groups", resourceGroups).
 		Msg("sending oracle metrics")
+}
+
+func buildServiceLastPluginOutput(serviceName string, interval time.Duration, value float64, noData bool) string {
+	if noData {
+		return fmt.Sprintf(
+			"%s sum(%dm)=0 (no metrics found for the selected period; defaulting to 0)",
+			serviceName, int(interval.Minutes()),
+		)
+	}
+	valueText := strconv.FormatFloat(value, 'f', -1, 64)
+	return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
 }
