@@ -1,6 +1,6 @@
 module github.com/gwos/tcg
 
-go 1.25
+go 1.26
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.11.0
