@@ -1,6 +1,6 @@
 version: "2"
 run:
-    go: "1.24"
+    go: "1.26"
     build-tags:
         - codeanalysis
 linters:
@@ -10,7 +10,6 @@ linters:
         - dupl
         - goconst
         - misspell
-        - prealloc
         - staticcheck
         - unconvert
         - whitespace
@@ -23,6 +22,7 @@ linters:
         - gosec
         - lll
         - nakedret
+        - prealloc
         - wsl
     exclusions:
         generated: lax
