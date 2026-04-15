@@ -19,6 +19,23 @@ import (
 	"github.com/gwos/tcg/sdk/transit"
 )
 
+type serviceMetricState struct {
+	metricBuilder connectors.MetricBuilder
+	dimensions    map[string]string
+	noData        bool
+	endTime       time.Time
+}
+
+var hostDimensionKeys = map[string]struct{}{
+	"resourcedisplayname": {},
+	"resourcename":        {},
+	"hostname":            {},
+	"host":                {},
+	"nodename":            {},
+	"instanceid":          {},
+	"resourceid":          {},
+}
+
 func collectMetrics() {
 	cfg, cfgVersion, ctx := extConfig, configVersion.Load(), ctxCancel
 
@@ -65,7 +82,7 @@ func collectMetrics() {
 		return
 	}
 
-	servicesByResource := make(map[string][]transit.MonitoredService)
+	serviceMetricsByResource := make(map[string]map[string]map[string]serviceMetricState)
 	resourceGroupByHost := make(map[string]string)
 	for _, compartment := range compartments {
 		definitions, err := utils.ListDefinitions(ctx, monClient, compartment.ID)
@@ -103,6 +120,7 @@ func collectMetrics() {
 					continue
 				}
 
+				seriesKey := buildDimensionSeriesKey(sample.Dimensions)
 				metricBuilder := connectors.MetricBuilder{
 					Name:       sample.ServiceName,
 					CustomName: sample.ServiceName,
@@ -115,16 +133,28 @@ func collectMetrics() {
 						Time: sample.EndTime,
 					},
 				}
-				service, err := connectors.BuildServiceForMetric(sample.HostName, metricBuilder)
-				if err != nil {
-					log.Error().Err(err).
-						Str("host", sample.HostName).
-						Str("service", sample.ServiceName).
-						Msg("failed to build service for metric")
-					continue
+
+				hostServices, exists := serviceMetricsByResource[sample.HostName]
+				if !exists {
+					hostServices = make(map[string]map[string]serviceMetricState)
+					serviceMetricsByResource[sample.HostName] = hostServices
 				}
-				service.LastPluginOutput = buildServiceLastPluginOutput(sample.ServiceName, cfg.CheckInterval, sample.Value, sample.NoData)
-				servicesByResource[sample.HostName] = append(servicesByResource[sample.HostName], *service)
+				serviceMetrics, exists := hostServices[sample.ServiceName]
+				if !exists {
+					serviceMetrics = make(map[string]serviceMetricState)
+					hostServices[sample.ServiceName] = serviceMetrics
+				}
+				state, exists := serviceMetrics[seriesKey]
+				if !exists || sample.EndTime.After(state.endTime) ||
+					(sample.EndTime.Equal(state.endTime) && state.noData && !sample.NoData) {
+					serviceMetrics[seriesKey] = serviceMetricState{
+						metricBuilder: metricBuilder,
+						dimensions:    sample.Dimensions,
+						noData:        sample.NoData,
+						endTime:       sample.EndTime,
+					}
+				}
+
 				if _, exists := resourceGroupByHost[sample.HostName]; !exists {
 					groupName := strings.TrimSpace(compartment.Name)
 					if groupName == "" {
@@ -136,8 +166,8 @@ func collectMetrics() {
 		}
 	}
 
-	resourceNames := make([]string, 0, len(servicesByResource))
-	for resourceName := range servicesByResource {
+	resourceNames := make([]string, 0, len(serviceMetricsByResource))
+	for resourceName := range serviceMetricsByResource {
 		resourceNames = append(resourceNames, resourceName)
 	}
 	sort.Strings(resourceNames)
@@ -145,7 +175,70 @@ func collectMetrics() {
 	mResources := make([]transit.MonitoredResource, 0, len(resourceNames))
 	resourceRefsByGroup := make(map[string][]transit.ResourceRef)
 	for _, resourceName := range resourceNames {
-		services := servicesByResource[resourceName]
+		hostServices := serviceMetricsByResource[resourceName]
+		if len(hostServices) == 0 {
+			continue
+		}
+
+		serviceNames := make([]string, 0, len(hostServices))
+		for serviceName := range hostServices {
+			serviceNames = append(serviceNames, serviceName)
+		}
+		sort.Strings(serviceNames)
+
+		services := make([]transit.MonitoredService, 0, len(serviceNames))
+		for _, serviceName := range serviceNames {
+			metricsBySeriesKey := hostServices[serviceName]
+			if len(metricsBySeriesKey) == 0 {
+				continue
+			}
+
+			seriesKeys := make([]string, 0, len(metricsBySeriesKey))
+			for seriesKey := range metricsBySeriesKey {
+				seriesKeys = append(seriesKeys, seriesKey)
+			}
+			sort.Strings(seriesKeys)
+
+			metricBuilders := make([]connectors.MetricBuilder, 0, len(seriesKeys))
+			noDataCount := 0
+			multiSeries := len(seriesKeys) > 1
+			usedMetricNames := make(map[string]int)
+			for _, seriesKey := range seriesKeys {
+				state := metricsBySeriesKey[seriesKey]
+				metricBuilder := state.metricBuilder
+				metricName := serviceName
+				if multiSeries {
+					metricName = buildDimensionMetricName(serviceName, state.dimensions)
+					if metricName == "" {
+						metricName = serviceName
+					}
+				}
+				if count := usedMetricNames[metricName]; count > 0 {
+					usedMetricNames[metricName] = count + 1
+					metricName = fmt.Sprintf("%s_%d", metricName, count+1)
+				} else {
+					usedMetricNames[metricName] = 1
+				}
+				metricBuilder.Name = metricName
+				metricBuilder.CustomName = metricName
+				metricBuilders = append(metricBuilders, metricBuilder)
+				if state.noData {
+					noDataCount++
+				}
+			}
+
+			service, err := connectors.BuildServiceForMetrics(serviceName, resourceName, metricBuilders)
+			if err != nil {
+				log.Error().Err(err).
+					Str("host", resourceName).
+					Str("service", serviceName).
+					Msg("failed to build service for metrics")
+				continue
+			}
+			service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, cfg.CheckInterval, metricBuilders, noDataCount)
+			services = append(services, *service)
+		}
+
 		if len(services) == 0 {
 			continue
 		}
@@ -209,13 +302,110 @@ func collectMetrics() {
 	}
 }
 
-func buildServiceLastPluginOutput(serviceName string, interval time.Duration, value float64, noData bool) string {
-	if noData {
+func buildServiceLastPluginOutput(serviceName string, interval time.Duration, metricBuilders []connectors.MetricBuilder, noDataCount int) string {
+	metricCount := len(metricBuilders)
+	if metricCount == 0 {
+		return fmt.Sprintf("%s sum(%dm)=0 (no metric series)", serviceName, int(interval.Minutes()))
+	}
+	if metricCount == 1 {
+		valueText := formatMetricBuilderValue(metricBuilders[0].Value)
+		if noDataCount == 1 {
+			return fmt.Sprintf(
+				"%s sum(%dm)=%s (no metrics found for the selected period; defaulting to %s)",
+				serviceName, int(interval.Minutes()), valueText, valueText,
+			)
+		}
+		return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
+	}
+	if noDataCount == metricCount {
 		return fmt.Sprintf(
-			"%s sum(%dm)=0 (no metrics found for the selected period; defaulting to 0)",
-			serviceName, int(interval.Minutes()),
+			"%s series(%dm)=%d (all series have no data; defaulting to 0)",
+			serviceName, int(interval.Minutes()), metricCount,
 		)
 	}
-	valueText := strconv.FormatFloat(value, 'f', -1, 64)
-	return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
+	if noDataCount > 0 {
+		return fmt.Sprintf(
+			"%s series(%dm)=%d (%d no-data series defaulted to 0)",
+			serviceName, int(interval.Minutes()), metricCount, noDataCount,
+		)
+	}
+	return fmt.Sprintf("%s series(%dm)=%d", serviceName, int(interval.Minutes()), metricCount)
+}
+
+func formatMetricBuilderValue(value any) string {
+	switch v := value.(type) {
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case int:
+		return strconv.Itoa(v)
+	case int64:
+		return strconv.FormatInt(v, 10)
+	case int32:
+		return strconv.FormatInt(int64(v), 10)
+	case uint:
+		return strconv.FormatUint(uint64(v), 10)
+	case uint64:
+		return strconv.FormatUint(v, 10)
+	case uint32:
+		return strconv.FormatUint(uint64(v), 10)
+	default:
+		return fmt.Sprintf("%v", value)
+	}
+}
+
+func buildDimensionSeriesKey(dimensions map[string]string) string {
+	parts := buildDimensionParts(dimensions)
+	if len(parts) == 0 {
+		return "__default__"
+	}
+	return strings.Join(parts, "__")
+}
+
+func buildDimensionMetricName(baseName string, dimensions map[string]string) string {
+	baseName = strings.TrimSpace(baseName)
+	if baseName == "" {
+		return baseName
+	}
+
+	parts := buildDimensionParts(dimensions)
+	if len(parts) == 0 {
+		return baseName
+	}
+
+	return connectors.SanitizeString(baseName + "__" + strings.Join(parts, "__"))
+}
+
+func buildDimensionParts(dimensions map[string]string) []string {
+	if len(dimensions) == 0 {
+		return nil
+	}
+
+	keys := make([]string, 0, len(dimensions))
+	for key, value := range dimensions {
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" || value == "" {
+			continue
+		}
+		if _, skip := hostDimensionKeys[strings.ToLower(key)]; skip {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		return nil
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		value := strings.TrimSpace(dimensions[key])
+		if value == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s_%s", key, value))
+	}
+	return parts
 }
