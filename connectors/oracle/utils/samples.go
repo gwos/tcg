@@ -13,6 +13,7 @@ import (
 type sample struct {
 	HostName    string
 	ServiceName string
+	Dimensions  map[string]string
 	Value       float64
 	StartTime   time.Time
 	EndTime     time.Time
@@ -53,6 +54,7 @@ func ListSamples(
 			{
 				HostName:    hostName,
 				ServiceName: definition.Name,
+				Dimensions:  cloneDimensions(definition.Dimensions),
 				Value:       0,
 				StartTime:   endTime,
 				EndTime:     endTime,
@@ -85,6 +87,7 @@ func ListSamples(
 		result = append(result, sample{
 			HostName:    hostName,
 			ServiceName: serviceName,
+			Dimensions:  cloneDimensions(tags),
 			Value:       value,
 			StartTime:   pointTime,
 			EndTime:     pointTime,
@@ -93,6 +96,17 @@ func ListSamples(
 	}
 
 	return result, nil
+}
+
+func cloneDimensions(src map[string]string) map[string]string {
+	if len(src) == 0 {
+		return nil
+	}
+	dst := make(map[string]string, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
 }
 
 func getValue(datapoints []ociMon.AggregatedDatapoint) (float64, time.Time, bool) {
