@@ -25,8 +25,6 @@ BUILD_ARGS      := ${BUILD_ARGS} \
                     --build-arg TRAVIS_JOB_WEB_URL \
                     --build-arg TRAVIS_TAG
 
-all: echo login build tag push
-
 
 echo:
 	@echo =======================================

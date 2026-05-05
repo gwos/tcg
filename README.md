@@ -51,7 +51,7 @@ The TCG project is built with Go Modules. See `go.mod` for a list of dependencie
 
     > Generate 'docs.go' for Swagger UI
 
-        $ go run github.com/swaggo/swag/cmd/swag@latest init --parseDependency --parseInternal --exclude ./connectors/
+        go run github.com/swaggo/swag/cmd/swag@latest init --parseDependency --parseInternal --exclude ./connectors/
 
     > Swagger url:
 
@@ -74,15 +74,15 @@ The TCG project is built with Go Modules. See `go.mod` for a list of dependencie
 ## Building
 
 ```
-$ cd tcg
-$ go build .
+cd tcg
+go build .
 ```
 
 
 ### Building C shared library:
 
 ```
-$ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'" -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
+go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'" -buildmode=c-shared -o libtransit/libtransit.so libtransit/libtransit.go
 ```
 
 #### or use Makefiles
@@ -91,12 +91,12 @@ $ go build -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s
 
 LINUX:
 ```
-$ CGO_ENABLED=1 go build -v -o tcg -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
+CGO_ENABLED=1 go build -v -o tcg -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
 ```
 
 OS X:
 ```
-$ CGO_ENABLED=1 go build -v -o tcg -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
+CGO_ENABLED=1 go build -v -o tcg -ldflags "-X 'github.com/gwos/tcg/config.buildTime=`date -u +"%Y-%m-%dT%H:%M:%SZ"`' -X 'github.com/gwos/tcg/config.buildTag=<TAG>'"
 ```
 
 ## Building Connectors for OS Targets (Cross Compiling)
@@ -144,8 +144,8 @@ journalctl -f -u tcg-elastic
 ## Running
 
 ```
-$ cd tcg
-$ go run .
+cd tcg
+go run .
 ```
 
 
@@ -154,7 +154,7 @@ $ go run .
 
 ### Build image:
 
-    $ docker build -t groundworkdevelopment/tcg .
+    docker build -t groundworkdevelopment/tcg .
 
 
 <a name="testing"></a>
@@ -164,26 +164,26 @@ $ go run .
 
 >With logs:
 
-    $ go test -v ./<package_one>/ ./<package_two>/
+    go test -v ./<package_one>/ ./<package_two>/
 
 ### Run integration tests:
 
 >For integration tests you must provide environment variables for Groundwork Connection. Also have to deal with TLS certs: get it in local trust storage or suppress check.
 
-    $ TCG_TLS_CLIENT_INSECURE=TRUE \
+    TCG_TLS_CLIENT_INSECURE=TRUE \
         TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
         go test -v ./integration/
 
 
 ### Examples:
 
-    $ go test -v ./config/ ./services/
+    go test -v ./config/ ./services/
 
-    $ go test -v ./libtransit/
+    go test -v ./libtransit/
 
-    $ go test -v $(go list ./... | grep -v tcg/integration)
+    go test -v $(go list ./... | grep -v tcg/integration)
 
-    $ GOFLAGS="-count=1" \
+    GOFLAGS="-count=1" \
         TCG_TLS_CLIENT_INSECURE=TRUE \
         TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
         TCG_CONNECTOR_LOGCOLORS=TRUE TCG_CONNECTOR_LOGLEVEL=3 \
@@ -191,7 +191,7 @@ $ go run .
         TCG_CONNECTOR_AGENTID=TEST11 \
         go test -failfast -v ./integration/
 
-    $ GOFLAGS="-count=1" \
+    GOFLAGS="-count=1" \
         TCG_TLS_CLIENT_INSECURE=TRUE \
         TCG_GWCONNECTIONS_0_USERNAME=remote TCG_GWCONNECTIONS_0_PASSWORD=remote \
         TCG_CONNECTOR_LOGCOLORS=TRUE TCG_CONNECTOR_LOGLEVEL=3 \
@@ -212,7 +212,7 @@ $ go run .
 
 Defines the path to `libtransit.so` library in docker container and tests.
 
-    $ export LIBTRANSIT=/path/to/libtransit.so
+    export LIBTRANSIT=/path/to/libtransit.so
 
 
 ### TCG config variables
@@ -221,8 +221,8 @@ By default, the config file is looked for in the work directory as `tcg_config.y
 
 The path to config file and any config option can be overridden with env vars:
 
-    $ export TCG_CONFIG=/path/to/tcg_config.yaml
-    $ export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
+    export TCG_CONFIG=/path/to/tcg_config.yaml
+    export TCG_CONNECTOR_NATSSTORETYPE=MEMORY
 
 For more info see package `config` and tests.
 
@@ -243,5 +243,5 @@ There are additional variables supported:
 
 ## Run golangci-lint locally:
 
-    $ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
-    $ ~/go/bin/golangci-lint --config ./.golangci.yaml run ./... --deadline=2m
+    go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.54.2
+    ~/go/bin/golangci-lint --config ./.golangci.yaml run ./... --deadline=2m
