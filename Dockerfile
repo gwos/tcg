@@ -1,83 +1,131 @@
-#
+# Pass --build-arg SUPPRESS_TEST=1 to skip unit tests (tests run by default)
+ARG SUPPRESS_TEST=
+
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
-#
-FROM golang:1.26-bookworm AS build-libtransit
-ARG TRAVIS_TAG=
-ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
+
+###############################################################################
+# download and cache once depend on deps only
+FROM golang:1-alpine3.22 AS deps
+WORKDIR /go/src/
+COPY go.mod go.sum ./
+COPY sdk/go.mod ./sdk/
+RUN go mod download
+
+###############################################################################
+# run unit tests (pass --build-arg SUPPRESS_TEST=1 to skip)
+# build libtransit - 1st check for Datageyser compatibility
+FROM golang:1-bookworm AS build-libtransit-tests
+
+RUN set -eux; \
+    apt-get update -y; \
+    DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
+        libjansson-dev libmcrypt-dev; \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /go/src/
 COPY . .
+COPY --from=deps /go/pkg/mod /go/pkg/mod
 
-RUN apt-get update -y \
-    && echo "--" \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y \
-        libjansson-dev libmcrypt-dev \
-    && echo "--"
-
-RUN go test  $(go list ./... | grep -v tcg/integration) \
+ARG SUPPRESS_TEST=
+RUN [ -n "$SUPPRESS_TEST" ] || go test  $(go list ./... | grep -v tcg/integration) \
     && echo "[Go TESTS DONE]"
 
-RUN make clean && make \
-    && cp libtransit/libtransit.so libtransit/libtransit.h libtransit/transit.h  build/ \
-    && echo "[LIBTRANSIT BUILD DONE]"
+ARG BUILD_TAG
+ARG BUILD_TIME
+ARG COMMIT_HASH
+ARG TRAVIS_TAG
+RUN set -eux; \
+    mkdir -p dist; \
+    make clean && make; \
+    cp libtransit/libtransit.so libtransit/libtransit_compat.h libtransit/libtransit.h libtransit/transit.h  dist/; \
+    echo "[LIBTRANSIT BUILD DONE]"
 
-FROM scratch AS export-libtransit
-COPY --from=build-libtransit /go/src/build /
+###############################################################################
+# target for Nagios build
+FROM scratch AS dist-libtransit
+COPY --from=build-libtransit-tests /go/src/dist /dist
 
-FROM golang:1.26-alpine AS build
-ARG TRAVIS_TAG=
-ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
+###############################################################################
+# build connectors
+FROM golang:1-alpine3.22 AS build
+
 WORKDIR /go/src/
 COPY . .
+COPY --from=deps /go/pkg/mod /go/pkg/mod
 
 RUN apk add --no-cache \
         bash build-base git \
         libmcrypt libmcrypt-dev \
     && echo "[CHECKER NSCA DEPS DONE]"
 
-# use bash for run to support '[[' command
 SHELL ["/bin/bash", "-c"]
 
-RUN sh -x \
-    && mkdir -p /app \
-    && build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-    && ldflags="-X 'github.com/gwos/tcg/config.buildTime=${build_time}'" \
-    && ldflags="${ldflags} -X 'github.com/gwos/tcg/config.buildTag=${TRAVIS_TAG}'" \
-    && CGO_ENABLED=1 go build -v -o /app/tcg -ldflags "$ldflags" . \
-    && echo "[TCG BUILD DONE]"
+ARG BUILD_TAG
+ARG BUILD_TIME
+ARG COMMIT_HASH
+ARG TRAVIS_TAG
+RUN set -eux; \
+    mkdir -p /app; \
+    BUILD_TAG="${BUILD_TAG:-${TRAVIS_TAG:-${COMMIT_HASH:-8.x}}}"; \
+    BUILD_TIME="${BUILD_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"; \
+    ldflags="-X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'"; \
+    ldflags="${ldflags} -X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}'"; \
+    CGO_ENABLED=1 go build -v -o /app/tcg -ldflags "$ldflags" .; \
+    echo "[TCG BUILD DONE]"
 
-RUN sh -x \
-    && for d in /go/src/connectors/*/ ; \
-    do  [ ! -f "${d}tcg_config.yaml" ] && continue ; \
-        cmd=$(basename "$d") ; dest="/app/${cmd}" ; \
-        echo "__ $cmd __" ; mkdir -p "$dest" \
-        && cp "${d}tcg_config.yaml" "$dest" \
-        && ln -s /app/tcg "/app/tcg-${cmd}" ; \
-    done \
-    && echo "[CONNECTORS DONE]"
+RUN set -eux; \
+    for d in /go/src/connectors/*/; \
+    do  [ ! -f "${d}tcg_config.yaml" ] && continue; \
+        cmd=$(basename "$d") ; dest="/app/${cmd}"; \
+        echo "__ $cmd __" ; mkdir -p "$dest"; \
+        cp "${d}tcg_config.yaml" "$dest"; \
+        ln -s /app/tcg "/app/tcg-${cmd}"; \
+    done; \
+    echo "[CONNECTORS DONE]"
 
-RUN sh -x \
-    && [ -d /app/k8s ] && ln -s /app/k8s /app/kubernetes  \
-    && ln -s /app/tcg /app/tcg-kubernetes \
-    && echo "[ALIASES DONE]"
+RUN set -eux; \
+    [ -d /app/k8s ] && ln -s /app/k8s /app/kubernetes; \
+    ln -s /app/tcg /app/tcg-kubernetes; \
+    echo "[ALIASES DONE]"
 
 RUN cp ./docker_cmd.sh /app/
 
-# Support custom-build-outputs for debug the build
-# https://docs.docker.com/engine/reference/commandline/build/#custom-build-outputs
-FROM scratch AS export
-COPY --from=build /app /
+###############################################################################
+# trigger all builds while required by prod
+FROM scratch AS dist
+COPY --from=build-libtransit-tests /go/src/dist /dist
+COPY --from=build /app /app
 
-FROM alpine:3.21 AS prod
-# update zlib to fix CVE
-RUN apk add -u --no-cache \
+###############################################################################
+FROM alpine:3.22 AS prod
+RUN set -eux; \
+    apk add --no-cache \
         bash coreutils procps \
         ca-certificates openssl \
         curl jq vim \
         libmcrypt \
-        zlib \
-    && update-ca-certificates
-COPY --from=build /app /app
+        zlib
+
+COPY --from=dist /app /app
+
+ARG BRANCH
+ARG COMMIT_HASH
+ARG TRAVIS_BUILD_ID
+ARG TRAVIS_COMMIT
+ARG TRAVIS_COMMIT_MESSAGE
+ARG TRAVIS_JOB_ID
+ARG TRAVIS_JOB_WEB_URL
+ARG TRAVIS_TAG
+
+ENV BRANCH="${BRANCH}"
+ENV COMMIT_HASH="${COMMIT_HASH}"
+ENV TRAVIS_BUILD_ID="${TRAVIS_BUILD_ID}"
+ENV TRAVIS_COMMIT="${TRAVIS_COMMIT}"
+ENV TRAVIS_COMMIT_MESSAGE="${TRAVIS_COMMIT_MESSAGE}"
+ENV TRAVIS_JOB_ID="${TRAVIS_JOB_ID}"
+ENV TRAVIS_JOB_WEB_URL="${TRAVIS_JOB_WEB_URL}"
+ENV TRAVIS_TAG="${TRAVIS_TAG}"
 
 # Land docker exec into var folder
 WORKDIR /tcg/

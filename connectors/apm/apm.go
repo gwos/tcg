@@ -21,6 +21,7 @@ import (
 	"github.com/gwos/tcg/services"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 	"github.com/rs/zerolog/log"
 )
 
@@ -104,7 +105,7 @@ type promMetricsData struct {
 func (mi *promMetricsData) parse() (*[]transit.MonitoredResource, *[]transit.ResourceGroup, error) {
 	var (
 		promParser         PromParser
-		textParser         expfmt.TextParser
+		textParser         = expfmt.NewTextParser(model.UTF8Validation)
 		prometheusServices map[string]*dto.MetricFamily
 	)
 	if mi.isProtobuf {
