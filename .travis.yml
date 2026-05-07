@@ -1,8 +1,12 @@
-language: bash
+os: linux
+dist: noble
+language: shell
 script:
-- export DOCKER_HUB_USERNAME=groundworkbot
-- export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
-- make --warn-undefined-variables -f travis.Makefile all
+  - export BUILD_ARGS="--secret id=github_token,env=GITHUB_TOKEN"
+  - export DOCKER_BUILDKIT=1
+  - export DOCKER_HUB_USERNAME=groundworkbot
+  - export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
+  - timeout 60m make --warn-undefined-variables -f travis.Makefile all & PID=$!; while [ -d /proc/$PID ]; do echo '# travis awaiting'; sleep 1m; done; wait $PID
 notifications:
   slack:
     rooms:
