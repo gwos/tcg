@@ -42,11 +42,6 @@ RUN set -eux; \
     echo "[LIBTRANSIT BUILD DONE]"
 
 ###############################################################################
-# target for Nagios build
-FROM scratch AS dist-libtransit
-COPY --from=build-libtransit-tests /go/src/dist /dist
-
-###############################################################################
 # build connectors
 FROM golang:1-alpine3.22 AS build
 
@@ -93,6 +88,7 @@ RUN cp ./docker_cmd.sh /app/
 
 ###############################################################################
 # trigger all builds while required by prod
+# target for Nagios build
 FROM scratch AS dist
 COPY --from=build-libtransit-tests /go/src/dist /dist
 COPY --from=build /app /app
