@@ -15,6 +15,7 @@ endif
 ESCAPED_BRANCH  := $(subst /,-,$(BRANCH))
 
 IMG             := ${REGISTRY_REPO}:${ESCAPED_BRANCH}
+IMG_DIST        := ${REGISTRY_REPO}-dist:${ESCAPED_BRANCH}
 BUILD_ARGS      := ${BUILD_ARGS} \
                     --build-arg COMMIT_HASH \
                     --build-arg BRANCH \
@@ -31,6 +32,7 @@ echo:
 	@echo REGISTRY_REPO:       ${REGISTRY_REPO}
 	@echo COMMIT_HASH:         ${COMMIT_HASH}
 	@echo IMG:                 ${IMG}
+	@echo IMG_DIST:            ${IMG_DIST}
 	@echo TRAVIS_TAG:          ${TRAVIS_TAG}
 	@echo BRANCH:              ${BRANCH}
 	@echo ESCAPED_BRANCH:      ${ESCAPED_BRANCH}
@@ -47,6 +49,7 @@ login:
 
 build:
 	docker build ${BUILD_ARGS} -t ${IMG} .
+	docker build ${BUILD_ARGS} --target dist -t ${IMG_DIST} .
 
 
 tag:
@@ -56,11 +59,13 @@ tag:
     else
 			@echo "Current build corresponds to git tag $(TRAVIS_TAG); tagging docker image..."
 			docker tag ${IMG} ${REGISTRY_REPO}:${TRAVIS_TAG}
+			docker tag ${IMG_DIST} ${REGISTRY_REPO}-dist:${TRAVIS_TAG}
     endif
 
 	# If branch is master, tag latest
     ifeq ($(BRANCH),master)
 			docker tag ${IMG} ${REGISTRY_REPO}:latest
+			docker tag ${IMG_DIST} ${REGISTRY_REPO}-dist:latest
     endif
 
 
