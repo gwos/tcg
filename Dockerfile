@@ -1,12 +1,18 @@
 # Pass --build-arg SUPPRESS_TEST=1 to skip unit tests (tests run by default)
 ARG SUPPRESS_TEST=
+ARG GOLANG_ALPINE=golang:1-alpine3.23
+ARG GOLANG_DEBIAN=golang:1-bookworm
 
+# branches may be updated on release
+ARG GW8BASE_BRANCH=master
+
+ARG GW8ALPINE=groundworkdevelopment/gw8base-alpine:${GW8BASE_BRANCH}
 # NOTE:
 # https://stackoverflow.com/questions/36279253/go-compiled-binary-wont-run-in-an-alpine-docker-container-on-ubuntu-host
 
 ###############################################################################
 # download and cache once depend on deps only
-FROM golang:1-alpine3.22 AS deps
+FROM $GOLANG_ALPINE AS deps
 WORKDIR /go/src/
 COPY go.mod go.sum ./
 COPY sdk/go.mod ./sdk/
@@ -15,7 +21,7 @@ RUN go mod download
 ###############################################################################
 # run unit tests (pass --build-arg SUPPRESS_TEST=1 to skip)
 # build libtransit - 1st check for Datageyser compatibility
-FROM golang:1-bookworm AS build-libtransit-tests
+FROM $GOLANG_DEBIAN AS build-libtransit-tests
 
 RUN set -eux; \
     apt-get update -y; \
@@ -27,7 +33,7 @@ WORKDIR /go/src/
 COPY . .
 COPY --from=deps /go/pkg/mod /go/pkg/mod
 
-ARG SUPPRESS_TEST=
+ARG SUPPRESS_TEST
 RUN [ -n "$SUPPRESS_TEST" ] || go test  $(go list ./... | grep -v tcg/integration) \
     && echo "[Go TESTS DONE]"
 
@@ -43,7 +49,7 @@ RUN set -eux; \
 
 ###############################################################################
 # build connectors
-FROM golang:1-alpine3.22 AS build
+FROM $GOLANG_ALPINE AS build
 
 WORKDIR /go/src/
 COPY . .
@@ -84,26 +90,29 @@ RUN set -eux; \
     ln -s /app/tcg /app/tcg-kubernetes; \
     echo "[ALIASES DONE]"
 
-RUN cp ./docker_cmd.sh /app/
-
 ###############################################################################
 # trigger all builds while required by prod
 # target for Nagios build
 FROM scratch AS dist
 COPY --from=build-libtransit-tests /go/src/dist /dist
+COPY --from=build-libtransit-tests /go/src/build/libtransitjson.so /dist/
+COPY --from=build-libtransit-tests /go/src/gotocjson/_c_code/convert_go_to_c.h /dist/
+COPY --from=build-libtransit-tests /go/src/build/generic_datatypes.h /dist/
+COPY --from=build-libtransit-tests /go/src/build/time.h /dist/
+COPY --from=build-libtransit-tests /go/src/build/milliseconds.h /dist/
 COPY --from=build /app /app
 
 ###############################################################################
-FROM alpine:3.22 AS prod
+FROM $GW8ALPINE AS prod
+COPY --from=dist /app /app
+COPY docker_cmd.d/. /docker_cmd.d/
+
 RUN set -eux; \
     apk add --no-cache \
-        bash coreutils procps \
-        ca-certificates openssl \
-        curl jq vim \
-        libmcrypt \
-        zlib
-
-COPY --from=dist /app /app
+        libmcrypt ;\
+    # Back-compat alias for docker-compose files in gwos/gw8 that pass
+    # /app/docker_cmd.sh as entrypoint; the real script comes from gw8base-alpine.
+    ln -s /docker_cmd.sh /app/docker_cmd.sh
 
 ARG BRANCH
 ARG COMMIT_HASH
@@ -125,4 +134,4 @@ ENV TRAVIS_TAG="${TRAVIS_TAG}"
 
 # Land docker exec into var folder
 WORKDIR /tcg/
-CMD ["/app/docker_cmd.sh", "apm-connector"]
+CMD ["/docker_cmd.sh", "apm-connector"]

@@ -152,9 +152,49 @@ go run .
 <a name="docker"></a>
 ## Docker
 
-### Build image:
+The Dockerfile has five stages:
 
-    docker build -t groundworkdevelopment/tcg .
+| Stage | Base | Purpose |
+|---|---|---|
+| `deps` | `golang:1-alpine3.23` | Download and cache Go modules |
+| `build-libtransit-tests` | `golang:1-bookworm` | Run unit tests; build libtransit (CGO, Debian) |
+| `build` | `golang:1-alpine3.23` | Build TCG binary and all connectors |
+| `dist` | `scratch` | Libtransit artifacts + connector binaries (consumed by Nagios build) |
+| `prod` | `gw8base-alpine:master` | Production image — no Go runtime, self-contained binary |
+
+```bash
+# build and test
+docker build -t groundworkdevelopment/tcg .
+
+# skip unit tests
+docker build --build-arg SUPPRESS_TEST=1 -t groundworkdevelopment/tcg .
+
+# build dist image only (libtransit + connectors, used by Nagios)
+docker build --target dist -t groundworkdevelopment/tcg-dist .
+```
+
+Override base images with `--build-arg`:
+
+| ARG | Default | Description |
+|---|---|---|
+| `GOLANG_ALPINE` | `golang:1-alpine3.23` | Alpine Go builder |
+| `GOLANG_DEBIAN` | `golang:1-bookworm` | Debian Go builder (libtransit requires CGO) |
+| `BASE_IMG` | `groundworkdevelopment/gw8base-alpine:master` | Production base image |
+
+### Runtime
+
+The container inherits `/docker_cmd.sh` and the standard `/docker_cmd.d/` infrastructure (signal handler, atop, cacerts, entrypoint_cmd) from `gw8base-alpine`. The Dockerfile adds:
+
+- **`/docker_cmd.d/90_tcg_wrapper`** — selects the connector binary (`/app/tcg-<connector>`) based on the CMD arg, seeds `tcg_config.yaml` into the `/tcg/<connector>/` volume, then runs the connector under a healthcheck-based watchdog (`TCG_RESTART_ON_CRASH`).
+- **`/app/docker_cmd.sh`** — symlink to `/docker_cmd.sh`, preserved for back-compat with existing `gwos/gw8` docker-compose files that pass `/app/docker_cmd.sh` as the entrypoint.
+
+Default `CMD` is `["/docker_cmd.sh", "apm-connector"]`. Override with a different connector via `docker run image /docker_cmd.sh <connector>-connector` or a docker-compose `entrypoint:` override.
+
+| Variable | Description |
+|---|---|
+| `TCG_RESTART_ON_CRASH` | If `true` (default), the watchdog restarts the connector when its `/api/v1/identity` healthcheck fails |
+| `TCG_CONNECTOR_CONTROLLERADDR` | Address the watchdog probes (default `127.0.0.1:8099`) |
+| `ATOP`, `ENTRYPOINT_CMD*` | Inherited from `gw8base-alpine` |
 
 
 <a name="testing"></a>
