@@ -19,9 +19,10 @@ import (
 )
 
 type Cfg struct {
-	Folders  []string
-	NoPrefix bool
-	Verbose  int8
+	Folders   []string
+	NoPrefix  bool
+	OutPrefix string
+	Verbose   int8
 }
 
 var (
@@ -65,12 +66,14 @@ func getCfg() *Cfg {
 		flags.SortFlags = false
 		folders := flags.StringSlice("folders", nil, "Folder pathes")
 		noPrefix := flags.Bool("no-prefix", false, "Omit prefixing constant name")
+		outPrefix := flags.String("out-prefix", "", "Prefix for the output header file name and include guard (does not affect constant names)")
 		verbose := flags.Int8("verbose", 2, "Verbose level 0..3")
 		if err := flags.Parse(os.Args[1:]); err != nil {
 			logError("could not parse options: %s", err)
 		}
 		cfg.Folders = *folders
 		cfg.NoPrefix = *noPrefix
+		cfg.OutPrefix = *outPrefix
 		if *verbose < 0 {
 			*verbose = 0
 		}
@@ -90,7 +93,11 @@ func isGoFile(fi fs.FileInfo) bool {
 
 func writeHFile(name string, cc []*doc.Value) {
 	name = formatConstName(name)
-	fname := strings.ToLower(name) + ".h"
+	// out-prefix renames the file and include guard (e.g. transit.h ->
+	// sdktransit.h / SDKTRANSIT_H) without touching the constant-name prefix,
+	// so callers can avoid header file-name collisions.
+	outName := strings.ToUpper(getCfg().OutPrefix) + name
+	fname := strings.ToLower(outName) + ".h"
 	f, err := os.Create(fname)
 	if err != nil {
 		logError("could not create file: %s: %s", fname, err)
@@ -99,7 +106,7 @@ func writeHFile(name string, cc []*doc.Value) {
 	defer f.Close()
 	logInfo("create file: %s", fname)
 
-	fmt.Fprintf(f, "#ifndef %s_H\n#define %s_H\n", name, name)
+	fmt.Fprintf(f, "#ifndef %s_H\n#define %s_H\n", outName, outName)
 	prefix := name + "_"
 	if getCfg().NoPrefix {
 		prefix = ""
@@ -107,7 +114,7 @@ func writeHFile(name string, cc []*doc.Value) {
 	for _, d := range cc {
 		writeConst(f, d, prefix)
 	}
-	fmt.Fprintf(f, "\n#endif /* %s_H */\n", name)
+	fmt.Fprintf(f, "\n#endif /* %s_H */\n", outName)
 }
 
 func writeConst(w io.Writer, d *doc.Value, prefix string) {

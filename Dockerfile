@@ -44,7 +44,7 @@ ARG TRAVIS_TAG
 RUN set -eux; \
     mkdir -p dist; \
     make clean && make; \
-    cp libtransit/libtransit.so libtransit/libtransit_compat.h libtransit/libtransit.h libtransit/transit.h  dist/; \
+    cp libtransit/libtransit.so libtransit/libtransit_compat.h libtransit/libtransit.h libtransit/sdktransit.h  dist/; \
     echo "[LIBTRANSIT BUILD DONE]"
 
 ###############################################################################
@@ -100,6 +100,11 @@ COPY --from=build-libtransit-tests /go/src/gotocjson/_c_code/convert_go_to_c.h /
 COPY --from=build-libtransit-tests /go/src/build/generic_datatypes.h /dist/
 COPY --from=build-libtransit-tests /go/src/build/time.h /dist/
 COPY --from=build-libtransit-tests /go/src/build/milliseconds.h /dist/
+# Ship the gotocjson-generated build/transit.h as dist/transit.h: it defines
+# the transit_* types and make_empty_*/free_* helpers the DataGeyser C code
+# consumes. The libtransit constants header is shipped separately as
+# sdktransit.h (see the dist/ copy above), so there is no name collision.
+COPY --from=build-libtransit-tests /go/src/build/transit.h /dist/
 COPY --from=build /app /app
 
 ###############################################################################
