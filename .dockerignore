@@ -1,7 +1,7 @@
 .?*
 __?*
-*md
-*Dockerfile
+**/*.md
+**/*Dockerfile*
 LICENSE
 script
 travis*

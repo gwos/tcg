@@ -1,0 +1,14 @@
+
+# deliver signals to all children
+_shutdown_requested=false
+handle_signal() {
+    _log "OS SIGNAL $1"
+    [[ $1 =~ QUIT|KILL|TERM ]] && _shutdown_requested=true
+    pkill --signal "$1" --session 0 --ignore-ancestors --echo
+}
+trap "handle_signal HUP"  HUP
+trap "handle_signal INT"  INT
+trap "handle_signal QUIT" QUIT
+trap "handle_signal KILL" KILL
+trap "handle_signal TERM" TERM
+# trap "handle_signal EXIT" EXIT # SIGEXIT pseudo-signal is unknown for pkill
