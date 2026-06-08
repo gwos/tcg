@@ -23,7 +23,7 @@ INCLUDES = -I./
 CFLAGS = ${INCLUDES} -m64 -std=gnu11 -g
 
 all		: echo \
-    transit.h \
+    sdktransit.h \
     libtransit.h libtransit.so\
     libtransit_compat.h \
 	examples
@@ -35,12 +35,13 @@ run_examples: examples
 	@echo Running examples
 	LIBTRANSIT=./libtransit.so ./example_dl.run
 
-examples	: libtransit.so libtransit.h transit.h ./examples/c/*.c
+examples	: libtransit.so libtransit.h sdktransit.h ./examples/c/*.c
 	${CC} ${CFLAGS} -o example_dl.run ./examples/c/example_dl.c -ldl
 
-# Build header with constants definitions
-transit.h	: ../sdk/transit/*.go
-	go run ./tools/hgen/ --folders ../sdk/transit
+# Build header with constants definitions. Emitted as sdktransit.h (via hgen's
+# --out-prefix) to avoid colliding with the gotocjson-generated build/transit.h.
+sdktransit.h	: ../sdk/transit/*.go
+	go run ./tools/hgen/ --folders ../sdk/transit --out-prefix sdk
 
 # Build shared lib with build info
 libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
@@ -51,8 +52,8 @@ libtransit.h libtransit.so	: ../*/*.go ../*/*/*.go
 	chmod +x libtransit.so
 
 # Build combined header for compatibility
-libtransit_compat.h	: libtransit.h transit.h
-	cat transit.h > libtransit_compat.h
+libtransit_compat.h	: libtransit.h sdktransit.h
+	cat sdktransit.h > libtransit_compat.h
 	echo >> libtransit_compat.h
 	cat libtransit.h >> libtransit_compat.h
 

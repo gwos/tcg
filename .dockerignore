@@ -1,0 +1,14 @@
+.?*
+__?*
+**/*.md
+**/*Dockerfile*
+LICENSE
+script
+travis*
+
+build
+dist
+examples
+
+**/*.so
+gotocjson/gotocjson

@@ -5,8 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "libtransit.h" /* refs */
-#include "transit.h"    /* consts */
+#include "libtransit.h"  /* refs */
+#include "sdktransit.h"  /* consts */
 
 #ifndef NUL_TERM_LEN
 /* Size of a NUL-termination byte. Generally useful for documenting the meaning

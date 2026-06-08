@@ -41,15 +41,15 @@ echo:
 	@echo BUILD_ARGS:          ${BUILD_ARGS}
 	@echo =======================================
 
-all: echo login build tag push trigger-docker-hub-build
+all: echo login build tag push trigger-travis-build
 
 login:
 	echo "$${DOCKER_HUB_PASSWORD}" | docker login -u "$${DOCKER_HUB_USERNAME}" --password-stdin "$${DOCKER_REGISTRY}"
 
 
 build:
-	docker build ${BUILD_ARGS} -t ${IMG} .
-	docker build ${BUILD_ARGS} --target dist -t ${IMG_DIST} .
+	DOCKER_BUILDKIT=1 docker build ${BUILD_ARGS} -t ${IMG} .
+	DOCKER_BUILDKIT=1 docker build ${BUILD_ARGS} --cache-from ${IMG} --target dist -t ${IMG_DIST} .
 
 
 tag:
@@ -73,13 +73,15 @@ push:
 	./script/docker-push ${REGISTRY_REPO} ${DOCKER_REGISTRY}
 
 
-trigger-docker-hub-build:
-	# trigger docker hub build if master
+trigger-travis-build:
+	# trigger downstream builds if master
     ifeq ($(BRANCH),master)
-    ifeq ($(DOCKER_HUB_TRIGGER_URL),)
-		@echo "DOCKER_HUB_TRIGGER_URL is empty; skipping"
+    ifeq ($(TRAVIS_TRIGGER_URL),)
+		@echo "TRAVIS_TRIGGER_URL is empty; skipping"
     else
-		@echo "DOCKER_HUB_TRIGGER_URL is set to $(DOCKER_HUB_TRIGGER_URL); triggering NAGIOS build..."
-		curl -i -H "Content-Type: application/json" -H "Accept: application/json" -H "Travis-API-Version: 3" -H "Authorization: token ${TRAVIS_ACCESS_TOKEN}" --data '{"request": {"branch": "master"}}' -X POST "${DOCKER_HUB_TRIGGER_URL}"
+		for TRIGGER_URL in $(TRAVIS_TRIGGER_URL); do \
+		echo "triggering $$TRIGGER_URL"; \
+		curl -i -H "Content-Type: application/json" -H "Accept: application/json" -H "Travis-API-Version: 3" -H "Authorization: token $(TRAVIS_ACCESS_TOKEN)" --data '{"request": {"branch": "master"}}' -X POST "$$TRIGGER_URL"; \
+		done
     endif
     endif

@@ -1,16 +1,19 @@
 os: linux
 dist: noble
 language: shell
+# DOCKER_HUB_PASSWORD, TRAVIS_ACCESS_TOKEN must be set as
+# encrypted environment variables in the Travis CI repository settings
+# (Settings → Environment Variables).
+# TRAVIS_ACCESS_TOKEN is used with TRAVIS_TRIGGER_URL for nested builds.
+# DOCKER_HUB_PASSWORD is used to docker login for pull/push images.
 script:
-  - export BUILD_ARGS="--secret id=github_token,env=GITHUB_TOKEN"
-  - export DOCKER_BUILDKIT=1
   - export DOCKER_HUB_USERNAME=groundworkbot
-  - export DOCKER_HUB_TRIGGER_URL=https://api.travis-ci.com/repo/gwos%2Fnagios/requests
+  - export TRAVIS_TRIGGER_URL="https://api.travis-ci.com/repo/gwos%2Fnagios/requests"
   - timeout 60m make --warn-undefined-variables -f travis.Makefile all & PID=$!; while [ -d /proc/$PID ]; do echo '# travis awaiting'; sleep 1m; done; wait $PID
 notifications:
   slack:
     rooms:
-      secure: Ywh5rQMCOhw5x2i8Rm9eGjA0bY+xspSiJ+LkNVMq/iJ2DAjLB2NxXoxt4/P9UxSwifJ2SUTUcMsL8RpKzwpSNG0dhPGZMW0j+pySx8jS2FEfqnwY/bynlWZX0qUUM12FUXVVJ2rsKtCvfNSi03sjVoWwCHpCuMuOmS9LPVPKiwfFJ2QitqgckDf25O+qGV4plryc2GA7W0CRAJ52WqWGqOhWvzEchBrUiZ4g6lyo/5IXMaM4hPHGdYBdxDug0m23r3mZfJ0qWmjW+bms0HWaHY4F4UsGVasoMV0vPeIw+H12wt/1EziIllbj6cWve2UKz+zTi1rjdwmxteIWw+FQ07VqlCdjTcnLbLcnAuIny8662QTpIcB2fL9uB+Qu1d8PbLmtE/kIepTwuM8nswQzm53N6L1UlldS6yGpl7v8zxHYl0pvvnTsTYeWXy/48uR+kyw1YUIZKQhzgoLrHYbdj2IHOum9Gqnf3DBQPz4c77lorCy+xMWnSF34fKheB/tvO0MpBCrXphO++q0lHKCvduux4BhW+swWvG6IvNjBrS7/9orrRwOHbGYuUa/KZ12zHUlFVknZ4djmw0TrtpcsY44Wnsk4bI6oZnHs4xX4YX0g5TexLSEgmZQ9Wos9dLiEA/ahRrzuvE1CUxjFibal45Hslc0bDwP7FJRc62L9nGs=
+      secure: Ywh5rQMCOhw5x2i8Rm9eGjA0bY+xspSiJ+LkNVMq/iJ2DAjLB2NxXoxt4/P9UxSwifJ2SUTUcMsL8RpKzwpSNG0dhPGZMW0j+pySx8jS2FEfqnwY/bynlWZX0qUUM12FUXVVJ2rsKtCvfNSi03sjVoWwCHpCuMuOmS9LPVPKiwfFJ2QitqgckDf25O+qGV4plryc2GA7W0CRAJ52WqWGqOhWvzEchBrUiZ4g6lyo/5IXMaM4hPHGdYBdxDug0m23r3mZfJ0qWmjW+bms0HWaHY4F4UsGVasoMV0vPeIw+H12wt/1EziIllbj6cWve2UKz+zTi1rjdwmxteIWw+FQ07VqlCdjTcnLbLcnAuIny8662QTpIcB2fL9uB+Qu1d8PbLmtE/kIepTwuM8nswQzm53N6L1UlldS6yGpl7v8zxHYl0pvvnTsTYeWXy/48uR+kyw1YUIZKQhzgoLrHYbdj2IHOum9Gqnf3DBQPz4c77lorCy+xMWnSF34fKheB/tvO0MpBCrXphO++q0lHKCvduux4BhW+swWvG6IvNjBrS7/9orrRwOHbGYuUa/KZ12zHUlFVknZ4djmw0TrtpcsY44Wnsk4bI6oZnHs4xX4YX0g5TexLSEgmZQ9Wos9dLiEA/ahZrzuvE1CUxjFibal45Hslc0bDwP7FJRc62L9nGs=
     on_pull_requests: true
   webhooks:
     on_success: always

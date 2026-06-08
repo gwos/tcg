@@ -1,0 +1,7 @@
+
+for f in "${DOCKER_CMD_D:-/docker_cmd.d}"/[0-9]* ; do
+    [ -f "$f" ] || continue  # guard; unmatched glob expands to a non-existent path, aborting under set -e
+    _log "SOURCE $f"
+    . "$f"
+done
+unset f
