@@ -105,15 +105,8 @@ func collectMetrics() {
 		inventory = make(map[string]utils.Resource)
 	}
 
-	metricsByKey := make(map[string]map[string]map[string]serviceMetricState)
-	displayByKey := make(map[string]string)
-	groupByKey := make(map[string]string)
+	metricsByOCID := make(map[string]map[string]map[string]serviceMetricState)
 	for _, compartment := range compartments {
-		groupName := strings.TrimSpace(compartment.Name)
-		if groupName == "" {
-			groupName = strings.TrimSpace(compartment.ID)
-		}
-
 		definitions, err := utils.ListDefinitions(ctx, monClient, compartment.ID)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -145,24 +138,13 @@ func collectMetrics() {
 			}
 
 			for _, sample := range samples {
-				key := ""
-				if sample.ResourceID != "" {
-					if _, ok := inventory[sample.ResourceID]; ok {
-						key = sample.ResourceID
-					}
+				if sample.ResourceID == "" {
+					continue
 				}
-				if key == "" {
-					display := sample.HostName
-					if display == "" {
-						display = sample.ResourceID
-					}
-					if display == "" {
-						continue
-					}
-					key = "fallback\x00" + display
-					displayByKey[key] = display
-					groupByKey[key] = groupName
+				if _, ok := inventory[sample.ResourceID]; !ok {
+					continue
 				}
+				key := sample.ResourceID
 
 				seriesKey := buildDimensionSeriesKey(sample.Dimensions)
 				metricBuilder := connectors.MetricBuilder{
@@ -178,10 +160,10 @@ func collectMetrics() {
 					},
 				}
 
-				hostServices, exists := metricsByKey[key]
+				hostServices, exists := metricsByOCID[key]
 				if !exists {
 					hostServices = make(map[string]map[string]serviceMetricState)
-					metricsByKey[key] = hostServices
+					metricsByOCID[key] = hostServices
 				}
 				serviceMetrics, exists := hostServices[sample.ServiceName]
 				if !exists {
@@ -210,7 +192,7 @@ func collectMetrics() {
 			continue
 		}
 
-		services := buildServices(res.DisplayName, metricsByKey[res.OCID], cfg.CheckInterval)
+		services := buildServices(res.DisplayName, metricsByOCID[res.OCID], cfg.CheckInterval)
 		mResource, err := connectors.CreateResource(res.DisplayName, services)
 		if err != nil {
 			log.Error().Err(err).
@@ -232,48 +214,6 @@ func collectMetrics() {
 		resourceRefsByGroup[groupName] = append(
 			resourceRefsByGroup[groupName],
 			connectors.CreateResourceRef(res.DisplayName, "", transit.ResourceTypeHost),
-		)
-	}
-
-	fallbackKeys := make([]string, 0, len(metricsByKey))
-	for key := range metricsByKey {
-		if _, isInventory := inventory[key]; isInventory {
-			continue
-		}
-		fallbackKeys = append(fallbackKeys, key)
-	}
-	sort.Strings(fallbackKeys)
-
-	for _, key := range fallbackKeys {
-		resourceName := displayByKey[key]
-		if resourceName == "" {
-			continue
-		}
-		if !cfg.GWMapping.Host.MatchString(resourceName) {
-			continue
-		}
-
-		services := buildServices(resourceName, metricsByKey[key], cfg.CheckInterval)
-		if len(services) == 0 {
-			continue
-		}
-
-		mResource, err := connectors.CreateResource(resourceName, services)
-		if err != nil {
-			log.Error().Err(err).
-				Str("resource_name", resourceName).
-				Msg("failed to create oracle resource")
-			continue
-		}
-		mResources = append(mResources, *mResource)
-
-		groupName := groupByKey[key]
-		if groupName == "" {
-			continue
-		}
-		resourceRefsByGroup[groupName] = append(
-			resourceRefsByGroup[groupName],
-			connectors.CreateResourceRef(resourceName, "", transit.ResourceTypeHost),
 		)
 	}
 

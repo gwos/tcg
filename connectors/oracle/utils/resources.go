@@ -17,6 +17,24 @@ type Resource struct {
 	ResourceType   string
 }
 
+var monitoredResourceTypes = map[string]struct{}{
+	"instance":            {}, // Compute instances
+	"loadbalancer":        {}, // Load Balancers
+	"networkloadbalancer": {}, // Network Load Balancers
+	"vcn":                 {}, // Virtual Cloud Networks
+	"volume":              {}, // Block Storage volumes
+	"bootvolume":          {}, // Block Storage boot volumes
+	"bucket":              {}, // Object Storage
+	"autonomousdatabase":  {}, // Autonomous Database
+	"dbsystem":            {}, // Database Systems
+	"apigateway":          {}, // API Gateway
+}
+
+func isMonitoredResourceType(resourceType string) bool {
+	_, ok := monitoredResourceTypes[strings.ToLower(strings.TrimSpace(resourceType))]
+	return ok
+}
+
 func ListResources(ctx context.Context, client ociSearch.ResourceSearchClient) (map[string]Resource, error) {
 	inventory := make(map[string]Resource)
 
@@ -34,7 +52,10 @@ func ListResources(ctx context.Context, client ociSearch.ResourceSearchClient) (
 		}
 
 		for _, item := range resp.Items {
-			if item.Identifier == nil {
+			if item.Identifier == nil || item.ResourceType == nil {
+				continue
+			}
+			if !isMonitoredResourceType(*item.ResourceType) {
 				continue
 			}
 			ocid := strings.TrimSpace(*item.Identifier)
