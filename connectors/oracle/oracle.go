@@ -12,6 +12,7 @@ import (
 	ociCom "github.com/oracle/oci-go-sdk/v65/common"
 	ociIde "github.com/oracle/oci-go-sdk/v65/identity"
 	ociMon "github.com/oracle/oci-go-sdk/v65/monitoring"
+	ociSearch "github.com/oracle/oci-go-sdk/v65/resourcesearch"
 	"github.com/rs/zerolog/log"
 
 	"github.com/gwos/tcg/connectors"
@@ -74,6 +75,15 @@ func collectMetrics() {
 	}
 	monClient.SetRegion(cfg.OracleRegion)
 
+	searchClient, err := ociSearch.NewResourceSearchClientWithConfigurationProvider(provider)
+	if err != nil {
+		if !errors.Is(err, context.Canceled) {
+			log.Error().Err(err).Msg("failed to create oracle resource search client")
+		}
+		return
+	}
+	searchClient.SetRegion(cfg.OracleRegion)
+
 	compartments, err := utils.ListCompartments(ctx, ideClient, cfg.OracleTenancyOCID)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
@@ -81,10 +91,29 @@ func collectMetrics() {
 		}
 		return
 	}
-
-	serviceMetricsByResource := make(map[string]map[string]map[string]serviceMetricState)
-	resourceGroupByHost := make(map[string]string)
+	compartmentNames := make(map[string]string, len(compartments))
 	for _, compartment := range compartments {
+		compartmentNames[compartment.ID] = strings.TrimSpace(compartment.Name)
+	}
+
+	inventory, err := utils.ListResources(ctx, searchClient)
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		log.Error().Err(err).Msg("failed to list oracle resources")
+		inventory = make(map[string]utils.Resource)
+	}
+
+	metricsByKey := make(map[string]map[string]map[string]serviceMetricState)
+	displayByKey := make(map[string]string)
+	groupByKey := make(map[string]string)
+	for _, compartment := range compartments {
+		groupName := strings.TrimSpace(compartment.Name)
+		if groupName == "" {
+			groupName = strings.TrimSpace(compartment.ID)
+		}
+
 		definitions, err := utils.ListDefinitions(ctx, monClient, compartment.ID)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -116,8 +145,23 @@ func collectMetrics() {
 			}
 
 			for _, sample := range samples {
-				if !cfg.GWMapping.Host.MatchString(sample.HostName) {
-					continue
+				key := ""
+				if sample.ResourceID != "" {
+					if _, ok := inventory[sample.ResourceID]; ok {
+						key = sample.ResourceID
+					}
+				}
+				if key == "" {
+					display := sample.HostName
+					if display == "" {
+						display = sample.ResourceID
+					}
+					if display == "" {
+						continue
+					}
+					key = "fallback\x00" + display
+					displayByKey[key] = display
+					groupByKey[key] = groupName
 				}
 
 				seriesKey := buildDimensionSeriesKey(sample.Dimensions)
@@ -134,10 +178,10 @@ func collectMetrics() {
 					},
 				}
 
-				hostServices, exists := serviceMetricsByResource[sample.HostName]
+				hostServices, exists := metricsByKey[key]
 				if !exists {
 					hostServices = make(map[string]map[string]serviceMetricState)
-					serviceMetricsByResource[sample.HostName] = hostServices
+					metricsByKey[key] = hostServices
 				}
 				serviceMetrics, exists := hostServices[sample.ServiceName]
 				if !exists {
@@ -154,91 +198,62 @@ func collectMetrics() {
 						endTime:       sample.EndTime,
 					}
 				}
-
-				if _, exists := resourceGroupByHost[sample.HostName]; !exists {
-					groupName := strings.TrimSpace(compartment.Name)
-					if groupName == "" {
-						groupName = strings.TrimSpace(compartment.ID)
-					}
-					resourceGroupByHost[sample.HostName] = groupName
-				}
 			}
 		}
 	}
 
-	resourceNames := make([]string, 0, len(serviceMetricsByResource))
-	for resourceName := range serviceMetricsByResource {
-		resourceNames = append(resourceNames, resourceName)
-	}
-	sort.Strings(resourceNames)
-
-	mResources := make([]transit.MonitoredResource, 0, len(resourceNames))
+	mResources := make([]transit.MonitoredResource, 0, len(inventory))
 	resourceRefsByGroup := make(map[string][]transit.ResourceRef)
-	for _, resourceName := range resourceNames {
-		hostServices := serviceMetricsByResource[resourceName]
-		if len(hostServices) == 0 {
+
+	for _, res := range utils.SortedResources(inventory) {
+		if !cfg.GWMapping.Host.MatchString(res.DisplayName) {
 			continue
 		}
 
-		serviceNames := make([]string, 0, len(hostServices))
-		for serviceName := range hostServices {
-			serviceNames = append(serviceNames, serviceName)
+		services := buildServices(res.DisplayName, metricsByKey[res.OCID], cfg.CheckInterval)
+		mResource, err := connectors.CreateResource(res.DisplayName, services)
+		if err != nil {
+			log.Error().Err(err).
+				Str("resource_name", res.DisplayName).
+				Str("ocid", res.OCID).
+				Msg("failed to create oracle resource")
+			continue
 		}
-		sort.Strings(serviceNames)
+		mResource.Status = mapLifecycleStateToHostStatus(res.LifecycleState)
+		mResources = append(mResources, *mResource)
 
-		services := make([]transit.MonitoredService, 0, len(serviceNames))
-		for _, serviceName := range serviceNames {
-			metricsBySeriesKey := hostServices[serviceName]
-			if len(metricsBySeriesKey) == 0 {
-				continue
-			}
+		groupName := compartmentNames[res.CompartmentID]
+		if groupName == "" {
+			groupName = strings.TrimSpace(res.CompartmentID)
+		}
+		if groupName == "" {
+			continue
+		}
+		resourceRefsByGroup[groupName] = append(
+			resourceRefsByGroup[groupName],
+			connectors.CreateResourceRef(res.DisplayName, "", transit.ResourceTypeHost),
+		)
+	}
 
-			seriesKeys := make([]string, 0, len(metricsBySeriesKey))
-			for seriesKey := range metricsBySeriesKey {
-				seriesKeys = append(seriesKeys, seriesKey)
-			}
-			sort.Strings(seriesKeys)
+	fallbackKeys := make([]string, 0, len(metricsByKey))
+	for key := range metricsByKey {
+		if _, isInventory := inventory[key]; isInventory {
+			continue
+		}
+		fallbackKeys = append(fallbackKeys, key)
+	}
+	sort.Strings(fallbackKeys)
 
-			metricBuilders := make([]connectors.MetricBuilder, 0, len(seriesKeys))
-			noDataCount := 0
-			multiSeries := len(seriesKeys) > 1
-			usedMetricNames := make(map[string]int)
-			for _, seriesKey := range seriesKeys {
-				state := metricsBySeriesKey[seriesKey]
-				metricBuilder := state.metricBuilder
-				metricName := serviceName
-				if multiSeries {
-					metricName = buildDimensionMetricName(serviceName, state.dimensions)
-					if metricName == "" {
-						metricName = serviceName
-					}
-				}
-				if count := usedMetricNames[metricName]; count > 0 {
-					usedMetricNames[metricName] = count + 1
-					metricName = fmt.Sprintf("%s_%d", metricName, count+1)
-				} else {
-					usedMetricNames[metricName] = 1
-				}
-				metricBuilder.Name = metricName
-				metricBuilder.CustomName = metricName
-				metricBuilders = append(metricBuilders, metricBuilder)
-				if state.noData {
-					noDataCount++
-				}
-			}
-
-			service, err := connectors.BuildServiceForMetrics(serviceName, resourceName, metricBuilders)
-			if err != nil {
-				log.Error().Err(err).
-					Str("host", resourceName).
-					Str("service", serviceName).
-					Msg("failed to build service for metrics")
-				continue
-			}
-			service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, cfg.CheckInterval, metricBuilders, noDataCount)
-			services = append(services, *service)
+	for _, key := range fallbackKeys {
+		resourceName := displayByKey[key]
+		if resourceName == "" {
+			continue
+		}
+		if !cfg.GWMapping.Host.MatchString(resourceName) {
+			continue
 		}
 
+		services := buildServices(resourceName, metricsByKey[key], cfg.CheckInterval)
 		if len(services) == 0 {
 			continue
 		}
@@ -251,7 +266,8 @@ func collectMetrics() {
 			continue
 		}
 		mResources = append(mResources, *mResource)
-		groupName := resourceGroupByHost[resourceName]
+
+		groupName := groupByKey[key]
 		if groupName == "" {
 			continue
 		}
@@ -299,6 +315,89 @@ func collectMetrics() {
 		if !errors.Is(err, context.Canceled) {
 			log.Error().Err(err).Msg("failed to send oracle metrics")
 		}
+	}
+}
+
+func buildServices(
+	resourceName string, hostServices map[string]map[string]serviceMetricState, interval time.Duration,
+) []transit.MonitoredService {
+	if len(hostServices) == 0 {
+		return nil
+	}
+
+	serviceNames := make([]string, 0, len(hostServices))
+	for serviceName := range hostServices {
+		serviceNames = append(serviceNames, serviceName)
+	}
+	sort.Strings(serviceNames)
+
+	services := make([]transit.MonitoredService, 0, len(serviceNames))
+	for _, serviceName := range serviceNames {
+		metricsBySeriesKey := hostServices[serviceName]
+		if len(metricsBySeriesKey) == 0 {
+			continue
+		}
+
+		seriesKeys := make([]string, 0, len(metricsBySeriesKey))
+		for seriesKey := range metricsBySeriesKey {
+			seriesKeys = append(seriesKeys, seriesKey)
+		}
+		sort.Strings(seriesKeys)
+
+		metricBuilders := make([]connectors.MetricBuilder, 0, len(seriesKeys))
+		noDataCount := 0
+		multiSeries := len(seriesKeys) > 1
+		usedMetricNames := make(map[string]int)
+		for _, seriesKey := range seriesKeys {
+			state := metricsBySeriesKey[seriesKey]
+			metricBuilder := state.metricBuilder
+			metricName := serviceName
+			if multiSeries {
+				metricName = buildDimensionMetricName(serviceName, state.dimensions)
+				if metricName == "" {
+					metricName = serviceName
+				}
+			}
+			if count := usedMetricNames[metricName]; count > 0 {
+				usedMetricNames[metricName] = count + 1
+				metricName = fmt.Sprintf("%s_%d", metricName, count+1)
+			} else {
+				usedMetricNames[metricName] = 1
+			}
+			metricBuilder.Name = metricName
+			metricBuilder.CustomName = metricName
+			metricBuilders = append(metricBuilders, metricBuilder)
+			if state.noData {
+				noDataCount++
+			}
+		}
+
+		service, err := connectors.BuildServiceForMetrics(serviceName, resourceName, metricBuilders)
+		if err != nil {
+			log.Error().Err(err).
+				Str("host", resourceName).
+				Str("service", serviceName).
+				Msg("failed to build service for metrics")
+			continue
+		}
+		service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, interval, metricBuilders, noDataCount)
+		services = append(services, *service)
+	}
+
+	return services
+}
+
+func mapLifecycleStateToHostStatus(state string) transit.MonitorStatus {
+	switch strings.ToUpper(strings.TrimSpace(state)) {
+	case "RUNNING", "AVAILABLE", "ACTIVE":
+		return transit.HostUp
+	case "STOPPING", "STARTING", "PROVISIONING", "CREATING", "UPDATING",
+		"TERMINATING", "DELETING", "PENDING":
+		return transit.HostPending
+	case "STOPPED", "TERMINATED", "DELETED", "FAILED", "INACTIVE":
+		return transit.HostUnscheduledDown
+	default:
+		return transit.HostUp
 	}
 }
 
