@@ -914,9 +914,9 @@ func (connector *KubernetesConnector) calculatePodStatus(pod *v1.Pod) (transit.M
 // Example:
 // You might want to assign a third of CPU each — or 33.33%.
 // If you wish to assign a third of a CPU, you should assign 333Mi (millicores) or 0.333(cores) to your container.
-func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
-	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
-}
+// func toPercentage(capacityMilliValue, allocatableMilliValue int64) float64 {
+// 	return float64(allocatableMilliValue) / float64(capacityMilliValue) * 100
+// }
 
 func GetLabels(a ...any) map[string]string {
 	labels := map[string]string{
