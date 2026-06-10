@@ -96,13 +96,15 @@ const (
 )
 
 const (
-	cpu             = "cpu"
-	pods            = "pods"
-	memory          = "memory"
-	cpuCores        = "cpu.cores"
-	cpuAllocated    = "cpu.allocated"
-	memoryCapacity  = "memory.capacity"
-	memoryAllocated = "memory.allocated"
+	cpu            = "cpu"
+	pods           = "pods"
+	memory         = "memory"
+	cpuTotal       = "cpu.total"
+	cpuReserved    = "cpu.reserved"
+	cpuUsed        = "cpu.used"
+	memoryTotal    = "memory.total"
+	memoryReserved = "memory.reserved"
+	memoryUsed     = "memory.used"
 )
 
 type KubernetesConnector struct {
@@ -336,6 +338,31 @@ func (connector *KubernetesConnector) Collect() (
 	return inventory, monitored, hostGroups, nil
 }
 
+// returns the total CPU and Memory requested by all active pods scheduled on the given node...
+func (connector *KubernetesConnector) getNodeReservations(nodeName string) (cpuMillis int64, memBytes int64, err error) {
+	podList, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{
+		FieldSelector: "spec.nodeName=" + nodeName,
+	})
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w: %v", ErrKAPI, err)
+	}
+	for _, pod := range podList.Items {
+		// skip completed or failed pods — they no longer hold reservations
+		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
+			continue
+		}
+		for _, container := range pod.Spec.Containers {
+			if cpu, ok := container.Resources.Requests[v1.ResourceCPU]; ok {
+				cpuMillis += cpu.MilliValue()
+			}
+			if mem, ok := container.Resources.Requests[v1.ResourceMemory]; ok {
+				memBytes += mem.Value()
+			}
+		}
+	}
+	return cpuMillis, memBytes, nil
+}
+
 // Node Inventory also retrieves status, capacity, and allocations
 // inventory also contains status, pod counts, capacity and allocation metrics
 //
@@ -405,26 +432,33 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 			Labels:   labels,
 			Services: make(map[string]transit.MonitoredService),
 		}
+
+		reservedCPUMillis, reservedMemBytes, err := connector.getNodeReservations(node.Name)
+		if err != nil {
+			log.Warn().Err(err).Msgf("could not get pod reservations for node %s", node.Name)
+		}
+
 		// process services
 		for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
 			var value any
 			switch key {
-			case cpuCores:
+			case cpuTotal:
+				// total CPU cores on the node
 				value = node.Status.Capacity.Cpu().Value()
-			case cpuAllocated:
-				value = toPercentage(node.Status.Capacity.Cpu().MilliValue(), node.Status.Allocatable.Cpu().MilliValue())
-			case memoryCapacity:
+			case cpuReserved:
+				// sum of pod CPU requests in cores
+				value = float64(reservedCPUMillis) / 1000.0
+			case memoryTotal:
+				// total RAM in bytes
 				value = node.Status.Capacity.Memory().Value()
-			case memoryAllocated:
-				value = toPercentage(node.Status.Capacity.Memory().MilliValue(), node.Status.Allocatable.Memory().MilliValue())
+			case memoryReserved:
+				// sum of pod memory requests in bytes
+				value = reservedMemBytes
 			case pods:
 				value = node.Status.Capacity.Pods().Value()
 			default:
 				continue
 			}
-			//if value > 4000000 { // TODO: how do we handle longs
-			//	value = value / 1000
-			//}
 			metricBuilder := connectors.MetricBuilder{
 				Name:       key,
 				CustomName: metricDefinition.CustomName,
@@ -597,6 +631,12 @@ func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) 
 					value = node.Usage.Cpu().MilliValue()
 				case memory:
 					value = node.Usage.Memory().MilliValue()
+				case cpuUsed:
+					// actual CPU usage in cores (converted from millicores)
+					value = float64(node.Usage.Cpu().MilliValue()) / 1000.0
+				case memoryUsed:
+					// actual memory usage in bytes
+					value = node.Usage.Memory().Value()
 				default:
 					continue
 				}
@@ -656,14 +696,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *Monitor
 				for key, metricDefinition := range connector.ExtConfig.Views[ViewPods] {
 					var value any
 					switch key {
-					case cpuCores:
-						value = container.Usage.Cpu().Value()
-					case cpuAllocated:
-						value = container.Usage.Cpu().MilliValue()
-					case memoryCapacity:
-						value = container.Usage.Memory().Value()
-					case memoryAllocated:
-						value = container.Usage.Memory().Value()
 					case cpu:
 						value = pod.Containers[index].Usage.Cpu().MilliValue()
 					case memory:
@@ -739,14 +771,6 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *Monit
 				if resource, ok := state.State[stateKey]; ok {
 					var value any
 					switch key {
-					case cpuCores:
-						value = container.Usage.Cpu().Value()
-					case cpuAllocated:
-						value = container.Usage.Cpu().MilliValue()
-					case memoryCapacity:
-						value = container.Usage.Memory().Value()
-					case memoryAllocated:
-						value = container.Usage.Memory().Value()
 					case cpu:
 						value = container.Usage.Cpu().MilliValue()
 					case memory:
