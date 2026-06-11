@@ -107,6 +107,11 @@ const (
 	memoryUsed     = "memory.used"
 )
 
+type nodeReservation struct {
+	cpuMillis int64
+	memBytes  int64
+}
+
 type KubernetesConnector struct {
 	ExtConfig
 	iChksum []byte
@@ -338,29 +343,31 @@ func (connector *KubernetesConnector) Collect() (
 	return inventory, monitored, hostGroups, nil
 }
 
-// returns the total CPU and Memory requested by all active pods scheduled on the given node...
-func (connector *KubernetesConnector) getNodeReservations(nodeName string) (cpuMillis int64, memBytes int64, err error) {
-	podList, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{
-		FieldSelector: "spec.nodeName=" + nodeName,
-	})
+func (connector *KubernetesConnector) buildNodeReservationMap() (map[string]nodeReservation, bool) {
+	podList, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w: %v", ErrKAPI, err)
+		log.Warn().Err(err).Msg("could not list pods for node reservations, reserved metrics will be skipped")
+		return nil, false
 	}
+
+	reservationMap := make(map[string]nodeReservation, len(podList.Items))
 	for _, pod := range podList.Items {
 		// skip completed or failed pods — they no longer hold reservations
 		if pod.Status.Phase == v1.PodSucceeded || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
+		res := reservationMap[pod.Spec.NodeName]
 		for _, container := range pod.Spec.Containers {
 			if cpu, ok := container.Resources.Requests[v1.ResourceCPU]; ok {
-				cpuMillis += cpu.MilliValue()
+				res.cpuMillis += cpu.MilliValue()
 			}
 			if mem, ok := container.Resources.Requests[v1.ResourceMemory]; ok {
-				memBytes += mem.Value()
+				res.memBytes += mem.Value()
 			}
 		}
+		reservationMap[pod.Spec.NodeName] = res
 	}
-	return cpuMillis, memBytes, nil
+	return reservationMap, true
 }
 
 // Node Inventory also retrieves status, capacity, and allocations
@@ -384,6 +391,8 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 		log.Err(err).Msg("could not collect nodes inventory")
 		return err
 	}
+
+	reservationMap, podListSucceeded := connector.buildNodeReservationMap()
 
 	for _, node := range nodes.Items {
 		resourceName := node.Name
@@ -433,10 +442,7 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 			Services: make(map[string]transit.MonitoredService),
 		}
 
-		reservedCPUMillis, reservedMemBytes, err := connector.getNodeReservations(node.Name)
-		if err != nil {
-			log.Warn().Err(err).Msgf("could not get pod reservations for node %s", node.Name)
-		}
+		res := reservationMap[node.Name]
 
 		// process services
 		for key, metricDefinition := range connector.ExtConfig.Views[ViewNodes] {
@@ -446,14 +452,22 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 				// total CPU cores on the node
 				value = node.Status.Capacity.Cpu().Value()
 			case cpuReserved:
-				// sum of pod CPU requests in cores
-				value = float64(reservedCPUMillis) / 1000.0
+				// skip if pod list failed — don't publish misleading 0
+				if !podListSucceeded {
+					continue
+				}
+				// sum of pod CPU requests in cores (converted from millicores)
+				value = float64(res.cpuMillis) / 1000.0
 			case memoryTotal:
 				// total RAM in bytes
 				value = node.Status.Capacity.Memory().Value()
 			case memoryReserved:
+				// skip if pod list failed — don't publish misleading 0
+				if !podListSucceeded {
+					continue
+				}
 				// sum of pod memory requests in bytes
-				value = reservedMemBytes
+				value = res.memBytes
 			case pods:
 				value = node.Status.Capacity.Pods().Value()
 			default:
