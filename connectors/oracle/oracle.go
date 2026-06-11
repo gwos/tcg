@@ -124,7 +124,7 @@ func collectMetrics() {
 				continue
 			}
 
-			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval)
+			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval, cfg.OracleAggregationType)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return
@@ -192,7 +192,7 @@ func collectMetrics() {
 			continue
 		}
 
-		services := buildServices(res.DisplayName, metricsByOCID[res.OCID], cfg.CheckInterval)
+		services := buildServices(res.DisplayName, metricsByOCID[res.OCID], cfg.CheckInterval, cfg.OracleAggregationType)
 		mResource, err := connectors.CreateResource(res.DisplayName, services)
 		if err != nil {
 			log.Error().Err(err).
@@ -259,7 +259,7 @@ func collectMetrics() {
 }
 
 func buildServices(
-	resourceName string, hostServices map[string]map[string]serviceMetricState, interval time.Duration,
+	resourceName string, hostServices map[string]map[string]serviceMetricState, interval time.Duration, aggregation string,
 ) []transit.MonitoredService {
 	if len(hostServices) == 0 {
 		return nil
@@ -320,7 +320,7 @@ func buildServices(
 				Msg("failed to build service for metrics")
 			continue
 		}
-		service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, interval, metricBuilders, noDataCount)
+		service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, interval, aggregation, metricBuilders, noDataCount)
 		services = append(services, *service)
 	}
 
@@ -341,20 +341,24 @@ func mapLifecycleStateToHostStatus(state string) transit.MonitorStatus {
 	}
 }
 
-func buildServiceLastPluginOutput(serviceName string, interval time.Duration, metricBuilders []connectors.MetricBuilder, noDataCount int) string {
+func buildServiceLastPluginOutput(serviceName string, interval time.Duration, aggregation string, metricBuilders []connectors.MetricBuilder, noDataCount int) string {
+	aggregation = strings.TrimSpace(aggregation)
+	if aggregation == "" {
+		aggregation = defaultAggregationType
+	}
 	metricCount := len(metricBuilders)
 	if metricCount == 0 {
-		return fmt.Sprintf("%s sum(%dm)=0 (no metric series)", serviceName, int(interval.Minutes()))
+		return fmt.Sprintf("%s %s(%dm)=0 (no metric series)", serviceName, aggregation, int(interval.Minutes()))
 	}
 	if metricCount == 1 {
 		valueText := formatMetricBuilderValue(metricBuilders[0].Value)
 		if noDataCount == 1 {
 			return fmt.Sprintf(
-				"%s sum(%dm)=%s (no metrics found for the selected period; defaulting to %s)",
-				serviceName, int(interval.Minutes()), valueText, valueText,
+				"%s %s(%dm)=%s (no metrics found for the selected period; defaulting to %s)",
+				serviceName, aggregation, int(interval.Minutes()), valueText, valueText,
 			)
 		}
-		return fmt.Sprintf("%s sum(%dm)=%s", serviceName, int(interval.Minutes()), valueText)
+		return fmt.Sprintf("%s %s(%dm)=%s", serviceName, aggregation, int(interval.Minutes()), valueText)
 	}
 	if noDataCount == metricCount {
 		return fmt.Sprintf(

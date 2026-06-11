@@ -2,6 +2,7 @@ package oracle
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -12,7 +13,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const defaultCheckInterval = time.Minute
+const (
+	defaultCheckInterval   = time.Minute
+	defaultAggregationType = "sum"
+)
 
 var (
 	extConfig         = &ExtConfig{}
@@ -55,6 +59,9 @@ func configHandler(data []byte) {
 	}
 	if tExt.CheckInterval <= 0 {
 		tExt.CheckInterval = defaultCheckInterval
+	}
+	if strings.TrimSpace(tExt.OracleAggregationType) == "" {
+		tExt.OracleAggregationType = defaultAggregationType
 	}
 	/* Update config with received values */
 	gwConnections := config.GetConfig().GWConnections

@@ -24,12 +24,13 @@ import (
 var (
 	configVersion atomic.Uint64
 	extConfig     = &oracle.ExtConfig{
-		OracleTenancyOCID: "***",
-		OracleUserOCID:    "***",
-		OraclePrivateKey:  "***",
-		OracleFingerprint: "***",
-		OracleRegion:      "***",
-		CheckInterval:     1 * time.Minute,
+		OracleTenancyOCID:     "***",
+		OracleUserOCID:        "***",
+		OraclePrivateKey:      "***",
+		OracleFingerprint:     "***",
+		OracleRegion:          "***",
+		OracleAggregationType: "sum",
+		CheckInterval:         1 * time.Minute,
 	}
 )
 
@@ -95,7 +96,7 @@ func main() {
 				continue
 			}
 
-			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval)
+			samples, err := utils.ListSamples(ctx, monClient, compartment, definition, cfg.CheckInterval, cfg.OracleAggregationType)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return

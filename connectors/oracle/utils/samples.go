@@ -22,13 +22,18 @@ type sample struct {
 }
 
 func ListSamples(
-	ctx context.Context, client ociMon.MonitoringClient, compartment compartment, definition definition, interval time.Duration,
+	ctx context.Context, client ociMon.MonitoringClient, compartment compartment, definition definition,
+	interval time.Duration, aggregation string,
 ) ([]sample, error) {
+	aggregation = strings.TrimSpace(aggregation)
+	if aggregation == "" {
+		aggregation = "sum"
+	}
 	endTime := time.Now().UTC().Truncate(time.Minute)
 	startTime := endTime.Add(-interval).Add(-1 * time.Minute)
 	end := ociCom.SDKTime{Time: endTime}
 	start := ociCom.SDKTime{Time: startTime}
-	query := fmt.Sprintf("%s[%dm].sum()", definition.Name, int(interval.Minutes()))
+	query := fmt.Sprintf("%s[%dm].%s()", definition.Name, int(interval.Minutes()), aggregation)
 	resolution := fmt.Sprintf("%dm", int(interval.Minutes()))
 
 	resp, err := client.SummarizeMetricsData(ctx, ociMon.SummarizeMetricsDataRequest{
