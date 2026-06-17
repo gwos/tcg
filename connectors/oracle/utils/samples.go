@@ -12,6 +12,7 @@ import (
 
 type sample struct {
 	HostName    string
+	ResourceID  string
 	ServiceName string
 	Dimensions  map[string]string
 	Value       float64
@@ -21,13 +22,18 @@ type sample struct {
 }
 
 func ListSamples(
-	ctx context.Context, client ociMon.MonitoringClient, compartment compartment, definition definition, interval time.Duration,
+	ctx context.Context, client ociMon.MonitoringClient, compartment compartment, definition definition,
+	interval time.Duration, aggregation string,
 ) ([]sample, error) {
+	aggregation = strings.TrimSpace(aggregation)
+	if aggregation == "" {
+		aggregation = "sum"
+	}
 	endTime := time.Now().UTC().Truncate(time.Minute)
 	startTime := endTime.Add(-interval).Add(-1 * time.Minute)
 	end := ociCom.SDKTime{Time: endTime}
 	start := ociCom.SDKTime{Time: startTime}
-	query := fmt.Sprintf("%s[%dm].sum()", definition.Name, int(interval.Minutes()))
+	query := fmt.Sprintf("%s[%dm].%s()", definition.Name, int(interval.Minutes()), aggregation)
 	resolution := fmt.Sprintf("%dm", int(interval.Minutes()))
 
 	resp, err := client.SummarizeMetricsData(ctx, ociMon.SummarizeMetricsDataRequest{
@@ -46,13 +52,15 @@ func ListSamples(
 
 	result := make([]sample, 0, len(resp.Items))
 	if len(resp.Items) == 0 {
-		hostName, ok := getHostName(definition.Dimensions)
-		if !ok {
+		hostName, hasHost := getHostName(definition.Dimensions)
+		resourceID, hasID := getResourceID(definition.Dimensions)
+		if !hasHost && !hasID {
 			return nil, nil
 		}
 		return []sample{
 			{
 				HostName:    hostName,
+				ResourceID:  resourceID,
 				ServiceName: definition.Name,
 				Dimensions:  cloneDimensions(definition.Dimensions),
 				Value:       0,
@@ -73,8 +81,9 @@ func ListSamples(
 		if len(tags) == 0 {
 			tags = definition.Dimensions
 		}
-		hostName, ok := getHostName(tags)
-		if !ok {
+		hostName, hasHost := getHostName(tags)
+		resourceID, hasID := getResourceID(tags)
+		if !hasHost && !hasID {
 			continue
 		}
 
@@ -86,6 +95,7 @@ func ListSamples(
 
 		result = append(result, sample{
 			HostName:    hostName,
+			ResourceID:  resourceID,
 			ServiceName: serviceName,
 			Dimensions:  cloneDimensions(tags),
 			Value:       value,

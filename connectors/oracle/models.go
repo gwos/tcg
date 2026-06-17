@@ -16,11 +16,12 @@ type ExtConfig struct {
 	HostGroup     string                    `json:"customHostGroup"`
 	HostPrefix    string                    `json:"customHostPrefix,omitempty"`
 
-	OracleTenancyOCID string `json:"oracleTenancyOCID"`
-	OracleUserOCID    string `json:"oracleUserOCID"`
-	OraclePrivateKey  string `json:"oraclePrivateKey"`
-	OracleFingerprint string `json:"oracleFingerprint"`
-	OracleRegion      string `json:"oracleRegion"`
+	OracleTenancyOCID     string `json:"oracleTenancyOCID"`
+	OracleUserOCID        string `json:"oracleUserOCID"`
+	OraclePrivateKey      string `json:"oraclePrivateKey"`
+	OracleFingerprint     string `json:"oracleFingerprint"`
+	OracleRegion          string `json:"oracleRegion"`
+	OracleAggregationType string `json:"oracleAggregationType"`
 
 	GWMapping
 }
