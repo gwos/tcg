@@ -10,7 +10,7 @@ import (
 // That's important for Get/Set operations on http.Header
 const (
 	HdrCompressed     = "Compressed"
-	HdrPayloadLen     = "Payload-Lenght"
+	HdrPayloadLen     = "Payload-Length"
 	HdrPayloadType    = "Payload-Type"
 	HdrSpanSpanID     = "Span-Span-Id"
 	HdrSpanTraceID    = "Span-Trace-Id"
