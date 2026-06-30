@@ -19,6 +19,11 @@ type LogFile struct {
 
 // Close implements io.Closer interface
 func (f *LogFile) Close() error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.file == nil {
+		return nil
+	}
 	return f.file.Close()
 }
 
