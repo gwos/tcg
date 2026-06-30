@@ -564,6 +564,11 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token(),
 	}
+	if len(additionalHeaders)%2 != 0 {
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn,
+			"SendRequest: odd number of additionalHeaders; last value ignored",
+			slog.Int("count", len(additionalHeaders)))
+	}
 	for i := 0; i < len(additionalHeaders)-1; i += 2 {
 		k, v := additionalHeaders[i], additionalHeaders[i+1]
 		headers[k] = v
