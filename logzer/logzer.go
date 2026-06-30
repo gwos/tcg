@@ -63,6 +63,10 @@ func (w *CondenseWriter) Write(p []byte) (int, error) {
 
 // WriteLevel implements zerolog.LevelWriter interface
 func (w *CondenseWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
+	if w.Condense <= 0 {
+		/* condensing disabled: skip cache/regex work entirely */
+		return w.LevelWriter.WriteLevel(lvl, p)
+	}
 	w.once.Do(func() {
 		defaultExpiration, cleanupInterval := time.Minute*10, time.Second*10
 		if w.Condense > 0 {
