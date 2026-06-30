@@ -28,7 +28,16 @@ var (
 	filter = &FilterWriter{
 		LevelWriter: zerolog.MultiLevelWriter(formatter, errBuffer),
 		Re: map[*regexp.Regexp][]byte{
-			regexp.MustCompile(`((?i:password|token)"[^":]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`): []byte(`${1}"***"`),
+			// (1) Structured JSON: a key ending in password/token,
+			// then its value (string | array | number | bool | null) -> "***".
+			// The key is fully bracketed so a match can't span into the next field.
+			regexp.MustCompile(`("[^"]*(?i:password|token)"\s*:\s*)` +
+				`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"***"`),
+			// (2) Free text: the word password/token, a separator, then the value run.
+			// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
+			// so masking prose can't corrupt a JSON line.
+			// Note: an object-valued secret ("password":{...}) is not handled.
+			regexp.MustCompile(`(?i)(password|token)([:=\s]+)([^\s"',:{}\[\]]+)`): []byte(`${1}${2}***`),
 		},
 	}
 	condenser = &CondenseWriter{

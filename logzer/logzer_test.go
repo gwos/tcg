@@ -80,6 +80,56 @@ func TestLogFilter(t *testing.T) {
 	assert.Contains(t, string(content), `"token":"***"`)
 }
 
+func TestLogFilterHardened(t *testing.T) {
+	logFile, _ := os.CreateTemp("", "log")
+	assert.NoError(t, logFile.Close())
+	defer os.Remove(logFile.Name())
+
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+	w := NewLoggerWriter(WithLogFile(&LogFile{FilePath: logFile.Name()}))
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
+
+	log.Info().
+		// (1) old bypass: unquoted token value preceding a password value
+		RawJSON("jnum", []byte(`{"token":123,"password":"NUMpass"}`)).
+		// (2) scalar token values: bool / null
+		RawJSON("jbool", []byte(`{"token":true,"password":"BOOLpass"}`)).
+		// (3) http.Header-style string array
+		RawJSON("jarr", []byte(`{"Gwos-Api-Token":["ARRtok","ARRtok2"]}`)).
+		// (4) benign sibling key must survive; the real password must not
+		RawJSON("jkeep", []byte(`{"token_count":5,"password":"KEEPpass"}`)).
+		// (5) free text inside string values (keys deliberately do NOT end in
+		// password/token, so only the embedded value run is masked)
+		Str("snote", "login password: FREEpass failed").
+		Str("snote2", "got token=EQtok here").
+		Msg("message edge cases")
+
+	// (6) free text inside the log message itself (distinct caller line)
+	log.Info().Msg("auth password: MSGpass denied")
+
+	content, err := os.ReadFile(logFile.Name())
+	assert.NoError(t, err)
+	s := string(content)
+
+	// no secret value survives, in any shape
+	for _, secret := range []string{
+		"NUMpass", "BOOLpass", "ARRtok", "KEEPpass", "FREEpass", "EQtok", "MSGpass",
+	} {
+		assert.NotContains(t, s, secret)
+	}
+
+	// masks are present and JSON stays well-formed
+	// (ConsoleWriter sorts object keys alphabetically)
+	assert.Contains(t, s, `{"password":"***","token":"***"}`)   // (1) jnum & (2) jbool
+	assert.Contains(t, s, `"Gwos-Api-Token":"***"`)             // (3)
+	assert.Contains(t, s, `{"password":"***","token_count":5}`) // (4) secret masked, benign sibling kept
+	assert.Contains(t, s, `password: *** failed`)               // (5) free text masked, prose kept
+	assert.Contains(t, s, `token=*** here`)                     // (5)
+	assert.Contains(t, s, `password: *** denied`)               // (6)
+}
+
 func TestLogRotate(t *testing.T) {
 	logFile, _ := os.CreateTemp("", "log")
 	defer os.Remove(logFile.Name())
