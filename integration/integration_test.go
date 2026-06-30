@@ -78,15 +78,21 @@ func TestIntegration(t *testing.T) {
 	gwServices := new(clients.GWServices)
 	assert.NoError(t, gwClient.GetServicesByAgent(cfg.Connector.AgentID, gwServices))
 	assert.Equal(t, 3, len(gwServices.Services))
-	assert.Equal(t, "host.0.test.tcg.gw8", gwServices.Services[0].HostName)
+	if assert.NotEmpty(t, gwServices.Services) {
+		assert.Equal(t, "host.0.test.tcg.gw8", gwServices.Services[0].HostName)
+	}
 
 	t.Log("Test GWClient.GetHostGroupsByAppTypeAndHostNames")
 	gwHostGroups := new(clients.GWHostGroups)
 	assert.NoError(t, gwClient.GetHostGroupsByAppTypeAndHostNames(cfg.Connector.AppType, []string{"host.0.test.tcg.gw8"}, gwHostGroups))
 	assert.Equal(t, 1, len(gwHostGroups.HostGroups))
-	assert.Equal(t, 1, len(gwHostGroups.HostGroups[0].Hosts))
-	assert.Equal(t, "host.0.test.tcg.gw8", gwHostGroups.HostGroups[0].Hosts[0].HostName)
-	assert.Equal(t, TestEntityName, gwHostGroups.HostGroups[0].Name)
+	if assert.NotEmpty(t, gwHostGroups.HostGroups) {
+		assert.Equal(t, 1, len(gwHostGroups.HostGroups[0].Hosts))
+		if assert.NotEmpty(t, gwHostGroups.HostGroups[0].Hosts) {
+			assert.Equal(t, "host.0.test.tcg.gw8", gwHostGroups.HostGroups[0].Hosts[0].HostName)
+		}
+		assert.Equal(t, TestEntityName, gwHostGroups.HostGroups[0].Name)
+	}
 }
 
 func BenchmarkE2E(b *testing.B) {
