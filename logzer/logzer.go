@@ -178,6 +178,16 @@ func (lb *LogBuffer) Clear() {
 	lb.ring = ring.New(lb.Size)
 }
 
+// Resize reconfigures the buffer to keep up to n records, discarding any already collected.
+// Safe for concurrent use; unlike assigning a new struct it does not copy the embedded lock.
+func (lb *LogBuffer) Resize(n int) {
+	lb.once.Do(func() {}) // consume lazy-init so it won't clobber the new ring
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.Size = n
+	lb.ring = ring.New(n)
+}
+
 // Records returns collected writes
 func (lb *LogBuffer) Records() []LogRecord {
 	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
@@ -249,12 +259,7 @@ func NewLoggerWriter(opts ...Option) io.Writer {
 
 // WithLastErrors sets count of buffered writes
 func WithLastErrors(n int) Option {
-	return func() {
-		*errBuffer = LogBuffer{
-			Level: zerolog.ErrorLevel,
-			Size:  n,
-		}
-	}
+	return func() { errBuffer.Resize(n) }
 }
 
 // WithLevel sets level option
