@@ -21,28 +21,49 @@ import (
 const (
 	EnvHttpClientTimeout = "TCG_HTTP_CLIENT_TIMEOUT"
 	EnvTlsClientInsecure = "TCG_TLS_CLIENT_INSECURE"
+
+	EnvHttpClientIdleConnTimeout = "TCG_HTTP_CLIENT_IDLE_CONN_TIMEOUT"
+	EnvHttpClientKeepAlive       = "TCG_HTTP_CLIENT_KEEPALIVE"
 )
 
+// httpClientKeepAlive enables HTTP connection reuse (keep-alive).
+// Disabled by default to preserve historical behavior ("Connection: close" on every request);
+// set TCG_HTTP_CLIENT_KEEPALIVE=true to reuse connections on the hot send path.
+// IdleConnTimeout below bounds how long reused connections may sit idle
+// so they can't go stale behind a load balancer.
+var httpClientKeepAlive = func() bool {
+	v, err := strconv.ParseBool(os.Getenv(EnvHttpClientKeepAlive))
+	return err == nil && v
+}()
+
 var HttpClientTransport = &http.Transport{
+	IdleConnTimeout: func() time.Duration {
+		if s, ok := os.LookupEnv(EnvHttpClientIdleConnTimeout); ok {
+			if v, err := time.ParseDuration(s); err == nil {
+				return v
+			}
+		}
+		return time.Second * 90 // 90s by default
+	}(),
 	TLSClientConfig: &tls.Config{
-		InsecureSkipVerify: func(env string) bool {
-			v, err := strconv.ParseBool(os.Getenv(env))
+		InsecureSkipVerify: func() bool {
+			v, err := strconv.ParseBool(os.Getenv(EnvTlsClientInsecure))
 			return err == nil && v
-		}(EnvTlsClientInsecure),
+		}(),
 
 		RootCAs: nil, // If RootCAs is nil, TLS uses the host's root CA set.
 	},
 }
 
 var HttpClient = &http.Client{
-	Timeout: func(env string) time.Duration {
-		if s, ok := os.LookupEnv(env); ok {
+	Timeout: func() time.Duration {
+		if s, ok := os.LookupEnv(EnvHttpClientTimeout); ok {
 			if v, err := time.ParseDuration(s); err == nil {
 				return v
 			}
 		}
-		return time.Duration(5 * time.Second)
-	}(EnvHttpClientTimeout),
+		return time.Second * 5 // 5s by default
+	}(),
 
 	Transport: HttpClientTransport,
 }
@@ -167,7 +188,9 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	if h, ok := HeaderFromCtx(ctx); ok {
 		maps.Copy(request.Header, h)
 	}
-	request.Header.Set("Connection", "close")
+	if !httpClientKeepAlive {
+		request.Header.Set("Connection", "close")
+	}
 	for k, v := range q.Headers {
 		request.Header.Add(k, v)
 	}
