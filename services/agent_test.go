@@ -1,11 +1,18 @@
 package services
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/gwos/tcg/config"
+	"github.com/gwos/tcg/sdk/clients"
+	tcgerr "github.com/gwos/tcg/sdk/errors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -93,4 +100,100 @@ func TestAgentService(t *testing.T) {
 		assert.NoError(t, agentService.startTransport())
 		assert.Equal(t, "gw-host-xx", agentService.gwClients[0].HostName)
 	})
+}
+
+// newDSStub starts a TLS stub that stands in for DalekServices and counts the reload requests it receives.
+// makeDalekServicesScheme derives https for any host is not prefixed with "dalekservices", so a TLS server matches.
+func newDSStub(t *testing.T, handler http.HandlerFunc) (host string, count *int32) {
+	t.Helper()
+	count = new(int32)
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(count, 1)
+		handler(w, r)
+	}))
+	prev := clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify
+	clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify = true
+	t.Cleanup(func() {
+		clients.HttpClientTransport.TLSClientConfig.InsecureSkipVerify = prev
+		srv.Close()
+	})
+	return strings.TrimPrefix(srv.URL, "https://"), count
+}
+
+// TestDemandConfig covers the guard and retry behavior that keeps the connector
+// from hammering DalekServices while its agent is not configured.
+func TestDemandConfig(t *testing.T) {
+	svc := GetAgentService()
+	t.Cleanup(func() { _ = svc.StopController() })
+
+	// shrink the retry backoff so the loop can be observed quickly
+	prevBackoff := demandConfigBackoff
+	demandConfigBackoff = func(int) time.Duration { return 10 * time.Millisecond }
+	t.Cleanup(func() { demandConfigBackoff = prevBackoff })
+
+	t.Run("Guard skips reload for empty/placeholder AgentID", func(t *testing.T) {
+		host, count := newDSStub(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusCreated)
+		})
+		for _, id := range []string{"", placeholderAgentID} {
+			atomic.StoreInt32(count, 0)
+			svc.Connector.AgentID = id
+			svc.dsClient.HostName = host
+			assert.NoError(t, svc.DemandConfig())
+			time.Sleep(200 * time.Millisecond)
+			assert.Equal(t, int32(0), atomic.LoadInt32(count),
+				"expected no reload request for AgentID=%q", id)
+		}
+	})
+
+	t.Run("NotFound stops retrying", func(t *testing.T) {
+		host, count := newDSStub(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNotFound)
+		})
+		svc.Connector.AgentID = "unknown-agent-id"
+		svc.dsClient.HostName = host
+
+		assert.NoError(t, svc.DemandConfig())
+		// window is much larger than the 10ms backoff: a retrying loop would
+		// send many requests, the fixed loop sends exactly one and stops.
+		time.Sleep(300 * time.Millisecond)
+		assert.Equal(t, int32(1), atomic.LoadInt32(count),
+			"expected exactly one reload request on 404, then stop")
+	})
+
+	t.Run("Transient error retries until success", func(t *testing.T) {
+		var attempts int32
+		host, count := newDSStub(t, func(w http.ResponseWriter, _ *http.Request) {
+			if atomic.AddInt32(&attempts, 1) < 3 {
+				w.WriteHeader(http.StatusInternalServerError) // ErrUndecided -> retry
+				return
+			}
+			w.WriteHeader(http.StatusCreated) // success on the 3rd attempt
+		})
+		svc.Connector.AgentID = "some-agent-id"
+		svc.dsClient.HostName = host
+
+		assert.NoError(t, svc.DemandConfig())
+		assert.Eventually(t, func() bool { return atomic.LoadInt32(count) == 3 },
+			2*time.Second, 10*time.Millisecond, "expected retries until success")
+		// once connected it must stop issuing requests
+		time.Sleep(100 * time.Millisecond)
+		assert.Equal(t, int32(3), atomic.LoadInt32(count),
+			"expected no further reload after success")
+	})
+}
+
+// TestStartTransportPlaceholderAgentID locks in that the placeholder AgentID
+// is treated as "not configured" everywhere via isConnectorConfigured,
+// not only in the DemandConfig guard.
+func TestStartTransportPlaceholderAgentID(t *testing.T) {
+	svc := GetAgentService()
+	prevAgentID, prevAppType := svc.Connector.AgentID, svc.Connector.AppType
+	t.Cleanup(func() {
+		svc.Connector.AgentID, svc.Connector.AppType = prevAgentID, prevAppType
+	})
+
+	svc.Connector.AgentID = placeholderAgentID
+	svc.Connector.AppType = "test-XX" // non-NAGIOS so the guard returns an error
+	assert.ErrorIs(t, svc.startTransport(), tcgerr.ErrNotConfigured)
 }
