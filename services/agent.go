@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"expvar"
 	"fmt"
 	"net/http"
@@ -75,7 +76,33 @@ const (
 	taskQueueCapacity    = 8
 	traceOnDemandAgentID = "#traceOnDemandAgentID#"
 	traceOnDemandAppType = "#traceOnDemandAppType#"
+	// placeholderAgentID is an unsubstituted deployment placeholder value;
+	// isConfiguredAgentID treats it as "not configured".
+	placeholderAgentID = "AGENT_ID"
 )
+
+// demandConfigBackoff returns the wait before the next reload retry on transient errors.
+// Declared as a var so tests can shrink it.
+var demandConfigBackoff = func(i int) time.Duration {
+	return time.Duration((i%4+1)*5) * time.Second
+}
+
+// isConfiguredAgentID reports whether id is a real configured agent id
+// (not empty, not the deployment placeholder, not the on-demand tracer sentinel).
+func isConfiguredAgentID(id string) bool {
+	return id != "" && id != placeholderAgentID && id != traceOnDemandAgentID
+}
+
+// isConfiguredAppType reports whether t is a real configured app type.
+func isConfiguredAppType(t string) bool {
+	return t != "" && t != traceOnDemandAppType
+}
+
+// isConnectorConfigured reports whether the connector has a usable AgentID and AppType.
+func (service *AgentService) isConnectorConfigured() bool {
+	return isConfiguredAgentID(service.Connector.AgentID) &&
+		isConfiguredAppType(service.Connector.AppType)
+}
 
 // AllowSignalHandlers defines setting the signal handlers
 // true by default, handle signals: os.Interrupt, syscall.SIGTERM
@@ -149,7 +176,7 @@ func (service *AgentService) DemandConfig() error {
 	// 	/* expect the config api call */
 	// 	return nil
 	// }
-	if len(service.AgentID) == 0 || len(service.dsClient.HostName) == 0 {
+	if !isConfiguredAgentID(service.AgentID) || len(service.dsClient.HostName) == 0 {
 		log.Info().Msg("config server is not configured")
 		/* expect the config api call */
 		return nil
@@ -157,14 +184,20 @@ func (service *AgentService) DemandConfig() error {
 
 	go func() {
 		for i := 0; ; i++ {
-			if err := service.dsClient.Reload(service.AgentID); err != nil {
-				log.Warn().Err(err).Msg("config server is not available, will retry")
-				time.Sleep(time.Duration((i%4+1)*5) * time.Second)
-				continue
+			err := service.dsClient.Reload(service.AgentID)
+			if err == nil {
+				log.Info().Msg("config server found and connected")
+				return
 			}
-			break
+			if errors.Is(err, tcgerr.ErrNotFound) {
+				/* agent is not configured in DalekServices (unknown AgentID):
+				stop requesting reload and wait for pushed config via POST /config */
+				log.Warn().Err(err).Msg("connector is not configured in DalekServices, waiting for configuration")
+				return
+			}
+			log.Warn().Err(err).Msg("config server is not available, will retry")
+			time.Sleep(demandConfigBackoff(i))
 		}
-		log.Info().Msg("config server found and connected")
 	}()
 	return nil
 }
@@ -458,8 +491,7 @@ func (service *AgentService) config(data []byte) error {
 		}
 	}
 
-	if service.Connector.AgentID == traceOnDemandAgentID || service.Connector.AppType == traceOnDemandAppType ||
-		len(service.Connector.AgentID) == 0 || len(service.Connector.AppType) == 0 {
+	if !service.isConnectorConfigured() {
 		GetTransitService().eventsBatcher.Clear()
 		GetTransitService().metricsBatcher.Clear()
 		_ = service.resetNats()
@@ -574,10 +606,7 @@ func (service *AgentService) stopNats() error {
 }
 
 func (service *AgentService) startTransport() error {
-	if service.Connector.AgentID == traceOnDemandAgentID ||
-		service.Connector.AppType == traceOnDemandAppType ||
-		len(service.Connector.AgentID) == 0 ||
-		len(service.Connector.AppType) == 0 {
+	if !service.isConnectorConfigured() {
 		log.Warn().Msg("could not start: connector is not configured")
 		if strings.EqualFold(service.Connector.AppType, "NAGIOS") {
 			// prevent DataGeyser fail on restart with empty config
@@ -642,10 +671,7 @@ func (service *AgentService) mixTracerContext(payloadJSON []byte) ([]byte, bool)
 
 // fixTracerContext replaces placeholders
 func (service *AgentService) fixTracerContext(payloadJSON []byte) []byte {
-	if service.Connector.AgentID == traceOnDemandAgentID ||
-		service.Connector.AppType == traceOnDemandAppType ||
-		len(service.Connector.AgentID) == 0 ||
-		len(service.Connector.AppType) == 0 {
+	if !service.isConnectorConfigured() {
 		err := fmt.Errorf("%w: AppType/AgentID: %v/%v", tcgerr.ErrNotConfigured,
 			service.Connector.AppType, service.Connector.AgentID)
 		log.Err(err).Msg("could not fixTracerContext")
