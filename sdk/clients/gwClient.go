@@ -106,7 +106,6 @@ type GWClient struct {
 	AppType string
 	GWConnection
 
-	mu   sync.Mutex
 	once sync.Once
 
 	uriAuthenticate    string
@@ -128,9 +127,16 @@ type GWClient struct {
 // tokens shares tokens between client instances
 var tokens = new(sync.Map)
 
+// connectMu serializes Connect across GWClient instances that share a token key
+var connectMu = new(sync.Map) // tokenKey -> *sync.Mutex
+
+// tokenKey identifies a shared token in the tokens map
+func (client *GWClient) tokenKey() string {
+	return client.AppName + ";" + client.UserName + ";" + client.HostName
+}
+
 func (client *GWClient) token() string {
-	k := client.AppName + ";" + client.UserName + ";" + client.HostName
-	if v, ok := tokens.Load(k); ok {
+	if v, ok := tokens.Load(client.tokenKey()); ok {
 		return v.(string)
 	}
 	return ""
@@ -138,10 +144,14 @@ func (client *GWClient) token() string {
 
 // Connect calls API
 func (client *GWClient) Connect() error {
+	k := client.tokenKey()
+	muAny, _ := connectMu.LoadOrStore(k, new(sync.Mutex))
+	mu := muAny.(*sync.Mutex)
+
 	prevToken := client.token()
-	/* restrict by mutex for one-thread at one-time */
-	client.mu.Lock()
-	defer client.mu.Unlock()
+	/* restrict by mutex for one-thread at one-time, shared across instances */
+	mu.Lock()
+	defer mu.Unlock()
 	if prevToken != client.token() {
 		/* token already changed */
 		return nil
@@ -149,7 +159,6 @@ func (client *GWClient) Connect() error {
 	if client.LocalConnection {
 		token, err := client.connectLocal()
 		if err == nil {
-			k := client.AppName + ";" + client.UserName + ";" + client.HostName
 			tokens.Store(k, token)
 		}
 		return err
@@ -158,7 +167,6 @@ func (client *GWClient) Connect() error {
 		client.GWConnection.UserName,
 		client.GWConnection.Password)
 	if err == nil {
-		k := client.AppName + ";" + client.UserName + ";" + client.HostName
 		tokens.Store(k, token)
 	}
 	return err
@@ -555,6 +563,11 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 		"Content-Type":   "application/json",
 		"GWOS-APP-NAME":  client.AppName,
 		"GWOS-API-TOKEN": client.token(),
+	}
+	if len(additionalHeaders)%2 != 0 {
+		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn,
+			"SendRequest: odd number of additionalHeaders; last value ignored",
+			slog.Int("count", len(additionalHeaders)))
 	}
 	for i := 0; i < len(additionalHeaders)-1; i += 2 {
 		k, v := additionalHeaders[i], additionalHeaders[i+1]

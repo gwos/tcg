@@ -28,7 +28,16 @@ var (
 	filter = &FilterWriter{
 		LevelWriter: zerolog.MultiLevelWriter(formatter, errBuffer),
 		Re: map[*regexp.Regexp][]byte{
-			regexp.MustCompile(`((?i:password|token)"[^":]*:[^"]*)"(?:[^\\"]*(?:\\")*[\\]*)*"`): []byte(`${1}"***"`),
+			// (1) Structured JSON: a key ending in password/token,
+			// then its value (string | array | number | bool | null) -> "***".
+			// The key is fully bracketed so a match can't span into the next field.
+			regexp.MustCompile(`("[^"]*(?i:password|token)"\s*:\s*)` +
+				`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"***"`),
+			// (2) Free text: the word password/token, a separator, then the value run.
+			// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
+			// so masking prose can't corrupt a JSON line.
+			// Note: an object-valued secret ("password":{...}) is not handled.
+			regexp.MustCompile(`(?i)(password|token)([:=\s]+)([^\s"',:{}\[\]]+)`): []byte(`${1}${2}***`),
 		},
 	}
 	condenser = &CondenseWriter{
@@ -54,6 +63,10 @@ func (w *CondenseWriter) Write(p []byte) (int, error) {
 
 // WriteLevel implements zerolog.LevelWriter interface
 func (w *CondenseWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
+	if w.Condense <= 0 {
+		/* condensing disabled: skip cache/regex work entirely */
+		return w.LevelWriter.WriteLevel(lvl, p)
+	}
 	w.once.Do(func() {
 		defaultExpiration, cleanupInterval := time.Minute*10, time.Second*10
 		if w.Condense > 0 {
@@ -169,6 +182,16 @@ func (lb *LogBuffer) Clear() {
 	lb.ring = ring.New(lb.Size)
 }
 
+// Resize reconfigures the buffer to keep up to n records, discarding any already collected.
+// Safe for concurrent use; unlike assigning a new struct it does not copy the embedded lock.
+func (lb *LogBuffer) Resize(n int) {
+	lb.once.Do(func() {}) // consume lazy-init so it won't clobber the new ring
+	lb.mu.Lock()
+	defer lb.mu.Unlock()
+	lb.Size = n
+	lb.ring = ring.New(n)
+}
+
 // Records returns collected writes
 func (lb *LogBuffer) Records() []LogRecord {
 	lb.once.Do(func() { lb.ring = ring.New(lb.Size) })
@@ -240,12 +263,7 @@ func NewLoggerWriter(opts ...Option) io.Writer {
 
 // WithLastErrors sets count of buffered writes
 func WithLastErrors(n int) Option {
-	return func() {
-		*errBuffer = LogBuffer{
-			Level: zerolog.ErrorLevel,
-			Size:  n,
-		}
-	}
+	return func() { errBuffer.Resize(n) }
 }
 
 // WithLevel sets level option
