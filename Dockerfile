@@ -4,7 +4,7 @@ ARG GOLANG_ALPINE=golang:1-alpine3.23
 ARG GOLANG_DEBIAN=golang:1-bookworm
 
 # branches may be updated on release
-ARG GW8BASE_BRANCH=master
+ARG GW8BASE_BRANCH=5.5.5
 
 ARG BASE_IMG=groundworkdevelopment/gw8base-alpine:${GW8BASE_BRANCH}
 # NOTE:
