@@ -395,24 +395,44 @@ func (client *GWClient) ValidateToken(appName, apiToken string) error {
 	return err
 }
 
-// SynchronizeInventory calls API
-func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
+// httpEncodeMinSize is the payload size above which the request body is gzip-compressed
+// even when the connection isn't configured for it (HTTPEncode=false).
+// This protects direct SDK callers (e.g. the Telegraf output plugin)
+// that never go through Put2Nats's own size-triggered compression,
+// and generally reduces the odds of exceeding Foundation's entity-size limit.
+// Matches Undertow's default MAX_ENTITY_SIZE on the Foundation side.
+const httpEncodeMinSize = 2 * 1024 * 1024
+
+// resolveEncoding gzip-compresses payload when required -
+// either because HTTPEncode is enabled for the connection,
+// the payload is already gzipped, or payload exceeds httpEncodeMinSize -
+// and returns the (possibly compressed) payload along with the headers needed to declare it.
+func (client *GWClient) resolveEncoding(ctx context.Context, payload []byte) (context.Context, []byte, []string, error) {
 	headers := []string{}
 	encoding := ""
 	if IsGZipped(payload) {
 		encoding = "gzip"
 	}
-	if client.GWConnection.HTTPEncode && encoding == "" {
+	if encoding == "" && (client.GWConnection.HTTPEncode || len(payload) > httpEncodeMinSize) {
 		var buf bytes.Buffer
 		var err error
 		if ctx, err = GZip(ctx, &buf, payload); err != nil {
-			return nil, err
+			return ctx, nil, nil, err
 		}
 		payload = buf.Bytes()
 		encoding = "gzip"
 	}
 	if encoding != "" {
 		headers = append(headers, "Content-Encoding", encoding)
+	}
+	return ctx, payload, headers, nil
+}
+
+// SynchronizeInventory calls API
+func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
+	ctx, payload, headers, err := client.resolveEncoding(ctx, payload)
+	if err != nil {
+		return nil, err
 	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
@@ -425,22 +445,9 @@ func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte
 
 // SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
-	headers := []string{}
-	encoding := ""
-	if IsGZipped(payload) {
-		encoding = "gzip"
-	}
-	if client.GWConnection.HTTPEncode && encoding == "" {
-		var buf bytes.Buffer
-		var err error
-		if ctx, err = GZip(ctx, &buf, payload); err != nil {
-			return nil, err
-		}
-		payload = buf.Bytes()
-		encoding = "gzip"
-	}
-	if encoding != "" {
-		headers = append(headers, "Content-Encoding", encoding)
+	ctx, payload, headers, err := client.resolveEncoding(ctx, payload)
+	if err != nil {
+		return nil, err
 	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
