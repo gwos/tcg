@@ -279,7 +279,7 @@ func defaults() Config {
 				NatsAckWait:            time.Second * 30,
 				NatsMaxInflight:        4,
 				NatsMaxPubAcksInflight: 4,
-				NatsMaxPayload:         1024 * 1024 * 8, // 8MB github.com/nats-io/nats-server/releases/tag/v2.3.4
+				NatsMaxPayload:         1024 * 1024 * 2, // 2MB, matches Undertow's default MAX_ENTITY_SIZE on the Foundation side
 				NatsMonitorPort:        0,
 				NatsStoreDir:           "natsstore",
 				NatsStoreType:          "FILE",
