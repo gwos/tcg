@@ -61,7 +61,16 @@ func IsErrorAddressInUse(err error) bool {
 func IsErrorConnection(err error) bool {
 	return IsErrorConnectionAborted(err) ||
 		IsErrorConnectionRefused(err) ||
-		IsErrorConnectionReset(err)
+		IsErrorConnectionReset(err) ||
+		IsErrorBrokenPipe(err)
+}
+
+// IsErrorBrokenPipe verifies error
+// EPIPE (write on a connection the peer already closed) has no distinct WinSock
+// equivalent - Windows reports that case via WSAECONNRESET or WSAECONNABORTED instead,
+// both already covered above - so this check is only meaningful on non-Windows platforms.
+func IsErrorBrokenPipe(err error) bool {
+	return errors.Is(err, syscall.EPIPE)
 }
 
 // IsErrorConnectionAborted verifies error
