@@ -234,6 +234,20 @@ func (c *GWConnection) UnmarshalYAML(unmarshal func(any) error) error {
 // GWConnections defines a set of configurations
 type GWConnections []GWConnection
 
+// HasEnabled reports whether at least one connection is enabled.
+// defaults() pre-populates GWConnections with empty placeholder entries
+// (for indexed env-var binding), so a plain length check is not a reliable
+// "has this connector received a real config yet" signal - this mirrors
+// the same Enabled filter startTransport() uses to populate gwClients.
+func (cc GWConnections) HasEnabled() bool {
+	for i := range cc {
+		if cc[i].Enabled {
+			return true
+		}
+	}
+	return false
+}
+
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 // Applies decode to items in collection for setting only fields present in yaml.
 // Note (as for gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b):
@@ -344,7 +358,12 @@ func GetConfig() *Config {
 		/* process PMC */
 		if cfg.IsPMC() {
 			cfg.Connector.InstallationMode = InstallationModePMC
-			cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+			/* don't fake a DSConnection.HostName before any real config exists:
+			   checkAccess's bootstrap bypass relies on it staying empty until the connector
+			   has actually received a config, same as every other installation mode. */
+			if cfg.GWConnections.HasEnabled() {
+				cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+			}
 		}
 		/* prepare gwConnections */
 		gwEncode := strings.ToLower(cfg.Connector.GWEncode)
@@ -496,7 +515,15 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	/* process PMC */
 	if cfg.IsPMC() {
 		newCfg.Connector.InstallationMode = InstallationModePMC
-		newCfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+		/* don't fake a DSConnection.HostName before any real config exists:
+		   checkAccess's bootstrap bypass relies on it staying empty until the connector
+		   has actually received a config, same as every other installation mode.
+		   newCfg.GWConnections was already set above from the incoming payload (loadConnector),
+		   so a push that itself carries the first enabled GWConnection closes the bypass
+		   starting with that push. */
+		if newCfg.GWConnections.HasEnabled() {
+			newCfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+		}
 	}
 	/* prepare gwConnections */
 	gwEncode := strings.ToLower(newCfg.Connector.GWEncode)
