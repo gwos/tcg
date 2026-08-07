@@ -201,6 +201,58 @@ dsConnection:
 	assert.Contains(t, string(data), "controllerAddr: :8011")
 }
 
+func TestIsPMCDSConnectionGating(t *testing.T) {
+	once = sync.Once{}
+	configYAML := []byte(`
+connector:
+  agentId: "3dcd9a52-949d-4531-a3b0-b14622f7dd39"
+  appName: "test-app"
+  appType: "NAGIOS"
+dsConnection:
+  hostName: ""
+`)
+
+	tmpFile, err := os.CreateTemp("", "config")
+	assert.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+	_, err = tmpFile.Write(configYAML)
+	assert.NoError(t, err)
+	err = tmpFile.Close()
+	assert.NoError(t, err)
+
+	t.Setenv(ConfigEnv, tmpFile.Name())
+	t.Setenv(InstallationModeEnv, InstallationModePMC)
+	t.Setenv(ParentInstanceNameEnv, "parent.example.local")
+
+	// A fresh PMC connector with no enabled GWConnections yet must not have its DSConnection.HostName forced -
+	// checkAccess's bootstrap bypass relies on it staying empty until the connector has actually received a config,
+	// same as any other installation mode. (defaults() pre-populates GWConnections with empty placeholder entries,
+	// so this also guards against gating on plain slice length instead of HasEnabled().)
+	cfg := GetConfig()
+	assert.Equal(t, "", cfg.DSConnection.HostName)
+	assert.False(t, cfg.GWConnections.HasEnabled())
+
+	// once a push carries a real, enabled GWConnection, the override must apply within that same push -
+	// even overriding a wrong dalekservicesConnection.hostName in the payload
+	dto := []byte(`
+{
+  "agentId": "3dcd9a52-949d-4531-a3b0-b14622f7dd39",
+  "appName": "test-app",
+  "appType": "NAGIOS",
+  "dalekservicesConnection": {
+    "hostName": "dalekservices:3001"
+  },
+  "groundworkConnections": [{
+    "id": 1,
+    "enabled": true,
+    "hostName": "http://foundation:8080/api"
+  }]
+}`)
+	_, err = cfg.LoadConnectorDTO(dto)
+	assert.NoError(t, err)
+	assert.Equal(t, "parent.example.local", cfg.DSConnection.HostName)
+}
+
 func TestMarshaling(t *testing.T) {
 	configYAML := []byte(`
 connector:
