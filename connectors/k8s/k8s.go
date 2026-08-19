@@ -162,6 +162,14 @@ type MonitoredState struct {
 	State      map[string]KubernetesResource
 	Groups     map[string]transit.ResourceGroup
 	Mismatched map[string]bool
+	Errs       []error
+}
+
+func (state *MonitoredState) addSoftErr(err error) {
+	if err == nil || (errors.Is(err, ErrMAPI) && IsMetricsUnavailable(err)) {
+		return
+	}
+	state.Errs = append(state.Errs, err)
 }
 
 func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
@@ -239,7 +247,7 @@ func (connector *KubernetesConnector) Initialize(ctx context.Context) error {
 	}
 	version, err := kClientSet.Discovery().ServerVersion()
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrAPI, err)
+		err = fmt.Errorf("%w: %w", ErrAPI, err)
 		return err
 	}
 
@@ -266,19 +274,22 @@ func (connector *KubernetesConnector) Ping() error {
 	}
 	_, err := connector.kClientSet.Discovery().ServerVersion()
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrAPI, err)
+		err = fmt.Errorf("%w: %w", ErrAPI, err)
 		return err
 	}
 	return nil
 }
 
 // Collect inventory and metrics for all kinds of Kubernetes resources.
-// Sort resources into groups and return inventory of host resources and inventory of groups
+// Sort resources into groups and return inventory of host resources and inventory of groups.
+// err is fatal: the payload is unusable and must not be sent.
+// softErr is non-fatal: the payload is worth sending but is incomplete.
 func (connector *KubernetesConnector) Collect() (
-	[]transit.InventoryResource,
-	[]transit.MonitoredResource,
-	[]transit.ResourceGroup,
-	error) {
+	inventory []transit.InventoryResource,
+	monitored []transit.MonitoredResource,
+	hostGroups []transit.ResourceGroup,
+	softErr error,
+	err error) {
 	// gather inventory and Metrics
 	metricsPerContainer := true
 	state := MonitoredState{
@@ -287,22 +298,22 @@ func (connector *KubernetesConnector) Collect() (
 		Mismatched: make(map[string]bool),
 	}
 	if err := connector.collectNodeInventory(&state); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	if err := connector.collectPodInventory(&state, &metricsPerContainer); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-	_ = connector.collectNodeMetrics(&state)
+	state.addSoftErr(connector.collectNodeMetrics(&state))
 	if metricsPerContainer {
-		_ = connector.collectPodMetricsPerContainer(&state)
+		state.addSoftErr(connector.collectPodMetricsPerContainer(&state))
 	} else {
-		_ = connector.collectPodMetricsPerReplica(&state)
+		state.addSoftErr(connector.collectPodMetricsPerReplica(&state))
 	}
 
 	// convert to arrays as expected by TCG
-	inventory := make([]transit.InventoryResource, 0, len(state.State))
-	monitored := make([]transit.MonitoredResource, 0, len(state.State))
-	hostGroups := make([]transit.ResourceGroup, 0, len(state.Groups))
+	inventory = make([]transit.InventoryResource, 0, len(state.State))
+	monitored = make([]transit.MonitoredResource, 0, len(state.State))
+	hostGroups = make([]transit.ResourceGroup, 0, len(state.Groups))
 	for _, resource := range state.State {
 		// convert inventory
 		services := make([]transit.InventoryService, 0, len(resource.Services))
@@ -340,14 +351,15 @@ func (connector *KubernetesConnector) Collect() (
 	slices.SortFunc(hostGroups, func(a, b transit.ResourceGroup) int { return cmp.Compare(a.GroupName, b.GroupName) })
 	slices.SortFunc(inventory, func(a, b transit.InventoryResource) int { return cmp.Compare(a.Name, b.Name) })
 
-	return inventory, monitored, hostGroups, nil
+	return inventory, monitored, hostGroups, errors.Join(state.Errs...), nil
 }
 
-func (connector *KubernetesConnector) buildNodeReservationMap() (map[string]nodeReservation, bool) {
+func (connector *KubernetesConnector) buildNodeReservationMap() (map[string]nodeReservation, error) {
 	podList, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
+		err = fmt.Errorf("%w: %w", ErrKAPI, err)
 		log.Warn().Err(err).Msg("could not list pods for node reservations, reserved metrics will be skipped")
-		return nil, false
+		return nil, err
 	}
 
 	reservationMap := make(map[string]nodeReservation, len(podList.Items))
@@ -367,7 +379,7 @@ func (connector *KubernetesConnector) buildNodeReservationMap() (map[string]node
 		}
 		reservationMap[pod.Spec.NodeName] = res
 	}
-	return reservationMap, true
+	return reservationMap, nil
 }
 
 // Node Inventory also retrieves status, capacity, and allocations
@@ -387,12 +399,14 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 	// TODO: ListOptions can filter by label
 	nodes, err := connector.kapi.Nodes().List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrKAPI, err)
+		err = fmt.Errorf("%w: %w", ErrKAPI, err)
 		log.Err(err).Msg("could not collect nodes inventory")
 		return err
 	}
 
-	reservationMap, podListSucceeded := connector.buildNodeReservationMap()
+	reservationMap, err := connector.buildNodeReservationMap()
+	state.addSoftErr(err)
+	podListSucceeded := err == nil
 
 	for _, node := range nodes.Items {
 		resourceName := node.Name
@@ -512,7 +526,7 @@ func (connector *KubernetesConnector) collectPodInventory(
 	// TODO: filter pods by namespace(s)
 	pods, err := connector.kapi.Pods("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrKAPI, err)
+		err = fmt.Errorf("%w: %w", ErrKAPI, err)
 		log.Err(err).Msg("could not collect pods inventory")
 		return err
 	}
@@ -630,7 +644,7 @@ func (connector *KubernetesConnector) collectNodeMetrics(state *MonitoredState) 
 	// TODO: filter by namespace
 	nodes, err := connector.mapi.NodeMetricses().List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		err = fmt.Errorf("%w: %w", ErrMAPI, err)
 		log.Err(err).Msg("could not collect node metricses")
 		return err
 	}
@@ -694,7 +708,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerReplica(state *Monitor
 	// TODO: filter by namespace
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		err = fmt.Errorf("%w: %w", ErrMAPI, err)
 		log.Err(err).Msg("could not collect pod metricses")
 		return err
 	}
@@ -767,7 +781,7 @@ func (connector *KubernetesConnector) collectPodMetricsPerContainer(state *Monit
 	// TODO: filter by namespace
 	pods, err := connector.mapi.PodMetricses("").List(connector.ctx, metav1.ListOptions{})
 	if err != nil {
-		err = fmt.Errorf("%w: %v", ErrMAPI, err)
+		err = fmt.Errorf("%w: %w", ErrMAPI, err)
 		log.Err(err).Msg("could not collect pod metricses")
 		return err
 	}
