@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gwos/tcg/config"
@@ -16,10 +17,67 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const failuresToStop = 3
+
 var (
 	ctxCancel, cancel = context.WithCancel(context.Background())
 	connector         = KubernetesConnector{}
+
+	stateMu     sync.Mutex
+	failures    int
+	stoppedByUs bool
+
+	transportRunning = func() bool {
+		return services.GetTransitService().Status().Transport.Value() == services.StatusRunning
+	}
+	stopTransport  = func() error { return services.GetTransitService().StopTransport() }
+	startTransport = func() error { return services.GetTransitService().StartTransport() }
 )
+
+func markCollectFailed(err error) {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
+	failures++
+	if stoppedByUs {
+		return
+	}
+	if !IsAuthError(err) && failures < failuresToStop {
+		return
+	}
+	if !transportRunning() {
+		return
+	}
+	log.Error().Err(err).Int("failures", failures).
+		Msg("k8s: data collection keeps failing, marking the connector stopped until it recovers")
+	if err := stopTransport(); err != nil {
+		log.Err(err).Msg("could not stop transport")
+		return
+	}
+	stoppedByUs = true
+}
+
+func markCollectOk() {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+
+	failures = 0
+	if !stoppedByUs {
+		return
+	}
+	if err := startTransport(); err != nil {
+		log.Err(err).Msg("could not start transport")
+		return
+	}
+	stoppedByUs = false
+	log.Info().Msg("k8s: data collection resumed, the connector is running again")
+}
+
+func resetCollectFailures() {
+	stateMu.Lock()
+	defer stateMu.Unlock()
+	failures = 0
+}
 
 func Run() {
 	transitService := services.GetTransitService()
@@ -114,6 +172,7 @@ func configHandler(data []byte) {
 	services.GetTransitService().RegisterExitHandler(cancel)
 
 	connector = KubernetesConnector{ExtConfig: *tExt}
+	resetCollectFailures()
 	if tMonConn.ConnectorID != 0 {
 		connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 	}
@@ -123,13 +182,15 @@ func periodicHandler() {
 	if connector.kapi == nil {
 		if err := connector.Initialize(ctxCancel); err != nil {
 			log.Err(err).Msg("Could not initialize connector")
+			markCollectFailed(err)
 			return
 		}
 	}
 
-	inventory, monitored, groups, err := connector.Collect()
+	inventory, monitored, groups, softErr, err := connector.Collect()
 	log.Err(err).Msgf("Collect data  %d:%d:%d", len(inventory), len(monitored), len(groups))
 	if err != nil {
+		markCollectFailed(err)
 		return
 	}
 
@@ -146,6 +207,12 @@ func periodicHandler() {
 
 	log.Err(connectors.SendMetrics(ctxCancel, monitored, &groups)).
 		Msg("Sending metrics")
+
+	if softErr != nil {
+		markCollectFailed(softErr)
+		return
+	}
+	markCollectOk()
 }
 
 func buildNodeMetricsMap(metricsArray []transit.MetricDefinition) map[string]transit.MetricDefinition {
