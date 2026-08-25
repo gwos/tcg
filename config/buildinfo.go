@@ -4,7 +4,7 @@ package config
 // can be overridden by Go linker during the build step:
 // go build -ldflags "-X 'github.com/gwos/tcg/config.buildTag=<TAG>' -X 'github.com/gwos/tcg/config.buildTime=`date --rfc-3339=s`'"
 var (
-	buildTag  = "8.x.x"
+	buildTag  = "9.x.x"
 	buildTime = "Build time not provided"
 )
 
