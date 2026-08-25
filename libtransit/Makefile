@@ -9,7 +9,7 @@ ifeq ($(BUILD_TAG),)
     BUILD_TAG       := ${COMMIT_HASH}
 endif
 ifeq ($(BUILD_TAG),)
-    BUILD_TAG       := 8.x
+    BUILD_TAG       := 9.x
 endif
 
 BUILD_TIME          := ${BUILD_TIME}
