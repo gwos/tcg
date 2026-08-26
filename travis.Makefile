@@ -17,8 +17,8 @@ ESCAPED_BRANCH  := $(subst /,-,$(BRANCH))
 IMG             := ${REGISTRY_REPO}:${ESCAPED_BRANCH}
 IMG_DIST        := ${REGISTRY_REPO}-dist:${ESCAPED_BRANCH}
 BUILD_ARGS      := ${BUILD_ARGS} \
-                    --build-arg COMMIT_HASH=$(COMMIT_HASH) \
-                    --build-arg BRANCH=$(BRANCH) \
+                    --build-arg COMMIT_HASH \
+                    --build-arg BRANCH \
                     --build-arg TRAVIS_BUILD_ID \
                     --build-arg TRAVIS_COMMIT \
                     --build-arg TRAVIS_COMMIT_MESSAGE \
