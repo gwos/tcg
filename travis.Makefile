@@ -1,6 +1,6 @@
 REGISTRY_REPO   := groundworkdevelopment/$$(basename $$PWD)
 DOCKER_REGISTRY := docker.io
-COMMIT_HASH     := $$(git log -1 --pretty=%h)
+COMMIT_HASH     := $(shell git log -1 --pretty=%h)
 
 # Branch name will be in either TRAVIS_BRANCH or TRAVIS_PULL_REQUEST_BRANCH,
 # depending on whether the build is a branch build or pull request build
@@ -16,6 +16,9 @@ ESCAPED_BRANCH  := $(subst /,-,$(BRANCH))
 
 IMG             := ${REGISTRY_REPO}:${ESCAPED_BRANCH}
 IMG_DIST        := ${REGISTRY_REPO}-dist:${ESCAPED_BRANCH}
+export COMMIT_HASH
+export BRANCH
+
 BUILD_ARGS      := ${BUILD_ARGS} \
                     --build-arg COMMIT_HASH \
                     --build-arg BRANCH \
