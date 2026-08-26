@@ -66,9 +66,10 @@ ARG BUILD_TAG
 ARG BUILD_TIME
 ARG COMMIT_HASH
 ARG TRAVIS_TAG
+ENV TRAVIS_TAG=${TRAVIS_TAG:-master}
 RUN set -eux ;\
     mkdir -p /app ;\
-    BUILD_TAG="${BUILD_TAG:-${TRAVIS_TAG:-${COMMIT_HASH:-9.x}}}" ;\
+    BUILD_TAG="${BUILD_TAG:-${TRAVIS_TAG}}" ;\
     BUILD_TIME="${BUILD_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}" ;\
     ldflags="-X 'github.com/gwos/tcg/config.buildTime=${BUILD_TIME}'" ;\
     ldflags="${ldflags} -X 'github.com/gwos/tcg/config.buildTag=${BUILD_TAG}'" ;\
