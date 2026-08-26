@@ -42,7 +42,6 @@ ARG BUILD_TIME
 ARG COMMIT_HASH
 ARG TRAVIS_TAG
 RUN set -eux ;\
-    echo "DEBUG build-libtransit-tests: BUILD_TAG=[$BUILD_TAG] TRAVIS_TAG=[$TRAVIS_TAG] COMMIT_HASH=[$COMMIT_HASH]" ;\
     mkdir -p dist ;\
     make clean && make ;\
     cp libtransit/libtransit.so libtransit/libtransit_compat.h libtransit/libtransit.h libtransit/sdktransit.h  dist/ ;\
