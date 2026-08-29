@@ -160,6 +160,144 @@ func (d *natsDispatcher) fetch(ctx context.Context, opt DurableCfg, cons jetstre
 	}
 }
 
+func (d *natsDispatcher) fetch2(ctx context.Context, opt DurableCfg, cons jetstream.Consumer) {
+	xFetchID.Add(1)
+	logger := log.With().Int64("fetchID", xFetchID.Value()).Str("durable", opt.Durable).Logger()
+	logger.Trace().Msg("dispatcher __fetch2__ begin")
+	defer func() { logger.Trace().Msg("dispatcher __fetch2__ end") }()
+
+	xFetchedAt, xProcessedAt, xRetryDelay := new(expvar.Int), new(expvar.Int), new(expvar.String)
+	xFetchedAt.Set(-1)
+	xProcessedAt.Set(-1)
+	xRetryDelay.Set("")
+	xStats.Set(opt.Durable+":fetchedAt", xFetchedAt)
+	xStats.Set(opt.Durable+":processedAt", xProcessedAt)
+	xStats.Set(opt.Durable+":retryDelay", xRetryDelay)
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Trace().Msg("dispatcher fetch: context cancelled")
+			return
+		default:
+		}
+
+		iter, err := cons.Messages(jetstream.PullMaxMessages(4))
+		// if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+		if err != nil {
+			log.Err(err).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed consume Messages")
+			continue
+		}
+
+		/* Process fetched messages and delay next fetching in case of transient error */
+
+		delayRetry, done := &dispatcherRetry{}, true
+		// Next can return error, e.g. when iterator is closed or no heartbeats were received
+		for msg, err := iter.Next(); err == nil; msg, err = iter.Next() {
+			// if msg.Subject() != opt.Subject {
+			// 	println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
+
+			// 	// NOTE: this redundant case resolved in Consumer with FilterSubject
+			// 	// but OrderedConsumer with FilterSubjects
+			// 	_ = msg.Ack()
+			// 	continue
+			// }
+			select {
+			case <-ctx.Done():
+				_ = msg.Nak()
+				iter.Stop()
+				return
+			default:
+			}
+
+			if !done {
+				_ = msg.Nak()
+				continue
+			}
+
+			xProcessedAt.Set(time.Now().UnixMilli())
+			done = d.processMsg(ctx, opt, msg, delayRetry)
+			if !done {
+				_ = msg.Nak()
+			} else {
+				_ = msg.Ack()
+			}
+		}
+		iter.Stop()
+
+		if !done {
+			xRetryDelay.Set(fmt.Sprintf("%v / %v / %v", delayRetry.Retry, RetryDelays[delayRetry.Retry], time.Now().UTC().Format(time.RFC3339)))
+			logger.Debug().
+				Stringer("delay", RetryDelays[delayRetry.Retry]).
+				Int("retry", delayRetry.Retry).
+				Msg("dispatcher delaying retry")
+
+			select {
+			case <-ctx.Done():
+				logger.Trace().Msg("dispatcher delaying retry: context cancelled")
+			case <-time.After(RetryDelays[delayRetry.Retry]):
+				logger.Trace().Msg("dispatcher delaying retry: delay ended")
+			}
+			xRetryDelay.Set("")
+		}
+	}
+}
+
+func (d *natsDispatcher) fetch3(ctx context.Context, opt DurableCfg, cons jetstream.Consumer) {
+	xFetchID.Add(1)
+	logger := log.With().Int64("fetchID", xFetchID.Value()).Str("durable", opt.Durable).Logger()
+	logger.Trace().Msg("dispatcher __fetch3__ begin")
+	defer func() { logger.Trace().Msg("dispatcher __fetch3__ end") }()
+
+	// Retry processing messages with delay in case of transient error
+	for {
+		ctx2, cancel2 := context.WithCancel(ctx)
+		delayRetry, done := &dispatcherRetry{}, true
+
+		consContext, consErr := cons.Consume(func(msg jetstream.Msg) {
+			// println("\n__subj__", msg.Subject(), opt.Subject, opt.Durable)
+
+			done = d.processMsg(ctx, opt, msg, delayRetry)
+			if !done {
+				_ = msg.Nak()
+				cancel2()
+				return
+			}
+			_ = msg.Ack()
+		},
+		// jetstream.PullMaxMessages(4),
+		)
+		if consErr != nil {
+			log.Err(consErr).
+				Str("durable", opt.Durable).
+				Msg("nats dispatcher failed Consume")
+			continue
+		}
+		// defer consContext.Stop()
+
+		select {
+		case <-ctx.Done(): // dispatcher stopped
+			println("\n__ctx__ context cancelled", opt.Durable)
+			consContext.Stop()
+			return
+		case <-ctx2.Done(): // error on processing msg
+			println("\n__ctx2__ context cancelled", opt.Durable)
+			consContext.Stop()
+
+			if done {
+				println("!! done")
+			}
+			select {
+			case <-ctx.Done():
+				logger.Trace().Msg("dispatcher delaying retry: context cancelled")
+			case <-time.After(RetryDelays[delayRetry.Retry]):
+				logger.Trace().Msg("dispatcher delaying retry: delay ended")
+			}
+		}
+	}
+}
+
 // processMsg wraps opt.Handler() call,
 // in case of transient error it calculates retry and returns False
 func (d *natsDispatcher) processMsg(ctx context.Context, opt DurableCfg, msg jetstream.Msg, retry *dispatcherRetry) bool {
