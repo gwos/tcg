@@ -17,7 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const failuresToStop = 3
+const defaultFailuresToStop = 3
 
 var (
 	ctxCancel, cancel = context.WithCancel(context.Background())
@@ -25,6 +25,7 @@ var (
 
 	stateMu     sync.Mutex
 	failures    int
+	maxFailures = defaultFailuresToStop
 	stoppedByUs bool
 
 	transportRunning = func() bool {
@@ -39,13 +40,11 @@ func markCollectFailed(err error) {
 	defer stateMu.Unlock()
 
 	failures++
-	if stoppedByUs {
-		return
-	}
-	if !IsAuthError(err) && failures < failuresToStop {
+	if !IsAuthError(err) && failures < maxFailures {
 		return
 	}
 	if !transportRunning() {
+		/* already stopped, by us on an earlier cycle or by an operator */
 		return
 	}
 	log.Error().Err(err).Int("failures", failures).
@@ -73,10 +72,14 @@ func markCollectOk() {
 	log.Info().Msg("k8s: data collection resumed, the connector is running again")
 }
 
-func resetCollectFailures() {
+func applyRetryConfig(retries int) {
 	stateMu.Lock()
 	defer stateMu.Unlock()
 	failures = 0
+	maxFailures = defaultFailuresToStop
+	if retries > 0 {
+		maxFailures = retries
+	}
 }
 
 func Run() {
@@ -172,7 +175,7 @@ func configHandler(data []byte) {
 	services.GetTransitService().RegisterExitHandler(cancel)
 
 	connector = KubernetesConnector{ExtConfig: *tExt}
-	resetCollectFailures()
+	applyRetryConfig(tExt.RetryConnection)
 	if tMonConn.ConnectorID != 0 {
 		connectors.StartPeriodic(ctxCancel, connectors.CheckInterval, periodicHandler)
 	}
