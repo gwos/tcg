@@ -29,13 +29,13 @@ import (
 // ExtConfig defines the MonitorConnection extensions configuration
 // extended with general configuration fields
 type ExtConfig struct {
-	EndPoint string                                                 `json:"kubernetesClusterEndpoint"`
-	Views    map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
-	// Groups        []transit.ResourceGroup                                `json:"groups"`
-	CheckInterval time.Duration             `json:"checkIntervalMinutes"`
-	Ownership     transit.HostOwnershipType `json:"ownership,omitempty"`
-	AuthType      AuthType                  `json:"authType"`
-	Insecure      bool                      `json:"insecure"`
+	EndPoint        string                                                 `json:"kubernetesClusterEndpoint"`
+	Views           map[KubernetesView]map[string]transit.MetricDefinition `json:"views"`
+	CheckInterval   time.Duration                                          `json:"checkIntervalMinutes"`
+	RetryConnection int                                                    `json:"retryConnection"`
+	Ownership       transit.HostOwnershipType                              `json:"ownership,omitempty"`
+	AuthType        AuthType                                               `json:"authType"`
+	Insecure        bool                                                   `json:"insecure"`
 
 	KubernetesUserName     string `json:"kubernetesUserName,omitempty"`
 	KubernetesUserPassword string `json:"kubernetesUserPassword,omitempty"`
