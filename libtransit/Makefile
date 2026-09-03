@@ -1,12 +1,16 @@
 # Makefile for libtransit/ files
 
 # Define the build info used by Go linker
-BUILD_TAG           := ${BUILD_TAG}
-ifeq ($(BUILD_TAG),)
-    BUILD_TAG       := ${TRAVIS_TAG}
-endif
-ifeq ($(BUILD_TAG),)
-    BUILD_TAG       := ${COMMIT_HASH}
+BRANCH              := $$(git branch --show-current)
+COMMIT_HASH         := $$(git log -1 --pretty=%h)
+ifneq ($(TRAVIS_TAG),)
+    BUILD_TAG       := ${TRAVIS_TAG}-${COMMIT_HASH}
+else ifneq ($(TRAVIS_PULL_REQUEST_BRANCH),)
+    BUILD_TAG       := ${TRAVIS_PULL_REQUEST_BRANCH}-${COMMIT_HASH}
+else ifneq ($(TRAVIS_BRANCH),)
+    BUILD_TAG       := ${TRAVIS_BRANCH}-${COMMIT_HASH}
+else ifneq ($(BRANCH),)
+    BUILD_TAG       := ${BRANCH}-${COMMIT_HASH}
 endif
 ifeq ($(BUILD_TAG),)
     BUILD_TAG       := 9.x
