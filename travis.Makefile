@@ -16,10 +16,26 @@ ESCAPED_BRANCH  := $(subst /,-,$(BRANCH))
 
 IMG             := ${REGISTRY_REPO}:${ESCAPED_BRANCH}
 IMG_DIST        := ${REGISTRY_REPO}-dist:${ESCAPED_BRANCH}
+
+ifneq ($(TRAVIS_TAG),)
+    BUILD_TAG   := ${TRAVIS_TAG}-${COMMIT_HASH}
+else ifneq ($(TRAVIS_PULL_REQUEST_BRANCH),)
+    BUILD_TAG   := ${TRAVIS_PULL_REQUEST_BRANCH}-${COMMIT_HASH}
+else ifneq ($(TRAVIS_BRANCH),)
+    BUILD_TAG   := ${TRAVIS_BRANCH}-${COMMIT_HASH}
+else ifneq ($(BRANCH),)
+    BUILD_TAG   := ${BRANCH}-${COMMIT_HASH}
+endif
+ifeq ($(BUILD_TAG),)
+    BUILD_TAG   := 9.x
+endif
+
+export BUILD_TAG
 export COMMIT_HASH
 export BRANCH
 
 BUILD_ARGS      := ${BUILD_ARGS} \
+                    --build-arg BUILD_TAG \
                     --build-arg COMMIT_HASH \
                     --build-arg BRANCH \
                     --build-arg TRAVIS_BUILD_ID \
