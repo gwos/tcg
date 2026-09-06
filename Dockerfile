@@ -66,6 +66,7 @@ ARG BUILD_TAG
 ARG BUILD_TIME
 ARG COMMIT_HASH
 ARG TRAVIS_TAG
+
 RUN set -eux ;\
     mkdir -p /app ;\
     BUILD_TAG="${BUILD_TAG:-${TRAVIS_TAG:-${COMMIT_HASH:-9.x}}}" ;\
