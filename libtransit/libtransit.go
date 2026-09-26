@@ -698,25 +698,3 @@ func SendStates(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	}
 	return true
 }
-
-// SyncExt processes extended inventory included additional properties
-//
-//export SyncExt
-func SyncExt(p C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	var inv *transit.InventoryRequest
-	h := cgo.Handle(p)
-	if v, ok := h.Value().(*transit.InventoryRequest); ok {
-		inv = v
-	} else {
-		msg := fmt.Sprintf("unexpected type: %+v", h.Value())
-		bufStr(errBuf, errBufLen, msg)
-		log.Warn().Msg(msg)
-		return false
-	}
-
-	if err := services.GetTransitService().SyncExt(context.Background(), inv); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
