@@ -64,3 +64,7 @@ func TestSetValueInt(t *testing.T) { testSetValueInt(t) }
 func TestSetValueStr(t *testing.T) { testSetValueStr(t) }
 
 func TestSetValueTime(t *testing.T) { testSetValueTime(t) }
+
+func TestSendChecks(t *testing.T) { testSendChecks(t) }
+
+func TestSendEvents(t *testing.T) { testSendEvents(t) }

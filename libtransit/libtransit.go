@@ -16,6 +16,7 @@ import (
 
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/gwos/tcg/services"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -590,20 +591,24 @@ func MarshallIndentJSON(
 	return true
 }
 
-// Send sends request
+// Send sends request.
+// ResourcesWithServicesRequest and GroundworkEventsRequest are passed to TCG
+// without serialization, TCG keeps them for batching.
+// The request and all values added to it must not be modified after the call,
+// the handle can be deleted right after the call.
 //
 //export Send
 func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	var sender func(context.Context, []byte) error
 
 	h := cgo.Handle(req)
-	switch h.Value().(type) {
+	switch v := h.Value().(type) {
 	case *transit.Downtimes:
 		sender = services.GetTransitService().ClearInDowntime
 	case *transit.DowntimesRequest:
 		sender = services.GetTransitService().SetInDowntime
 	case *transit.GroundworkEventsRequest:
-		sender = services.GetTransitService().SendEvents
+		return sendReq(v, services.GetTransitService().SendEventsReq, errBuf, errBufLen)
 	case *transit.GroundworkEventsAckRequest:
 		sender = services.GetTransitService().SendEventsAck
 	case *transit.GroundworkEventsUnackRequest:
@@ -611,7 +616,7 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	case *transit.InventoryRequest:
 		sender = services.GetTransitService().SynchronizeInventory
 	case *transit.ResourcesWithServicesRequest:
-		sender = services.GetTransitService().SendResourceWithMetrics
+		return sendReq(v, services.GetTransitService().SendMetricsReq, errBuf, errBufLen)
 	default:
 		msg := fmt.Sprintf("unknown type: %+v", h.Value())
 		bufStr(errBuf, errBufLen, msg)
@@ -632,8 +637,10 @@ func Send(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	return true
 }
 
-// SendChecks processes ResourcesWithServicesRequest or MonitoredResource with perf data
-// TODO: re-factor MetricsBatcher for support nonserialized structures
+// SendChecks processes ResourcesWithServicesRequest or MonitoredResource with perf data.
+// The request is passed to TCG without serialization, TCG keeps it for batching.
+// The request and all values added to it must not be modified after the call,
+// the handle can be deleted right after the call.
 //
 //export SendChecks
 func SendChecks(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
@@ -642,6 +649,7 @@ func SendChecks(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 	switch v := h.Value().(type) {
 	case *transit.MonitoredResource:
 		q = new(transit.ResourcesWithServicesRequest)
+		q.Context = services.GetTransitService().MakeTracerContext()
 		q.AddResource(*v)
 	case *transit.ResourcesWithServicesRequest:
 		q = v
@@ -652,13 +660,16 @@ func SendChecks(req C.uintptr_t, errBuf *C.char, errBufLen C.size_t) C.bool {
 		return false
 	}
 
-	bb, err := json.Marshal(q)
-	log.Trace().Err(err).RawJSON("payload", bb).Msg("SendChecks")
-	if err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	if err := services.GetTransitService().SendResourceWithMetrics(context.Background(), bb); err != nil {
+	return sendReq(q, services.GetTransitService().SendMetricsReq, errBuf, errBufLen)
+}
+
+// sendReq passes typed request to sender, traces it if loglevel enabled
+func sendReq[T any](q *T, sender func(context.Context, *T) error, errBuf *C.char, errBufLen C.size_t) C.bool {
+	log.Trace().Func(func(e *zerolog.Event) { // process only if loglevel enabled
+		bb, err := json.Marshal(q)
+		e.Err(err).RawJSON("payload", bb)
+	}).Msgf("Send %T", q)
+	if err := sender(context.Background(), q); err != nil {
 		bufStr(errBuf, errBufLen, err.Error())
 		return false
 	}
