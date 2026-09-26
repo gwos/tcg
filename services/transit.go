@@ -130,6 +130,9 @@ func (service *TransitService) exportTransitFn(op TransitOperation, payloadFn fu
 }
 
 // ClearInDowntime implements TransitServices.ClearInDowntime interface
+// It decrements downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status:
+// the level is set as is and ordered with check results.
 func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
@@ -161,6 +164,9 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 }
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
+// It increments downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status:
+// the level is set as is and ordered with check results.
 func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error

@@ -14,3 +14,5 @@ https://stackoverflow.com/questions/27930737/import-c-is-unsupported-in-test-loo
 func TestAddDowntime(t *testing.T) { testAddDowntime(t) }
 
 func TestExtendDowntimesRequest(t *testing.T) { testExtendDowntimesRequest(t) }
+
+func TestSetDowntimesFlags(t *testing.T) { testSetDowntimesFlags(t) }
