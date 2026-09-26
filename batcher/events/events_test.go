@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gwos/tcg/batcher"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ func TestBuild(t *testing.T) {
 	}
 
 	printMemStats()
-	mbb.Build(&buf, 1024)
+	buf = mbb.Build(toSized(t, buf), 1024)
 	printMemStats()
 
 	qq := make([]transit.GroundworkEventsRequest, 0, len(buf))
@@ -51,4 +52,15 @@ func memstats() any {
 }
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
+}
+
+// toSized converts serialized payloads into batcher input with exact sizes
+func toSized(t testing.TB, buf [][]byte) []batcher.Sized[*transit.GroundworkEventsRequest] {
+	items := make([]batcher.Sized[*transit.GroundworkEventsRequest], 0, len(buf))
+	for _, p := range buf {
+		q := new(transit.GroundworkEventsRequest)
+		assert.NoError(t, json.Unmarshal(p, q))
+		items = append(items, batcher.Sized[*transit.GroundworkEventsRequest]{Value: q, Size: len(p)})
+	}
+	return items
 }

@@ -39,8 +39,8 @@ type TransitService struct {
 	*AgentService
 	listMetricsHandler func() ([]byte, error)
 
-	eventsBatcher  *batcher.Batcher
-	metricsBatcher *batcher.Batcher
+	eventsBatcher  *batcher.Batcher[*transit.GroundworkEventsRequest]
+	metricsBatcher *batcher.Batcher[*transit.ResourcesWithServicesRequest]
 }
 
 var onceTransitService sync.Once
@@ -88,9 +88,31 @@ func (service *TransitService) RemoveListMetricsHandler() {
 	service.listMetricsHandler = defaultListMetricsHandler
 }
 
+// lazyPayload returns the payload if given,
+// otherwise serializes the request once on the first call
+func lazyPayload[T any](q *T, payload []byte) func() ([]byte, error) {
+	var err error
+	return func() ([]byte, error) {
+		if payload == nil && err == nil {
+			payload, err = json.Marshal(q)
+		}
+		return payload, err
+	}
+}
+
 func (service *TransitService) exportTransit(op TransitOperation, payload []byte) error {
+	return service.exportTransitFn(op, func() ([]byte, error) { return payload, nil })
+}
+
+// exportTransitFn calls the payload func only if export is configured
+func (service *TransitService) exportTransitFn(op TransitOperation, payloadFn func() ([]byte, error)) error {
 	if len(service.Connector.ExportTransitDir) == 0 {
 		return nil
+	}
+	payload, err := payloadFn()
+	if err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
 	}
 	if err := os.MkdirAll(service.Connector.ExportTransitDir, 0777); err != nil {
 		log.Err(err).Msg("exportTransit failed")
@@ -171,7 +193,22 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
-	if err := service.exportTransit(TOpSendEvents, payload); err != nil {
+	return service.submitEvents(ctx, nil, payload)
+}
+
+// SendEventsReq processes GroundworkEventsRequest without pre-serialization,
+// the request is serialized once on sending or batching.
+// The request must not be modified after the call.
+func (service *TransitService) SendEventsReq(ctx context.Context, q *transit.GroundworkEventsRequest) error {
+	return service.submitEvents(ctx, q, nil)
+}
+
+// submitEvents exports, then sends or batches events given either as request or as payload
+//
+//nolint:dupl // mirrors submitMetrics, kept separate like its sibling methods
+func (service *TransitService) submitEvents(ctx context.Context, q *transit.GroundworkEventsRequest, payload []byte) error {
+	payloadFn := lazyPayload(q, payload)
+	if err := service.exportTransitFn(TOpSendEvents, payloadFn); err != nil {
 		log.Err(err).Msgf("could not exportTransit: %v", TOpSendEvents)
 	}
 
@@ -181,9 +218,22 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 
 	service.stats.LastEventsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchEvents == 0 {
-		return service.sendEvents(ctx, payload)
+		p, err := payloadFn()
+		if err != nil {
+			return err
+		}
+		return service.sendEvents(ctx, p)
 	}
-	service.eventsBatcher.Add(payload)
+	if q != nil {
+		service.eventsBatcher.Add(q, events.EstimateSize(q))
+		return nil
+	}
+	q = new(transit.GroundworkEventsRequest)
+	if err := json.Unmarshal(payload, q); err != nil {
+		log.Err(err).RawJSON("payload", payload).Msg("could not unmarshal events payload for batch")
+		return err
+	}
+	service.eventsBatcher.Add(q, len(payload))
 	return nil
 }
 
@@ -274,7 +324,22 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
-	if err := service.exportTransit(TOpSendMetrics, payload); err != nil {
+	return service.submitMetrics(ctx, nil, payload)
+}
+
+// SendMetricsReq processes ResourcesWithServicesRequest without pre-serialization,
+// the request is serialized once on sending or batching.
+// The request must not be modified after the call.
+func (service *TransitService) SendMetricsReq(ctx context.Context, q *transit.ResourcesWithServicesRequest) error {
+	return service.submitMetrics(ctx, q, nil)
+}
+
+// submitMetrics exports, then sends or batches metrics given either as request or as payload
+//
+//nolint:dupl // mirrors submitEvents, kept separate like its sibling methods
+func (service *TransitService) submitMetrics(ctx context.Context, q *transit.ResourcesWithServicesRequest, payload []byte) error {
+	payloadFn := lazyPayload(q, payload)
+	if err := service.exportTransitFn(TOpSendMetrics, payloadFn); err != nil {
 		log.Err(err).Msgf("could not exportTransit: %v", TOpSendMetrics)
 	}
 
@@ -284,9 +349,22 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 
 	service.stats.LastMetricsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchMetrics == 0 {
-		return service.sendMetrics(ctx, payload)
+		p, err := payloadFn()
+		if err != nil {
+			return err
+		}
+		return service.sendMetrics(ctx, p)
 	}
-	service.metricsBatcher.Add(payload)
+	if q != nil {
+		service.metricsBatcher.Add(q, metrics.EstimateSize(q))
+		return nil
+	}
+	q = new(transit.ResourcesWithServicesRequest)
+	if err := json.Unmarshal(payload, q); err != nil {
+		log.Err(err).RawJSON("payload", payload).Msg("could not unmarshal metrics payload for batch")
+		return err
+	}
+	service.metricsBatcher.Add(q, len(payload))
 	return nil
 }
 
