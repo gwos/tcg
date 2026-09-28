@@ -37,6 +37,8 @@ type BatchHandler func(context.Context, []byte) error
 // Batcher implements buffered batcher
 type Batcher[T any] struct {
 	mu sync.Mutex
+	// batchMu serializes batches, so payloads are handled in the order they were added
+	batchMu sync.Mutex
 
 	buf        []Sized[T]
 	bufSize    int
@@ -124,6 +126,9 @@ func (bt *Batcher[T]) Add(v T, size int) {
 
 // Batch processes buffered payloads
 func (bt *Batcher[T]) Batch() {
+	bt.batchMu.Lock()
+	defer bt.batchMu.Unlock()
+
 	bt.xBatchedAt.Set(time.Now().UnixMilli())
 	bt.mu.Lock()
 
