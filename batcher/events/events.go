@@ -18,6 +18,12 @@ func (bld *EventsBatchBuilder) Build(buf []batcher.Sized[*transit.GroundworkEven
 	// counter, batched request, and accum
 	c, bq := 0, transit.GroundworkEventsRequest{}
 	qq := make([]transit.GroundworkEventsRequest, 0)
+	flush := func() {
+		if len(bq.Events) > 0 {
+			qq = append(qq, bq)
+			c, bq = 0, transit.GroundworkEventsRequest{}
+		}
+	}
 
 	for _, it := range buf {
 		q := it.Value
@@ -25,21 +31,19 @@ func (bld *EventsBatchBuilder) Build(buf []batcher.Sized[*transit.GroundworkEven
 			continue
 		}
 		if it.Size > maxBytes {
-			xxl2qq(&qq, q, it.Size, maxBytes)
+			// keep the order: put collected requests into accum before the split parts
+			flush()
+			qq = append(qq, xxl2qq(q, it.Size, maxBytes)...)
 			continue
 		}
 
 		bq.Events = append(bq.Events, q.Events...)
 		c += it.Size
 		if c >= maxBytes {
-			qq = append(qq, bq)
-			c, bq = 0, transit.GroundworkEventsRequest{}
+			flush()
 		}
 	}
-
-	if len(bq.Events) > 0 {
-		qq = append(qq, bq)
-	}
+	flush()
 
 	payloads := make([][]byte, 0, len(qq))
 	for _, q := range qq {
@@ -58,19 +62,21 @@ func (bld *EventsBatchBuilder) Build(buf []batcher.Sized[*transit.GroundworkEven
 	return payloads
 }
 
-func xxl2qq(qq *[]transit.GroundworkEventsRequest, q *transit.GroundworkEventsRequest, size, maxBytes int) {
+func xxl2qq(q *transit.GroundworkEventsRequest, size, maxBytes int) []transit.GroundworkEventsRequest {
 	/* split big request for parts contained ~lim events */
 	cnt := len(q.Events)
 	lim := cnt/(size/maxBytes+1) + 1
 	log.Debug().Msgf("#EventsBatchBuilder maxBytes/size/cnt/lim %v/%v/%v/%v",
 		maxBytes, size, cnt, lim)
 
+	qq := make([]transit.GroundworkEventsRequest, 0, cnt/lim+1)
 	for i1, i2 := 0, lim; i1 < cnt; i1, i2 = i1+lim, i2+lim {
 		if i2 > len(q.Events) {
 			i2 = len(q.Events)
 		}
-		*qq = append(*qq, transit.GroundworkEventsRequest{
+		qq = append(qq, transit.GroundworkEventsRequest{
 			Events: q.Events[i1:i2],
 		})
 	}
+	return qq
 }

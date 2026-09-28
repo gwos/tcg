@@ -115,6 +115,32 @@ func TestBuild(t *testing.T) {
 		// t.Logf("%#v\n\n%s", qq, bb)
 	})
 
+	t.Run("keep order around oversized", func(t *testing.T) {
+		req := func(host string, services ...string) *transit.ResourcesWithServicesRequest {
+			res := transit.MonitoredResource{BaseResource: transit.BaseResource{BaseInfo: transit.BaseInfo{
+				Name: host, Type: transit.ResourceTypeHost}}, MonitoredInfo: transit.MonitoredInfo{Status: transit.HostUnchanged}}
+			for _, svc := range services {
+				res.Services = append(res.Services, transit.MonitoredService{BaseInfo: transit.BaseInfo{
+					Name: svc, Type: transit.ResourceTypeService}, MonitoredInfo: transit.MonitoredInfo{Status: transit.ServiceOk}})
+			}
+			return &transit.ResourcesWithServicesRequest{Resources: []transit.MonitoredResource{res}}
+		}
+		buf := []batcher.Sized[*transit.ResourcesWithServicesRequest]{
+			{Value: req("h1", "before"), Size: 100},
+			{Value: req("h2", "big-1", "big-2", "big-3", "big-4"), Size: 3000},
+			{Value: req("h1", "after"), Size: 100},
+		}
+		names := make([]string, 0)
+		for _, q := range unmarshalAll(t, mbb.Build(buf, 1024)) {
+			for _, res := range q.Resources {
+				for _, svc := range res.Services {
+					names = append(names, svc.Name)
+				}
+			}
+		}
+		assert.Equal(t, []string{"before", "big-1", "big-2", "big-3", "big-4", "after"}, names)
+	})
+
 	t.Run("combine small", func(t *testing.T) {
 		buf := [][]byte{
 			[]byte(`{"context":{"agentId":"2a728b11-3359-49b2-8611-98854927af2c","appType":"NAGIOS","timeStamp":"1676911781735","traceToken":"2a728b11-3359-49b2-8611-98854927af2c","version":"1.0.0"},"groups":[{"groupName":"HHostGroup22","resources":[{"name":"a-test-2","type":"host"}],"type":"HostGroup"}],"resources":[{"name":"a-test-2","services":[{"lastCheckTime":"1676911781000","lastPluginOutput":"CRITICAL - load average: 83.57, 36.40, 18.21","metrics":[{"interval":{"endTime":"1676911781280","startTime":"1676911781181"},"metricName":"load1","sampleType":"Value","thresholds":[{"label":"load1_wn","sampleType":"Warning","value":{"doubleValue":5.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load1_cr","sampleType":"Critical","value":{"doubleValue":10.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load1_mn","sampleType":"Min","value":{"doubleValue":0.0,"integerValue":0,"valueType":"DoubleType"}}],"unit":"1","value":{"doubleValue":83.569999999999993,"integerValue":0,"valueType":"DoubleType"}},{"interval":{"endTime":"1676911781280","startTime":"1676911781181"},"metricName":"load5","sampleType":"Value","thresholds":[{"label":"load5_wn","sampleType":"Warning","value":{"doubleValue":4.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load5_cr","sampleType":"Critical","value":{"doubleValue":8.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load5_mn","sampleType":"Min","value":{"doubleValue":0.0,"integerValue":0,"valueType":"DoubleType"}}],"unit":"1","value":{"doubleValue":36.399999999999999,"integerValue":0,"valueType":"DoubleType"}},{"interval":{"endTime":"1676911781280","startTime":"1676911781181"},"metricName":"load15","sampleType":"Value","thresholds":[{"label":"load15_wn","sampleType":"Warning","value":{"doubleValue":3.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load15_cr","sampleType":"Critical","value":{"doubleValue":6.0,"integerValue":0,"valueType":"DoubleType"}},{"label":"load15_mn","sampleType":"Min","value":{"doubleValue":0.0,"integerValue":0,"valueType":"DoubleType"}}],"unit":"1","value":{"doubleValue":18.210000000000001,"integerValue":0,"valueType":"DoubleType"}}],"name":"local_load_6009","nextCheckTime":"1676912381000","properties":{"CheckType":{"doubleValue":0.0,"integerValue":0,"stringValue":"ACTIVE","valueType":"StringType"},"CurrentAttempt":{"doubleValue":0.0,"integerValue":3,"valueType":"IntegerType"},"CurrentNotificationNumber":{"doubleValue":0.0,"integerValue":0,"valueType":"IntegerType"},"ExecutionTime":{"doubleValue":0.098902000000000004,"integerValue":0,"valueType":"DoubleType"},"LastNotificationTime":{"doubleValue":0.0,"integerValue":0,"timeValue":"0","valueType":"TimeType"},"LastStateChange":{"doubleValue":0.0,"integerValue":0,"timeValue":"1676911144000","valueType":"TimeType"},"Latency":{"doubleValue":11.620201110839844,"integerValue":0,"valueType":"DoubleType"},"MaxAttempts":{"doubleValue":0.0,"integerValue":3,"valueType":"IntegerType"},"PercentStateChange":{"doubleValue":31.44736842105263,"integerValue":0,"valueType":"DoubleType"},"ScheduledDowntimeDepth":{"doubleValue":0.0,"integerValue":0,"valueType":"IntegerType"},"StateType":{"doubleValue":0.0,"integerValue":0,"stringValue":"HARD","valueType":"StringType"},"isAcceptPassiveChecks":{"boolValue":true,"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"},"isChecksEnabled":{"boolValue":true,"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"},"isEventHandlersEnabled":{"boolValue":true,"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"},"isFlapDetectionEnabled":{"boolValue":true,"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"},"isNotificationsEnabled":{"boolValue":true,"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"},"isProblemAcknowledged":{"doubleValue":0.0,"integerValue":0,"valueType":"BooleanType"}},"status":"SERVICE_UNSCHEDULED_CRITICAL","type":"hypervisor"}],"status":"HOST_UNCHANGED","type":"host"}]}`),

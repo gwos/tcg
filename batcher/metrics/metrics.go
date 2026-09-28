@@ -18,6 +18,12 @@ type MetricsBatchBuilder struct{}
 func (bld *MetricsBatchBuilder) Build(buf []batcher.Sized[*transit.ResourcesWithServicesRequest], maxBytes int) [][]byte {
 	// counter, batched request, and accum
 	c, bq, qq := 0, transit.ResourcesWithServicesRequest{}, make([]transit.ResourcesWithServicesRequest, 0)
+	flush := func() {
+		if len(bq.Resources) > 0 {
+			qq = append(qq, bq)
+			c, bq = 0, transit.ResourcesWithServicesRequest{}
+		}
+	}
 
 	for _, it := range buf {
 		q := it.Value
@@ -25,16 +31,15 @@ func (bld *MetricsBatchBuilder) Build(buf []batcher.Sized[*transit.ResourcesWith
 			continue
 		}
 		if it.Size > maxBytes {
-			xxl2qq(&qq, q, it.Size, maxBytes)
+			// keep the order: put collected requests into accum before the split parts
+			flush()
+			qq = append(qq, xxl2qq(q, it.Size, maxBytes)...)
 			continue
 		}
 
 		// in case of not HostUnchanged stop combining, put bq and q into accum
 		if hasStatus(q) {
-			if len(bq.Resources) > 0 {
-				qq = append(qq, bq)
-				c, bq = 0, transit.ResourcesWithServicesRequest{}
-			}
+			flush()
 			qq = append(qq, *q)
 			continue
 		}
@@ -44,14 +49,10 @@ func (bld *MetricsBatchBuilder) Build(buf []batcher.Sized[*transit.ResourcesWith
 		bq.Resources = append(bq.Resources, q.Resources...)
 		c += it.Size
 		if c >= maxBytes {
-			qq = append(qq, bq)
-			c, bq = 0, transit.ResourcesWithServicesRequest{}
+			flush()
 		}
 	}
-
-	if len(bq.Resources) > 0 {
-		qq = append(qq, bq)
-	}
+	flush()
 
 	payloads := make([][]byte, 0, len(qq))
 	for _, q := range qq {
@@ -118,7 +119,7 @@ func hasStatus(q *transit.ResourcesWithServicesRequest) bool {
 	return false
 }
 
-func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, q *transit.ResourcesWithServicesRequest, size, maxBytes int) {
+func xxl2qq(q *transit.ResourcesWithServicesRequest, size, maxBytes int) []transit.ResourcesWithServicesRequest {
 	/* split big request for parts contained ~lim services */
 	cnt := 0
 	for _, res := range q.Resources {
@@ -128,7 +129,7 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, q *transit.ResourcesWith
 	log.Debug().Msgf("#MetricsBatchBuilder maxBytes/size/cnt/lim %v/%v/%v/%v",
 		maxBytes, size, cnt, lim)
 
-	n0 := len(*qq)
+	qq := make([]transit.ResourcesWithServicesRequest, 0, size/maxBytes+1)
 	c, x := 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
 	for _, res := range q.Resources {
 		pr := res
@@ -142,7 +143,7 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, q *transit.ResourcesWith
 
 			x.Resources = append(x.Resources, pr)
 			x.SetContext(q.Context)
-			*qq = append(*qq, x)
+			qq = append(qq, x)
 
 			c, x = 0, transit.ResourcesWithServicesRequest{Groups: q.Groups}
 			pr = res
@@ -159,15 +160,16 @@ func xxl2qq(qq *[]transit.ResourcesWithServicesRequest, q *transit.ResourcesWith
 
 	if len(x.Resources) > 0 {
 		x.SetContext(q.Context)
-		*qq = append(*qq, x)
+		qq = append(qq, x)
 	}
 
-	for i := range (*qq)[n0:] {
-		t := (*qq)[n0+i].Context.TraceToken
+	for i := range qq {
+		t := qq[i].Context.TraceToken
 		if len(t) > 14 {
-			(*qq)[n0+i].Context.TraceToken = fmt.Sprintf("%s-%04d-%s", t[:8], i, t[14:])
+			qq[i].Context.TraceToken = fmt.Sprintf("%s-%04d-%s", t[:8], i, t[14:])
 		}
 	}
+	return qq
 }
 
 func packGroups(groups *[]transit.ResourceGroup) {
