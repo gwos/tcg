@@ -286,7 +286,6 @@ There are additional variables supported:
     * OTEL_EXPORTER_OTLP_ENDPOINT=http://jaegertracing:4317
     * TCG_HTTP_CLIENT_TIMEOUT=10s
     * TCG_HTTP_CLIENT_TIMEOUT_GW=120s
-    * TCG_INVENTORY_NOEXT=true
     * TCG_SUPPRESS_DOWNTIMES=true
     * TCG_SUPPRESS_EVENTS=true
     * TCG_SUPPRESS_INVENTORY=true

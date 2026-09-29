@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"time"
 
@@ -39,8 +38,8 @@ type TransitService struct {
 	*AgentService
 	listMetricsHandler func() ([]byte, error)
 
-	eventsBatcher  *batcher.Batcher
-	metricsBatcher *batcher.Batcher
+	eventsBatcher  *batcher.Batcher[*transit.GroundworkEventsRequest]
+	metricsBatcher *batcher.Batcher[*transit.ResourcesWithServicesRequest]
 }
 
 var onceTransitService sync.Once
@@ -88,9 +87,31 @@ func (service *TransitService) RemoveListMetricsHandler() {
 	service.listMetricsHandler = defaultListMetricsHandler
 }
 
+// lazyPayload returns the payload if given,
+// otherwise serializes the request once on the first call
+func lazyPayload[T any](q *T, payload []byte) func() ([]byte, error) {
+	var err error
+	return func() ([]byte, error) {
+		if payload == nil && err == nil {
+			payload, err = json.Marshal(q)
+		}
+		return payload, err
+	}
+}
+
 func (service *TransitService) exportTransit(op TransitOperation, payload []byte) error {
+	return service.exportTransitFn(op, func() ([]byte, error) { return payload, nil })
+}
+
+// exportTransitFn calls the payload func only if export is configured
+func (service *TransitService) exportTransitFn(op TransitOperation, payloadFn func() ([]byte, error)) error {
 	if len(service.Connector.ExportTransitDir) == 0 {
 		return nil
+	}
+	payload, err := payloadFn()
+	if err != nil {
+		log.Err(err).Msg("exportTransit failed")
+		return err
 	}
 	if err := os.MkdirAll(service.Connector.ExportTransitDir, 0777); err != nil {
 		log.Err(err).Msg("exportTransit failed")
@@ -108,6 +129,9 @@ func (service *TransitService) exportTransit(op TransitOperation, payload []byte
 }
 
 // ClearInDowntime implements TransitServices.ClearInDowntime interface
+// It decrements downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status:
+// the level is set as is and ordered with check results.
 func (service *TransitService) ClearInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpClearInDowntime))
 	var err error
@@ -139,6 +163,9 @@ func (service *TransitService) ClearInDowntime(ctx context.Context, payload []by
 }
 
 // SetInDowntime implements TransitServices.SetInDowntime interface
+// It increments downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status:
+// the level is set as is and ordered with check results.
 func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte) error { // nolint:dupl
 	ctx, span := tracing.StartTraceSpan(ctx, "services", string(TOpSetInDowntime))
 	var err error
@@ -171,7 +198,22 @@ func (service *TransitService) SetInDowntime(ctx context.Context, payload []byte
 
 // SendEvents implements TransitServices.SendEvents interface
 func (service *TransitService) SendEvents(ctx context.Context, payload []byte) error {
-	if err := service.exportTransit(TOpSendEvents, payload); err != nil {
+	return service.submitEvents(ctx, nil, payload)
+}
+
+// SendEventsReq processes GroundworkEventsRequest without pre-serialization,
+// the request is serialized once on sending or batching.
+// The request must not be modified after the call.
+func (service *TransitService) SendEventsReq(ctx context.Context, q *transit.GroundworkEventsRequest) error {
+	return service.submitEvents(ctx, q, nil)
+}
+
+// submitEvents exports, then sends or batches events given either as request or as payload
+//
+//nolint:dupl // mirrors submitMetrics, kept separate like its sibling methods
+func (service *TransitService) submitEvents(ctx context.Context, q *transit.GroundworkEventsRequest, payload []byte) error {
+	payloadFn := lazyPayload(q, payload)
+	if err := service.exportTransitFn(TOpSendEvents, payloadFn); err != nil {
 		log.Err(err).Msgf("could not exportTransit: %v", TOpSendEvents)
 	}
 
@@ -181,9 +223,22 @@ func (service *TransitService) SendEvents(ctx context.Context, payload []byte) e
 
 	service.stats.LastEventsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchEvents == 0 {
-		return service.sendEvents(ctx, payload)
+		p, err := payloadFn()
+		if err != nil {
+			return err
+		}
+		return service.sendEvents(ctx, p)
 	}
-	service.eventsBatcher.Add(payload)
+	if q != nil {
+		service.eventsBatcher.Add(q, events.EstimateSize(q))
+		return nil
+	}
+	q = new(transit.GroundworkEventsRequest)
+	if err := json.Unmarshal(payload, q); err != nil {
+		log.Err(err).RawJSON("payload", payload).Msg("could not unmarshal events payload for batch")
+		return err
+	}
+	service.eventsBatcher.Add(q, len(payload))
 	return nil
 }
 
@@ -274,7 +329,22 @@ func (service *TransitService) SendEventsUnack(ctx context.Context, payload []by
 
 // SendResourceWithMetrics implements TransitServices.SendResourceWithMetrics interface
 func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payload []byte) error {
-	if err := service.exportTransit(TOpSendMetrics, payload); err != nil {
+	return service.submitMetrics(ctx, nil, payload)
+}
+
+// SendMetricsReq processes ResourcesWithServicesRequest without pre-serialization,
+// the request is serialized once on sending or batching.
+// The request must not be modified after the call.
+func (service *TransitService) SendMetricsReq(ctx context.Context, q *transit.ResourcesWithServicesRequest) error {
+	return service.submitMetrics(ctx, q, nil)
+}
+
+// submitMetrics exports, then sends or batches metrics given either as request or as payload
+//
+//nolint:dupl // mirrors submitEvents, kept separate like its sibling methods
+func (service *TransitService) submitMetrics(ctx context.Context, q *transit.ResourcesWithServicesRequest, payload []byte) error {
+	payloadFn := lazyPayload(q, payload)
+	if err := service.exportTransitFn(TOpSendMetrics, payloadFn); err != nil {
 		log.Err(err).Msgf("could not exportTransit: %v", TOpSendMetrics)
 	}
 
@@ -284,9 +354,22 @@ func (service *TransitService) SendResourceWithMetrics(ctx context.Context, payl
 
 	service.stats.LastMetricsRun.Set(time.Now().UnixMilli())
 	if service.Connector.BatchMetrics == 0 {
-		return service.sendMetrics(ctx, payload)
+		p, err := payloadFn()
+		if err != nil {
+			return err
+		}
+		return service.sendMetrics(ctx, p)
 	}
-	service.metricsBatcher.Add(payload)
+	if q != nil {
+		service.metricsBatcher.Add(q, metrics.EstimateSize(q))
+		return nil
+	}
+	q = new(transit.ResourcesWithServicesRequest)
+	if err := json.Unmarshal(payload, q); err != nil {
+		log.Err(err).RawJSON("payload", payload).Msg("could not unmarshal metrics payload for batch")
+		return err
+	}
+	service.metricsBatcher.Add(q, len(payload))
 	return nil
 }
 
@@ -416,178 +499,4 @@ func (service *TransitService) SynchronizeInventory(ctx context.Context, payload
 	ctx = clients.CtxWithHeader(ctx, header)
 	err = Put2Nats(ctx, subjInventoryMetrics, payload)
 	return err
-}
-
-// SynchronizeInventoryExt processes extended inventory included additional properties
-func (service *TransitService) SynchronizeInventoryExt(ctx context.Context, payload []byte) error {
-	if v, ok := os.LookupEnv("TCG_INVENTORY_EXT"); ok {
-		if val, err := strconv.ParseBool(v); err == nil && !val {
-			log.Info().Msg("SynchronizeInventoryExt: False TCG_INVENTORY_EXT")
-			return service.SynchronizeInventory(ctx, payload)
-		}
-	}
-
-	var p transit.InventoryRequest
-	if err := json.Unmarshal(payload, &p); err != nil {
-		return err
-	}
-	return service.SyncExt(ctx, &p)
-}
-
-// SyncExt processes extended inventory included additional properties
-func (service *TransitService) SyncExt(ctx context.Context, p *transit.InventoryRequest) error {
-	_, span := tracing.StartTraceSpan(ctx, "services", string(TOpSyncInventory))
-	var err error
-	defer func() {
-		tracing.EndTraceSpan(span,
-			tracing.TraceAttrError(err),
-		)
-		if err != nil {
-			log.Err(err).Msg("SyncExt failed")
-		}
-	}()
-
-	if v, ok := os.LookupEnv("TCG_INVENTORY_EXT"); ok {
-		if val, err := strconv.ParseBool(v); err == nil && !val {
-			log.Info().Msg("SyncExt: False TCG_INVENTORY_EXT")
-			payload, err := json.Marshal(p)
-			if err != nil {
-				return err
-			}
-			return service.SynchronizeInventory(ctx, payload)
-		}
-	}
-
-	var dt transit.Downtimes
-	var mon transit.ResourcesWithServicesRequest
-	filterExtInfo(p, &mon, &dt)
-
-	payload, err := json.Marshal(p)
-	if err != nil {
-		return err
-	}
-	err = service.SynchronizeInventory(ctx, payload)
-	if err != nil {
-		return err
-	}
-
-	if len(mon.Resources) > 0 {
-		mon.SetContext(service.MakeTracerContext())
-		err = service.SendStates(ctx, &mon)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(dt.BizHostServiceInDowntimes) > 0 {
-		payload, err = json.Marshal(dt)
-		if err != nil {
-			return err
-		}
-		// TODO: Sync Downtimes
-		log.Trace().RawJSON("downtimes", payload).Msg("TODO: Sync Downtimes")
-	}
-
-	return nil
-}
-
-func filterExtInfo(
-	p *transit.InventoryRequest,
-	mon *transit.ResourcesWithServicesRequest,
-	dt *transit.Downtimes,
-) {
-	var iPropsRes = map[string]int{"Alias": 0, "Notes": 0}
-	var iPropsSvc = map[string]int{"Notes": 0}
-
-	var mRes transit.MonitoredResource
-	var mSvc transit.MonitoredService
-
-	for i, iRes := range p.Resources {
-		mRes = transit.MonitoredResource{}
-		mRes.BaseResource = iRes.BaseResource
-		mRes.Properties = iRes.Properties
-
-		iProps := make(map[string]transit.TypedValue, len(iPropsRes))
-		for k := range iPropsRes {
-			if v, ok := iRes.Properties[k]; ok {
-				iProps[k] = v
-			}
-		}
-		p.Resources[i].Properties = iProps
-
-		if v, ok := mRes.Properties["MonitorStatus"]; ok {
-			delete(mRes.Properties, "MonitorStatus")
-			mRes.SetStatus(transit.MonitorStatus(*v.StringValue))
-		}
-		if v, ok := mRes.Properties["LastPluginOutput"]; ok {
-			delete(mRes.Properties, "LastPluginOutput")
-			mRes.SetLastPluginOutput(*v.StringValue)
-		}
-		if v, ok := mRes.Properties["LastCheckTime"]; ok {
-			delete(mRes.Properties, "LastCheckTime")
-			mRes.SetLastCheckTime(v.TimeValue)
-		} else {
-			mRes.SetLastCheckTime(transit.NewTimestamp())
-		}
-		if v, ok := mRes.Properties["NextCheckTime"]; ok {
-			delete(mRes.Properties, "NextCheckTime")
-			mRes.SetNextCheckTime(v.TimeValue)
-		}
-		if v, ok := mRes.Properties["ScheduledDowntimeDepth"]; ok {
-			delete(mRes.Properties, "ScheduledDowntimeDepth")
-			dt.BizHostServiceInDowntimes = append(dt.BizHostServiceInDowntimes, transit.Downtime{
-				EntityType:             "HOST",
-				EntityName:             mRes.Name,
-				HostName:               mRes.Name,
-				ScheduledDowntimeDepth: int(*v.IntegerValue),
-			})
-		}
-
-		for j, iSvc := range iRes.Services {
-			mSvc = transit.MonitoredService{}
-			mSvc.BaseInfo = iSvc.BaseInfo
-			mSvc.Properties = iSvc.Properties
-
-			iProps := make(map[string]transit.TypedValue, len(iPropsSvc))
-			for k := range iPropsSvc {
-				if v, ok := iSvc.Properties[k]; ok {
-					iProps[k] = v
-				}
-			}
-			p.Resources[i].Services[j].Properties = iProps
-
-			if v, ok := mSvc.Properties["MonitorStatus"]; ok {
-				delete(mSvc.Properties, "MonitorStatus")
-				mSvc.SetStatus(transit.MonitorStatus(*v.StringValue))
-			}
-			if v, ok := mSvc.Properties["LastPluginOutput"]; ok {
-				delete(mSvc.Properties, "LastPluginOutput")
-				mSvc.SetLastPluginOutput(*v.StringValue)
-			}
-			if v, ok := mSvc.Properties["LastCheckTime"]; ok {
-				delete(mSvc.Properties, "LastCheckTime")
-				mSvc.SetLastCheckTime(v.TimeValue)
-			} else {
-				mSvc.SetLastCheckTime(transit.NewTimestamp())
-			}
-			if v, ok := mSvc.Properties["NextCheckTime"]; ok {
-				delete(mSvc.Properties, "NextCheckTime")
-				mSvc.SetNextCheckTime(v.TimeValue)
-			}
-			if v, ok := mSvc.Properties["ScheduledDowntimeDepth"]; ok {
-				delete(mSvc.Properties, "ScheduledDowntimeDepth")
-				dt.BizHostServiceInDowntimes = append(dt.BizHostServiceInDowntimes, transit.Downtime{
-					EntityType:             "HOST",
-					EntityName:             mRes.Name,
-					HostName:               mRes.Name,
-					ServiceDescription:     mSvc.Description,
-					ScheduledDowntimeDepth: int(*v.IntegerValue),
-				})
-			}
-
-			mRes.AddService(mSvc)
-		}
-
-		mon.AddResource(mRes)
-	}
 }

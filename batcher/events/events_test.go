@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gwos/tcg/batcher"
 	"github.com/gwos/tcg/sdk/transit"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,7 +26,7 @@ func TestBuild(t *testing.T) {
 	}
 
 	printMemStats()
-	mbb.Build(&buf, 1024)
+	buf = mbb.Build(toSized(t, buf), 1024)
 	printMemStats()
 
 	qq := make([]transit.GroundworkEventsRequest, 0, len(buf))
@@ -43,6 +44,30 @@ func TestBuild(t *testing.T) {
 	assert.Equal(t, "host11", qq[2].Events[0].Host)
 }
 
+func TestBuildOrder(t *testing.T) {
+	ev := func(hosts ...string) *transit.GroundworkEventsRequest {
+		q := &transit.GroundworkEventsRequest{}
+		for _, h := range hosts {
+			q.Events = append(q.Events, transit.GroundworkEvent{Host: h})
+		}
+		return q
+	}
+	buf := []batcher.Sized[*transit.GroundworkEventsRequest]{
+		{Value: ev("before"), Size: 100},
+		{Value: ev("big-1", "big-2", "big-3", "big-4"), Size: 3000},
+		{Value: ev("after"), Size: 100},
+	}
+	hosts := make([]string, 0)
+	for _, p := range new(EventsBatchBuilder).Build(buf, 1024) {
+		q := transit.GroundworkEventsRequest{}
+		assert.NoError(t, json.Unmarshal(p, &q))
+		for _, e := range q.Events {
+			hosts = append(hosts, e.Host)
+		}
+	}
+	assert.Equal(t, []string{"before", "big-1", "big-2", "big-3", "big-4", "after"}, hosts)
+}
+
 // inspired by expvar.Handler() implementation
 func memstats() any {
 	var stats runtime.MemStats
@@ -51,4 +76,15 @@ func memstats() any {
 }
 func printMemStats() {
 	println("\n~", time.Now().Format(time.DateTime), "MEM_STATS", fmt.Sprintf("%+v", memstats()))
+}
+
+// toSized converts serialized payloads into batcher input with exact sizes
+func toSized(t testing.TB, buf [][]byte) []batcher.Sized[*transit.GroundworkEventsRequest] {
+	items := make([]batcher.Sized[*transit.GroundworkEventsRequest], 0, len(buf))
+	for _, p := range buf {
+		q := new(transit.GroundworkEventsRequest)
+		assert.NoError(t, json.Unmarshal(p, q))
+		items = append(items, batcher.Sized[*transit.GroundworkEventsRequest]{Value: q, Size: len(p)})
+	}
+	return items
 }
