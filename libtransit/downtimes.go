@@ -14,6 +14,8 @@ import (
 )
 
 // CreateDowntimes creates payload for ClearInDowntime API.
+// ClearInDowntime decrements downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status.
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateDowntimes
@@ -46,6 +48,8 @@ func AddDowntime(
 }
 
 // CreateDowntimesRequest creates payload for SetInDowntime API.
+// SetInDowntime increments downtime levels by one. If the downtime level is known,
+// it's better to send it as ScheduledDowntimeDepth property with the status.
 // It returns a handle that should be deleted after use with DeleteHandle.
 //
 //export CreateDowntimesRequest
@@ -85,5 +89,18 @@ func ExtendDowntimesRequest(
 			hv.ServiceGroupCategoryNames = append(hv.ServiceGroupCategoryNames, C.GoString(serviceGroup))
 			hv.SetServices = true
 		}
+	}
+}
+
+// SetDowntimesFlags sets SetHosts and SetServices flags on target.
+// ExtendDowntimesRequest sets them depending on non-NULL params,
+// use this to override, e.g. SetHosts is false for a service downtime.
+//
+//export SetDowntimesFlags
+func SetDowntimesFlags(target C.uintptr_t, setHosts, setServices C.bool) {
+	h := cgo.Handle(target)
+	if hv, ok := h.Value().(*transit.DowntimesRequest); ok {
+		hv.SetHosts = bool(setHosts)
+		hv.SetServices = bool(setServices)
 	}
 }

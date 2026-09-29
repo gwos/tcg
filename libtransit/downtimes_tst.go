@@ -126,3 +126,15 @@ func testExtendDowntimesRequest(t *testing.T) {
 		})
 	}
 }
+
+func testSetDowntimesFlags(t *testing.T) {
+	target := &transit.DowntimesRequest{}
+	h := cgo.NewHandle(target)
+	ExtendDowntimesRequest(C.ulong(h), C.CString("host-1"), nil, C.CString("service-1"), nil)
+	SetDowntimesFlags(C.ulong(h), false, true)
+	h.Delete()
+	assert.Equal(t, []string{"host-1"}, target.HostNames)
+	assert.Equal(t, []string{"service-1"}, target.ServiceDescriptions)
+	assert.False(t, target.SetHosts)
+	assert.True(t, target.SetServices)
+}

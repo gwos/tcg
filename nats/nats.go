@@ -51,6 +51,9 @@ type state struct {
 
 	cancel context.CancelFunc
 	pub    chan *nats.Msg
+	// pubMu guards pubOverflow, the messages waiting for room in pub in the order of publishing
+	pubMu       sync.Mutex
+	pubOverflow []*nats.Msg
 }
 
 // Config defines NATS configurable options
@@ -375,9 +378,40 @@ func Pub(subj string, data []byte, header http.Header) error {
 	msg := nats.NewMsg(subj)
 	msg.Data = data
 	maps.Copy(msg.Header, header)
-	// use goroutine as L2 buffer
-	go func(msg *nats.Msg) { s.pub <- msg }(msg)
+	pubMsg(msg)
 	return nil
+}
+
+// pubMsg queues the message without blocking and keeps the order of publishing,
+// when pub is full the message waits in the overflow buffer
+func pubMsg(msg *nats.Msg) {
+	s.pubMu.Lock()
+	defer s.pubMu.Unlock()
+	if len(s.pubOverflow) == 0 {
+		select {
+		case s.pub <- msg:
+			return
+		default:
+		}
+	}
+	s.pubOverflow = append(s.pubOverflow, msg)
+	if len(s.pubOverflow) == 1 {
+		go drainPubOverflow()
+	}
+}
+
+// drainPubOverflow moves the overflow buffer into pub, until the buffer is empty
+func drainPubOverflow() {
+	s.pubMu.Lock()
+	for len(s.pubOverflow) > 0 {
+		msg := s.pubOverflow[0]
+		s.pubMu.Unlock()
+		s.pub <- msg
+		s.pubMu.Lock()
+		s.pubOverflow[0] = nil
+		s.pubOverflow = s.pubOverflow[1:]
+	}
+	s.pubMu.Unlock()
 }
 
 // Publish sends NATS message

@@ -116,15 +116,3 @@ func SynchronizeInventory(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.si
 	}
 	return true
 }
-
-// SynchronizeInventoryExt is a C API for services.GetTransitService().SynchronizeInventoryExt
-//
-//export SynchronizeInventoryExt
-func SynchronizeInventoryExt(payloadJSON *C.cchar_t, errBuf *C.char, errBufLen C.size_t) C.bool {
-	if err := services.GetTransitService().
-		SynchronizeInventoryExt(context.Background(), []byte(C.GoString(payloadJSON))); err != nil {
-		bufStr(errBuf, errBufLen, err.Error())
-		return false
-	}
-	return true
-}
