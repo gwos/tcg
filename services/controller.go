@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -42,7 +43,8 @@ type Controller struct {
 	muGWOS      sync.Mutex
 	authCache   *cache.Cache
 	entrypoints []Entrypoint
-	srv         *http.Server
+	// srv is set while the http server runs, read by status checks from other goroutines
+	srv atomic.Pointer[http.Server]
 }
 
 // Credentials defines type of AuthCache items
@@ -88,7 +90,7 @@ func (controller *Controller) RemoveEntrypoints() {
 // starts the http server
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
-	if controller.srv != nil {
+	if controller.srv.Load() != nil {
 		log.Warn().Msg("controller already started")
 		return nil
 	}
@@ -110,16 +112,19 @@ func (controller *Controller) startController() error {
 	router.Use(sessions.Sessions("tcg-session", cookie.NewStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
+	/* create and publish the server before serving, so stopController can always reach it */
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  controller.Connector.ControllerReadTimeout,
+		WriteTimeout: controller.Connector.ControllerWriteTimeout,
+	}
+	controller.srv.Store(srv)
+
 	/* set a short timer to wait for http.Server starting */
 	idleTimer := time.NewTimer(startRetryDelay * 2)
 	go func() {
 		t0 := time.Now()
-		controller.srv = &http.Server{
-			Addr:         addr,
-			Handler:      router,
-			ReadTimeout:  controller.Connector.ControllerReadTimeout,
-			WriteTimeout: controller.Connector.ControllerWriteTimeout,
-		}
 		lc := net.ListenConfig{
 			Control: func(network, address string, c syscall.RawConn) error {
 				var opErr error
@@ -141,7 +146,7 @@ func (controller *Controller) startController() error {
 				// using listener with configured socket options SO_REUSEPORT to prevent
 				// "bind: address already in use" error on stop-start controller
 				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
-					err = controller.srv.ServeTLS(l, certFile, keyFile)
+					err = srv.ServeTLS(l, certFile, keyFile)
 				}
 			} else {
 				log.Info().Msgf("controller starts listen: %s", addr)
@@ -149,7 +154,7 @@ func (controller *Controller) startController() error {
 				// using listener with configured socket options SO_REUSEPORT to prevent
 				// "bind: address already in use" error on stop-start controller
 				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
-					err = controller.srv.Serve(l)
+					err = srv.Serve(l)
 				}
 			}
 			/* getting here after http.Server exit */
@@ -165,7 +170,8 @@ func (controller *Controller) startController() error {
 			}
 			break
 		}
-		controller.srv = nil
+		/* clear only our own server, a newer one may have been started meanwhile */
+		controller.srv.CompareAndSwap(srv, nil)
 	}()
 	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
 	<-idleTimer.C
@@ -176,13 +182,14 @@ func (controller *Controller) startController() error {
 // overrides AgentService implementation
 func (controller *Controller) stopController() error {
 	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
-	if controller.srv == nil {
+	srv := controller.srv.Load()
+	if srv == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), controller.Connector.ControllerStopTimeout)
 	go func() {
 		log.Info().Msg("controller shutdown ...")
-		if err := controller.srv.Shutdown(ctx); err != nil {
+		if err := srv.Shutdown(ctx); err != nil {
 			log.Warn().Msgf("controller got %s", err)
 		}
 		cancel()
