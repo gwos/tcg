@@ -213,15 +213,20 @@ func checkTokenResponse(ctx context.Context, req *Req, okStatus int, msg string)
 
 // Connect calls API
 func (client *GWClient) Connect() error {
+	return client.reconnect(client.token())
+}
+
+// reconnect logs in unless the shared token no longer equals stale,
+// which means another request has already replaced it.
+func (client *GWClient) reconnect(stale string) error {
 	k := client.tokenKey()
 	muAny, _ := connectMu.LoadOrStore(k, new(sync.Mutex))
 	mu := muAny.(*sync.Mutex)
 
-	prevToken := client.token()
 	/* restrict by mutex for one-thread at one-time, shared across instances */
 	mu.Lock()
 	defer mu.Unlock()
-	if prevToken != client.token() {
+	if stale != client.token() {
 		/* token already changed */
 		return nil
 	}
@@ -467,7 +472,7 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == http.StatusUnauthorized {
 		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
-		if err := client.Connect(); err != nil {
+		if err := client.reconnect(headers["GWOS-API-TOKEN"]); err != nil {
 			sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request: could not reconnect", slog.String("error", err.Error()))
 			return nil, err
 		}
