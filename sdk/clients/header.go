@@ -18,6 +18,17 @@ const (
 	HdrTodoTracerCtx  = "Todo-Tracer-Ctx"
 )
 
+// internalHeaders carry NATS message details for TCG itself and are not sent over HTTP
+var internalHeaders = map[string]bool{
+	HdrCompressed:     true,
+	HdrPayloadLen:     true,
+	HdrPayloadType:    true,
+	HdrSpanSpanID:     true,
+	HdrSpanTraceID:    true,
+	HdrSpanTraceFlags: true,
+	HdrTodoTracerCtx:  true,
+}
+
 type ctxKeyType int
 
 const ctxHeader ctxKeyType = iota
