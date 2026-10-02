@@ -24,6 +24,7 @@ type ExtConfig struct {
 	MapHostgroup mapping.Mappings `json:"mapHostgroup"`
 	MapHostname  mapping.Mappings `json:"mapHostname"`
 	MapService   mapping.Mappings `json:"mapService"`
+	MapIgnore    mapping.Mappings `json:"mapIgnore"`
 }
 
 func GetExtConfig() *ExtConfig {
@@ -34,12 +35,12 @@ func GetCancelFunc() *context.CancelFunc {
 	return &cancel
 }
 
-func GetMonitorConnection() *transit.MetricsProfile {
-	return metricsProfile
+func GetMonitorConnection() *transit.MonitorConnection {
+	return monitorConnection
 }
 
-func GetMetricsProfile() *transit.MonitorConnection {
-	return monitorConnection
+func GetMetricsProfile() *transit.MetricsProfile {
+	return metricsProfile
 }
 
 func ConfigHandler(data []byte) {
@@ -52,20 +53,25 @@ func ConfigHandler(data []byte) {
 		log.Err(err).Msg("failed to parse config")
 		return
 	}
-	/* Update config with received values */
-	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
-	if err := extConfig.MapHostgroup.Compile(); err != nil {
+	/* Compile mappings before applying, so an invalid config keeps the current one */
+	if err := tExt.MapHostgroup.Compile(); err != nil {
 		log.Err(err).Msg("failed to compile host group mappings")
 		return
 	}
-	if err := extConfig.MapHostname.Compile(); err != nil {
+	if err := tExt.MapHostname.Compile(); err != nil {
 		log.Err(err).Msg("failed to compile host mappings")
 		return
 	}
-	if err := extConfig.MapService.Compile(); err != nil {
+	if err := tExt.MapService.Compile(); err != nil {
 		log.Err(err).Msg("failed to compile service mappings")
 		return
 	}
+	if err := tExt.MapIgnore.Compile(); err != nil {
+		log.Err(err).Msg("failed to compile ignore mappings")
+		return
+	}
+	/* Update config with received values */
+	extConfig, metricsProfile, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	/* Restart periodic loop */
 	cancel()

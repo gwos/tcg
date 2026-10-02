@@ -31,18 +31,22 @@ func ParsePrometheusData(data template.Data, cfg *ExtConfig) ([]ParseResult, err
 		maps.Copy(tags, data.CommonLabels)
 		maps.Copy(tags, alert.Labels)
 
+		if cfg.MapIgnore.Matches(tags) {
+			log.Debug().Interface("tags", tags).Interface("mappings", cfg.MapIgnore).Msg("ignored by mapping")
+			continue
+		}
 		hostGroupName, err := cfg.MapHostgroup.ApplyOR(tags)
 		if err != nil {
 			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapHostgroup).Send()
 			continue
 		}
-		hostName, err := cfg.MapHostname.ApplyOR(tags)
-		if err != nil || hostName == "" {
+		hostName, ok, err := cfg.MapHostname.Lookup(tags)
+		if !ok {
 			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapHostname).Send()
 			continue
 		}
-		serviceName, err := cfg.MapService.ApplyOR(tags)
-		if err != nil || serviceName == "" {
+		serviceName, ok, err := cfg.MapService.Lookup(tags)
+		if !ok {
 			log.Debug().Err(err).Interface("tags", tags).Interface("mappings", cfg.MapService).Send()
 			continue
 		}
