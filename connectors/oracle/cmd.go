@@ -63,6 +63,8 @@ func configHandler(data []byte) {
 	if strings.TrimSpace(tExt.OracleAggregationType) == "" {
 		tExt.OracleAggregationType = defaultAggregationType
 	}
+	/* Compile mappings before applying, so running collections never see them uncompiled */
+	tExt.GWMapping.Prepare()
 	/* Update config with received values */
 	gwConnections := config.GetConfig().GWConnections
 	if len(gwConnections) > 0 {
@@ -71,8 +73,6 @@ func configHandler(data []byte) {
 	extConfig, _, monitorConnection = tExt, tMetProf, tMonConn
 	monitorConnection.Extensions = extConfig
 	configVersion.Add(1)
-
-	tExt.GWMapping.Prepare()
 
 	/* Restart periodic loop */
 	cancel()
