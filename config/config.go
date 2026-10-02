@@ -535,6 +535,9 @@ func (cfg Config) Hashsum() ([]byte, error) {
 	return Hashsum(cfg)
 }
 
+// installLogger guards setting the global loggers in initLogger
+var installLogger sync.Once
+
 func (cfg Config) initLogger() {
 	if cfg.Connector.LogLevel > 4 {
 		cfg.Connector.LogLevel = 4
@@ -558,19 +561,20 @@ func (cfg Config) initLogger() {
 		}))
 	}
 
-	/* prevent writes in global logger */
-	log.Logger = zerolog.Nop()
-	/* reset to defaults */
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	/* apply options */
 	w := logzer.NewLoggerWriter(opts...)
-	/* set global logger */
-	log.Logger = zerolog.New(w).
-		With().Timestamp().Caller().
-		Logger()
-	/* adapt SDK logger */
-	sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
-	/* set as standard logger output */
-	stdlog.SetFlags(0)
-	stdlog.SetOutput(log.Logger)
+	/* the writer never changes, so the global loggers are set once:
+	reassigning them on config reload raced with concurrent logging */
+	installLogger.Do(func() {
+		zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+		/* set global logger */
+		log.Logger = zerolog.New(w).
+			With().Timestamp().Caller().
+			Logger()
+		/* adapt SDK logger */
+		sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
+		/* set as standard logger output */
+		stdlog.SetFlags(0)
+		stdlog.SetOutput(log.Logger)
+	})
 }
