@@ -23,6 +23,7 @@ const (
 	bodyBoom    = "boom"
 	bodyTrue    = "true"
 	eventsURI   = "https://gw.example/api/events"
+	contentJSON = "application/json"
 )
 
 // fakeGW is a GroundWork API stub that answers each path with a configured status and body.
@@ -355,7 +356,7 @@ func TestGWClientSendMethods(t *testing.T) {
 					t.Errorf("HostNamePrefix header = %q", got)
 				}
 				if req.header.Get("GWOS-API-TOKEN") != testToken || req.header.Get("GWOS-APP-NAME") != testAppName ||
-					req.header.Get("Content-Type") != "application/json" || req.header.Get("Content-Encoding") != "" {
+					req.header.Get("Content-Type") != contentJSON || req.header.Get("Content-Encoding") != "" {
 					t.Errorf("headers = %v", req.header)
 				}
 				if path == GWEntrypointSynchronizer && req.query != "merge=false" {

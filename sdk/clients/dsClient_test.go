@@ -79,7 +79,7 @@ func TestDSClientReload(t *testing.T) {
 			if tc.want == nil && err != nil || tc.want != nil && !errors.Is(err, tc.want) {
 				t.Fatalf("error = %v; want %v", err, tc.want)
 			}
-			if req.URL.Path != "/dalekservices/connectors/reload/agent-1" || req.Header.Get("Content-Type") != "application/json" {
+			if req.URL.Path != "/dalekservices/connectors/reload/agent-1" || req.Header.Get("Content-Type") != contentJSON {
 				t.Errorf("request = %s %v", req.URL.Path, req.Header)
 			}
 		})

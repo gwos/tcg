@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
-	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -202,7 +201,8 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 		return err
 	}
 	if h, ok := HeaderFromCtx(ctx); ok {
-		maps.Copy(request.Header, h)
+		// clone values too, so adding request headers never writes into the ctx header
+		request.Header = h.Clone()
 	}
 	if !httpClientKeepAlive {
 		request.Header.Set("Connection", "close")

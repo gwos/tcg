@@ -22,10 +22,13 @@ type ctxKeyType int
 
 const ctxHeader ctxKeyType = iota
 
+// CtxWithHeader returns a context carrying header merged over the header of ctx, if any.
+// The header of ctx is not modified, so contexts derived from one parent stay independent.
 func CtxWithHeader(ctx context.Context, header http.Header) context.Context {
 	if h, ok := ctx.Value(ctxHeader).(http.Header); ok {
-		maps.Copy(h, header)
-		return context.WithValue(ctx, ctxHeader, h)
+		merged := h.Clone()
+		maps.Copy(merged, header)
+		return context.WithValue(ctx, ctxHeader, merged)
 	}
 	return context.WithValue(ctx, ctxHeader, header)
 }
