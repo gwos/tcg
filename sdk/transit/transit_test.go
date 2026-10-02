@@ -9,7 +9,8 @@ import (
 )
 
 func TestMonitoredService_MarshalJSON(t *testing.T) {
-	expected := `{"name":"monSvc","type":"service","status":"SERVICE_OK","lastCheckTime":"1609372800000","metrics":[]}`
+	// empty metrics are omitted
+	expected := `{"name":"monSvc","type":"service","status":"SERVICE_OK","lastCheckTime":"1609372800000"}`
 	monSvc := MonitoredService{
 		BaseInfo: BaseInfo{
 			Name: "monSvc",
@@ -114,8 +115,7 @@ func TestMonitoredService_CreateProperties(t *testing.T) {
 			"timeValue": "1293753600000"
 		  }
 		},
-		"status": "",
-		"metrics": null
+		"status": ""
 	}`)
 
 	/* check json equality */
