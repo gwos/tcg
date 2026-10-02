@@ -364,6 +364,20 @@ func TestGWClientSendMethods(t *testing.T) {
 				}
 			})
 		}
+		// Put2Nats gzips payloads above NatsMaxPayload, and every entrypoint must declare that
+		t.Run(string(path)+"/gzipped", func(t *testing.T) {
+			gw := newFakeGW(t)
+			if _, err := call(gw.client(), gzipBytes(t, payload)); err != nil {
+				t.Fatal(err)
+			}
+			req := gw.lastRequest(t)
+			if req.header.Get("Content-Encoding") != "gzip" {
+				t.Fatalf("Content-Encoding = %q", req.header.Get("Content-Encoding"))
+			}
+			if body := gunzip(t, req.body); !bytes.Equal(body, payload) {
+				t.Errorf("body = %q", body)
+			}
+		})
 	}
 
 	t.Run("dynamic inventory and merge hosts", func(t *testing.T) {

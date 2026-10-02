@@ -362,61 +362,57 @@ func (client *GWClient) resolveEncoding(ctx context.Context, payload []byte) (co
 	return ctx, payload, []string{"Content-Encoding", "gzip"}, nil
 }
 
-// prefixHeaders appends the HostNamePrefix header to headers when resource names are prefixed
-func (client *GWClient) prefixHeaders(headers ...string) []string {
+// postPayload sends payload to entrypoint, declaring or applying gzip encoding as resolveEncoding decides,
+// so a payload that arrives already gzipped (e.g. from Put2Nats) is never sent undeclared
+func (client *GWClient) postPayload(ctx context.Context, entrypoint GWEntrypoint, queryStr string, payload []byte) ([]byte, error) {
+	ctx, payload, headers, err := client.resolveEncoding(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
 	if client.PrefixResourceNames && client.ResourceNamePrefix != "" {
 		headers = append(headers, "HostNamePrefix", client.ResourceNamePrefix)
 	}
-	return headers
+	return client.SendRequest(ctx, http.MethodPost, entrypoint, queryStr, payload, headers...)
 }
 
 // SynchronizeInventory calls API
 func (client *GWClient) SynchronizeInventory(ctx context.Context, payload []byte) ([]byte, error) {
-	ctx, payload, headers, err := client.resolveEncoding(ctx, payload)
-	if err != nil {
-		return nil, err
-	}
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointSynchronizer,
-		"?merge="+strconv.FormatBool(client.GWConnection.MergeHosts),
-		payload, client.prefixHeaders(headers...)...)
+	return client.postPayload(ctx, GWEntrypointSynchronizer,
+		"?merge="+strconv.FormatBool(client.GWConnection.MergeHosts), payload)
 }
 
 // SendResourcesWithMetrics calls API
 func (client *GWClient) SendResourcesWithMetrics(ctx context.Context, payload []byte) ([]byte, error) {
-	ctx, payload, headers, err := client.resolveEncoding(ctx, payload)
-	if err != nil {
-		return nil, err
-	}
 	entrypoint := GWEntrypointMonitoring
 	if client.IsDynamicInventory {
 		entrypoint = GWEntrypointMonitoringDyn
 	}
-	return client.SendRequest(ctx, http.MethodPost, entrypoint, "", payload, client.prefixHeaders(headers...)...)
+	return client.postPayload(ctx, entrypoint, "", payload)
 }
 
 // ClearInDowntime calls API
 func (client *GWClient) ClearInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointClearInDowntime, "", payload, client.prefixHeaders()...)
+	return client.postPayload(ctx, GWEntrypointClearInDowntime, "", payload)
 }
 
 // SetInDowntime calls API
 func (client *GWClient) SetInDowntime(ctx context.Context, payload []byte) ([]byte, error) {
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointSetInDowntime, "", payload, client.prefixHeaders()...)
+	return client.postPayload(ctx, GWEntrypointSetInDowntime, "", payload)
 }
 
 // SendEvents calls API
 func (client *GWClient) SendEvents(ctx context.Context, payload []byte) ([]byte, error) {
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointEvents, "", payload, client.prefixHeaders()...)
+	return client.postPayload(ctx, GWEntrypointEvents, "", payload)
 }
 
 // SendEventsAck calls API
 func (client *GWClient) SendEventsAck(ctx context.Context, payload []byte) ([]byte, error) {
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointEventsAck, "", payload, client.prefixHeaders()...)
+	return client.postPayload(ctx, GWEntrypointEventsAck, "", payload)
 }
 
 // SendEventsUnack calls API
 func (client *GWClient) SendEventsUnack(ctx context.Context, payload []byte) ([]byte, error) {
-	return client.SendRequest(ctx, http.MethodPost, GWEntrypointEventsUnack, "", payload, client.prefixHeaders()...)
+	return client.postPayload(ctx, GWEntrypointEventsUnack, "", payload)
 }
 
 // getJSON queries the entrypoint and decodes the JSON response into out, what names it in logs
