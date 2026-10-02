@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	sdklog "github.com/gwos/tcg/sdk/log"
@@ -31,52 +33,75 @@ const (
 // set TCG_HTTP_CLIENT_KEEPALIVE=true to reuse connections on the hot send path.
 // IdleConnTimeout below bounds how long reused connections may sit idle
 // so they can't go stale behind a load balancer.
-var httpClientKeepAlive = func() bool {
-	v, err := strconv.ParseBool(os.Getenv(EnvHttpClientKeepAlive))
-	return err == nil && v
-}()
+var httpClientKeepAlive = envBool(EnvHttpClientKeepAlive)
 
 var HttpClientTransport = &http.Transport{
-	IdleConnTimeout: func() time.Duration {
-		if s, ok := os.LookupEnv(EnvHttpClientIdleConnTimeout); ok {
-			if v, err := time.ParseDuration(s); err == nil {
-				return v
-			}
-		}
-		return time.Second * 90 // 90s by default
-	}(),
+	IdleConnTimeout: envDuration(time.Second*90, EnvHttpClientIdleConnTimeout), // 90s by default
 	TLSClientConfig: &tls.Config{
-		InsecureSkipVerify: func() bool {
-			v, err := strconv.ParseBool(os.Getenv(EnvTlsClientInsecure))
-			return err == nil && v
-		}(),
+		InsecureSkipVerify: envBool(EnvTlsClientInsecure),
 
 		RootCAs: nil, // If RootCAs is nil, TLS uses the host's root CA set.
 	},
 }
 
 var HttpClient = &http.Client{
-	Timeout: func() time.Duration {
-		if s, ok := os.LookupEnv(EnvHttpClientTimeout); ok {
+	Timeout: envDuration(time.Second*5, EnvHttpClientTimeout), // 5s by default
+
+	Transport: HttpClientTransport,
+}
+
+// envBool reports whether the env var holds a true boolean value
+func envBool(key string) bool {
+	v, err := strconv.ParseBool(os.Getenv(key))
+	return err == nil && v
+}
+
+// envDuration returns the duration from the first env var in keys that holds a valid one, or def
+func envDuration(def time.Duration, keys ...string) time.Duration {
+	for _, key := range keys {
+		if s, ok := os.LookupEnv(key); ok {
 			if v, err := time.ParseDuration(s); err == nil {
 				return v
 			}
 		}
-		return time.Second * 5 // 5s by default
-	}(),
-
-	Transport: HttpClientTransport,
+	}
+	return def
 }
 
 var HookRequestContext = func(ctx context.Context, req *http.Request) (context.Context, *http.Request) {
 	return ctx, req
 }
 
+// pooledGZip is a gzip writer that writes through its own sink,
+// so it is reset once per use and doesn't keep the caller's writer while pooled
+type pooledGZip struct {
+	gw *gzip.Writer
+	w  io.Writer
+}
+
+func (pz *pooledGZip) Write(p []byte) (int, error) { return pz.w.Write(p) }
+
+// gzipWriters reuses gzip writers, as each one allocates sizable compressor state
+var gzipWriters = sync.Pool{New: func() any {
+	pz := new(pooledGZip)
+	pz.gw = gzip.NewWriter(pz)
+	return pz
+}}
+
+// GZipTo compresses p into w with a pooled gzip writer
+func GZipTo(w io.Writer, p []byte) error {
+	pz := gzipWriters.Get().(*pooledGZip)
+	pz.w = w
+	pz.gw.Reset(pz)
+	_, err := pz.gw.Write(p)
+	_ = pz.gw.Close()
+	pz.w = nil
+	gzipWriters.Put(pz)
+	return err
+}
+
 var GZip = func(ctx context.Context, w io.Writer, p []byte) (context.Context, error) {
-	gw := gzip.NewWriter(w)
-	_, err := gw.Write(p)
-	_ = gw.Close()
-	return ctx, err
+	return ctx, GZipTo(w, p)
 }
 
 // IsGZipped detects if payload was compressed with gzip
@@ -87,12 +112,9 @@ func IsGZipped(p []byte) bool {
 
 // IsJSON does quick check for JSON-like content
 func IsJSON(s []byte) bool {
-	if len(s) >= 2 &&
+	return len(s) >= 2 &&
 		((s[0] == '{' && s[len(s)-1] == '}') ||
-			(s[0] == '[' && s[len(s)-1] == ']')) {
-		return true
-	}
-	return false
+			(s[0] == '[' && s[len(s)-1] == ']'))
 }
 
 // SendRequest wraps HTTP methods
@@ -118,20 +140,14 @@ func SendRequestWithContext(ctx context.Context, httpMethod string, requestURL s
 
 // BuildQueryParams makes the query parameters string
 func BuildQueryParams(params map[string]string) string {
-	var query string
-	for paramName, paramValue := range params {
-		query = appendSeparator(query) + url.QueryEscape(paramName) + "=" + url.QueryEscape(paramValue)
+	if len(params) == 0 {
+		return ""
 	}
-	return query
-}
-
-func appendSeparator(params string) string {
-	if params != "" {
-		params = params + "&"
-	} else {
-		params = "?"
+	values := make(url.Values, len(params))
+	for k, v := range params {
+		values.Set(k, v)
 	}
-	return params
+	return "?" + values.Encode()
 }
 
 // Req defines request context
@@ -175,9 +191,9 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 		for k, v := range q.Form {
 			urlValues.Add(k, v)
 		}
-		body = bytes.NewBuffer([]byte(urlValues.Encode()))
+		body = strings.NewReader(urlValues.Encode())
 	} else if q.Payload != nil {
-		body = bytes.NewBuffer(q.Payload)
+		body = bytes.NewReader(q.Payload)
 	}
 
 	request, err = http.NewRequestWithContext(ctx, q.Method, q.URL, body)
