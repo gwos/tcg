@@ -45,25 +45,13 @@ type GWMapping struct {
 	Service mapping.Mappings `json:"mapService"`
 }
 
-// Prepare compiles mappings
+// Prepare compiles mappings and drops the invalid ones
 func (m *GWMapping) Prepare() {
-	var hg, hn mapping.Mappings
-
-	for i := range m.Service {
-		if err := m.Service[i].Compile(); err != nil {
-			log.Warn().Err(err).Interface("mapping", m.Service[i]).Msg("failed to prepare mapping")
-			continue
-		}
-		hg = append(hg, m.Service[i])
+	var err error
+	if m.Service, err = m.Service.CompileValid(); err != nil {
+		log.Warn().Err(err).Msg("failed to prepare service mappings")
 	}
-
-	for i := range m.Host {
-		if err := m.Host[i].Compile(); err != nil {
-			log.Warn().Err(err).Interface("mapping", m.Host[i]).Msg("failed to prepare mapping")
-			continue
-		}
-		hn = append(hn, m.Host[i])
+	if m.Host, err = m.Host.CompileValid(); err != nil {
+		log.Warn().Err(err).Msg("failed to prepare host mappings")
 	}
-
-	m.Service, m.Host = hg, hn
 }

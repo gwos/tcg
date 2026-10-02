@@ -48,26 +48,50 @@ type ExtConfig struct {
 type GWMapping struct {
 	HostGroup mapping.Mappings `json:"mapHostgroup"`
 	HostName  mapping.Mappings `json:"mapHostname"`
+	Ignore    mapping.Mappings `json:"mapIgnore"`
 }
 
-// Prepare compiles mappings
+// Prepare compiles mappings and drops the invalid ones
 func (m *GWMapping) Prepare() {
-	var hg, hn mapping.Mappings
-	for i := range m.HostGroup {
-		if err := m.HostGroup[i].Compile(); err != nil {
-			log.Warn().Err(err).Interface("mapping", m.HostGroup[i]).Msg("could not prepare mapping")
-			continue
-		}
-		hg = append(hg, m.HostGroup[i])
+	var err error
+	if m.HostGroup, err = m.HostGroup.CompileValid(); err != nil {
+		log.Warn().Err(err).Msg("could not prepare hostgroup mappings")
 	}
-	for i := range m.HostName {
-		if err := m.HostName[i].Compile(); err != nil {
-			log.Warn().Err(err).Interface("mapping", m.HostName[i]).Msg("could not prepare mapping")
-			continue
-		}
-		hn = append(hn, m.HostName[i])
+	if m.HostName, err = m.HostName.CompileValid(); err != nil {
+		log.Warn().Err(err).Msg("could not prepare hostname mappings")
 	}
-	m.HostGroup, m.HostName = hg, hn
+	if m.Ignore, err = m.Ignore.CompileValid(); err != nil {
+		log.Warn().Err(err).Msg("could not prepare ignore mappings")
+	}
+}
+
+// mapNames applies the hostname and hostgroup mappings to labels.
+// The name is kept when no hostname mapping is configured, and the hostgroup
+// falls back to groupPrefix plus the namespace label when its mapping does not apply.
+// It reports false if the ignore mapping matches or a configured hostname mapping does not.
+func (m *GWMapping) mapNames(labels map[string]string, name, groupPrefix, kind string) (string, string, bool) {
+	if m.Ignore.Matches(labels) {
+		log.Debug().Str("kind", kind).Interface("labels", labels).Msg("ignored by mapping")
+		return "", "", false
+	}
+	mappedName, ok, err := m.HostName.Lookup(labels)
+	if err != nil {
+		log.Debug().Err(err).Str("kind", kind).
+			Interface("labels", labels).Interface("mappings", m.HostName).
+			Msg("could not map hostname")
+		return "", "", false
+	}
+	if ok {
+		name = mappedName
+	}
+	group, ok, err := m.HostGroup.Lookup(labels)
+	if !ok {
+		group = groupPrefix + labels["namespace"]
+		log.Debug().Err(err).Str("kind", kind).Str("group", group).
+			Interface("labels", labels).Interface("mappings", m.HostGroup).
+			Msg("could not map hostgroup, adding to default group")
+	}
+	return name, group, true
 }
 
 type KubernetesView string
@@ -409,29 +433,14 @@ func (connector *KubernetesConnector) collectNodeInventory(state *MonitoredState
 	podListSucceeded := err == nil
 
 	for _, node := range nodes.Items {
-		resourceName := node.Name
 		labels := GetLabels(node)
 		namespace := labels["namespace"]
 		stateKey := fmt.Sprintf("node:%v:%v", namespace, node.Name)
 		// apply mapping and skip unmatched entries
-		if len(connector.ExtConfig.GWMapping.HostName) > 0 {
-			var err error
-			resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
-			if err != nil || resourceName == "" {
-				log.Debug().Err(err).
-					Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
-					Msg("could not map hostname on node")
-
-				state.Mismatched[stateKey] = true
-				continue
-			}
-		}
-		groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
-		if err != nil || groupName == "" {
-			groupName = "nodes-" + namespace
-			log.Debug().Err(err).
-				Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
-				Msg("could not map hostgroup on node, adding to nodes-namespace group")
+		resourceName, groupName, ok := connector.ExtConfig.GWMapping.mapNames(labels, node.Name, "nodes-", "node")
+		if !ok {
+			state.Mismatched[stateKey] = true
+			continue
 		}
 
 		rf := transit.ResourceRef{Name: resourceName, Owner: groupName, Type: transit.ResourceTypeHost}
@@ -532,14 +541,20 @@ func (connector *KubernetesConnector) collectPodInventory(
 	}
 
 	groupsMap := make(map[string]bool)
+	// addResource applies mappings and adds the resource, or marks it mismatched
 	addResource := func(
 		stateKey string,
-		resourceName string,
+		name string,
+		kind string,
 		monitorStatus transit.MonitorStatus,
 		message string,
 		labels map[string]string,
-		groupName string,
 	) {
+		resourceName, groupName, ok := connector.ExtConfig.GWMapping.mapNames(labels, name, "pods-", kind)
+		if !ok {
+			state.Mismatched[stateKey] = true
+			return
+		}
 		resource := KubernetesResource{
 			Name:     resourceName,
 			Type:     transit.ResourceTypeHost,
@@ -570,7 +585,6 @@ func (connector *KubernetesConnector) collectPodInventory(
 
 	for _, pod := range pods.Items {
 		monitorStatus, message := connector.calculatePodStatus(&pod)
-		resourceName := pod.Name
 
 		if *metricsPerContainer {
 			for _, container := range pod.Spec.Containers {
@@ -578,63 +592,14 @@ func (connector *KubernetesConnector) collectPodInventory(
 					continue
 				}
 
-				resourceName := container.Name
 				labels := GetLabels(pod, container)
-				namespace := labels["namespace"]
-				stateKey := fmt.Sprintf("pod:%v:%v:%v", namespace, pod.Name, container.Name)
-				// apply mapping and skip unmatched entries
-				if len(connector.ExtConfig.GWMapping.HostName) > 0 {
-					var err error
-					resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
-					if err != nil || resourceName == "" {
-						log.Debug().Err(err).
-							Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
-							Msg("could not map hostname on pod container")
-
-						state.Mismatched[stateKey] = true
-						continue
-					}
-				}
-				groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
-				if err != nil || groupName == "" {
-					groupName = "pods-" + namespace
-					log.Debug().Err(err).
-						Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
-						Msg("could not map hostgroup on pod container, adding to pods-namespace group")
-				}
-
-				addResource(stateKey,
-					resourceName, monitorStatus, message, labels,
-					groupName)
+				stateKey := fmt.Sprintf("pod:%v:%v:%v", labels["namespace"], pod.Name, container.Name)
+				addResource(stateKey, container.Name, "pod container", monitorStatus, message, labels)
 			}
 		} else {
 			labels := GetLabels(pod)
-			namespace := labels["namespace"]
-			stateKey := fmt.Sprintf("pod:%v:%v", namespace, pod.Name)
-			// apply mapping and skip unmatched entries
-			if len(connector.ExtConfig.GWMapping.HostName) > 0 {
-				var err error
-				resourceName, err = connector.ExtConfig.GWMapping.HostName.ApplyOR(labels)
-				if err != nil || resourceName == "" {
-					log.Debug().Err(err).
-						Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostName).
-						Msg("could not map hostname on pod")
-
-					state.Mismatched[stateKey] = true
-					continue
-				}
-			}
-			groupName, err := connector.ExtConfig.GWMapping.HostGroup.ApplyOR(labels)
-			if err != nil || groupName == "" {
-				groupName = "pods-" + namespace
-				log.Debug().Err(err).
-					Interface("labels", labels).Interface("mappings", connector.ExtConfig.GWMapping.HostGroup).
-					Msg("could not map hostgroup on pod, adding to pods-namespace group")
-			}
-
-			addResource(stateKey,
-				resourceName, monitorStatus, message, labels,
-				groupName)
+			stateKey := fmt.Sprintf("pod:%v:%v", labels["namespace"], pod.Name)
+			addResource(stateKey, pod.Name, "pod", monitorStatus, message, labels)
 		}
 	}
 	return nil
