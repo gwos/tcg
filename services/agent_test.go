@@ -1,6 +1,7 @@
 package services
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -40,10 +41,16 @@ func TestAgentService(t *testing.T) {
 	})
 
 	t.Run("Controller", func(t *testing.T) {
-		assert.NoError(t, GetAgentService().StartController())
-		assert.NoError(t, GetAgentService().StopController())
-		assert.NoError(t, GetAgentService().StartController())
-		assert.NoError(t, GetAgentService().StopController())
+		addr := "127.0.0.1" + GetController().Connector.ControllerAddr
+		for i := 0; i < 5; i++ {
+			assert.NoError(t, GetAgentService().StartController())
+			assert.NotNil(t, GetController().srv.Load(), "running after start #%d", i)
+			if conn, err := net.DialTimeout("tcp", addr, time.Second); assert.NoError(t, err) {
+				_ = conn.Close()
+			}
+			assert.NoError(t, GetAgentService().StopController())
+			assert.Nil(t, GetController().srv.Load(), "stopped after stop #%d", i)
+		}
 	})
 
 	t.Run("NATS", func(t *testing.T) {
@@ -181,6 +188,54 @@ func TestDemandConfig(t *testing.T) {
 		assert.Equal(t, int32(3), atomic.LoadInt32(count),
 			"expected no further reload after success")
 	})
+}
+
+// TestDemandConfigControllerUnavailable locks in that a controller which
+// cannot listen does not stop the connector from running on its local config.
+func TestDemandConfigControllerUnavailable(t *testing.T) {
+	svc := GetAgentService()
+	conn := svc.Connector
+	prevAddr, prevTimeout, prevAgentID := conn.ControllerAddr, conn.ControllerStartTimeout, conn.AgentID
+	t.Cleanup(func() {
+		_ = svc.StopController()
+		conn.ControllerAddr, conn.ControllerStartTimeout, conn.AgentID = prevAddr, prevTimeout, prevAgentID
+	})
+
+	// hold the port without SO_REUSEPORT so the controller cannot bind it
+	busy, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = busy.Close() })
+	conn.ControllerAddr = busy.Addr().String()
+	conn.ControllerStartTimeout = 300 * time.Millisecond
+	conn.AgentID = ""
+
+	assert.Error(t, svc.StartController())
+	assert.NoError(t, svc.DemandConfig())
+}
+
+// TestControllerTLSKeyPairError locks in that the listener is released when
+// ServeTLS fails to load the key pair, so no orphan socket shares the port.
+func TestControllerTLSKeyPairError(t *testing.T) {
+	svc := GetAgentService()
+	conn := svc.Connector
+	prevAddr, prevCert, prevKey := conn.ControllerAddr, conn.ControllerCertFile, conn.ControllerKeyFile
+	t.Cleanup(func() {
+		_ = svc.StopController()
+		conn.ControllerAddr, conn.ControllerCertFile, conn.ControllerKeyFile = prevAddr, prevCert, prevKey
+	})
+
+	conn.ControllerAddr = "127.0.0.1:11098"
+	conn.ControllerCertFile = filepath.Join(t.TempDir(), "missing.crt")
+	conn.ControllerKeyFile = filepath.Join(t.TempDir(), "missing.key")
+
+	assert.NoError(t, svc.StartController())
+	assert.Eventually(t, func() bool { return GetController().srv.Load() == nil },
+		2*time.Second, 10*time.Millisecond, "expected server cleared after ServeTLS error")
+	// a plain listener cannot share the port with a leaked SO_REUSEPORT socket
+	l, err := net.Listen("tcp", conn.ControllerAddr)
+	if assert.NoError(t, err, "expected the port to be released") {
+		_ = l.Close()
+	}
 }
 
 // TestStartTransportPlaceholderAgentID locks in that the placeholder AgentID

@@ -13,6 +13,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -42,7 +43,9 @@ type Controller struct {
 	muGWOS      sync.Mutex
 	authCache   *cache.Cache
 	entrypoints []Entrypoint
-	srv         *http.Server
+	// srv is set while the http server listens; stopController clears it,
+	// the serve goroutine clears it only when serving ends on its own
+	srv atomic.Pointer[http.Server]
 }
 
 // Credentials defines type of AuthCache items
@@ -85,10 +88,24 @@ func (controller *Controller) RemoveEntrypoints() {
 	controller.entrypoints = []Entrypoint{}
 }
 
+// controllerListenConfig sets SO_REUSEPORT to prevent
+// "bind: address already in use" error on stop-start controller
+var controllerListenConfig = net.ListenConfig{
+	Control: func(network, address string, c syscall.RawConn) error {
+		var opErr error
+		if err := c.Control(func(fd uintptr) {
+			opErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
+		}); err != nil {
+			return err
+		}
+		return opErr
+	},
+}
+
 // starts the http server
 // overrides AgentService implementation
 func (controller *Controller) startController() error {
-	if controller.srv != nil {
+	if controller.srv.Load() != nil {
 		log.Warn().Msg("controller already started")
 		return nil
 	}
@@ -110,85 +127,62 @@ func (controller *Controller) startController() error {
 	router.Use(sessions.Sessions("tcg-session", cookie.NewStore([]byte("secret"))))
 	controller.registerAPI1(router, addr, controller.entrypoints)
 
-	/* set a short timer to wait for http.Server starting */
-	idleTimer := time.NewTimer(startRetryDelay * 2)
-	go func() {
-		t0 := time.Now()
-		controller.srv = &http.Server{
-			Addr:         addr,
-			Handler:      router,
-			ReadTimeout:  controller.Connector.ControllerReadTimeout,
-			WriteTimeout: controller.Connector.ControllerWriteTimeout,
-		}
-		lc := net.ListenConfig{
-			Control: func(network, address string, c syscall.RawConn) error {
-				var opErr error
-				if err := c.Control(func(fd uintptr) {
-					opErr = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_REUSEPORT, 1)
-				}); err != nil {
-					return err
-				}
-				return opErr
-			},
-		}
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      router,
+		ReadTimeout:  controller.Connector.ControllerReadTimeout,
+		WriteTimeout: controller.Connector.ControllerWriteTimeout,
+	}
 
-		for {
-			var err error
-			var l net.Listener
-			if certFile != "" && keyFile != "" {
-				log.Info().Msgf("controller starts listen TLS: %s", addr)
-				// err = controller.srv.ListenAndServeTLS(certFile, keyFile)
-				// using listener with configured socket options SO_REUSEPORT to prevent
-				// "bind: address already in use" error on stop-start controller
-				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
-					err = controller.srv.ServeTLS(l, certFile, keyFile)
-				}
-			} else {
-				log.Info().Msgf("controller starts listen: %s", addr)
-				// err = controller.srv.ListenAndServe()
-				// using listener with configured socket options SO_REUSEPORT to prevent
-				// "bind: address already in use" error on stop-start controller
-				if l, err = lc.Listen(context.Background(), "tcp", addr); err == nil {
-					err = controller.srv.Serve(l)
-				}
-			}
-			/* getting here after http.Server exit */
-			/* catch the "bind: address already in use" error */
-			if err != nil && tcgerr.IsErrorAddressInUse(err) &&
-				time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
-				log.Warn().Err(err).Msg("controller retrying http.Server start")
-				time.Sleep(startRetryDelay)
-				idleTimer.Reset(startRetryDelay * 2)
-				continue
-			} else if err != nil && err != http.ErrServerClosed {
-				log.Err(err).Msg("controller got http.Server error")
-			}
-			break
+	/* listen before returning, retrying while the address is still in use */
+	t0 := time.Now()
+	l, err := controllerListenConfig.Listen(context.Background(), "tcp", addr)
+	for err != nil && tcgerr.IsErrorAddressInUse(err) &&
+		time.Since(t0) < controller.Connector.ControllerStartTimeout-startRetryDelay {
+		log.Warn().Err(err).Msg("controller retrying http.Server start")
+		time.Sleep(startRetryDelay)
+		l, err = controllerListenConfig.Listen(context.Background(), "tcp", addr)
+	}
+	if err != nil {
+		log.Err(err).Msg("controller could not listen")
+		return err
+	}
+
+	controller.srv.Store(srv)
+	go func() {
+		var err error
+		if certFile != "" && keyFile != "" {
+			log.Info().Msgf("controller starts listen TLS: %s", addr)
+			err = srv.ServeTLS(l, certFile, keyFile)
+		} else {
+			log.Info().Msgf("controller starts listen: %s", addr)
+			err = srv.Serve(l)
 		}
-		controller.srv = nil
+		if err != nil && err != http.ErrServerClosed {
+			log.Err(err).Msg("controller got http.Server error")
+			/* ServeTLS returns without closing l when the key pair fails to load */
+			_ = l.Close()
+		}
+		/* clear only our own server, a newer one may have been started meanwhile */
+		controller.srv.CompareAndSwap(srv, nil)
 	}()
-	/* wait for http.Server starting to prevent misbehavior on immediate shutdown */
-	<-idleTimer.C
 	return nil
 }
 
 // gracefully shutdowns the http server
 // overrides AgentService implementation
 func (controller *Controller) stopController() error {
-	// NOTE: the controller.agentStatus.Controller will be updated by controller.StartController itself
-	if controller.srv == nil {
+	srv := controller.srv.Swap(nil)
+	if srv == nil {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), controller.Connector.ControllerStopTimeout)
-	go func() {
-		log.Info().Msg("controller shutdown ...")
-		if err := controller.srv.Shutdown(ctx); err != nil {
-			log.Warn().Msgf("controller got %s", err)
-		}
-		cancel()
-	}()
-	/* wait for http.Server stopping to prevent misbehavior on immediate start */
-	<-ctx.Done()
+	defer cancel()
+	log.Info().Msg("controller shutdown ...")
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Warn().Err(err).Msg("controller shutdown failed, closing")
+		_ = srv.Close()
+	}
 	return nil
 }
 
