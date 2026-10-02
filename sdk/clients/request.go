@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -163,6 +164,8 @@ type Req struct {
 	client   *http.Client
 	duration time.Duration
 	header   http.Header
+	// internal keeps the internal ctx headers, which are logged but not sent
+	internal http.Header
 }
 
 // SetClient sets http.Client to use
@@ -200,15 +203,30 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 		q.Status, q.Err = -1, err
 		return err
 	}
+	q.internal = nil
 	if h, ok := HeaderFromCtx(ctx); ok {
-		// clone values too, so adding request headers never writes into the ctx header
-		request.Header = h.Clone()
+		// Add canonicalizes keys and copies values, so the ctx header is never written
+		for k, vv := range h {
+			dst := request.Header
+			if internalHeaders[http.CanonicalHeaderKey(k)] {
+				if q.internal == nil {
+					q.internal = make(http.Header)
+				}
+				dst = q.internal
+			}
+			for _, v := range vv {
+				dst.Add(k, v)
+			}
+		}
 	}
 	if !httpClientKeepAlive {
 		request.Header.Set("Connection", "close")
 	}
 	for k, v := range q.Headers {
-		request.Header.Add(k, v)
+		// headers from ctx take precedence, so a key is never sent twice
+		if _, ok := request.Header[http.CanonicalHeaderKey(k)]; !ok {
+			request.Header.Set(k, v)
+		}
 	}
 	_, request = HookRequestContext(ctx, request)
 
@@ -236,6 +254,16 @@ func (q *Req) SendWithContext(ctx context.Context) error {
 	return nil
 }
 
+// loggedHeader returns the sent header together with the internal ctx headers
+func (q Req) loggedHeader() http.Header {
+	if len(q.internal) == 0 {
+		return q.header
+	}
+	h := q.header.Clone()
+	maps.Copy(h, q.internal)
+	return h
+}
+
 func (q Req) Details() []slog.Attr {
 	return q.logAttrs(true)
 }
@@ -256,8 +284,8 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 	}
 	if q.Status >= 400 || forceDetails ||
 		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
-		if len(q.header) > 0 {
-			attrs = append(attrs, slog.Any("header", q.header))
+		if h := q.loggedHeader(); len(h) > 0 {
+			attrs = append(attrs, slog.Any("header", h))
 		}
 
 		if len(q.Form) > 0 {
