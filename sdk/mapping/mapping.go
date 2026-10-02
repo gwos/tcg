@@ -13,6 +13,9 @@ var (
 	ErrMappingCompile       = fmt.Errorf("%w: %v", ErrMapping, "compile")
 	ErrMappingMissedTag     = fmt.Errorf("%w: %v", ErrMapping, "missed tag")
 	ErrMappingMismatchedTag = fmt.Errorf("%w: %v", ErrMapping, "mismatched tag")
+	ErrMappingEmptyResult   = fmt.Errorf("%w: %v", ErrMapping, "empty result")
+
+	errNotCompiled = errors.New("not compiled")
 )
 
 type Mapping struct {
@@ -99,6 +102,9 @@ func (p Mappings) Apply(tags map[string]string) (string, error) {
 			result = append(result, mapping.Template...)
 			continue
 		}
+		if mapping.matcher == nil {
+			return "", mapping.errCompile(i, errNotCompiled)
+		}
 		content, ok := tags[mapping.Tag]
 		if !ok {
 			return "", fmt.Errorf("%w: %v", ErrMappingMissedTag, mapping.Tag)
@@ -116,6 +122,9 @@ func (p Mappings) ApplyOR(tags map[string]string) (string, error) {
 		mapping := &p[i]
 		if mapping.Tag == "" {
 			return mapping.Template, nil
+		}
+		if mapping.matcher == nil {
+			return "", mapping.errCompile(i, errNotCompiled)
 		}
 		content, ok := mapping.joinTags(tags)
 		if !ok {
@@ -138,22 +147,68 @@ func (p Mappings) ApplyOR(tags map[string]string) (string, error) {
 	return "", nil
 }
 
+// Lookup applies ApplyOR and tells unconfigured mappings apart from failed ones.
+// It returns ok=false with a nil error when p is empty,
+// an error when no mapping matches or the mapped value is empty,
+// and the mapped value with ok=true otherwise.
+func (p Mappings) Lookup(tags map[string]string) (string, bool, error) {
+	if len(p) == 0 {
+		return "", false, nil
+	}
+	v, err := p.ApplyOR(tags)
+	if err == nil && v == "" {
+		err = ErrMappingEmptyResult
+	}
+	return v, err == nil, err
+}
+
+// Matches reports whether any mapping applies to tags with a non-empty result.
+// It reports false when p is empty.
+func (p Mappings) Matches(tags map[string]string) bool {
+	v, err := p.ApplyOR(tags)
+	return err == nil && v != ""
+}
+
 // Compile compiles mappings matchers.
+// It stops at the first invalid matcher.
 func (p Mappings) Compile() error {
 	for i := range p {
 		if err := p[i].Compile(); err != nil {
-			return fmt.Errorf("%w [%d:%v]: %v", ErrMappingCompile, i, p[i].Tag, err)
+			return p[i].errCompile(i, err)
 		}
 	}
 	return nil
 }
 
+// CompileValid compiles mappings matchers and returns the mappings that compiled.
+// The errors of the dropped mappings are joined into the returned error.
+func (p Mappings) CompileValid() (Mappings, error) {
+	var (
+		valid Mappings
+		errs  []error
+	)
+	for i := range p {
+		if err := p[i].Compile(); err != nil {
+			errs = append(errs, p[i].errCompile(i, err))
+			continue
+		}
+		valid = append(valid, p[i])
+	}
+	return valid, errors.Join(errs...)
+}
+
+func (p *Mapping) errCompile(i int, err error) error {
+	return fmt.Errorf("%w [%d:%v]: %v", ErrMappingCompile, i, p.Tag, err)
+}
+
+// MatchString reports whether str matches any mapping matcher, or true if p is empty.
+// Mappings that are not compiled never match.
 func (p Mappings) MatchString(str string) bool {
 	if len(p) == 0 {
 		return true
 	}
 	for i := range p {
-		if p[i].matcher.MatchString(str) {
+		if p[i].matcher != nil && p[i].matcher.MatchString(str) {
 			return true
 		}
 	}
