@@ -384,6 +384,15 @@ func TestGWClientSendMethods(t *testing.T) {
 	})
 }
 
+func gzipBytes(t *testing.T, p []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := GZipTo(&buf, p); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
 func gunzip(t *testing.T, p []byte) []byte {
 	t.Helper()
 	r, err := gzip.NewReader(bytes.NewReader(p))
@@ -400,10 +409,6 @@ func gunzip(t *testing.T, p []byte) []byte {
 func TestGWClientEncoding(t *testing.T) {
 	small := []byte(`{"key":"value"}`)
 	large := bytes.Repeat([]byte("x"), httpEncodeMinSize+1)
-	var gzipped bytes.Buffer
-	if _, err := GZip(context.Background(), &gzipped, small); err != nil {
-		t.Fatal(err)
-	}
 
 	cases := []struct {
 		name       string
@@ -415,7 +420,7 @@ func TestGWClientEncoding(t *testing.T) {
 		{"plain", false, small, false, small},
 		{"http encode", true, small, true, small},
 		{"large", false, large, true, large},
-		{"already gzipped", false, gzipped.Bytes(), true, small},
+		{"already gzipped", false, gzipBytes(t, small), true, small},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
