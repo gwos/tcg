@@ -34,7 +34,7 @@ func init() {
 var (
 	// export debug info AgentStatus
 	xAgentStatusController = expvar.Func(func() any {
-		if controller != nil && controller.srv != nil {
+		if controller != nil && controller.srv.Load() != nil {
 			return StatusRunning
 		}
 		return StatusStopped

@@ -15,6 +15,10 @@ import (
 )
 
 var (
+	// configMu guards the writer configuration below: writes hold it for reading,
+	// NewLoggerWriter holds it for writing while it applies options
+	configMu sync.RWMutex
+
 	logFile   io.WriteCloser
 	errBuffer = &LogBuffer{
 		Level: zerolog.ErrorLevel,
@@ -63,17 +67,15 @@ func (w *CondenseWriter) Write(p []byte) (int, error) {
 
 // WriteLevel implements zerolog.LevelWriter interface
 func (w *CondenseWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
-	if w.Condense <= 0 {
+	configMu.RLock()
+	condense := w.Condense
+	configMu.RUnlock()
+	if condense <= 0 {
 		/* condensing disabled: skip cache/regex work entirely */
-		return w.LevelWriter.WriteLevel(lvl, p)
+		return w.writeLevel(lvl, p)
 	}
 	w.once.Do(func() {
-		defaultExpiration, cleanupInterval := time.Minute*10, time.Second*10
-		if w.Condense > 0 {
-			defaultExpiration = w.Condense * 2
-			cleanupInterval = w.Condense / 4
-		}
-		w.cache = cache.New(defaultExpiration, cleanupInterval)
+		w.cache = cache.New(condense*2, condense/4)
 		w.cache.OnEvicted(w.onEvicted())
 		w.callerRe = regexp.MustCompile(`"` + zerolog.CallerFieldName + `":"[^"]*"`)
 	})
@@ -89,10 +91,15 @@ func (w *CondenseWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
 		_ = w.cache.Increment(ck, 1)
 		return len(p), nil
 	}
-	/* skip caching if not condense */
-	if w.Condense > 0 {
-		_ = w.cache.Add(ck, uint16(0), w.Condense)
-	}
+	_ = w.cache.Add(ck, uint16(0), condense)
+	return w.writeLevel(lvl, p)
+}
+
+// writeLevel writes to the underlying writer while its configuration can't change.
+// It locks only around the write, as cache evictions call it from within WriteLevel too.
+func (w *CondenseWriter) writeLevel(lvl zerolog.Level, p []byte) (int, error) {
+	configMu.RLock()
+	defer configMu.RUnlock()
 	return w.LevelWriter.WriteLevel(lvl, p)
 }
 
@@ -124,6 +131,9 @@ func (w *CondenseWriter) onEvicted() func(string, any) {
 
 		v := i.(uint16)
 		if v > 0 {
+			configMu.RLock()
+			condense := w.Condense
+			configMu.RUnlock()
 			lvl, caller := zerolog.Level(ck[0]), ck[2:]
 			buf := append(make([]byte, 0, 200), '{')
 			buf = appendLvl(buf, lvl)
@@ -136,9 +146,9 @@ func (w *CondenseWriter) onEvicted() func(string, any) {
 			buf = append(buf, `":"[condensed `...)
 			buf = strconv.AppendInt(buf, int64(v), 10)
 			buf = append(buf, ` more entries last `...)
-			buf = strconv.AppendInt(buf, int64(w.Condense.Seconds()), 10)
+			buf = strconv.AppendInt(buf, int64(condense.Seconds()), 10)
 			buf = append(buf, ` seconds]"}`...)
-			_, _ = w.LevelWriter.WriteLevel(lvl, buf)
+			_, _ = w.writeLevel(lvl, buf)
 		}
 	}
 }
@@ -242,6 +252,9 @@ type Option func()
 
 // NewLoggerWriter returns writer
 func NewLoggerWriter(opts ...Option) io.Writer {
+	/* concurrent writes wait while the configuration changes */
+	configMu.Lock()
+	defer configMu.Unlock()
 	if logFile != nil {
 		logFile.Close()
 		logFile = nil
@@ -254,6 +267,7 @@ func NewLoggerWriter(opts ...Option) io.Writer {
 	for _, p := range lastErrors {
 		_, _ = errBuffer.WriteLevel(p.lvl, p.buf)
 	}
+	formatter.Out = os.Stdout
 	if logFile != nil {
 		formatter.Out = zerolog.MultiLevelWriter(os.Stdout, logFile)
 	}
