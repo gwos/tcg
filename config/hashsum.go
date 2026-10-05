@@ -1,26 +1,19 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"hash/fnv"
 )
 
 // Hashsum calculates FNV non-cryptographic hash suitable for checking the equality
 func Hashsum(args ...any) ([]byte, error) {
-	var b bytes.Buffer
+	h := fnv.New128()
 	for _, arg := range args {
 		s, err := json.Marshal(arg)
 		if err != nil {
 			return nil, err
 		}
-		if _, err := b.Write(s); err != nil {
-			return nil, err
-		}
-	}
-	h := fnv.New128()
-	if _, err := h.Write(b.Bytes()); err != nil {
-		return nil, err
+		_, _ = h.Write(s)
 	}
 	return h.Sum(nil), nil
 }
