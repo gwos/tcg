@@ -11,20 +11,25 @@ type LogFile struct {
 	mu       sync.Mutex
 	file     *os.File
 	fileSize int64
+	closed   bool
 
 	FilePath string
 	MaxSize  int64
 	Rotate   int
 }
 
-// Close implements io.Closer interface
+// Close implements io.Closer interface,
+// later writes are appended one by one without keeping the file open
 func (f *LogFile) Close() error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.closed = true
 	if f.file == nil {
 		return nil
 	}
-	return f.file.Close()
+	err := f.file.Close()
+	f.file = nil
+	return err
 }
 
 // Write implements io.Writer interface
@@ -32,6 +37,9 @@ func (f *LogFile) Write(p []byte) (int, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
+	if f.closed {
+		return f.appendOnce(p)
+	}
 	if f.file == nil {
 		f.open()
 	}
@@ -49,6 +57,15 @@ func (f *LogFile) Write(p []byte) (int, error) {
 		f.fileSize += int64(n)
 	}
 	return n, err
+}
+
+func (f *LogFile) appendOnce(p []byte) (int, error) {
+	file, err := os.OpenFile(f.FilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+	return file.Write(p)
 }
 
 func (f *LogFile) open() {

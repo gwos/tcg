@@ -169,7 +169,8 @@ func GetAgentService() *AgentService {
 // DemandConfig implements AgentServices.DemandConfig interface
 func (service *AgentService) DemandConfig() error {
 	if err := service.StartController(); err != nil {
-		return err
+		/* keep running on the local config, the config api is just unavailable */
+		log.Warn().Err(err).Msg("controller is not available")
 	}
 	// if config.GetConfig().IsPMC() {
 	// 	log.Info().Msg("configuring PARENT_MANAGED_CHILD")
