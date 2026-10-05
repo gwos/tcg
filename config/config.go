@@ -315,18 +315,7 @@ func GetConfig() *Config {
 		applyFlags()
 		cfg = new(Config)
 		*cfg = defaults()
-		if data, err := os.ReadFile(cfg.ConfigPath()); err != nil {
-			log.Warn().Err(err).
-				Str("configPath", cfg.ConfigPath()).
-				Msg("could not read config")
-		} else {
-			if err := yaml.Unmarshal(data, cfg); err != nil {
-				log.Err(err).
-					Str("configData", string(data)).
-					Str("configPath", cfg.ConfigPath()).
-					Msg("could not parse config")
-			}
-		}
+		readConfigFile(cfg)
 		if err := applyEnv(cfg, &Suppress); err != nil {
 			log.Warn().Err(err).
 				Msg("could not apply env vars")
@@ -341,18 +330,7 @@ func GetConfig() *Config {
 		logSuppress(Suppress.Inventory, "Inventory")
 		logSuppress(Suppress.Metrics, "Metrics")
 
-		/* process PMC */
-		if cfg.IsPMC() {
-			cfg.Connector.InstallationMode = InstallationModePMC
-			cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
-		}
-		/* prepare gwConnections */
-		gwEncode := strings.ToLower(cfg.Connector.GWEncode)
-		for i := range cfg.GWConnections {
-			cfg.GWConnections[i].IsDynamicInventory = cfg.Connector.IsDynamicInventory
-			cfg.GWConnections[i].HTTPEncode = gwEncode == "force" ||
-				(gwEncode != "off" && cfg.GWConnections[i].IsChild)
-		}
+		cfg.prepare()
 		/* init logger and flush buffer */
 		cfg.initLogger()
 		logzer.WriteLogBuffer(logBuf)
@@ -360,6 +338,39 @@ func GetConfig() *Config {
 		nats.RetryDelays = cfg.Connector.RetryDelays
 	})
 	return cfg
+}
+
+// readConfigFile merges the config file into cfg
+func readConfigFile(cfg *Config) {
+	data, err := os.ReadFile(cfg.ConfigPath())
+	if err != nil {
+		log.Warn().Err(err).
+			Str("configPath", cfg.ConfigPath()).
+			Msg("could not read config")
+		return
+	}
+	if err := yaml.Unmarshal(data, cfg); err != nil {
+		log.Err(err).
+			Str("configData", string(data)).
+			Str("configPath", cfg.ConfigPath()).
+			Msg("could not parse config")
+	}
+}
+
+// prepare applies the installation mode and derives the GW connection settings
+func (cfg *Config) prepare() {
+	/* process PMC */
+	if cfg.IsPMC() {
+		cfg.Connector.InstallationMode = InstallationModePMC
+		cfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
+	}
+	/* prepare gwConnections */
+	gwEncode := strings.ToLower(cfg.Connector.GWEncode)
+	for i := range cfg.GWConnections {
+		cfg.GWConnections[i].IsDynamicInventory = cfg.Connector.IsDynamicInventory
+		cfg.GWConnections[i].HTTPEncode = gwEncode == "force" ||
+			(gwEncode != "off" && cfg.GWConnections[i].IsChild)
+	}
 }
 
 // ConfigPath returns config file path
@@ -447,19 +458,7 @@ func (cfg *Config) loadDynamicInventoryFlag(_ []byte) error {
 func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 	newCfg := new(Config)
 	*newCfg = defaults()
-	/* load config file */
-	if data, err := os.ReadFile(newCfg.ConfigPath()); err != nil {
-		log.Warn().Err(err).
-			Str("configPath", newCfg.ConfigPath()).
-			Msg("could not read config")
-	} else {
-		if err := yaml.Unmarshal(data, newCfg); err != nil {
-			log.Warn().Err(err).
-				Str("configData", string(data)).
-				Str("configPath", newCfg.ConfigPath()).
-				Msg("could not parse config")
-		}
-	}
+	readConfigFile(newCfg)
 	/* load as ConnectorDTO */
 	dto, err := newCfg.loadConnector(data)
 	if err != nil {
@@ -493,18 +492,7 @@ func (cfg *Config) LoadConnectorDTO(data []byte) (*ConnectorDTO, error) {
 		}
 	}
 
-	/* process PMC */
-	if cfg.IsPMC() {
-		newCfg.Connector.InstallationMode = InstallationModePMC
-		newCfg.DSConnection.HostName = os.Getenv(ParentInstanceNameEnv)
-	}
-	/* prepare gwConnections */
-	gwEncode := strings.ToLower(newCfg.Connector.GWEncode)
-	for i := range newCfg.GWConnections {
-		newCfg.GWConnections[i].IsDynamicInventory = newCfg.Connector.IsDynamicInventory
-		newCfg.GWConnections[i].HTTPEncode = gwEncode == "force" ||
-			(gwEncode != "off" && newCfg.GWConnections[i].IsChild)
-	}
+	newCfg.prepare()
 	/* update config */
 	cfg.Connector = newCfg.Connector
 	cfg.DSConnection = newCfg.DSConnection

@@ -23,18 +23,20 @@ type SLogHandler struct {
 }
 
 func (h *SLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	l := zerolog.GlobalLevel()
+	return zerolog.GlobalLevel() <= zerologLevel(level)
+}
+
+// zerologLevel maps slog levels, others are taken as info
+func zerologLevel(level slog.Level) zerolog.Level {
 	switch level {
 	case slog.LevelDebug:
-		return l <= zerolog.DebugLevel
-	case slog.LevelInfo:
-		return l <= zerolog.InfoLevel
+		return zerolog.DebugLevel
 	case slog.LevelWarn:
-		return l <= zerolog.WarnLevel
+		return zerolog.WarnLevel
 	case slog.LevelError:
-		return l <= zerolog.ErrorLevel
+		return zerolog.ErrorLevel
 	default:
-		return l <= zerolog.InfoLevel
+		return zerolog.InfoLevel
 	}
 }
 
@@ -45,20 +47,7 @@ func (h *SLogHandler) Handle(ctx context.Context, r slog.Record) error {
 		}
 	})
 
-	var l zerolog.Level
-	switch r.Level {
-	case slog.LevelDebug:
-		l = zerolog.DebugLevel
-	case slog.LevelInfo:
-		l = zerolog.InfoLevel
-	case slog.LevelWarn:
-		l = zerolog.WarnLevel
-	case slog.LevelError:
-		l = zerolog.ErrorLevel
-	default:
-		l = zerolog.InfoLevel
-	}
-	e := zlog.WithLevel(l)
+	e := zlog.WithLevel(zerologLevel(r.Level))
 
 	attr2e := func(attr slog.Attr) bool {
 		switch attr.Value.Kind() {
@@ -100,17 +89,20 @@ func (h *SLogHandler) Handle(ctx context.Context, r slog.Record) error {
 }
 
 func (h *SLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	nested := &SLogHandler{CallerSkipFrame: h.CallerSkipFrame, GroupsFieldName: h.GroupsFieldName}
-	nested.attrs = append(nested.attrs, h.attrs...)
-	nested.groups = append(nested.groups, h.groups...)
+	nested := h.clone()
 	nested.attrs = append(nested.attrs, attrs...)
 	return nested
 }
 
 func (h *SLogHandler) WithGroup(name string) slog.Handler {
+	nested := h.clone()
+	nested.groups = append(nested.groups, name)
+	return nested
+}
+
+func (h *SLogHandler) clone() *SLogHandler {
 	nested := &SLogHandler{CallerSkipFrame: h.CallerSkipFrame, GroupsFieldName: h.GroupsFieldName}
 	nested.attrs = append(nested.attrs, h.attrs...)
 	nested.groups = append(nested.groups, h.groups...)
-	nested.groups = append(nested.groups, name)
 	return nested
 }

@@ -55,8 +55,5 @@ func applyEnv(v ...any) error {
 			ee = append(ee, err)
 		}
 	}
-	if len(ee) > 0 {
-		return errors.Join(ee...)
-	}
-	return nil
+	return errors.Join(ee...)
 }
