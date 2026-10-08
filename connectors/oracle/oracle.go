@@ -39,6 +39,8 @@ var hostDimensionKeys = map[string]struct{}{
 
 func collectMetrics() {
 	cfg, cfgVersion, ctx := extConfig, configVersion.Load(), ctxCancel
+	lastCheckTime := *transit.NewTimestamp()
+	nextCheckTime := lastCheckTime.Add(cfg.CheckInterval)
 
 	if cfg.OracleTenancyOCID == "" || cfg.OracleUserOCID == "" ||
 		cfg.OraclePrivateKey == "" || cfg.OracleFingerprint == "" || cfg.OracleRegion == "" {
@@ -192,7 +194,8 @@ func collectMetrics() {
 			continue
 		}
 
-		services := buildServices(res.DisplayName, metricsByOCID[res.OCID], cfg.CheckInterval, cfg.OracleAggregationType)
+		services := buildServices(res.DisplayName, metricsByOCID[res.OCID], cfg.CheckInterval, cfg.OracleAggregationType,
+			lastCheckTime, nextCheckTime)
 		mResource, err := connectors.CreateResource(res.DisplayName, services)
 		if err != nil {
 			log.Error().Err(err).
@@ -202,6 +205,9 @@ func collectMetrics() {
 			continue
 		}
 		mResource.Status = mapLifecycleStateToHostStatus(res.LifecycleState)
+		resLastCheckTime, resNextCheckTime := lastCheckTime, nextCheckTime
+		mResource.LastCheckTime = &resLastCheckTime
+		mResource.NextCheckTime = &resNextCheckTime
 		mResources = append(mResources, *mResource)
 
 		groupName := compartmentNames[res.CompartmentID]
@@ -259,7 +265,8 @@ func collectMetrics() {
 }
 
 func buildServices(
-	resourceName string, hostServices map[string]map[string]serviceMetricState, interval time.Duration, aggregation string,
+	resourceName string, hostServices map[string]map[string]serviceMetricState,
+	interval time.Duration, aggregation string, lastCheckTime, nextCheckTime transit.Timestamp,
 ) []transit.MonitoredService {
 	if len(hostServices) == 0 {
 		return nil
@@ -321,6 +328,9 @@ func buildServices(
 			continue
 		}
 		service.LastPluginOutput = buildServiceLastPluginOutput(serviceName, interval, aggregation, metricBuilders, noDataCount)
+		svcLastCheckTime, svcNextCheckTime := lastCheckTime, nextCheckTime
+		service.LastCheckTime = &svcLastCheckTime
+		service.NextCheckTime = &svcNextCheckTime
 		services = append(services, *service)
 	}
 
