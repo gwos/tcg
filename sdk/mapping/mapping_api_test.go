@@ -36,6 +36,36 @@ func TestMappingsLookup(t *testing.T) {
 	}
 }
 
+func TestMappingsFirstMatch(t *testing.T) {
+	tags := map[string]string{
+		"message":   "disk full on /var, disk full on /tmp",
+		"host":      "node1-rack2",
+		"lines":     "disk full\nretry",
+		tagCluster:  "prod",
+		"namespace": "kube-system",
+	}
+	cases := []struct {
+		name    string
+		mapping *Mapping
+		want    string
+	}{
+		{"literal template", NewMapping("message", "disk full", "SERVICE_WARNING"), "SERVICE_WARNING"},
+		{"capture group", NewMapping("host", `(\d+)`, "$1"), "1"},
+		{"multi-line value", NewMapping("lines", matchAll, "$1"), "disk full"},
+		{"joined tags", NewMapping("cluster,namespace", "([^,]+)", "$1-"), "prod-"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if v, err := (Mappings{*tc.mapping}).ApplyOR(tags); v != tc.want || err != nil {
+				t.Errorf("ApplyOR() = %q, %v; want %q, nil", v, err, tc.want)
+			}
+		})
+	}
+	if v, err := (Mappings{*NewMapping("message", "disk full", "SERVICE_WARNING")}).Apply(tags); v != "SERVICE_WARNING" || err != nil {
+		t.Errorf("Apply() = %q, %v; want %q, nil", v, err, "SERVICE_WARNING")
+	}
+}
+
 func TestMappingsCompileValid(t *testing.T) {
 	mappings := Mappings{
 		{Tag: "a", Matcher: matchAll, Template: "$1"},
