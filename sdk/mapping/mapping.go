@@ -19,11 +19,11 @@ var (
 )
 
 type Mapping struct {
-	Tag string `json:"tag"`
+	Tag string `json:"tag" toml:"tag"`
 	// Match tag value with regexp
-	Matcher string `json:"matcher"`
-	// Expand Template with matches
-	Template string `json:"template"`
+	Matcher string `json:"matcher" toml:"matcher"`
+	// Expand Template with the first match
+	Template string `json:"template" toml:"template"`
 
 	matcher *regexp.Regexp
 	// keys holds the trimmed comma-separated Tag names used by ApplyOR
