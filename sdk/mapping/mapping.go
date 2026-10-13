@@ -53,17 +53,14 @@ func (p *Mapping) Compile() error {
 	return nil
 }
 
-// expand appends Template expanded for every match in content to dst.
+// expand appends Template expanded for the first match in content to dst.
 // It reports false if content does not match.
 func (p *Mapping) expand(dst []byte, content string) ([]byte, bool) {
-	matches := p.matcher.FindAllStringSubmatchIndex(content, -1)
-	if matches == nil {
+	submatches := p.matcher.FindStringSubmatchIndex(content)
+	if submatches == nil {
 		return dst, false
 	}
-	for _, submatches := range matches {
-		dst = p.matcher.ExpandString(dst, p.Template, content, submatches)
-	}
-	return dst, true
+	return p.matcher.ExpandString(dst, p.Template, content, submatches), true
 }
 
 // joinTags returns the comma-joined values of the keys tags.
