@@ -559,8 +559,8 @@ func (cfg Config) initLogger() {
 		log.Logger = zerolog.New(w).
 			With().Timestamp().Caller().
 			Logger()
-		/* adapt SDK logger */
-		sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 3})
+		/* adapt SDK logger, skip frames include the sdklog.XLogger handler */
+		sdklog.Logger = slog.New(&logzer.SLogHandler{CallerSkipFrame: 4})
 		/* set as standard logger output */
 		stdlog.SetFlags(0)
 		stdlog.SetOutput(log.Logger)

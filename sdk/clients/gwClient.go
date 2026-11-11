@@ -156,7 +156,7 @@ func isTransientNet(err error) bool {
 
 // transportErr logs a failed request and wraps network errors worth retrying as transient
 func transportErr(ctx context.Context, req *Req, msg string, err error) error {
-	sdklog.Logger.LogAttrs(ctx, slog.LevelError, msg, req.LogAttrs()...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelError, msg, req.LogAttrs()...)
 	if isTransientNet(err) {
 		return fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 	}
@@ -191,7 +191,7 @@ func statusErr(ctx context.Context, req *Req, msg string, authNotFound bool) err
 	if base == tcgerr.ErrUndecided {
 		attrs = req.Details()
 	}
-	sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, msg, attrs...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, msg, attrs...)
 	return req.Err
 }
 
@@ -199,15 +199,15 @@ func statusErr(ctx context.Context, req *Req, msg string, authNotFound bool) err
 func checkTokenResponse(ctx context.Context, req *Req, okStatus int, msg string) error {
 	if req.Status != okStatus {
 		req.Err = fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not "+msg, req.Details()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not "+msg, req.Details()...)
 		return req.Err
 	}
 	if b, err := strconv.ParseBool(string(req.Response)); err != nil || !b {
 		req.Err = fmt.Errorf("%w: %v", tcgerr.ErrUnauthorized, "invalid gwos-app-name or gwos-api-token")
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not "+msg, req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not "+msg, req.LogAttrs()...)
 		return req.Err
 	}
-	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, msg, req.LogAttrs()...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, msg, req.LogAttrs()...)
 	return nil
 }
 
@@ -261,7 +261,7 @@ func (client *GWClient) connectLocal() (string, error) {
 	if err := statusErr(ctx, &req, msg, true); err != nil {
 		return "", err
 	}
-	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
 	return string(req.Response), nil
 }
 
@@ -289,10 +289,10 @@ func (client *GWClient) AuthenticatePassword(username, password string) (string,
 		AccessToken string `json:"accessToken"`
 	}
 	if err := json.Unmarshal(req.Response, &user); err != nil {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, fmt.Sprintf("could not authenticate password: parsingError: %s", err), req.Details()...)
 		return "", fmt.Errorf("%w: %v", tcgerr.ErrUndecided, err)
 	}
-	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "authenticate password", req.LogAttrs()...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "authenticate password", req.LogAttrs()...)
 	return user.AccessToken, nil
 }
 
@@ -312,7 +312,7 @@ func (client *GWClient) Disconnect() error {
 	if err := statusErr(ctx, &req, msg, false); err != nil {
 		return err
 	}
-	sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "disconnect groundwork", req.LogAttrs()...)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "disconnect groundwork", req.LogAttrs()...)
 	return nil
 }
 
@@ -424,11 +424,11 @@ func (client *GWClient) getJSON(entrypoint GWEntrypoint, query string, what stri
 	}
 	response, err := client.SendRequest(ctx, http.MethodGet, entrypoint, BuildQueryParams(params), nil)
 	if err != nil {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not get GW "+what, slog.String("error", err.Error()))
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelError, "could not get GW "+what, slog.String("error", err.Error()))
 		return err
 	}
 	if err := json.Unmarshal(response, out); err != nil {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not parse received GW "+what, slog.String("error", err.Error()))
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelError, "could not parse received GW "+what, slog.String("error", err.Error()))
 		return err
 	}
 	return nil
@@ -455,7 +455,7 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 	headers["GWOS-APP-NAME"] = client.AppName
 	headers["GWOS-API-TOKEN"] = client.token()
 	if len(additionalHeaders)%2 != 0 {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn,
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn,
 			"SendRequest: odd number of additionalHeaders; last value ignored",
 			slog.Int("count", len(additionalHeaders)))
 	}
@@ -467,9 +467,9 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 	req := Req{}
 	err := client.doReq(ctx, &req, httpMethod, entrypoint, queryStr, headers, nil, payload)
 	if err == nil && req.Status == http.StatusUnauthorized {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "could not send request: reconnecting")
 		if err := client.reconnect(headers["GWOS-API-TOKEN"]); err != nil {
-			sdklog.Logger.LogAttrs(ctx, slog.LevelError, "could not send request: could not reconnect", slog.String("error", err.Error()))
+			sdklog.XLogger.LogAttrs(ctx, slog.LevelError, "could not send request: could not reconnect", slog.String("error", err.Error()))
 			return nil, err
 		}
 		req.Headers["GWOS-API-TOKEN"] = client.token()
@@ -479,18 +479,18 @@ func (client *GWClient) SendRequest(ctx context.Context, httpMethod string, entr
 	const msg = "could not send request"
 	if err != nil {
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || isTransientNet(err) {
-			sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, msg, req.LogAttrs()...)
+			sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, msg, req.LogAttrs()...)
 			return nil, fmt.Errorf("%w: %v", tcgerr.ErrTransient, err.Error())
 		}
-		sdklog.Logger.LogAttrs(ctx, slog.LevelError, msg, req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelError, msg, req.LogAttrs()...)
 		return nil, err
 	}
 	if err := statusErr(ctx, &req, msg, false); err != nil {
 		return nil, err
 	}
 
-	if sdklog.Logger.Enabled(ctx, slog.LevelDebug) {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "send request", req.LogAttrs()...)
+	if sdklog.XLogger.Enabled(ctx, slog.LevelDebug) {
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "send request", req.LogAttrs()...)
 	}
 	return req.Response, nil
 }
