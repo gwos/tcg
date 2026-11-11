@@ -45,7 +45,7 @@ func (p *BaseInfo) SetDescription(s string) {
 func (p *BaseInfo) SetProperty(k string, v any) {
 	t := NewTypedValue(v)
 	if t == nil {
-		sdklog.Logger.Error(fmt.Sprintf("could not set property %s on %s: unsupported value type: %T",
+		sdklog.XLogger.Error(fmt.Sprintf("could not set property %s on %s: unsupported value type: %T",
 			k, p.Name, v))
 		return
 	}

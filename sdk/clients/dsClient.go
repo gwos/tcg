@@ -43,7 +43,7 @@ func (client *DSClient) url(path string) string {
 // ValidateToken calls API
 func (client *DSClient) ValidateToken(appName, apiToken string) error {
 	if len(client.HostName) == 0 {
-		sdklog.Logger.Info("DSClient is not configured")
+		sdklog.XLogger.Info("DSClient is not configured")
 		return nil
 	}
 
@@ -58,7 +58,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 		},
 	}
 	if err := req.Send(); err != nil {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not validate token", req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not validate token", req.LogAttrs()...)
 		return err
 	}
 	return checkTokenResponse(ctx, &req, http.StatusCreated, "validate token")
@@ -67,7 +67,7 @@ func (client *DSClient) ValidateToken(appName, apiToken string) error {
 // Reload calls API
 func (client *DSClient) Reload(agentID string) error {
 	if len(client.HostName) == 0 {
-		sdklog.Logger.Info("DSClient is not configured")
+		sdklog.XLogger.Info("DSClient is not configured")
 		return nil
 	}
 
@@ -78,20 +78,20 @@ func (client *DSClient) Reload(agentID string) error {
 		Headers: jsonHeaders(),
 	}
 	if err := req.Send(); err != nil {
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload", req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload", req.LogAttrs()...)
 		return err
 	}
 	switch req.Status {
 	case http.StatusCreated:
-		sdklog.Logger.LogAttrs(ctx, slog.LevelDebug, "request for reload", req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "request for reload", req.LogAttrs()...)
 		return nil
 	case http.StatusNotFound:
 		req.Err = fmt.Errorf("%w: %v", tcgerr.ErrNotFound, string(req.Response))
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload: check AgentID", req.LogAttrs()...)
 		return req.Err
 	default:
 		req.Err = fmt.Errorf("%w: %v", tcgerr.ErrUndecided, string(req.Response))
-		sdklog.Logger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload", req.Details()...)
+		sdklog.XLogger.LogAttrs(ctx, slog.LevelWarn, "could not request for reload", req.Details()...)
 		return req.Err
 	}
 }
