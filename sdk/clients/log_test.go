@@ -34,6 +34,12 @@ func TestGWClientLogsNoSecrets(t *testing.T) {
 		t.Errorf("connectLocal() 201 error = %v", err)
 	}
 
+	// a token in an unexpected login response is masked in the returned error
+	gw.respond(GWEntrypointAuthenticate, http.StatusCreated, `{"name":"u","accessToken":"`+token+`"}`)
+	if _, err := c.AuthenticatePassword("user", password); err == nil || strings.Contains(err.Error(), token) {
+		t.Errorf("AuthenticatePassword() 201 error = %v", err)
+	}
+
 	gw.respond(GWEntrypointConnect, http.StatusUnauthorized, "denied")
 	if _, err := c.connectLocal(); err == nil {
 		t.Fatal("connectLocal() 401 error = nil")

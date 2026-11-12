@@ -51,6 +51,10 @@ func (h *SLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	})
 
 	e := zlog.WithLevel(zerologLevel(r.Level))
+	if e == nil {
+		/* disabled by the zerolog logger level, skip attrs and the caller lookup */
+		return nil
+	}
 
 	attr2e := func(attr slog.Attr) bool {
 		switch attr.Value.Kind() {

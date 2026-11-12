@@ -189,6 +189,10 @@ func TestMaskString(t *testing.T) {
 		{`http://gw:8080#a@b`, `http://gw:8080#a@b`},
 		{`token abc123`, `token abc123`},
 		{`Cookie: JSESSIONID=abc`, `Cookie: ***`},
+		{`Authorization: Negotiate abc`, `Authorization: Negotiate ***`},
+		{`authorization digest abc`, `authorization digest ***`},
+		// an escaped quote keeps its backslash, so a JSON line stays valid
+		{`{"error":"bad password=\"s3\"","x":1}`, `{"error":"bad password=\"s3\"","x":1}`},
 		{`/api?token=abc&agent=x`, `/api?token=***&agent=x`},
 		{`mailto user@host`, `mailto user@host`},
 	} {
