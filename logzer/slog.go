@@ -3,6 +3,7 @@ package logzer
 import (
 	"context"
 	"log/slog"
+	"runtime"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type SLogHandler struct {
 
 	once sync.Once
 
+	// CallerSkipFrame is the frame count from Handle to the log call site,
+	// used when the call site can't be found by the record PC
 	CallerSkipFrame int
 	GroupsFieldName string
 }
@@ -83,9 +86,34 @@ func (h *SLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	}
 	r.Attrs(attr2e)
 
-	e.CallerSkipFrame(h.CallerSkipFrame).Msg(r.Message)
+	e.CallerSkipFrame(h.callerSkip(r.PC)).Msg(r.Message)
 
 	return nil
+}
+
+// callerSkip returns the frame count from Handle to the frame of pc,
+// so the caller stays right however many handlers wrap this one.
+// Frames are compared by function and line, which counts inlined frames
+// the same way zerolog's runtime.Caller does.
+//
+//go:noinline
+func (h *SLogHandler) callerSkip(pc uintptr) int {
+	if pc == 0 {
+		return h.CallerSkipFrame
+	}
+	want, _ := runtime.CallersFrames([]uintptr{pc}).Next()
+	var pcs [64]uintptr
+	// skip runtime.Callers and callerSkip, so the first frame is Handle
+	frames := runtime.CallersFrames(pcs[:runtime.Callers(2, pcs[:])])
+	for i := 0; ; i++ {
+		f, more := frames.Next()
+		if f.Function == want.Function && f.Line == want.Line {
+			return i
+		}
+		if !more {
+			return h.CallerSkipFrame
+		}
+	}
 }
 
 func (h *SLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

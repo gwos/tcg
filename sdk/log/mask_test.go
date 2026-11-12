@@ -154,3 +154,24 @@ func TestXLoggerDisabled(t *testing.T) {
 		t.Error("disabled record handled")
 	}
 }
+
+func TestMaskString(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{`password=abc`, `password=***`},
+		{`token: abc def`, `token: *** def`},
+		{`Authorization: Bearer abc`, `Authorization: ***`},
+		{`{"Gwos-Api-Token":["abc"],"name":"n"}`, `{"Gwos-Api-Token":"***","name":"n"}`},
+		{`Get "https://admin:s3cr3t@gw.example/api": EOF`, `Get "https://admin:***@gw.example/api": EOF`},
+		{`https://:s3cr3t@gw.example`, `https://:***@gw.example`},
+		// prose and plain URLs are kept
+		{`authorization failed`, `authorization failed`},
+		{`could not set property password on host1`, `could not set property password on host1`},
+		{`secret store unavailable`, `secret store unavailable`},
+		{`http://gw.example:8080/api?x=a@b`, `http://gw.example:8080/api?x=a@b`},
+		{`mailto user@host`, `mailto user@host`},
+	} {
+		if got := MaskString(tc.in); got != tc.want {
+			t.Errorf("MaskString(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
