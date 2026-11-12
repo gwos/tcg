@@ -186,7 +186,8 @@ func statusErr(ctx context.Context, req *Req, msg string, authNotFound bool) err
 	default:
 		base = tcgerr.ErrUndecided
 	}
-	req.Err = fmt.Errorf("%w: %v", base, string(req.Response))
+	/* the error goes back to callers that may log it without masking */
+	req.Err = fmt.Errorf("%w: %v", base, sdklog.MaskString(string(req.Response)))
 	attrs := req.LogAttrs()
 	if base == tcgerr.ErrUndecided {
 		attrs = req.Details()
