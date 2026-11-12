@@ -66,6 +66,7 @@ func TestXLoggerMasks(t *testing.T) {
 		"Gwos-Api-Token": {"tok-123"},
 		"Authorization":  {"Bearer abc"},
 		"Gwos-App-Name":  {"tcg"},
+		"Set-Cookie":     {"JSESSIONID=abc"},
 	}
 	form := url.Values{"user": {"admin"}, "password": {"pass-123"}}
 	payload := json.RawMessage(`{"token":"tok-456","nested":{"password":"pass-456"},"name":"host"}`)
@@ -89,7 +90,8 @@ func TestXLoggerMasks(t *testing.T) {
 		t.Errorf("message: %q", got)
 	}
 	h := sink.attr(t, "header").Any().(http.Header)
-	if h.Get("Gwos-Api-Token") != MaskValue || h.Get("Authorization") != MaskValue || h.Get("Gwos-App-Name") != "tcg" {
+	if h.Get("Gwos-Api-Token") != MaskValue || h.Get("Authorization") != MaskValue || h.Get("Gwos-App-Name") != "tcg" ||
+		h.Get("Set-Cookie") != MaskValue {
 		t.Errorf("header: %v", h)
 	}
 	if header.Get("Gwos-Api-Token") != "tok-123" {
@@ -108,7 +110,7 @@ func TestXLoggerMasks(t *testing.T) {
 	}
 	for key, want := range map[string]string{
 		"response": "token: *** ok",
-		"url":      "http://host/api?apikey=***",
+		"url":      "http://host/api?apikey=***&x=1",
 		"secret":   MaskValue,
 		"error":    "bad Authorization: Basic ***",
 	} {
@@ -186,6 +188,8 @@ func TestMaskString(t *testing.T) {
 		{`http://gw:8080?email=a@b.com`, `http://gw:8080?email=a@b.com`},
 		{`http://gw:8080#a@b`, `http://gw:8080#a@b`},
 		{`token abc123`, `token abc123`},
+		{`Cookie: JSESSIONID=abc`, `Cookie: ***`},
+		{`/api?token=abc&agent=x`, `/api?token=***&agent=x`},
 		{`mailto user@host`, `mailto user@host`},
 	} {
 		if got := MaskString(tc.in); got != tc.want {
