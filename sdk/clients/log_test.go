@@ -28,6 +28,12 @@ func TestGWClientLogsNoSecrets(t *testing.T) {
 		t.Fatalf("Connect() error = %v", err)
 	}
 
+	// a token with an unexpected success status must not leak through the error either
+	gw.respond(GWEntrypointConnect, http.StatusCreated, token)
+	if _, err := c.connectLocal(); err == nil || strings.Contains(err.Error(), token) {
+		t.Errorf("connectLocal() 201 error = %v", err)
+	}
+
 	gw.respond(GWEntrypointConnect, http.StatusUnauthorized, "denied")
 	if _, err := c.connectLocal(); err == nil {
 		t.Fatal("connectLocal() 401 error = nil")

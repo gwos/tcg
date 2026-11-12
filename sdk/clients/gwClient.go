@@ -258,14 +258,16 @@ func (client *GWClient) connectLocal() (string, error) {
 		formHeaders(), formValues, nil); err != nil {
 		return "", transportErr(ctx, &req, msg, err)
 	}
+	token := string(req.Response)
+	if req.Status >= 200 && req.Status < 300 {
+		/* a success body is the bare token, no rule can match it in logs or errors */
+		req.Response = []byte(sdklog.MaskValue)
+	}
 	if err := statusErr(ctx, &req, msg, true); err != nil {
 		return "", err
 	}
-	/* the response is the bare token, no rule can match it */
-	logged := req
-	logged.Response = []byte(sdklog.MaskValue)
-	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", logged.LogAttrs()...)
-	return string(req.Response), nil
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
+	return token, nil
 }
 
 // AuthenticatePassword calls API and returns token

@@ -13,7 +13,7 @@ import (
 // MaskValue replaces masked secrets
 const MaskValue = "***"
 
-const secretKeys = `password|token|secret|authorization|api[-_]?key`
+const secretKeys = `password|token|secret|authorization|api[-_]?key|cookie`
 
 var (
 	// secretKeyRe matches an attr, header or form key ending in a secret keyword
@@ -37,10 +37,10 @@ var (
 		// A bare space separates only before an auth scheme (Authorization Bearer x),
 		// so prose like "authorization failed" is kept.
 		// An auth scheme (Basic, Bearer) is kept and the credential after it is masked.
-		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
-		// so masking prose can't corrupt a JSON line.
+		// The value run excludes whitespace, JSON structural chars (" ' , : { } [ ])
+		// and '&', so masking prose can't corrupt a JSON line or drop the next query param.
 		// Note: an object-valued secret ("password":{...}) is not handled.
-		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*(?:(?:basic|bearer)\s+)?|\s+(?:basic|bearer)\s+)([^\s"',:{}\[\]]+)`), []byte(`${1}${2}` + MaskValue)},
+		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*(?:(?:basic|bearer)\s+)?|\s+(?:basic|bearer)\s+)([^\s"',:{}\[\]&]+)`), []byte(`${1}${2}` + MaskValue)},
 	}
 )
 
