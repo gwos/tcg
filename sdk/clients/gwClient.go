@@ -261,7 +261,10 @@ func (client *GWClient) connectLocal() (string, error) {
 	if err := statusErr(ctx, &req, msg, true); err != nil {
 		return "", err
 	}
-	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
+	/* the response is the bare token, no rule can match it */
+	logged := req
+	logged.Response = []byte(sdklog.MaskValue)
+	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", logged.LogAttrs()...)
 	return string(req.Response), nil
 }
 
