@@ -31,14 +31,16 @@ var (
 		{regexp.MustCompile(`("[^"]*(?i:` + secretKeys + `)"\s*:\s*)` +
 			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`), []byte(`${1}"` + MaskValue + `"`)},
 		// (2) URL userinfo: scheme://user:password@ -> scheme://user:***@
-		{regexp.MustCompile(`(://[^/\s:@"']*:)[^/\s@"']+@`), []byte(`${1}` + MaskValue + `@`)},
+		// Path, query and fragment chars end the match, so a later '@' is kept.
+		{regexp.MustCompile(`(://[^/?#\s:@"']*:)[^/?#\s@"']+@`), []byte(`${1}` + MaskValue + `@`)},
 		// (3) Free text: a secret keyword, a ':' or '=' separator, then the value run.
-		// A bare space doesn't separate, so prose like "authorization failed" is kept.
-		// An auth scheme (Basic, Bearer) is dropped so the credential after it is masked.
+		// A bare space separates only before an auth scheme (Authorization Bearer x),
+		// so prose like "authorization failed" is kept.
+		// An auth scheme (Basic, Bearer) is kept and the credential after it is masked.
 		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
 		// so masking prose can't corrupt a JSON line.
 		// Note: an object-valued secret ("password":{...}) is not handled.
-		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*)(?:(?:basic|bearer)\s+)?([^\s"',:{}\[\]]+)`), []byte(`${1}${2}` + MaskValue)},
+		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*(?:(?:basic|bearer)\s+)?|\s+(?:basic|bearer)\s+)([^\s"',:{}\[\]]+)`), []byte(`${1}${2}` + MaskValue)},
 	}
 )
 
@@ -101,7 +103,7 @@ func (h *maskHandler) with(wrap func(slog.Handler) slog.Handler) *maskHandler {
 
 func maskAttr(a slog.Attr) slog.Attr {
 	a.Value = a.Value.Resolve()
-	if a.Value.Kind() != slog.KindGroup && secretKeyRe.MatchString(a.Key) {
+	if secretKeyRe.MatchString(a.Key) {
 		return slog.String(a.Key, MaskValue)
 	}
 	switch a.Value.Kind() {
@@ -126,11 +128,37 @@ func maskAttr(a slog.Attr) slog.Attr {
 			return slog.Any(a.Key, url.Values(maskMultiMap(v)))
 		case map[string][]string:
 			return slog.Any(a.Key, maskMultiMap(v))
+		case map[string]string:
+			return slog.Any(a.Key, maskMap(v))
 		case error:
-			return slog.String(a.Key, MaskString(v.Error()))
+			return slog.String(a.Key, MaskString(errorText(v)))
 		}
 	}
 	return a
+}
+
+// errorText returns err.Error(), or "<nil>" for a nil pointer error that panics,
+// as slog handlers do
+func errorText(err error) (s string) {
+	defer func() {
+		if recover() != nil {
+			s = "<nil>"
+		}
+	}()
+	return err.Error()
+}
+
+// maskMap returns a copy of m with secret keys masked, and other values masked as text
+func maskMap(m map[string]string) map[string]string {
+	res := make(map[string]string, len(m))
+	for k, v := range m {
+		if secretKeyRe.MatchString(k) {
+			res[k] = MaskValue
+			continue
+		}
+		res[k] = MaskString(v)
+	}
+	return res
 }
 
 // maskMultiMap returns a copy of m with secret keys masked, and other values masked as text
