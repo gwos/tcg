@@ -19,26 +19,33 @@ var (
 	// secretKeyRe matches an attr, header or form key ending in a secret keyword
 	secretKeyRe = regexp.MustCompile(`(?i)(?:` + secretKeys + `)$`)
 
-	// MaskRe maps a secret-matching regexp to its replacement, applied to raw text.
-	MaskRe = map[*regexp.Regexp][]byte{
+	// maskRules are applied to raw text in order
+	maskRules = []struct {
+		re   *regexp.Regexp
+		repl []byte
+	}{
 		// (1) Structured JSON: a key ending in a secret keyword,
 		// then its value (string | array | number | bool | null) -> "***".
 		// The key is fully bracketed so a match can't span into the next field.
-		regexp.MustCompile(`("[^"]*(?i:` + secretKeys + `)"\s*:\s*)` +
-			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"` + MaskValue + `"`),
-		// (2) Free text: a secret keyword, a separator, then the value run.
+		// Note: a nested array value is cut at its first ']'.
+		{regexp.MustCompile(`("[^"]*(?i:` + secretKeys + `)"\s*:\s*)` +
+			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`), []byte(`${1}"` + MaskValue + `"`)},
+		// (2) URL userinfo: scheme://user:password@ -> scheme://user:***@
+		{regexp.MustCompile(`(://[^/\s:@"']*:)[^/\s@"']+@`), []byte(`${1}` + MaskValue + `@`)},
+		// (3) Free text: a secret keyword, a ':' or '=' separator, then the value run.
+		// A bare space doesn't separate, so prose like "authorization failed" is kept.
 		// An auth scheme (Basic, Bearer) is dropped so the credential after it is masked.
 		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
 		// so masking prose can't corrupt a JSON line.
 		// Note: an object-valued secret ("password":{...}) is not handled.
-		regexp.MustCompile(`(?i)(` + secretKeys + `)([:=\s]+)(?:(?:basic|bearer)\s+)?([^\s"',:{}\[\]]+)`): []byte(`${1}${2}` + MaskValue),
+		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*)(?:(?:basic|bearer)\s+)?([^\s"',:{}\[\]]+)`), []byte(`${1}${2}` + MaskValue)},
 	}
 )
 
 // MaskBytes returns p with secrets masked
 func MaskBytes(p []byte) []byte {
-	for re, repl := range MaskRe {
-		p = re.ReplaceAll(p, repl)
+	for _, rule := range maskRules {
+		p = rule.re.ReplaceAll(p, rule.repl)
 	}
 	return p
 }

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
+	"strconv"
 	"testing"
 
 	sdklog "github.com/gwos/tcg/sdk/log"
@@ -39,7 +41,7 @@ func TestNewSLogHandler(t *testing.T) {
 	assert.Contains(t, string(content), `aaa=bbb`)
 }
 
-func TestSLogHandlerXLogger(t *testing.T) {
+func TestSLogHandlerCaller(t *testing.T) {
 	logFile, _ := os.CreateTemp("", "log")
 	assert.NoError(t, logFile.Close())
 	defer os.Remove(logFile.Name())
@@ -51,16 +53,28 @@ func TestSLogHandlerXLogger(t *testing.T) {
 
 	orig := sdklog.Logger
 	defer func() { sdklog.Logger = orig }()
-	sdklog.Logger = slog.New(&SLogHandler{CallerSkipFrame: 4})
+	// a wrong skip count is ignored while the record PC resolves the caller
+	sdklog.Logger = slog.New(&SLogHandler{CallerSkipFrame: 1})
 
+	line := func() string {
+		_, _, l, _ := runtime.Caller(1)
+		return "slog_test.go:" + strconv.Itoa(l+1)
+	}
+	want := []string{line()}
 	sdklog.XLogger.LogAttrs(context.TODO(), slog.LevelWarn, "__xlogger__ message",
 		slog.Any("header", map[string][]string{"Authorization": {"Bearer abc"}}))
+	want = append(want, line())
 	sdklog.XLogger.Warn("__xlogger__ warn")
+	want = append(want, line())
+	sdklog.Logger.Warn("__sdklogger__ warn")
+	want = append(want, line())
+	sdklog.XLogger.With("k", "v").WithGroup("g").Warn("__xlogger__ nested")
 
 	content, err := os.ReadFile(logFile.Name())
 	assert.NoError(t, err)
 	assert.Contains(t, string(content), `__xlogger__ message`)
 	assert.NotContains(t, string(content), `abc`)
-	assert.Contains(t, string(content), `slog_test.go:`)
-	assert.NotContains(t, string(content), `mask.go:`)
+	for _, w := range want {
+		assert.Contains(t, string(content), w+" ")
+	}
 }

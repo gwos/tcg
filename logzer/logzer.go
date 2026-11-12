@@ -26,8 +26,6 @@ var (
 		Level: zerolog.ErrorLevel,
 		Size:  10,
 	}
-	// filterRe masks secrets, shared with the SDK logger
-	filterRe  = sdklog.MaskRe
 	condenser = &CondenseWriter{}
 )
 
@@ -63,7 +61,6 @@ func newChain(s settings) *chain {
 		settings: s,
 		out: &FilterWriter{
 			LevelWriter: zerolog.MultiLevelWriter(formatter, errBuffer),
-			Re:          filterRe,
 		},
 	}
 }
@@ -157,11 +154,10 @@ func (w *CondenseWriter) onEvicted(ck string, i any) {
 	_, _ = c.out.WriteLevel(lvl, buf)
 }
 
-// FilterWriter implements sanitizing writes by Regexp map
+// FilterWriter masks secrets in writes, sharing the rules of the SDK logger
 type FilterWriter struct {
 	zerolog.LevelWriter
 	mu sync.Mutex
-	Re map[*regexp.Regexp][]byte
 }
 
 // Write implements io.Writer interface
@@ -173,10 +169,7 @@ func (w *FilterWriter) Write(p []byte) (int, error) {
 func (w *FilterWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for reg, repl := range w.Re {
-		p = reg.ReplaceAll(p, repl)
-	}
-	return w.LevelWriter.WriteLevel(lvl, p)
+	return w.LevelWriter.WriteLevel(lvl, sdklog.MaskBytes(p))
 }
 
 // LogBuffer collects writes if level passed
