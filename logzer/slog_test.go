@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
@@ -36,4 +37,30 @@ func TestNewSLogHandler(t *testing.T) {
 	assert.Contains(t, string(content), `logger=["foo.bar","bar.foo"]`)
 	assert.Contains(t, string(content), `__slogger__ message`)
 	assert.Contains(t, string(content), `aaa=bbb`)
+}
+
+func TestSLogHandlerXLogger(t *testing.T) {
+	logFile, _ := os.CreateTemp("", "log")
+	assert.NoError(t, logFile.Close())
+	defer os.Remove(logFile.Name())
+
+	w := NewLoggerWriter(WithLogFile(&LogFile{FilePath: logFile.Name()}))
+	log.Logger = zerolog.New(w).
+		With().Timestamp().Caller().
+		Logger()
+
+	orig := sdklog.Logger
+	defer func() { sdklog.Logger = orig }()
+	sdklog.Logger = slog.New(&SLogHandler{CallerSkipFrame: 4})
+
+	sdklog.XLogger.LogAttrs(context.TODO(), slog.LevelWarn, "__xlogger__ message",
+		slog.Any("header", map[string][]string{"Authorization": {"Bearer abc"}}))
+	sdklog.XLogger.Warn("__xlogger__ warn")
+
+	content, err := os.ReadFile(logFile.Name())
+	assert.NoError(t, err)
+	assert.Contains(t, string(content), `__xlogger__ message`)
+	assert.NotContains(t, string(content), `abc`)
+	assert.Contains(t, string(content), `slog_test.go:`)
+	assert.NotContains(t, string(content), `mask.go:`)
 }

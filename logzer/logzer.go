@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 )
@@ -25,18 +26,8 @@ var (
 		Level: zerolog.ErrorLevel,
 		Size:  10,
 	}
-	filterRe = map[*regexp.Regexp][]byte{
-		// (1) Structured JSON: a key ending in password/token,
-		// then its value (string | array | number | bool | null) -> "***".
-		// The key is fully bracketed so a match can't span into the next field.
-		regexp.MustCompile(`("[^"]*(?i:password|token)"\s*:\s*)` +
-			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"***"`),
-		// (2) Free text: the word password/token, a separator, then the value run.
-		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
-		// so masking prose can't corrupt a JSON line.
-		// Note: an object-valued secret ("password":{...}) is not handled.
-		regexp.MustCompile(`(?i)(password|token)([:=\s]+)([^\s"',:{}\[\]]+)`): []byte(`${1}${2}***`),
-	}
+	// filterRe masks secrets, shared with the SDK logger
+	filterRe  = sdklog.MaskRe
 	condenser = &CondenseWriter{}
 )
 
