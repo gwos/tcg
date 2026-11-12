@@ -283,7 +283,7 @@ func (q Req) logAttrs(forceDetails bool) []slog.Attr {
 		attrs = append(attrs, slog.String("error", q.Err.Error()))
 	}
 	if q.Status >= 400 || forceDetails ||
-		sdklog.Logger.Enabled(context.Background(), slog.LevelDebug) {
+		sdklog.XLogger.Enabled(context.Background(), slog.LevelDebug) {
 		if h := q.loggedHeader(); len(h) > 0 {
 			attrs = append(attrs, slog.Any("header", h))
 		}

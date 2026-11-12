@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	sdklog "github.com/gwos/tcg/sdk/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rs/zerolog"
 )
@@ -24,18 +25,6 @@ var (
 	errBuffer = &LogBuffer{
 		Level: zerolog.ErrorLevel,
 		Size:  10,
-	}
-	filterRe = map[*regexp.Regexp][]byte{
-		// (1) Structured JSON: a key ending in password/token,
-		// then its value (string | array | number | bool | null) -> "***".
-		// The key is fully bracketed so a match can't span into the next field.
-		regexp.MustCompile(`("[^"]*(?i:password|token)"\s*:\s*)` +
-			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"***"`),
-		// (2) Free text: the word password/token, a separator, then the value run.
-		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
-		// so masking prose can't corrupt a JSON line.
-		// Note: an object-valued secret ("password":{...}) is not handled.
-		regexp.MustCompile(`(?i)(password|token)([:=\s]+)([^\s"',:{}\[\]]+)`): []byte(`${1}${2}***`),
 	}
 	condenser = &CondenseWriter{}
 )
@@ -72,7 +61,6 @@ func newChain(s settings) *chain {
 		settings: s,
 		out: &FilterWriter{
 			LevelWriter: zerolog.MultiLevelWriter(formatter, errBuffer),
-			Re:          filterRe,
 		},
 	}
 }
@@ -166,11 +154,10 @@ func (w *CondenseWriter) onEvicted(ck string, i any) {
 	_, _ = c.out.WriteLevel(lvl, buf)
 }
 
-// FilterWriter implements sanitizing writes by Regexp map
+// FilterWriter masks secrets in writes, sharing the rules of the SDK logger
 type FilterWriter struct {
 	zerolog.LevelWriter
 	mu sync.Mutex
-	Re map[*regexp.Regexp][]byte
 }
 
 // Write implements io.Writer interface
@@ -182,10 +169,7 @@ func (w *FilterWriter) Write(p []byte) (int, error) {
 func (w *FilterWriter) WriteLevel(lvl zerolog.Level, p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	for reg, repl := range w.Re {
-		p = reg.ReplaceAll(p, repl)
-	}
-	return w.LevelWriter.WriteLevel(lvl, p)
+	return w.LevelWriter.WriteLevel(lvl, sdklog.MaskBytes(p))
 }
 
 // LogBuffer collects writes if level passed
