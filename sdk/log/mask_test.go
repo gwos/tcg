@@ -80,6 +80,9 @@ func TestXLoggerMasks(t *testing.T) {
 		slog.Any("error", errors.New("bad Authorization: Basic dXNlcjpwYXNz")),
 		slog.Int("status", 401),
 		slog.Group("auth", slog.String("token", "tok-000"), slog.String("user", "admin")),
+		slog.Group("password", slog.String("value", "pass-000")),
+		slog.Any("formvalues", map[string]string{"password": "pass-111", "user": "admin"}),
+		slog.Any("nilerr", (*nilErr)(nil)),
 	)
 
 	if got := sink.last.Message; got != "authenticate password=***" {
@@ -107,7 +110,7 @@ func TestXLoggerMasks(t *testing.T) {
 		"response": "token: *** ok",
 		"url":      "http://host/api?apikey=***",
 		"secret":   MaskValue,
-		"error":    "bad Authorization: ***",
+		"error":    "bad Authorization: Basic ***",
 	} {
 		if got := sink.attr(t, key).String(); got != want {
 			t.Errorf("%s: %q, want %q", key, got, want)
@@ -115,6 +118,16 @@ func TestXLoggerMasks(t *testing.T) {
 	}
 	if got := sink.attr(t, "status").Int64(); got != 401 {
 		t.Errorf("status: %d", got)
+	}
+	if got := sink.attr(t, "password").String(); got != MaskValue {
+		t.Errorf("secret group: %q", got)
+	}
+	fv := sink.attr(t, "formvalues").Any().(map[string]string)
+	if fv["password"] != MaskValue || fv["user"] != "admin" {
+		t.Errorf("formvalues: %v", fv)
+	}
+	if got := sink.attr(t, "nilerr").String(); got != "<nil>" {
+		t.Errorf("nilerr: %q", got)
 	}
 	group := sink.attr(t, "auth").Group()
 	if group[0].Value.String() != MaskValue || group[1].Value.String() != "admin" {
@@ -159,7 +172,9 @@ func TestMaskString(t *testing.T) {
 	for _, tc := range []struct{ in, want string }{
 		{`password=abc`, `password=***`},
 		{`token: abc def`, `token: *** def`},
-		{`Authorization: Bearer abc`, `Authorization: ***`},
+		{`Authorization: Bearer abc`, `Authorization: Bearer ***`},
+		{`Authorization Bearer abc`, `Authorization Bearer ***`},
+		{`authorization basic abc`, `authorization basic ***`},
 		{`{"Gwos-Api-Token":["abc"],"name":"n"}`, `{"Gwos-Api-Token":"***","name":"n"}`},
 		{`Get "https://admin:s3cr3t@gw.example/api": EOF`, `Get "https://admin:***@gw.example/api": EOF`},
 		{`https://:s3cr3t@gw.example`, `https://:***@gw.example`},
@@ -168,6 +183,9 @@ func TestMaskString(t *testing.T) {
 		{`could not set property password on host1`, `could not set property password on host1`},
 		{`secret store unavailable`, `secret store unavailable`},
 		{`http://gw.example:8080/api?x=a@b`, `http://gw.example:8080/api?x=a@b`},
+		{`http://gw:8080?email=a@b.com`, `http://gw:8080?email=a@b.com`},
+		{`http://gw:8080#a@b`, `http://gw:8080#a@b`},
+		{`token abc123`, `token abc123`},
 		{`mailto user@host`, `mailto user@host`},
 	} {
 		if got := MaskString(tc.in); got != tc.want {
@@ -175,3 +193,7 @@ func TestMaskString(t *testing.T) {
 		}
 	}
 }
+
+type nilErr struct{ msg string }
+
+func (e *nilErr) Error() string { return e.msg }
