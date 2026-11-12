@@ -186,7 +186,8 @@ func statusErr(ctx context.Context, req *Req, msg string, authNotFound bool) err
 	default:
 		base = tcgerr.ErrUndecided
 	}
-	req.Err = fmt.Errorf("%w: %v", base, string(req.Response))
+	/* the error goes back to callers that may log it without masking */
+	req.Err = fmt.Errorf("%w: %v", base, sdklog.MaskString(string(req.Response)))
 	attrs := req.LogAttrs()
 	if base == tcgerr.ErrUndecided {
 		attrs = req.Details()
@@ -258,11 +259,16 @@ func (client *GWClient) connectLocal() (string, error) {
 		formHeaders(), formValues, nil); err != nil {
 		return "", transportErr(ctx, &req, msg, err)
 	}
+	token := string(req.Response)
+	if req.Status >= 200 && req.Status < 300 {
+		/* a success body is the bare token, no rule can match it in logs or errors */
+		req.Response = []byte(sdklog.MaskValue)
+	}
 	if err := statusErr(ctx, &req, msg, true); err != nil {
 		return "", err
 	}
 	sdklog.XLogger.LogAttrs(ctx, slog.LevelDebug, "connect local groundwork", req.LogAttrs()...)
-	return string(req.Response), nil
+	return token, nil
 }
 
 // AuthenticatePassword calls API and returns token

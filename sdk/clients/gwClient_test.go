@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	tcgerr "github.com/gwos/tcg/sdk/errors"
+	sdklog "github.com/gwos/tcg/sdk/log"
 )
 
 const (
@@ -154,7 +155,12 @@ func TestGWClientStatusErrors(t *testing.T) {
 				if !errors.Is(err, want) {
 					t.Fatalf("error = %v; want %v", err, want)
 				}
-				if got, wantMsg := err.Error(), want.Error()+": "+s.body; got != wantMsg {
+				body := s.body
+				if m.path == GWEntrypointConnect && s.status/100 == 2 {
+					// a connect success body is the bare token, masked in errors too
+					body = sdklog.MaskValue
+				}
+				if got, wantMsg := err.Error(), want.Error()+": "+body; got != wantMsg {
 					t.Errorf("error text = %q; want %q", got, wantMsg)
 				}
 			})

@@ -13,32 +13,44 @@ import (
 // MaskValue replaces masked secrets
 const MaskValue = "***"
 
-const secretKeys = `password|token|secret|authorization|api[-_]?key`
+const (
+	secretKeys  = `password|token|secret|authorization|api[-_]?key|cookie`
+	authSchemes = `basic|bearer|digest|negotiate`
+)
 
 var (
 	// secretKeyRe matches an attr, header or form key ending in a secret keyword
 	secretKeyRe = regexp.MustCompile(`(?i)(?:` + secretKeys + `)$`)
 
-	// MaskRe maps a secret-matching regexp to its replacement, applied to raw text.
-	MaskRe = map[*regexp.Regexp][]byte{
+	// maskRules are applied to raw text in order
+	maskRules = []struct {
+		re   *regexp.Regexp
+		repl []byte
+	}{
 		// (1) Structured JSON: a key ending in a secret keyword,
 		// then its value (string | array | number | bool | null) -> "***".
 		// The key is fully bracketed so a match can't span into the next field.
-		regexp.MustCompile(`("[^"]*(?i:` + secretKeys + `)"\s*:\s*)` +
-			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`): []byte(`${1}"` + MaskValue + `"`),
-		// (2) Free text: a secret keyword, a separator, then the value run.
-		// An auth scheme (Basic, Bearer) is dropped so the credential after it is masked.
-		// The value run excludes whitespace and JSON structural chars (" ' , : { } [ ])
-		// so masking prose can't corrupt a JSON line.
+		// Note: a nested array value is cut at its first ']'.
+		{regexp.MustCompile(`("[^"]*(?i:` + secretKeys + `)"\s*:\s*)` +
+			`("(?:[^"\\]|\\.)*"|\[[^\]]*\]|true|false|null|-?\d[\d.eE+-]*)`), []byte(`${1}"` + MaskValue + `"`)},
+		// (2) URL userinfo: scheme://user:password@ -> scheme://user:***@
+		// Path, query and fragment chars end the match, so a later '@' is kept.
+		{regexp.MustCompile(`(://[^/?#\s:@"']*:)[^/?#\s@"']+@`), []byte(`${1}` + MaskValue + `@`)},
+		// (3) Free text: a secret keyword, a ':' or '=' separator, then the value run.
+		// A bare space separates only before an auth scheme (Authorization Bearer x),
+		// so prose like "authorization failed" is kept.
+		// An auth scheme (Basic, Bearer, Digest, Negotiate) is kept and the credential after it is masked.
+		// The value run excludes whitespace, JSON structural chars (" ' , : { } [ ]),
+		// '\' and '&', so masking can't break a JSON escape or drop the next query param.
 		// Note: an object-valued secret ("password":{...}) is not handled.
-		regexp.MustCompile(`(?i)(` + secretKeys + `)([:=\s]+)(?:(?:basic|bearer)\s+)?([^\s"',:{}\[\]]+)`): []byte(`${1}${2}` + MaskValue),
+		{regexp.MustCompile(`(?i)(` + secretKeys + `)(\s*[:=]\s*(?:(?:` + authSchemes + `)\s+)?|\s+(?:` + authSchemes + `)\s+)([^\s"',:{}\[\]&\\]+)`), []byte(`${1}${2}` + MaskValue)},
 	}
 )
 
 // MaskBytes returns p with secrets masked
 func MaskBytes(p []byte) []byte {
-	for re, repl := range MaskRe {
-		p = re.ReplaceAll(p, repl)
+	for _, rule := range maskRules {
+		p = rule.re.ReplaceAll(p, rule.repl)
 	}
 	return p
 }
@@ -94,7 +106,7 @@ func (h *maskHandler) with(wrap func(slog.Handler) slog.Handler) *maskHandler {
 
 func maskAttr(a slog.Attr) slog.Attr {
 	a.Value = a.Value.Resolve()
-	if a.Value.Kind() != slog.KindGroup && secretKeyRe.MatchString(a.Key) {
+	if secretKeyRe.MatchString(a.Key) {
 		return slog.String(a.Key, MaskValue)
 	}
 	switch a.Value.Kind() {
@@ -119,24 +131,50 @@ func maskAttr(a slog.Attr) slog.Attr {
 			return slog.Any(a.Key, url.Values(maskMultiMap(v)))
 		case map[string][]string:
 			return slog.Any(a.Key, maskMultiMap(v))
+		case map[string]string:
+			return slog.Any(a.Key, maskMap(v))
 		case error:
-			return slog.String(a.Key, MaskString(v.Error()))
+			return slog.String(a.Key, MaskString(errorText(v)))
 		}
 	}
 	return a
 }
 
-// maskMultiMap returns a copy of m with secret keys masked, and other values masked as text
+// errorText returns err.Error(), or "<nil>" for a nil pointer error that panics,
+// as slog handlers do
+func errorText(err error) (s string) {
+	defer func() {
+		if recover() != nil {
+			s = "<nil>"
+		}
+	}()
+	return err.Error()
+}
+
+// maskKV returns v masked as a whole under a secret key k, otherwise masked as text
+func maskKV(k, v string) string {
+	if secretKeyRe.MatchString(k) {
+		return MaskValue
+	}
+	return MaskString(v)
+}
+
+// maskMap returns a copy of m with values masked by maskKV
+func maskMap(m map[string]string) map[string]string {
+	res := make(map[string]string, len(m))
+	for k, v := range m {
+		res[k] = maskKV(k, v)
+	}
+	return res
+}
+
+// maskMultiMap returns a copy of m with values masked by maskKV
 func maskMultiMap(m map[string][]string) map[string][]string {
 	res := make(map[string][]string, len(m))
 	for k, vv := range m {
-		if secretKeyRe.MatchString(k) {
-			res[k] = []string{MaskValue}
-			continue
-		}
 		masked := make([]string, len(vv))
 		for i, v := range vv {
-			masked[i] = MaskString(v)
+			masked[i] = maskKV(k, v)
 		}
 		res[k] = masked
 	}

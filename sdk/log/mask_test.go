@@ -66,6 +66,7 @@ func TestXLoggerMasks(t *testing.T) {
 		"Gwos-Api-Token": {"tok-123"},
 		"Authorization":  {"Bearer abc"},
 		"Gwos-App-Name":  {"tcg"},
+		"Set-Cookie":     {"JSESSIONID=abc"},
 	}
 	form := url.Values{"user": {"admin"}, "password": {"pass-123"}}
 	payload := json.RawMessage(`{"token":"tok-456","nested":{"password":"pass-456"},"name":"host"}`)
@@ -80,13 +81,17 @@ func TestXLoggerMasks(t *testing.T) {
 		slog.Any("error", errors.New("bad Authorization: Basic dXNlcjpwYXNz")),
 		slog.Int("status", 401),
 		slog.Group("auth", slog.String("token", "tok-000"), slog.String("user", "admin")),
+		slog.Group("password", slog.String("value", "pass-000")),
+		slog.Any("formvalues", map[string]string{"password": "pass-111", "user": "admin"}),
+		slog.Any("nilerr", (*nilErr)(nil)),
 	)
 
 	if got := sink.last.Message; got != "authenticate password=***" {
 		t.Errorf("message: %q", got)
 	}
 	h := sink.attr(t, "header").Any().(http.Header)
-	if h.Get("Gwos-Api-Token") != MaskValue || h.Get("Authorization") != MaskValue || h.Get("Gwos-App-Name") != "tcg" {
+	if h.Get("Gwos-Api-Token") != MaskValue || h.Get("Authorization") != MaskValue || h.Get("Gwos-App-Name") != "tcg" ||
+		h.Get("Set-Cookie") != MaskValue {
 		t.Errorf("header: %v", h)
 	}
 	if header.Get("Gwos-Api-Token") != "tok-123" {
@@ -105,9 +110,9 @@ func TestXLoggerMasks(t *testing.T) {
 	}
 	for key, want := range map[string]string{
 		"response": "token: *** ok",
-		"url":      "http://host/api?apikey=***",
+		"url":      "http://host/api?apikey=***&x=1",
 		"secret":   MaskValue,
-		"error":    "bad Authorization: ***",
+		"error":    "bad Authorization: Basic ***",
 	} {
 		if got := sink.attr(t, key).String(); got != want {
 			t.Errorf("%s: %q, want %q", key, got, want)
@@ -115,6 +120,16 @@ func TestXLoggerMasks(t *testing.T) {
 	}
 	if got := sink.attr(t, "status").Int64(); got != 401 {
 		t.Errorf("status: %d", got)
+	}
+	if got := sink.attr(t, "password").String(); got != MaskValue {
+		t.Errorf("secret group: %q", got)
+	}
+	fv := sink.attr(t, "formvalues").Any().(map[string]string)
+	if fv["password"] != MaskValue || fv["user"] != "admin" {
+		t.Errorf("formvalues: %v", fv)
+	}
+	if got := sink.attr(t, "nilerr").String(); got != "<nil>" {
+		t.Errorf("nilerr: %q", got)
 	}
 	group := sink.attr(t, "auth").Group()
 	if group[0].Value.String() != MaskValue || group[1].Value.String() != "admin" {
@@ -154,3 +169,39 @@ func TestXLoggerDisabled(t *testing.T) {
 		t.Error("disabled record handled")
 	}
 }
+
+func TestMaskString(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{`password=abc`, `password=***`},
+		{`token: abc def`, `token: *** def`},
+		{`Authorization: Bearer abc`, `Authorization: Bearer ***`},
+		{`Authorization Bearer abc`, `Authorization Bearer ***`},
+		{`authorization basic abc`, `authorization basic ***`},
+		{`{"Gwos-Api-Token":["abc"],"name":"n"}`, `{"Gwos-Api-Token":"***","name":"n"}`},
+		{`Get "https://admin:s3cr3t@gw.example/api": EOF`, `Get "https://admin:***@gw.example/api": EOF`},
+		{`https://:s3cr3t@gw.example`, `https://:***@gw.example`},
+		// prose and plain URLs are kept
+		{`authorization failed`, `authorization failed`},
+		{`could not set property password on host1`, `could not set property password on host1`},
+		{`secret store unavailable`, `secret store unavailable`},
+		{`http://gw.example:8080/api?x=a@b`, `http://gw.example:8080/api?x=a@b`},
+		{`http://gw:8080?email=a@b.com`, `http://gw:8080?email=a@b.com`},
+		{`http://gw:8080#a@b`, `http://gw:8080#a@b`},
+		{`token abc123`, `token abc123`},
+		{`Cookie: JSESSIONID=abc`, `Cookie: ***`},
+		{`Authorization: Negotiate abc`, `Authorization: Negotiate ***`},
+		{`authorization digest abc`, `authorization digest ***`},
+		// an escaped quote keeps its backslash, so a JSON line stays valid
+		{`{"error":"bad password=\"s3\"","x":1}`, `{"error":"bad password=\"s3\"","x":1}`},
+		{`/api?token=abc&agent=x`, `/api?token=***&agent=x`},
+		{`mailto user@host`, `mailto user@host`},
+	} {
+		if got := MaskString(tc.in); got != tc.want {
+			t.Errorf("MaskString(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+type nilErr struct{ msg string }
+
+func (e *nilErr) Error() string { return e.msg }
