@@ -10,3 +10,6 @@ var Logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 	AddSource: true,
 	Level:     slog.LevelInfo,
 }).WithGroup("tcg.sdk"))
+
+// XLogger is the extended SDK logger: it masks secrets and writes into the current Logger
+var XLogger = slog.New(&maskHandler{})
