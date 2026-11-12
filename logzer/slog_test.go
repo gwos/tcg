@@ -19,6 +19,8 @@ func TestNewSLogHandler(t *testing.T) {
 	assert.NoError(t, logFile.Close())
 	defer os.Remove(logFile.Name())
 
+	origLogger, origTimeFormat := log.Logger, zerolog.TimeFieldFormat
+	defer func() { log.Logger, zerolog.TimeFieldFormat = origLogger, origTimeFormat }()
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 	w := NewLoggerWriter(WithLogFile(&LogFile{FilePath: logFile.Name()}))
 	log.Logger = zerolog.New(w).
@@ -46,6 +48,8 @@ func TestSLogHandlerCaller(t *testing.T) {
 	assert.NoError(t, logFile.Close())
 	defer os.Remove(logFile.Name())
 
+	origLogger := log.Logger
+	defer func() { log.Logger = origLogger }()
 	w := NewLoggerWriter(WithLogFile(&LogFile{FilePath: logFile.Name()}))
 	log.Logger = zerolog.New(w).
 		With().Timestamp().Caller().
