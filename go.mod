@@ -18,7 +18,7 @@ require (
 	github.com/gosnmp/gosnmp v1.43.2
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/markel1974/gokuery v1.0.3
-	github.com/nats-io/nats-server/v2 v2.12.6
+	github.com/nats-io/nats-server/v2 v2.12.12
 	github.com/nats-io/nats.go v1.51.0
 	github.com/oracle/oci-go-sdk/v65 v65.111.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -116,8 +116,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/nats-io/jwt/v2 v2.8.1 // indirect
-	github.com/nats-io/nkeys v0.4.15 // indirect
+	github.com/nats-io/jwt/v2 v2.8.2 // indirect
+	github.com/nats-io/nkeys v0.4.16 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.3.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
